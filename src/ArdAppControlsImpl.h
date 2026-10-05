@@ -276,7 +276,14 @@ void ArdAppControls::prepareMqtt(uint32_t now) {
       app[key]=_mqttAppQueue[key];
     }
     if(!_mqttAppQueue.length()) {_mqttAckPending=0;}
-    else if(_portal.scheduleConfig(_portal._config,app,ChangeSource::Mqtt,true)) { _mqttAckInFlight=_mqttAckPending; _mqttAckPending=0; _mqttAppQueue=V::object(); }
+    else if(_portal.scheduleConfig(_portal._config,app,ChangeSource::Mqtt,true)) {
+      _mqttAckInFlight=_mqttAckPending; _mqttAckPending=0;
+      V commands=std::move(_mqttAppQueue); _mqttAppQueue=V::object();
+      // Dispatch the accepted intent before a reported state can hide it at save completion.
+      // HTTP controls use the same path; hardware confirmation remains application-owned.
+      V commandKeys=commands.keys();
+      for(size_t i=0;i<commandKeys.length();++i) {String key=commandKeys[i].asString();applyAppState(key,commands[key],ChangeSource::Mqtt);}
+    }
     else if(_portal._configurationReady) { _mqttAckPending=0; _mqttAppQueue=V::object(); _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177)); }
   }
   if(_portal._options.appStateIntervalMs && uint32_t(now-_stateSince)>=_portal._options.appStateIntervalMs) {

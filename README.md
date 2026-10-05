@@ -908,8 +908,12 @@ Persistent application setters retain their debounce/wear-saving behavior;
 `flushConfig()` bypasses that delay. Basic dynamic controls update live state and
 MQTT immediately, with a debounced journal write afterward. Their change callback
 runs on live application; `onConfigSaved` reports durable completion. Ordinary
-persistent code/MQTT changes invoke the callback after commit. Unchanged values
-do not invoke the change callback. Startup restoration uses
+persistent code changes invoke the callback after commit. Accepted MQTT control
+commands update live state and invoke the callback when their save is scheduled,
+just like portal controls. A previously reported hardware state cannot hide the
+requested value; later hardware confirmation remains the application’s responsibility.
+Save completion does not repeat the callback. Unchanged effective values do not
+invoke the change callback. Startup restoration uses
 `onPortalAndAppConfigReady`, not change callbacks. Keep callbacks brief.
 
 Descriptor-based fields use built-in presets with optional `ha` and `controls`
