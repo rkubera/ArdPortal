@@ -2,15 +2,28 @@
 
 # ArdPortal
 
+**Default access point (AP) password: `1234567890`.**
+
 A Wi-Fi and MQTT configuration portal for Wi-Fi equipped ESP8266 and ESP32 boards,
 with storage and JSON implementations written in this project. The library
 requires only the board’s Arduino core; no ESPAsyncTCP, AsyncTCP,
 ESPAsyncWebServer or external MQTT library is required.
 
-The library includes cooperative HTTP and MQTT state machines, optional verified
-MQTT TLS, background Wi-Fi scanning and NTP, captive DNS, firmware OTA, a
-WebSocket console, a standalone JSON module and integrated ArdFS configuration
-storage with a two-record journal.
+## Main features
+
+- **Wi-Fi setup:** scan nearby networks, connect to a saved network and start a fallback AP when connection attempts time out. The portal remains accessible after connecting.
+- **Captive portal:** configure the device from a browser, with captive DNS for supported operating systems.
+- **MQTT:** configure the broker, optionally use verified TLS, publish application data and handle commands.
+- **Home Assistant:** automatically publish discovery definitions and synchronize supported controls through MQTT.
+- **Dynamic pages:** define forms in JSON, including a Home block, live controls and cascading visibility conditions for fields and pages.
+- **Persistent configuration:** store portal and application settings as JSON using ArdFS, with a journal and delayed, coalesced writes to reduce flash wear.
+- **Live updates:** synchronize portal controls through WebSockets and inspect or send MQTT messages in the console.
+- **Firmware updates:** install firmware from a local file or URL through the OTA page.
+- **Device management:** configure the device name and description, set manufacturer metadata from code, view system information, restart or restore factory settings.
+- **Time and languages:** synchronize time through NTP and support developer-provided translations with automatic browser language selection.
+- **Configurable builds:** disable optional modules and control types with compile-time flags to reduce firmware size.
+- **Cooperative operation:** service network and storage work from `loop()`; remaining synchronous core calls are documented.
+- **Self-contained library:** includes standalone ArdFS and ArdJSON modules and uses only the ESP Arduino core.
 
 ## Developer guide map
 
@@ -20,6 +33,48 @@ storage with a two-record journal.
 - [Custom MQTT payloads](#custom-mqtt-payloads-and-reconnect-handling), [Console/OTA](#console-and-ota) and [languages](#languages-and-adding-translations).
 - [Standalone ArdFS](#standalone-storage), [storage methods](#ardfs-method-and-result-reference), [LittleFS coexistence](#using-ardfs-alongside-littlefs) and [ArdJSON](#standalone-json-api).
 - [All runtime Options](#options-and-remaining-blocking-operations), [maintenance](#verification-and-maintenance) and [MIT license](#license).
+
+## Portal screenshots
+
+Screenshots from the DHT example show the portal and its configuration pages.
+Available pages depend on the enabled features.
+
+### Home
+
+![Home with temperature, humidity and device information](media/Demo1.png)
+
+<details>
+<summary>Device, Wi-Fi, AP, MQTT, update, console and DHT settings</summary>
+
+### Device
+
+![Device name, description, restart and factory reset](media/Demo2.png)
+
+### Wi-Fi configuration
+
+![Wi-Fi scanning and connection settings](media/Demo3.png)
+
+### AP configuration
+
+![Access point name and password settings](media/Demo4.png)
+
+### MQTT configuration
+
+![MQTT broker and connection settings](media/Demo5.png)
+
+### Update
+
+![Firmware update from a file or URL](media/Demo6.png)
+
+### MQTT console
+
+![MQTT messages and manual topic publication](media/Demo7.png)
+
+### DHT settings
+
+![Temperature units, calibration and MQTT update interval](media/Demo8.png)
+
+</details>
 
 ## Components
 
