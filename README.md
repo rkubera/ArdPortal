@@ -1098,10 +1098,10 @@ state from code. The separate built-in Update portal page handles uploaded image
 
 These four field types keep `null` as their state/default. They invoke
 `onAppCommand`; they are not persistent switches and are not periodically replayed.
-Action submission requires connected MQTT and an installed `onAppCommand`
-callback, including commands submitted from the portal. A callback returning
+Action submission requires an installed `onAppCommand` callback. Commands submitted
+from the portal execute locally even when MQTT is disconnected. A callback returning
 `false` rejects the command; returning `true` acknowledges acceptance, not physical
-completion. This requirement also applies to action buttons in composite devices.
+completion. This behavior also applies to action buttons in composite devices.
 All use the base command topic.
 
 | Type | Portal control | Command value and intended application behavior |
@@ -1262,9 +1262,11 @@ portal.onAppCommand([](const String& field, const String& command,
 portal.emitAppEvent("tag_reader", "tag-id"); // With MQTT enabled, connection required.
 ```
 
-Actions require `onAppCommand`. Accepted actions publish a nonretained completion
-message containing `accepted`, `command` and `value`; stateful entities also publish
-their reported state. Report actual hardware results with `setAppStateValue`.
+Actions require `onAppCommand`. When MQTT is connected, accepted actions attempt to
+queue a nonretained acceptance message containing `accepted`, `command` and `value`;
+stateful entities also attempt to queue their reported state. Disconnection or a
+full emission queue does not reject an action accepted by the callback.
+Report actual hardware results with `setAppStateValue`.
 With MQTT enabled, events and action replies share an eight-message FIFO; emission
 returns false when full or disconnected. Without MQTT, supported events update
 local RAM state/revision only. `emitAppEvent()` does not invoke the application

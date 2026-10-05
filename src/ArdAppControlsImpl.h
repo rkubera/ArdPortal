@@ -180,21 +180,20 @@ bool ArdAppControls::appControl(const V& definition,size_t index,const V& value,
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
   if(kind.indexOf("action")==0) {
     if(!_portal._appCommand) return false;
-#if ARDPORTAL_ENABLE_MQTT
-    if(_emissionCount>5||!_portal.mqttConnected()) return false;
-#endif
     if(kind=="action" && _portal._json.stringify(value)!=_portal._json.stringify(c["payload"])) return false;
     if(kind=="action_text"&&!ArdHa::string(value)) return false;
     if(kind=="action_json"&&(!value.isValid()||value.isUndefined()||_portal._json.stringify(value,false,nullptr,[](){ArdJSON::Limits limits;limits.maxNodes=512;return limits;}()).length()>1500)) return false;
     if(!_portal._appCommand(key,suffix,value,source)) return false;
 #if ARDPORTAL_ENABLE_MQTT
-    V ack=V::object();ack["command"]=suffix;ack["value"]=value;ack["accepted"]=true;
-    // The callback accepts an action; it must report actual hardware state separately.
-    if(!ArdHa::transient(f)) {V state=_portal.getAppConfigValue(key.c_str());String payload=state.type()==V::Type::String?state.asString():_portal._json.stringify(state);queueAppEmission(_portal._mqttClient.mqttTopic("stat",key.c_str()),payload);}
-    return queueAppEmission(_portal._mqttClient.mqttTopic("stat",(key+(ArdHa::transient(f)?String():String("_ack"))).c_str()),_portal._json.stringify(ack));
-#else
-    return true;
+    if(_portal.mqttConnected()) {
+      V ack=V::object();ack["command"]=suffix;ack["value"]=value;ack["accepted"]=true;
+      // The callback accepts an action; it must report actual hardware state separately.
+      if(!ArdHa::transient(f)) {V state=_portal.getAppConfigValue(key.c_str());String payload=state.type()==V::Type::String?state.asString():_portal._json.stringify(state);queueAppEmission(_portal._mqttClient.mqttTopic("stat",key.c_str()),payload);}
+      queueAppEmission(_portal._mqttClient.mqttTopic("stat",(key+(ArdHa::transient(f)?String():String("_ack"))).c_str()),_portal._json.stringify(ack));
+    }
 #endif
+    // Acceptance depends on the local callback, even if MQTT delivery is unavailable.
+    return true;
   }
 #endif
   _appControlStage=3;if(!ArdHa::validControl(c,value)) return false;
