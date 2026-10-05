@@ -9,7 +9,7 @@ from control_assets import segments, selected, emit_profile_chunks, emit_chunks
 from pathlib import Path
 
 
-def portal_parts(root, ota=True, mqtt=True, console=True, controls=None, guarded=False, tls=True):
+def portal_parts(root, ota=True, mqtt=True, console=True, controls=None, guarded=False, tls=True, messages=True):
     """Return the selected UI; excluded HTML and JS are absent from its asset."""
     source = (root / 'PortalPage.h').read_text(encoding='utf-8')
     body = source.split('R"HTML(', 1)[1].split(')HTML"', 1)[0]
@@ -18,6 +18,9 @@ def portal_parts(root, ota=True, mqtt=True, console=True, controls=None, guarded
             for section in ids:
                 body = re.sub(r'<section id="' + section + r'"[\s\S]*?</section>', '', body)
     body=re.sub(r'/\*@if ARDPORTAL_ENABLE_MQTT_TLS\*/(.*?)/\*@endif\*/',lambda m:m[1] if tls and mqtt else '',body,flags=re.S)
+    if not messages:
+        body = re.sub(r'<div class="consoleTabs".*?</div>', '', body, flags=re.S)
+        body = re.sub(r'<div id="messagesPanel".*?</div>', '', body, flags=re.S)
     css = re.search(r'<style>(.*?)</style>', body, re.S).group(1)
     script = re.search(r'<script>(.*?)</script>', body, re.S).group(1)
     for enabled, entry in [(ota, 'upgrade'), (mqtt, 'mqtt'), (console, 'console')]:
@@ -27,15 +30,20 @@ def portal_parts(root, ota=True, mqtt=True, console=True, controls=None, guarded
         script = '\n'.join(line for line in script.split('\n')
                            if not line.startswith("document.querySelector('#upgradeForm').onsubmit")
                            and not line.startswith("document.querySelector('#upgradeUrlForm').onsubmit"))
+    if not messages:
+        script = script.replace("const consoleRows={mqtt:[],messages:[]};", "const consoleRows={mqtt:[]};")
+        script = re.sub(r"^function selectConsoleTab\(.*?$", "", script, flags=re.M)
     if not console:
-        script = script.replace("else document.querySelector('#publishForm').elements.topic.placeholder=t('ui_097',{device:document.title})", "")
-        script = script.replace("document.querySelector('#publishForm').elements.topic.placeholder=t('ui_097',{device:c.deviceName});", "")
+        script = script.replace("else document.querySelector('#publishForm').elements.topic.placeholder=t('ui_097',{device:document.querySelector('#publishForm').dataset.device})", "")
+        script = script.replace("document.querySelector('#publishForm').dataset.device=c.mqttName;", "")
+        script = script.replace("document.querySelector('#publishForm').elements.topic.placeholder=t('ui_097',{device:c.mqttName});", "")
         script = script.replace("if(currentPage?.id==='console')setMessage(document.querySelector('#consoleState'),consoleErrorKey?t(consoleErrorKey):'',!!consoleErrorKey);", "")
-        script = script.replace("const consoleRows={mqtt:[]};", "")
+        script = re.sub(r"const consoleRows=\{[^;]+;", "", script)
         script = re.sub(r"^function consoleAvailability\(\).*?$", 'function consoleAvailability(){}', script, flags=re.M)
         script = '\n'.join(line for line in script.split('\n')
                            if not line.startswith("document.querySelector('#publishForm').onsubmit")
-                           and line != "if(currentPage?.id==='console')consoleAvailability();")
+                           and line != "if(currentPage?.id==='console')consoleAvailability();"
+                           and not line.startswith("function selectConsoleTab("))
         script = script.replace("setMessage(document.querySelector('#consoleState'),", "setConsoleMessage(")
         script = script.replace("function openConsole()", "function setConsoleMessage(){}\nfunction openConsole()")
         script = script.replace("currentPage?.id==='console'?'/api/console':'/api/events'", "'/api/events'")
@@ -74,11 +82,12 @@ def generate(root):
     lines += emit_profile_chunks('PORTAL_CSS_GZIP', css, gzip_array)
     variants = [(1, 1, 1), (1, 1, 0), (1, 0, 0), (0, 1, 1), (0, 1, 0), (0, 0, 0)]
     variants=[(*flags,tls) for flags in variants for tls in ([1,0] if flags[1] else [0])]
-    for index, (ota, mqtt, console, tls) in enumerate(variants):
-        flags = [('OTA', ota), ('MQTT', mqtt), ('CONSOLE', console), ('MQTT_TLS',tls)]
+    variants=[(*flags,messages) for flags in variants for messages in ([1,0] if flags[2] else [0])]
+    for index, (ota, mqtt, console, tls, messages) in enumerate(variants):
+        flags = [('OTA', ota), ('MQTT', mqtt), ('CONSOLE', console), ('MQTT_TLS',tls), ('CONSOLE_MESSAGES',messages)]
         condition = ' && '.join(('' if value else '!') + 'ARDPORTAL_ENABLE_' + name for name, value in flags)
         lines.append(('#if ' if not index else '#elif ') + condition)
-        _, script, shell = portal_parts(root, ota, mqtt, console, guarded=True,tls=tls)
+        _, script, shell = portal_parts(root, ota, mqtt, console, guarded=True,tls=tls,messages=messages)
         head=(root/'PortalPage.h').read_text().split('R"HEAD(',1)[1].split(')HEAD"',1)[0].split('<script id="pageCatalog"',1)[0]
         minimal=head+shell.removeprefix('</script>')
         minimal=re.sub(r'<section id="dynamicLoading".*?</section>','',minimal,flags=re.S)

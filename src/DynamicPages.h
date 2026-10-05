@@ -17,8 +17,12 @@ public:
     bool dependent=false;
 #endif
     };
-    struct Entry {String id,source;const __FlashStringHelper* flash=nullptr;std::unique_ptr<Field[]> fields;size_t count=0;};
+    struct Entry {String id,source,menu;V condition;const __FlashStringHelper* flash=nullptr;std::unique_ptr<Field[]> fields;size_t count=0,jsonLength=0;};
     std::unique_ptr<Entry> entries[16];size_t size=0;
+  public:
+    class ReadScope;
+  private:
+    mutable ReadScope* scope=nullptr;
   public:
     ArdJsonCodec codec;
     size_t length() const {return size;}
@@ -42,13 +46,17 @@ public:
       }
       ArdJSON::Limits limits;limits.maxNodes=4096;entry->source=codec.stringify(page,false,nullptr,limits);
       if(entry->id!=page["id"].asString()||!entry->source.length())return false;
+      entry->jsonLength=entry->source.length();
+      V menu=V::object();for(const char* key:{"id","name","names","order","visibleWhen"})if(page.hasOwnProperty(key))menu[key]=page[key];
+      limits.escapeHtml=true;entry->menu=codec.stringify(menu,false,nullptr,limits);entry->condition=page["visibleWhen"];
+      if(!entry->menu.length())return false;
       entries[size++]=std::move(entry);return true;
     }
     void remove(size_t index) {if(index>=size)return;for(size_t i=index;i+1<size;++i)entries[i]=std::move(entries[i+1]);entries[--size].reset();}
     void useFlash(size_t index,const __FlashStringHelper* source) {entries[index]->flash=source;entries[index]->source=String();}
     bool flashBacked(size_t index) const {return entries[index]->flash!=nullptr;}
     size_t ownedSourceBytes() const {size_t bytes=0;for(size_t i=0;i<size;++i)bytes+=entries[i]->source.length();return bytes;}
-    V operator[](size_t index) const {
+    V parsePage(size_t index) const {
       if(index>=size)return V();
       ArdJSON::Limits limits;limits.maxNodes=4096;limits.maxInputBytes=32768;
       const Entry& entry=*entries[index];V page=codec.parse(entry.flash?String(entry.flash):entry.source,nullptr,limits);
@@ -56,8 +64,24 @@ public:
       for(size_t f=0;f<entry.count;++f)if(entry.fields[f].extended){page["fields"][f]["extended"]=true;if(!page["fields"][f].hasOwnProperty("persist"))page["fields"][f]["persist"]=entry.fields[f].persist;}
       return page;
     }
+    // Request-local trees are destroyed before any HTTP transmission begins.
+    class ReadScope {
+      PageStore& store;ReadScope* previous;
+      std::unique_ptr<V> cache[16];bool tried[16]={};V missing;
+    public:
+      explicit ReadScope(PageStore& value):store(value),previous(value.scope){store.scope=this;}
+      ~ReadScope(){store.scope=previous;}
+      const V& get(size_t index){if(index>=store.length())return missing;if(!tried[index]){tried[index]=true;cache[index].reset(new(std::nothrow) V(store.parsePage(index)));}return cache[index]?*cache[index]:missing;}
+      void release(size_t index){cache[index].reset();}
+      ReadScope(const ReadScope&)=delete;ReadScope& operator=(const ReadScope&)=delete;
+    };
+    const V* cachedPage(size_t index) const {return scope?&scope->get(index):nullptr;}
+    V operator[](size_t index) const {if(const V* page=cachedPage(index))return *page;return parsePage(index);}
+    const String& menu(size_t index) const {return entries[index]->menu;}
+    const V& pageCondition(size_t index) const {return entries[index]->condition;}
+    size_t menuLength() const {size_t n=2;for(size_t p=0;p<size;++p)n+=entries[p]->menu.length()+(p?1:0);return n;}
     size_t measure(const ArdJSON::Limits& limits,String* error=nullptr) const {
-      size_t bytes=2;for(size_t i=0;i<size;++i){V page=(*this)[i];size_t length=ArdJSON::JSON.measure(page,error,limits);if(!length)return 0;bytes+=length+(i?1:0);yield();}if(bytes>limits.maxOutputBytes){if(error)*error="output limit";return 0;}return bytes;
+      size_t bytes=2;for(size_t i=0;i<size;++i){size_t length=entries[i]->jsonLength;if(limits.escapeHtml||limits.maxNodes!=4096){V page=(*this)[i];length=ArdJSON::JSON.measure(page,error,limits);}if(!length)return 0;bytes+=length+(i?1:0);yield();}if(bytes>limits.maxOutputBytes){if(error)*error="output limit";return 0;}return bytes;
     }
   };
   PageStore pages;
@@ -95,12 +119,12 @@ public:
   }
 #endif
   V field(const String& id) const {
-    for(size_t p=0;p<pages.length();++p)if(pages.belongs(p,id)){V page=pages[p];for(size_t f=0;f<page["fields"].length();++f)if(page["fields"][f]["id"].asString()==id)return inheritCondition(page,f);}
+    for(size_t p=0;p<pages.length();++p)if(pages.belongs(p,id)){if(const V* cached=pages.cachedPage(p)){for(size_t f=0;f<(*cached)["fields"].length();++f)if((*cached)["fields"][f]["id"].asString()==id){V field=(*cached)["fields"][f];if(cached->hasOwnProperty("visibleWhen"))field["_pageVisibleWhen"]=(*cached)["visibleWhen"];return field;}return V();}V page=pages[p];for(size_t f=0;f<page["fields"].length();++f)if(page["fields"][f]["id"].asString()==id)return inheritCondition(page,f);}
     return V();
   }
   size_t count() const {size_t n=0;for(size_t p=0;p<pages.length();++p)n+=pages.fields(p);return n;}
   V at(size_t index) const {
-    for(size_t p=0;p<pages.length();++p){size_t n=pages.fields(p);if(index<n){V page=pages[p];return inheritCondition(page,index);}index-=n;}
+    for(size_t p=0;p<pages.length();++p){size_t n=pages.fields(p);if(index<n){if(const V* cached=pages.cachedPage(p)){V field=(*cached)["fields"][index];if(cached->hasOwnProperty("visibleWhen"))field["_pageVisibleWhen"]=(*cached)["visibleWhen"];return field;}V page=pages[p];return inheritCondition(page,index);}index-=n;}
     return V();
   }
   String idAt(size_t index) const {

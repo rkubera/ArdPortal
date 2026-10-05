@@ -98,7 +98,8 @@ public:
   using AppConfigCallback = std::function<void(const String&, const ArdJSON::JSONVar&, ChangeSource)>;
   void onAppConfigValueChanged(AppConfigCallback callback) { _appChanged = callback; }
   bool flushConfig(); // Skip debounce, never perform flash I/O here.
-  void log(const String& message); // Application debug messages, no implicit Serial interception.
+  void log(const String& message); // Diagnostic messages in Console > Messages.
+  void logMessage(const String& message) { log(message); } // Explicit diagnostic logging; no Serial interception.
   const String& storageError() const { return _storageError; }
   static String chipId();
   static String defaultDeviceName() { return "ArdUI-" + chipId(); }
@@ -247,11 +248,9 @@ private:
 
   WiFiServer _server{80};
   WiFiClient _http;
-#if ARDPORTAL_SUPPORT_WEBSOCKET
-  WiFiClient _ws;
-#endif
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   bool _httpDynamicPages = false, _httpDynamicPageStarted = false, _httpPortalTail = false;
+  String _httpDynamicText;
   size_t _httpDynamicPageIndex = 0, _httpDynamicPageCount = 0, _httpDynamicPageOffset = 0, _httpDynamicPageLength = 0;
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE
@@ -259,28 +258,40 @@ private:
   static constexpr size_t ConsoleCapacity = 16;
   ConsoleLine _console[ConsoleCapacity];
   size_t _consoleHistoryBudget = 8192;
-  uint32_t _consoleId = 0, _wsCursor = 0;
+  uint32_t _consoleId = 0;
 #endif
 #if ARDPORTAL_SUPPORT_WEBSOCKET
-  uint32_t _wsSince=0, _wsFrameSince=0;
-  bool _wsUpgrade = false, _wsStatusSent = false, _wsMqtt = false, _wsClosing = false, _wsPingPending = false;
-  uint32_t _wsPingSince = 0, _wsAppRevision = 0;
-  bool _wsAppSent = false, _wsLogs = true;
-  uint32_t _wsStatusSince = 0;
-
-  uint8_t _wsRx[ARDPORTAL_ENABLE_CONSOLE ? 1032 : 136]; size_t _wsRxSize = 0;
-  String _wsTx, _wsPong; size_t _wsTxOffset = 0;
-  bool _wsPongPending = false;
+  struct WebSocketState {
+    WiFiClient client;
+    uint8_t* rx;size_t capacity,rxSize=0;
+    String tx,pong;size_t txOffset=0;
+    uint32_t since=0,frameSince=0,pingSince=0,statusSince=0,appRevision=0,cursor=0;
+    bool statusSent=false,mqtt=false,closing=false,pingPending=false,appSent=false,pongPending=false;
+    const bool logs;
+    WebSocketState(uint8_t* buffer,size_t size,bool console):rx(buffer),capacity(size),logs(console){}
+  };
+  uint8_t _eventWsRx[136];
+  WebSocketState _eventWs{_eventWsRx,sizeof(_eventWsRx),false};
+#if ARDPORTAL_ENABLE_CONSOLE
+  uint8_t _consoleWsRx[1032];
+  WebSocketState _consoleWs{_consoleWsRx,sizeof(_consoleWsRx),true};
+#endif
+  bool _wsUpgrade=false,_wsUpgradeConsole=false;
+  WebSocketState& upgradeWebSocket();
+  void serviceWebSocket(WebSocketState& ws,uint32_t now);
+  void closeWebSocket(WebSocketState& ws);
+  void queueWebSocket(WebSocketState& ws,uint8_t opcode,const String& payload);
 #endif
   uint32_t _minimumFreeHeap = UINT32_MAX;
   void consoleLine(bool mqtt, const String& text);
   void logMqtt(const String& direction, const String& topic, const uint8_t* payload, size_t length);
   void serviceWebSocket(uint32_t now);
-  void closeWebSocket();
-  void queueWebSocket(uint8_t opcode, const String& payload);
   void websocketCommand(const String& command);
   WifiState _wifiState = WifiState::NoCredentials;
 
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  unsigned _diagnosticApStations = 0;
+#endif
   bool _started = false, _apActive = false, _storageOK = false, _pendingReady = false;
   bool _attempting = false, _wasConnected = false, _scanRequested = false, _scanning = false;
   uint32_t _wifiRevision = 0;

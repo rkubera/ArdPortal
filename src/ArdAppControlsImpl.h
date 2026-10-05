@@ -1,3 +1,4 @@
+#include "DeviceName.h"
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #include "ArdAppControls.h"
@@ -60,7 +61,7 @@ bool ArdAppControls::appFieldVisible(const V&) const {return true;}
 
 #if ARDPORTAL_ENABLE_MQTT
 void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t size,bool retained) {
-  String commandPrefix="cmnd/"+_portal._config.deviceName+"/",getPrefix="get/"+_portal._config.deviceName+"/";
+  String commandPrefix="cmnd/"+ArdDeviceName::mqtt(_portal._config.deviceName)+"/",getPrefix="get/"+ArdDeviceName::mqtt(_portal._config.deviceName)+"/";
   if(topic.indexOf(getPrefix)==0) { String id=topic.substring(getPrefix.length()); for(size_t i=0;i<_portal._dynamic.count();++i) if(_portal._dynamic.idAt(i)==id) _stateDirty|=uint64_t(1)<<i; return; }
   if(topic.indexOf(commandPrefix)!=0||retained||size>ArdMqtt::PacketCapacity-5) return;
   String command=topic.substring(commandPrefix.length()),payload; for(size_t i=0;i<size;++i) { if(!data[i]) return; payload+=char(data[i]); }

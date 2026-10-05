@@ -5,6 +5,7 @@
 #include "PortalPage.h"
 #include "PortalAssets.h"
 #include "ConfigJson.h"
+#include "DeviceName.h"
 #if ARDPORTAL_SUPPORT_WEBSOCKET
 #include "WebSocketAccept.h"
 #endif
@@ -131,11 +132,7 @@ bool ArdPortal::validConfig(const Config& c) {
     if(value.length()>entry.limit)return false;
     for(size_t j=0;j<value.length();++j)if(value[j]==0)return false;
   }
-  for (size_t i = 0; i < c.deviceName.length(); ++i) {
-    char ch = c.deviceName[i];
-    if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-')) return false;
-  }
-  if (c.deviceName.length() && (c.deviceName[0] == '-' || c.deviceName[c.deviceName.length()-1] == '-')) return false;
+  if(!ArdDeviceName::valid(c.deviceName))return false;
   return c.apName.length() > 0 &&
          (!c.apPassword.length() || c.apPassword.length() >= 8) && c.port != 0 && (!c.mqttTls || !c.host.length() ||
            (c.caCert.indexOf("-----BEGIN CERTIFICATE-----") >= 0 &&
@@ -157,6 +154,7 @@ bool ArdPortal::begin(const Options& options) {
       !_options.tcpTimeoutMs || !_options.keepAliveSeconds ||
       !_options.tlsHandshakeTimeoutSeconds) return false;
   _config.deviceName = _apName;
+  _apName = ArdDeviceName::ap(_config.deviceName);
   _config.apName = _apName; _config.apPassword = _apPassword;
   if (!validConfig(_config)) return false;
   WiFi.persistent(false); WiFi.setAutoReconnect(false); WiFi.mode(WIFI_STA);
@@ -172,7 +170,11 @@ bool ArdPortal::begin(const Options& options) {
   return true; // Storage state is separate; a missing config is normal on first boot.
 }
 void ArdPortal::connectWifi() {
-  _wifiSince=millis();log(ArdUILanguage::text(ArdUILanguage::Key::s_209)+String(_wifiSince));
+  _wifiSince=millis();
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  logMessage(String("Wi-Fi connecting: ")+_config.ssid);
+#endif
+  log(ArdUILanguage::text(ArdUILanguage::Key::s_209)+String(_wifiSince));
   WiFi.begin(_config.ssid.c_str(), _config.password.c_str());
   _attempting = true; _wifiState = WifiState::Connecting;
 }
@@ -181,12 +183,26 @@ void ArdPortal::startAP() {
     WiFi.mode(WIFI_AP_STA);
     log(ArdUILanguage::text(ArdUILanguage::Key::s_101) + _apName);
     _apActive = WiFi.softAP(_apName.c_str(), _apPassword.length() ? _apPassword.c_str() : nullptr);
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+    _diagnosticApStations = 0;
+    logMessage(_apActive ? String("AP started: ")+_apName+"; IP="+WiFi.softAPIP().toString() : String("AP start failed: ")+_apName);
+#endif
     if (_apActive) { _dns.setErrorReplyCode(DNSReplyCode::NoError); _dns.start(53, "*", WiFi.softAPIP()); }
   }
   _wifiState = _config.ssid.length() ? WifiState::FallbackAP : WifiState::NoCredentials;
   _retrySince = millis();
 }
 void ArdPortal::serviceWifi(uint32_t now) {
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  const unsigned stations = _apActive ? WiFi.softAPgetStationNum() : 0;
+  if(stations != _diagnosticApStations) {
+    const bool connected = stations > _diagnosticApStations;
+    logMessage(String(connected ? "AP clients connected: " : "AP clients disconnected: ")+
+      String(connected ? stations-_diagnosticApStations : _diagnosticApStations-stations)+
+      "; active="+String(stations));
+    _diagnosticApStations = stations;
+  }
+#endif
   if (wifiConnected()) {
     const bool wasAttempting=_attempting;_wifiState = WifiState::Connected; _attempting = false;
     if (!_wifiResult) _wifiResult = 1;
@@ -345,6 +361,7 @@ void ArdPortal::closeHttp() {
 #endif
   stopClient(_http); _http = WiFiClient(); _request = String(); _response = String();
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
+  _httpDynamicText=String();
   _httpDynamicPages = _httpDynamicPageStarted = _httpPortalTail = false; _httpDynamicPageIndex = _httpDynamicPageCount = _httpDynamicPageOffset = _httpDynamicPageLength = 0;
 #endif
   _httpConfigUpload = false; _httpWaitingStorage = false;
@@ -390,14 +407,23 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
     } else if(_httpDynamicPages) {
       if(!_httpDynamicPageStarted) {_response="[";_httpDynamicPageStarted=true;}
       else if(_httpDynamicPageIndex<_httpDynamicPageCount) {
-        ArdJSON::Limits limits;limits.maxNodes=4096;limits.escapeHtml=_httpPortalTail;if(_httpPortalTail)limits.maxOutputBytes=196608;
-        const auto page=_dynamic.pages[_httpDynamicPageIndex];
-        if(!_httpDynamicPageOffset) _httpDynamicPageLength=ArdJSON::JSON.measure(page,nullptr,limits);
-        String part=ArdJSON::JSON.stringifySlice(page,_httpDynamicPageOffset,256,nullptr,limits);
+        String part;
+        if(_httpPortalTail){const String& menu=_dynamic.pages.menu(_httpDynamicPageIndex);_httpDynamicPageLength=menu.length();part=menu.substring(_httpDynamicPageOffset,_httpDynamicPageOffset+256);}
+        else {
+          if(!_httpDynamicPageOffset){
+            ArdJSON::Limits limits;limits.maxNodes=4096;
+            const auto page=_dynamic.pages[_httpDynamicPageIndex];
+            if(!page.isValid()||page.isUndefined()){closeHttp();return;}
+            _httpDynamicText=ArdJSON::JSON.stringify(page,false,nullptr,limits);
+            _httpDynamicPageLength=_httpDynamicText.length();
+          }
+          part=_httpDynamicText.substring(_httpDynamicPageOffset,_httpDynamicPageOffset+256);
+        }
+
         if(!part.length()) {closeHttp();return;}
         _response=(_httpDynamicPageIndex&&!_httpDynamicPageOffset?String(","):String())+part;
         _httpDynamicPageOffset+=part.length();
-        if(_httpDynamicPageOffset==_httpDynamicPageLength) {++_httpDynamicPageIndex;_httpDynamicPageOffset=0;}
+        if(_httpDynamicPageOffset==_httpDynamicPageLength) {++_httpDynamicPageIndex;_httpDynamicPageOffset=0;_httpDynamicText=String();}
       } else {_response="]";_httpDynamicPages=false;}
       _responseOffset=0;
     } else if(_httpPortalTail) {
@@ -407,12 +433,13 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
     } else {
 #if ARDPORTAL_SUPPORT_WEBSOCKET
       if (_wsUpgrade) {
-        _ws = _http; _http = WiFiClient(); _wsUpgrade = false;
+        WebSocketState& ws=upgradeWebSocket();
+        ws.client = _http; _http = WiFiClient(); _wsUpgrade = false;
         _request = String(); _response = String(); _responseOffset = 0;
 #if ARDPORTAL_ENABLE_CONSOLE
-        _wsCursor = _consoleId > ConsoleCapacity ? _consoleId - ConsoleCapacity : 0;
+        ws.cursor = _consoleId > ConsoleCapacity ? _consoleId - ConsoleCapacity : 0;
 #endif
-        _wsAppSent = false; _wsStatusSent = false; _wsRxSize = 0; _wsSince = _wsPingSince = millis(); _wsPingPending = _wsClosing = _wsPongPending = false; return;
+        ws.appSent = false; ws.statusSent = false; ws.rxSize = 0; ws.since = ws.pingSince = millis(); ws.pingPending = ws.closing = ws.pongPending = false; return;
       }
 #endif
 #if defined(ESP8266)
@@ -519,7 +546,8 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     || path == "/api/console"
 #endif
     )) {
-    if (_ws) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
+    _wsUpgradeConsole=path=="/api/console";
+    if(upgradeWebSocket().client){replyMessage(409,ArdUILanguage::Key::s_132);return;}
     String key, upgrade, connection, version;
     int offset = _request.indexOf("\r\n") + 2;
     while (offset > 1) {
@@ -539,7 +567,6 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     bool validKey = key.length() == 24 && key[22] == '=' && key[23] == '=';
     for(size_t i=0;validKey && i<22;++i) { char c=key[i]; validKey=(c>='A'&&c<='Z')||(c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='+'||c=='/'; }
     if (!validKey || version != "13" || upgrade != "websocket" || connection.indexOf("upgrade") < 0) { replyMessage(400,ArdUILanguage::Key::s_120); return; }
-    _wsLogs=path=="/api/console";
     _response = String(F("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ")) + ArdPortalWS::accept(key) + "\r\n\r\n";
     _responseOffset=0; _httpSince=millis(); _wsUpgrade=true; return;
   }
@@ -551,8 +578,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
   }
   if (method == "GET" && (path.indexOf("/api/") != 0 && path.indexOf('.') < 0)) {
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-    ArdJSON::Limits limits;limits.maxNodes=4096;limits.escapeHtml=true;limits.maxOutputBytes=196608;String error;size_t catalogLength=_dynamic.pages.measure(limits,&error);
-    if(!catalogLength) {reply(503,"text/plain",ArdUILanguage::text(error.indexOf("memory")>=0?ArdUILanguage::Key::s_169:ArdUILanguage::Key::s_190));return;}
+    const size_t catalogLength=_dynamic.pages.menuLength();
     _page=PORTAL_PAGE_HEAD;_pageLength=strlen_P(_page);_pageOffset=0;
     _httpDynamicPages=true;_httpDynamicPageStarted=false;_httpPortalTail=true;_httpDynamicPageIndex=0;_httpDynamicPageOffset=0;_httpDynamicPageCount=_dynamic.pages.length();
     size_t length=_pageLength+catalogLength+strlen_P(PORTAL_HTML);
@@ -611,6 +637,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     out += F(",\"caCert\":"); appendQuoted(out,_config.caCert);
     out += F(",\"apName\":"); appendQuoted(out,_config.apName);
     out += F(",\"deviceName\":"); appendQuoted(out,_config.deviceName);
+    out += F(",\"mqttName\":"); appendQuoted(out,ArdDeviceName::mqtt(_config.deviceName));
     out += F(",\"deviceDescription\":"); appendQuoted(out,_config.deviceDescription);
     out += '}';
     reply(200,"application/json",out);return;
@@ -680,8 +707,8 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     if (values[11] != "1" || seen != 2048) { replyMessage(400,ArdUILanguage::Key::s_142); return; }
     c.ssid = ""; c.password = "";
   }
-  if ((seen & 256) && values[8] != c.deviceName) { replyMessage(400,ArdUILanguage::Key::s_142); return; }
-  c.apName = c.deviceName;
+  if ((seen & 256) && values[8] != ArdDeviceName::ap(c.deviceName)) { replyMessage(400,ArdUILanguage::Key::s_142); return; }
+  c.apName = ArdDeviceName::ap(c.deviceName);
   if (!validConfig(c)) { replyMessage(400,ArdUILanguage::Key::s_142); return; }
 #if ARDPORTAL_ENABLE_MQTT
   if (path == "/api/mqtt/connect" && ((seen & ~252) || !(seen & 4))) { replyMessage(400,ArdUILanguage::Key::s_142); return; }
@@ -739,12 +766,12 @@ String ArdPortal::chipId() {
 void ArdPortal::configureIdentity() {
 
 #if ARDPORTAL_ENABLE_MQTT
-  _mqttClient.configureIdentity(_config.deviceName);
+  _mqttClient.configureIdentity(ArdDeviceName::mqtt(_config.deviceName));
 #endif
 #if defined(ESP32)
-  WiFi.setHostname(_config.deviceName.c_str());
+  WiFi.setHostname(ArdDeviceName::hostname(_config.deviceName,defaultDeviceName()).c_str());
 #else
-  WiFi.hostname(_config.deviceName.c_str());
+  WiFi.hostname(ArdDeviceName::hostname(_config.deviceName,defaultDeviceName()).c_str());
 #endif
 }
 String ArdPortal::infoJson() {
@@ -772,6 +799,7 @@ String ArdPortal::infoJson() {
 
 #if ARDPORTAL_ENABLE_CONSOLE
 void ArdPortal::consoleLine(bool mqtt, const String& text) {
+  if(!mqtt && !ARDPORTAL_ENABLE_CONSOLE_MESSAGES) return;
   if(ESP.getFreeHeap()<24576) _consoleHistoryBudget=2048;
   ConsoleLine& line = _console[_consoleId % ConsoleCapacity];line=ConsoleLine();
   size_t used=0;for(const auto& entry:_console) used+=entry.text.length();
@@ -790,7 +818,7 @@ void ArdPortal::consoleLine(bool mqtt, const String& text) {
 #else
 void ArdPortal::consoleLine(bool , const String& ) {}
 #endif
-#if ARDPORTAL_ENABLE_CONSOLE
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
 void ArdPortal::log(const String& message) { consoleLine(false, message); }
 #else
 void ArdPortal::log(const String& ) {}
@@ -802,22 +830,31 @@ void ArdPortal::logMqtt(const String& direction, const String& topic, const uint
   if(!printable) value=ArdUILanguage::text(ArdUILanguage::Key::s_178)+String(length);
   else for(size_t i=0;i<length;++i) value+=char(payload[i]);
   consoleLine(true,direction+" "+topic+" = "+value);
-  if (direction == "RX" && validMqttTopic(topic)) {
-    log(ArdUILanguage::text(ArdUILanguage::Key::s_157) + topic.substring(0,80) + " = " + value);
-  }
 }
 #else
 void ArdPortal::logMqtt(const String& , const String& , const uint8_t* , size_t ) {}
 #endif
 #if ARDPORTAL_SUPPORT_WEBSOCKET
-void ArdPortal::closeWebSocket() {
-  stopClient(_ws); _ws = WiFiClient(); _wsTx=String(); _wsTxOffset=0; _wsRxSize=0; _wsAppSent=false; _wsStatusSent=false; _wsClosing=false; _wsPingPending=false; _wsPongPending=false; _wsPong=String();
+ArdPortal::WebSocketState& ArdPortal::upgradeWebSocket() {
+#if ARDPORTAL_ENABLE_CONSOLE
+  if(_wsUpgradeConsole)return _consoleWs;
+#endif
+  return _eventWs;
 }
-void ArdPortal::queueWebSocket(uint8_t opcode, const String& payload) {
-  _wsTx=""; _wsTx+=char(0x80|opcode);
-  if(payload.length()<126) _wsTx+=char(payload.length());
-  else { _wsTx+=char(126); _wsTx+=char(payload.length()>>8); _wsTx+=char(payload.length()&255); }
-  _wsTx+=payload; _wsTxOffset=0; _wsSince=millis();
+void ArdPortal::serviceWebSocket(uint32_t now) {
+  serviceWebSocket(_eventWs,now);
+#if ARDPORTAL_ENABLE_CONSOLE
+  serviceWebSocket(_consoleWs,now);
+#endif
+}
+void ArdPortal::closeWebSocket(WebSocketState& ws) {
+  stopClient(ws.client); ws.client = WiFiClient(); ws.tx=String(); ws.txOffset=0; ws.rxSize=0; ws.appSent=false; ws.statusSent=false; ws.closing=false; ws.pingPending=false; ws.pongPending=false; ws.pong=String();
+}
+void ArdPortal::queueWebSocket(WebSocketState& ws,uint8_t opcode, const String& payload) {
+  ws.tx=""; ws.tx+=char(0x80|opcode);
+  if(payload.length()<126) ws.tx+=char(payload.length());
+  else { ws.tx+=char(126); ws.tx+=char(payload.length()>>8); ws.tx+=char(payload.length()&255); }
+  ws.tx+=payload; ws.txOffset=0; ws.since=millis();
 }
 #if ARDPORTAL_ENABLE_CONSOLE
 void ArdPortal::websocketCommand(const String& command) {
@@ -840,55 +877,55 @@ void ArdPortal::websocketCommand(const String& command) {
   if(error.length()) { log(error); consoleLine(true,error); }
 }
 #else
-void ArdPortal::websocketCommand(const String&) { closeWebSocket(); }
+void ArdPortal::websocketCommand(const String&) {}
 #endif
-void ArdPortal::serviceWebSocket(uint32_t now) {
-  if(!_ws) { if(_wsTx.length() || _wsRxSize)closeWebSocket(); return; }
-  if((_wsTx.length() && uint32_t(now-_wsSince)>=5000) || (_wsRxSize && uint32_t(now-_wsFrameSince)>=5000)) { closeWebSocket(); return; }
-  if(_wsPingPending && uint32_t(now-_wsPingSince)>=15000) {closeWebSocket();return;}
+void ArdPortal::serviceWebSocket(WebSocketState& ws,uint32_t now) {
+  if(!ws.client) { if(ws.tx.length() || ws.rxSize)closeWebSocket(ws); return; }
+  if((ws.tx.length() && uint32_t(now-ws.since)>=5000) || (ws.rxSize && uint32_t(now-ws.frameSince)>=5000)) { closeWebSocket(ws); return; }
+  if(ws.pingPending && uint32_t(now-ws.pingSince)>=15000) {closeWebSocket(ws);return;}
   // Bounded receive and transmit; browser frames must be masked and unfragmented.
-  for(size_t budget=0;budget<256 && _ws.available();++budget) {
-    if(_wsRxSize==sizeof(_wsRx)) { closeWebSocket();return; }
-    int c=_ws.read();if(c<0)break;if(!_wsRxSize)_wsFrameSince=now;_wsRx[_wsRxSize++]=c;
-    if(_wsRxSize<2)continue;
-    uint8_t opcode=_wsRx[0]&15;size_t length=_wsRx[1]&127,header=2;
-    if((_wsRx[0]&0x70) || !(_wsRx[0]&0x80) || !(_wsRx[1]&0x80) || length==127 || (opcode!=1 && opcode!=8 && opcode!=9 && opcode!=10)) { closeWebSocket();return; }
-    if(length==126) { if(_wsRxSize<4)continue;length=(size_t(_wsRx[2])<<8)|_wsRx[3];header=4;if(length<126){closeWebSocket();return;} }
-    if(length>1024 || (opcode>=8 && length>125)) { closeWebSocket();return; }
-    if(_wsRxSize<header+4+length)continue;
+  for(size_t budget=0;budget<256 && ws.client.available();++budget) {
+    if(ws.rxSize==ws.capacity) { closeWebSocket(ws);return; }
+    int c=ws.client.read();if(c<0)break;if(!ws.rxSize)ws.frameSince=now;ws.rx[ws.rxSize++]=c;
+    if(ws.rxSize<2)continue;
+    uint8_t opcode=ws.rx[0]&15;size_t length=ws.rx[1]&127,header=2;
+    if((ws.rx[0]&0x70) || !(ws.rx[0]&0x80) || !(ws.rx[1]&0x80) || length==127 || (opcode!=1 && opcode!=8 && opcode!=9 && opcode!=10)) { closeWebSocket(ws);return; }
+    if(length==126) { if(ws.rxSize<4)continue;length=(size_t(ws.rx[2])<<8)|ws.rx[3];header=4;if(length<126){closeWebSocket(ws);return;} }
+    if(length>1024 || (opcode>=8 && length>125)) { closeWebSocket(ws);return; }
+    if(ws.rxSize<header+4+length)continue;
     String payload;payload.reserve(length);
-    for(size_t i=0;i<length;++i)payload+=char(_wsRx[header+4+i]^_wsRx[header+(i%4)]);
-    _wsRxSize=0;
-    if(opcode==8){if(length==1 || _wsTxOffset){closeWebSocket();return;}queueWebSocket(8,payload);_wsClosing=true;break;}
-    if(opcode==10 && payload=="ArdUI")_wsPingPending=false;
-    if(opcode==9){_wsPong=payload;_wsPongPending=true;}
-    if(opcode==1)websocketCommand(payload);
+    for(size_t i=0;i<length;++i)payload+=char(ws.rx[header+4+i]^ws.rx[header+(i%4)]);
+    ws.rxSize=0;
+    if(opcode==8){if(length==1 || ws.txOffset){closeWebSocket(ws);return;}queueWebSocket(ws,8,payload);ws.closing=true;break;}
+    if(opcode==10 && payload=="ArdUI")ws.pingPending=false;
+    if(opcode==9){ws.pong=payload;ws.pongPending=true;}
+    if(opcode==1){if(!ws.logs){closeWebSocket(ws);return;}websocketCommand(payload);}
   }
-  if(!_wsTx.length() && !_wsClosing) {
-    if(_wsPongPending){queueWebSocket(10,_wsPong);_wsPong="";_wsPongPending=false;}
-    else if(!_wsPingPending && uint32_t(now-_wsPingSince)>=20000) {queueWebSocket(9,"ArdUI");_wsPingPending=true;_wsPingSince=now;}
-    else if(!_wsStatusSent || _wsMqtt!=mqttConnected() || uint32_t(now-_wsStatusSince)>=10000) {
-      _wsMqtt=mqttConnected();_wsStatusSent=true;_wsStatusSince=now;
-      queueWebSocket(1,String("{\"type\":\"status\",\"mqtt\":")+(_wsMqtt?"true":"false")+"}");
-    } else if(!_wsAppSent || _wsAppRevision!=_appRevision) {
-      _wsAppSent=true; _wsAppRevision=_appRevision;
-      queueWebSocket(1,String("{\"type\":\"app\",\"revision\":")+String(_wsAppRevision)+"}");
+  if(!ws.tx.length() && !ws.closing) {
+    if(ws.pongPending){queueWebSocket(ws,10,ws.pong);ws.pong="";ws.pongPending=false;}
+    else if(!ws.pingPending && uint32_t(now-ws.pingSince)>=20000) {queueWebSocket(ws,9,"ArdUI");ws.pingPending=true;ws.pingSince=now;}
+    else if(!ws.statusSent || ws.mqtt!=mqttConnected() || uint32_t(now-ws.statusSince)>=10000) {
+      ws.mqtt=mqttConnected();ws.statusSent=true;ws.statusSince=now;
+      queueWebSocket(ws,1,String("{\"type\":\"status\",\"mqtt\":")+(ws.mqtt?"true":"false")+"}");
+    } else if(!ws.appSent || ws.appRevision!=_appRevision) {
+      ws.appSent=true; ws.appRevision=_appRevision;
+      queueWebSocket(ws,1,String("{\"type\":\"app\",\"revision\":")+String(ws.appRevision)+"}");
     }
 #if ARDPORTAL_ENABLE_CONSOLE
-    if(!_wsTx.length() && _wsLogs) {
+    if(!ws.tx.length() && ws.logs) {
       uint32_t oldest=_consoleId>ConsoleCapacity?_consoleId-ConsoleCapacity:0;
-      if(_wsCursor<oldest)_wsCursor=oldest;
-      if(_wsCursor<_consoleId) {
-        const ConsoleLine& line=_console[_wsCursor%ConsoleCapacity];++_wsCursor;
-        if(line.id==_wsCursor&&line.mqtt&&line.text.length()) queueWebSocket(1,String("{\"type\":\"log\",\"channel\":")+quote(line.mqtt?"mqtt":"debug")+String(F(",\"id\":")) +String(line.id)+String(F(",\"text\":")) +quote(line.text)+"}");
+      if(ws.cursor<oldest)ws.cursor=oldest;
+      if(ws.cursor<_consoleId) {
+        const ConsoleLine& line=_console[ws.cursor%ConsoleCapacity];++ws.cursor;
+        if(line.id==ws.cursor&&line.text.length()) queueWebSocket(ws,1,String("{\"type\":\"log\",\"channel\":")+quote(line.mqtt?"mqtt":"messages")+String(F(",\"id\":")) +String(line.id)+String(F(",\"text\":")) +quote(line.text)+"}");
       }
     }
 #endif
   }
-  if(_wsTx.length()) {
-    size_t length=_wsTx.length()-_wsTxOffset;if(length>256)length=256;
-    _wsTxOffset+=writeChunk(_ws,reinterpret_cast<const uint8_t*>(_wsTx.c_str())+_wsTxOffset,length);
-    if(_wsTxOffset==_wsTx.length()){_wsTx="";_wsTxOffset=0;if(_wsClosing)closeWebSocket();}
+  if(ws.tx.length()) {
+    size_t length=ws.tx.length()-ws.txOffset;if(length>256)length=256;
+    ws.txOffset+=writeChunk(ws.client,reinterpret_cast<const uint8_t*>(ws.tx.c_str())+ws.txOffset,length);
+    if(ws.txOffset==ws.tx.length()){ws.tx="";ws.txOffset=0;if(ws.closing)closeWebSocket(ws);}
   }
 }
 
@@ -921,7 +958,7 @@ void ArdPortal::finishLoad(const ArdFS::Result& result) {
   }
   _storageOK = _storageMounted && result.ok && !_storageError.length();
   if (!_config.deviceName.length()) _config.deviceName = defaultDeviceName();
-  _config.apName = _config.deviceName; _apName = _config.apName; _apPassword = _config.apPassword;
+  _config.apName = ArdDeviceName::ap(_config.deviceName); _apName = _config.apName; _apPassword = _config.apPassword;
   configureIdentity(); _configurationReady = true;
   log(result.recovered ? ArdUILanguage::text(ArdUILanguage::Key::s_167) : ArdUILanguage::text(ArdUILanguage::Key::s_168));
   if (_storageError.length()) log(_storageError);
@@ -974,7 +1011,7 @@ bool ArdPortal::scheduleConfig(const Config& config, const ArdJSON::JSONVar& app
   if (_savePending && (source != ChangeSource::Application || _saveSource != source)) return false;
   _pending = config;
   if (!_pending.deviceName.length()) _pending.deviceName = defaultDeviceName();
-  _pending.apName = _pending.deviceName;
+  _pending.apName = ArdDeviceName::ap(_pending.deviceName);
   _pendingApp = app; _saveSource = source; _savePending = true; _forceSave = immediate; _dirtySince = millis();
   return true;
 }

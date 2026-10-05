@@ -7,7 +7,7 @@
     "ui_002": "Info",
     "ui_005": "Device",
     "ui_006": "Device name",
-    "ui_007": "AP name, hostname and MQTT ID. Letters, digits and hyphens; changes reconnect.",
+    "ui_007": "Letters and digits from any language, spaces, hyphens and underscores; up to 32 UTF-8 bytes. AP and MQTT replace spaces with hyphens; changes reconnect.",
     "ui_008": "Save",
     "ui_009": "Factory reset",
     "ui_010": "Cancel",

@@ -48,15 +48,25 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
   }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   if(method=="GET"&&path=="/api/page-conditions") {
+    ArdDynamicPages::PageStore::ReadScope definitions(_dynamic.pages);
     String body="{";
     for(size_t p=0;p<_dynamic.pages.length();++p) {
-      V page=_dynamic.pages[p];if(!page.isValid()){replyMessage(503,ArdUILanguage::Key::s_169);return true;}
       if(p)body+=',';
-      body+=_json.stringify(V(_dynamic.pages.id(p)))+":"+(_appControls.dependencyMatches(page["visibleWhen"])?"true":"false");yield();
+      body+=_json.stringify(V(_dynamic.pages.id(p)))+":"+(_appControls.dependencyMatches(_dynamic.pages.pageCondition(p))?"true":"false");yield();
     }
     body+='}';reply(200,"application/json",body);return true;
   }
 #endif
+  if(method=="GET"&&path.indexOf("/api/pages?page=")==0) {
+    const String id=path.substring(strlen("/api/pages?page="));
+    for(size_t p=0;p<_dynamic.pages.length();++p)if(_dynamic.pages.id(p)==id){
+      const V page=_dynamic.pages[p];ArdJSON::Limits limits;limits.maxNodes=4096;
+      String body=_json.stringify(page,false,nullptr,limits);
+      if(!page.isValid()||page.isUndefined()||!body.length())replyMessage(503,ArdUILanguage::Key::s_169);else reply(200,"application/json",body);
+      return true;
+    }
+    reply(404,"text/plain",ArdUILanguage::text(ArdUILanguage::Key::s_192)+id);return true;
+  }
   if(method=="GET"&&path=="/api/pages") {
     // Measure without an output buffer, then emit bounded JSON slices in loop().
     ArdJSON::Limits limits;limits.maxNodes=4096;String error;
@@ -65,11 +75,13 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     responseHeader(200,"application/json",length,false,true);_response+='[';
     _httpDynamicPages=true;_httpDynamicPageStarted=true;_httpDynamicPageIndex=0;_httpDynamicPageCount=_dynamic.pages.length();_httpDynamicPageOffset=0;return true;
   }
+  ArdDynamicPages::PageStore::ReadScope definitions(_dynamic.pages);
   if(method=="GET"&&(path=="/api/app"||path.indexOf("/api/app?page=")==0)) {
     String pageId=path=="/api/app"?String():path.substring(strlen("/api/app?page="));
-    V selected;const V* page=nullptr;
-    if(pageId.length()) {for(size_t p=0;p<_dynamic.pages.length();++p) if(_dynamic.pages.id(p)==pageId) {selected=_dynamic.pages[p];page=&selected;}if(!page) {reply(404,"text/plain",ArdUILanguage::text(ArdUILanguage::Key::s_192)+pageId);return true;}}
+    const V* page=nullptr;
+    if(pageId.length()) {for(size_t p=0;p<_dynamic.pages.length();++p) if(_dynamic.pages.id(p)==pageId) {page=&definitions.get(p);}if(!page) {reply(404,"text/plain",ArdUILanguage::text(ArdUILanguage::Key::s_192)+pageId);return true;}}
     if(page) {
+      if(!page->isValid()||page->isUndefined()){replyMessage(503,ArdUILanguage::Key::s_169);return true;}
       // Serialize fields individually; do not duplicate a composite state tree.
       String body="{\"values\":{";
       for(size_t f=0;f<(*page)["fields"].length();++f) {String id=(*page)["fields"][f]["id"].asString();String value=_json.stringify(getAppConfigValue(id.c_str()));if(!value.length()) {replyMessage(503,ArdUILanguage::Key::s_169);return true;}if(f) body+=',';body+=_json.stringify(V(id))+":"+value;}
@@ -79,9 +91,11 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
 #endif
       body+=String(F("},\"revision\":")) +String(_appRevision)+"}";reply(200,"application/json",body);return true;
     }
-    V body=V::object(),values=page?V::object():_appConfig;
-    size_t count=page?(*page)["fields"].length():_dynamic.count();
-    for(size_t f=0;f<count;++f) {String id=page?(*page)["fields"][f]["id"].asString():_dynamic.idAt(f);values[id]=getAppConfigValue(id.c_str());}
+    V body=V::object(),values=_appConfig;
+    for(size_t p=0;p<_dynamic.pages.length();++p){
+      for(size_t f=0;f<_dynamic.pages.fields(p);++f){const String id=_dynamic.pages.fieldId(p,f);values[id]=getAppConfigValue(id.c_str());}
+      definitions.release(p);yield();
+    }
     body["values"]=values; body["revision"]=_appRevision; reply(200,"application/json",_json.stringify(body,false,nullptr,[](){ArdJSON::Limits l;l.maxNodes=4096;return l;}())); return true;
   }
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED

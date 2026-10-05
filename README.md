@@ -170,6 +170,7 @@ Unspecified options default to `1` (enabled):
 | `ARDPORTAL_ENABLE_MQTT` | Removes MQTT, MQTT Configuration, Console and HA. |
 | `ARDPORTAL_ENABLE_MQTT_TLS` | Removes secure MQTT transport and TLS/CA settings. Defaults to `1`; MQTT disabled forces it off. Stored TLS configurations require explicit reconfiguration, with no automatic plaintext fallback. |
 | `ARDPORTAL_ENABLE_HA` | Removes HA discovery; local dynamic pages remain available. |
+| `ARDPORTAL_ENABLE_CONSOLE_MESSAGES` | Enables the Messages diagnostic tab when set to `1`; defaults to `0`, requires Console. |
 | `ARDPORTAL_ENABLE_CONSOLE` | Removes Console while keeping MQTT and HA enabled. |
 | `ARDPORTAL_ENABLE_DYNAMIC_PAGES` | Removes dynamic forms, field renderers/validation and their HTTP/MQTT handling; forces all control flags, HA and dependencies off. |
 | `ARDPORTAL_ENABLE_DEPENDENCIES` | Removes `visibleWhen` evaluation, conditional portal visibility and HA discovery removal/recreation. |
@@ -301,7 +302,7 @@ an IP address. Submitting unchanged Wi-Fi credentials starts a fresh attempt.
 | AP configuration | `/ap` | AP password and current network name |
 | MQTT configuration | `/mqtt` | Broker, port, credentials, optional TLS and CA |
 | Update | `/upgrade` | Streaming application firmware OTA |
-| Console | `/console` | MQTT messages over WebSocket |
+| Console | `/console` | MQTT and diagnostic messages over WebSocket |
 
 Each settings page has a Cancel button returning to Home. The CA field is hidden
 when TLS is disabled. Home information includes chip type/ID, configured and
@@ -445,10 +446,10 @@ are bytes, not Unicode characters. All strings reject embedded NUL bytes.
 | `mqttPassword` | `String`, empty | Up to 128 bytes; nonempty requires a nonempty `user`. |
 | `mqttTls` | `bool`, `false` | Verified TLS; setting it is rejected when MQTT TLS is compiled out. |
 | `caCert` | `String`, empty | Up to 4096 bytes; PEM CA certificate/bundle, required for a nonempty TLS broker host. |
-| `deviceName` | `String`, generated at startup | Up to 32 ASCII letters, digits or hyphens; no leading/trailing hyphen. Empty becomes `ArdUI-<chip ID>`. Used for hostname, AP SSID and MQTT identity/topics. |
+| `deviceName` | `String`, generated at startup | Up to 32 UTF-8 bytes: Unicode letters/numbers, spaces, hyphens and underscores. Other symbols and all-space names are rejected. Empty becomes `ArdUI-<chip ID>`. AP SSID and MQTT identity/topics replace spaces with hyphens. Hostname uses ASCII letters/digits and hyphens, with the generated name as fallback. Portal and HA retain the display name. |
 | `deviceDescription` | `String`, empty | Up to 128 bytes; optional Device input and Info row; HA `device.model`. |
 | `deviceManufacturer` | `String`, `"DYI"` | Up to 128 bytes; set from code; optional Info row and HA `device.manufacturer`. |
-| `apName` | `String`, normalized to device name | Must be nonempty and at most 32 bytes in a validated Config; accepted saves force it to `deviceName`. It is not an independent SSID setting. |
+| `apName` | `String`, normalized to device name | Must be nonempty and at most 32 bytes in a validated Config; accepted saves derive it from `deviceName` with spaces replaced by hyphens. It is not an independent SSID setting. |
 | `apPassword` | `String`, `"1234567890"` | Empty for an open AP, otherwise 8–63 bytes. |
 
 Copy `getPortalConfig()`, edit the copy, then call `setPortalConfig()`. A change
@@ -528,7 +529,7 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | `publish(topic, payload, retain=false)` | Queue one QoS 0 text packet; true means queued locally, not delivered/acknowledged. |
 | `subscribe(topic)` | Queue one subscription; retry busy requests and resubscribe after reconnect. |
 | `onMqttMessage(callback)` | `void(const String& topic, const uint8_t* bytes, size_t length)` for received messages; bytes are not NUL-terminated. No-op without MQTT. |
-| `log(message)` | Explicit application debug logging; does not intercept Serial or send debug records to the MQTT-only Console. |
+| `log(message)` / `logMessage(message)` | Diagnostic logging to Console → Messages; does not intercept Serial. |
 | `mqtt()` | Owned `ArdMqtt&` (also const overload); accessor exists only when MQTT is enabled. |
 | `homeAssistant()` | Owned `ArdHomeAssistant&` (also const overload); accessor exists only when HA is enabled. `discoveryConfig(field)` builds discovery JSON; it does not publish it. |
 | `ota()` | Owned `ArdOta&` (also const overload); accessor exists only when OTA is enabled. `active()`, `received()`, `expected()` report upload status; there is no public code-level URL updater. |
@@ -579,7 +580,7 @@ and publishes state; application code controls the physical actuator.
 ## Dynamic portal pages and Home Assistant
 
 Register JSON definitions with `addPortalPage(definition)` before `begin()`, or
-later from the Arduino task. Register definitions on every boot. Static `PROGMEM`
+later from the Arduino task. Register definitions on every boot. The portal embeds only page menu metadata and fetches the active definition through `/api/pages?page=<id>`. Definitions are parsed at most once per page during a dynamic HTTP request; field defaults and dependency checks reuse those request-local trees. Static `PROGMEM`
 definitions passed through `FPSTR()` remain in flash; only a compact index stays
 in RAM. String definitions retain their JSON text in RAM. Pages are parsed on
 demand and released after use. Application values use the existing journaled
@@ -1630,20 +1631,55 @@ and retains up to 16 log records within an 8 KiB history budget in device RAM.
 When free heap falls below 24 KiB, that budget shrinks to 2 KiB for the rest of
 the boot. Older records are evicted; the newest MQTT text remains complete.
 MQTT text is not truncated; older records are evicted when the budget is reached.
-The console displays MQTT messages and connection errors. Its initial connection
+The default console tab is **MQTT**. To add **Messages** for library and
+application diagnostics, enable the optional feature before including ArdPortal:
+
+```cpp
+#define ARDPORTAL_ENABLE_CONSOLE_MESSAGES 1
+#include <ArdPortal.h>
+```
+
+Use the same feature settings in every sketch source file that includes ArdPortal.
+The feature defaults to `0` and is disabled when Console is disabled. The initial Console connection
 starts with the error banner hidden; changing the language during the handshake
 does not mark an in-progress connection as failed. Dynamic forms use `/api/events` for live value updates without console log
-traffic. Both endpoints share the single supported browser WebSocket connection.
+traffic. Each endpoint has its own browser WebSocket connection, receive/transmit
+buffers and heartbeat state. One console client and one events client can connect
+simultaneously; closing or reconnecting either leaves the other connected. On ESP8266, the plaintext MQTT TCP connection receives higher lwIP priority so transient portal connections cannot reclaim its slot when the TCP connection pool is full.
 Status heartbeats run every ten seconds; the browser reconnects after a stalled
 connection and fetches current values again. The browser retains up to 200
-MQTT records. The MQTT view remains visible while disconnected; publishing
+records per tab. The MQTT view remains visible while disconnected; publishing
 is disabled until both WebSocket and broker connections are available.
 
 The console publisher permits any valid MQTT publishing topic, including topics
 outside the device namespace, subject to broker permissions and packet limits.
 Received device topics and their values appear in the MQTT log.
-Internal debug records are not transmitted to the browser console. Serial output
-is not automatically captured. Log timestamps use uptime milliseconds before NTP and
+With Messages enabled, library diagnostics include Wi-Fi connection attempts,
+success, disconnects and timeouts, AP start/failure/stop, and changes in the
+number of connected AP clients. Client counts are sampled in `loop()`; changes
+that cancel each other between samples cannot be distinguished.
+
+MQTT payload traffic appears only in the MQTT tab, not in Messages.
+MQTT diagnostics include connection attempts (broker, port, client ID and TLS),
+success and connection duration, broker refusal codes, and disconnect reasons
+with session duration, transmit idle time, maximum loop gap and free heap. No
+passwords are logged. When the feature is disabled, diagnostic records are neither stored
+nor transmitted, and AP diagnostic sampling is omitted.
+
+Library diagnostic records are transmitted to Messages. Developers can use
+`portal.logMessage(message)` or the equivalent `portal.log(message)` instead of
+`Serial.println()` for their own diagnostic lines:
+
+```cpp
+portal.logMessage("Sensor initialized");
+portal.logMessage(String("Free heap: ") + ESP.getFreeHeap());
+portal.log(String("Temperature: ") + temperature);
+```
+
+These methods do not publish to MQTT or write to Serial. They work without a
+broker connection and become no-ops when `ARDPORTAL_ENABLE_CONSOLE_MESSAGES=0`. Diagnostic
+text is limited to 320 bytes per record; both tabs share the bounded device
+history described above. Serial output is not automatically captured. Log timestamps use uptime milliseconds before NTP and
 date/time afterward. Existing log text keeps the language in which it was emitted.
 
 OTA accepts a raw `.bin` compiled for the same board and partition layout.
@@ -1666,7 +1702,9 @@ The HTTP server supports one client at a time, bounded read/write chunks,
 Content-Length and connection-close responses. It does not support chunked
 encoding or HTTP keep-alive. Header limit: 1536 bytes; form limit: 14336 bytes;
 regular request timeout: 5 seconds, storage response: 30 seconds, OTA inactivity:
-15 seconds. WebSocket frames must be masked, unfragmented and at most 1024 bytes.
+15 seconds. WebSocket frames must be masked and unfragmented. Console payloads
+are limited to 1024 bytes; the events connection has a 136-byte receive buffer
+for control frames and does not accept application commands.
 
 ## Languages and adding translations
 

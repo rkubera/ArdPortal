@@ -17,6 +17,8 @@ class ArdPortal;
 #include <ESP8266WiFi.h>
 #endif
 
+#include "MqttTransport.h"
+
 // Owns the MQTT protocol, transport, TLS session and connection trial.
 class ArdMqtt {
 public:
@@ -61,7 +63,7 @@ private:
   const Config& saveBaseline() const;
   void completeTrialSave(bool saved, const String& error, bool stillConnected);
 
-  WiFiClient _mqtt;
+  ArdMqttTransport _mqtt;
 #if ARDPORTAL_ENABLE_MQTT_TLS
 #if defined(ESP8266)
   std::unique_ptr<BearSSL::X509List> _trustAnchors;
@@ -80,6 +82,7 @@ private:
   uint8_t _mqttResult = 0;
   String _mqttResultMessage;
   uint32_t _mqttSince = 0, _lastTx = 0, _pingSince = 0, _txSince = 0;
+  uint32_t _lastServiceMs=0,_maxServiceGapMs=0;
   bool _pingPending = false;
   uint8_t _rx[PacketCapacity], _tx[PacketCapacity];
   size_t _rxSize = 0, _txSize = 0, _txOffset = 0;
@@ -87,7 +90,7 @@ private:
   bool _subscriptionPending = false;
   uint32_t _subscriptionSince = 0, _packetSince = 0;
   void serviceMqtt(uint32_t now);
-  void closeMqtt();
+  void closeMqtt(const char* reason=nullptr);
   bool publishRaw(const char* topic, const char* payload, bool retain = false);
   bool subscribeRaw(const char* topic);
   bool queuePacket(uint8_t type, const String& body);

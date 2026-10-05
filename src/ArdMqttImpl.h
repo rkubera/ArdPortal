@@ -1,3 +1,4 @@
+#include "DeviceName.h"
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #include "ArdPortalFeatures.h"
@@ -20,7 +21,7 @@ bool ArdMqtt::queuePacket(uint8_t type, const String& body) {
 
 String ArdMqtt::mqttTopic(const char* kind, const char* command) const {
   if (!kind || !command) return "";
-  String topic = String(kind) + "/" + _portal._config.deviceName + "/" + command;
+  String topic = String(kind) + "/" + ArdDeviceName::mqtt(_portal._config.deviceName) + "/" + command;
   return validMqttTopic(topic, true) ? topic : String();
 }
 
@@ -28,7 +29,7 @@ bool ArdMqtt::validMqttTopic(const String& topic, bool subscription) const {
   int first = topic.indexOf('/'), second = topic.indexOf('/', first + 1);
   if (first < 0 || second < 0 || topic.indexOf('/', second + 1) >= 0) return false;
   String kind = topic.substring(0, first), command = topic.substring(second + 1);
-  if ((kind != "cmnd" && kind != "get" && kind != "stat") || topic.substring(first + 1, second) != _portal._config.deviceName || !command.length()) return false;
+  if ((kind != "cmnd" && kind != "get" && kind != "stat") || topic.substring(first + 1, second) != ArdDeviceName::mqtt(_portal._config.deviceName) || !command.length()) return false;
   if (subscription && (command == "+" || command == "#")) return true;
   for (size_t i = 0; i < command.length(); ++i) if (uint8_t(command[i]) < 32 || command[i] == '#' || command[i] == '+') return false;
   return true;
@@ -60,8 +61,22 @@ bool ArdMqtt::subscribeRaw(const char* topic) {
   _subscriptionId = id; _subscriptionPending = true; _subscriptionSince = millis(); return true;
 }
 
-void ArdMqtt::closeMqtt() {
-  if (_mqttState == MqttState::Connecting || _mqttState == MqttState::Connected) _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_147));
+void ArdMqtt::closeMqtt(const char* reason) {
+  if (reason || _mqttState == MqttState::Connecting || _mqttState == MqttState::Connected) {
+    String message=ArdUILanguage::text(ArdUILanguage::Key::s_147);
+    _portal.consoleLine(true,message);
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+    if(reason){
+      const uint32_t now=millis();
+      message+=String(" [")+reason+"; state="+(_mqttState==MqttState::Connected?"connected":_mqttState==MqttState::Connecting?"connecting":"retry");
+      message+="; sessionMs="+String(uint32_t(now-_mqttSince))+"; txIdleMs="+String(uint32_t(now-_lastTx));
+      message+="; maxLoopGapMs="+String(_maxServiceGapMs)+"; heap="+String(ESP.getFreeHeap())+"]";
+    }
+    _portal.logMessage(message);
+#else
+    (void)reason;
+#endif
+  }
   if (_mqttTrial) _mqttTrialFailed = true;
 #if ARDPORTAL_ENABLE_MQTT_TLS
   if (_tls) { _tls->stop(); _tls.reset(); }
@@ -79,9 +94,17 @@ void ArdMqtt::closeMqtt() {
 
 bool ArdMqtt::processPacket(uint8_t type, const uint8_t* body, size_t length) {
   if (_mqttState == MqttState::Connecting) {
-    if (type != 0x20 || length != 2 || body[0] != 0 || body[1] != 0) return false;
+    if (type != 0x20 || length != 2 || body[0] != 0 || body[1] != 0) {
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+      if(type==0x20 && length==2 && body[1]!=0) _portal.logMessage(String("MQTT CONNACK refused; code=")+String(body[1]));
+#endif
+      return false;
+    }
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_148));
-    _mqttState = MqttState::Connected; _lastTx = millis(); 
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+    _portal.logMessage(String("MQTT connected; clientId=")+_clientId+"; connectMs="+String(uint32_t(millis()-_mqttSince)));
+#endif
+    _mqttState = MqttState::Connected; _lastTx = _lastServiceMs = millis(); _maxServiceGapMs=0;
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
 _portal._appControls.resetMqtt();
 #endif
@@ -119,6 +142,8 @@ _portal._appControls.resetMqtt();
 }
 
 void ArdMqtt::serviceMqtt(uint32_t now) {
+  if(_mqttState==MqttState::Connected){const uint32_t gap=uint32_t(now-_lastServiceMs);if(gap>_maxServiceGapMs)_maxServiceGapMs=gap;}
+  _lastServiceMs=now;
   if (_portal._httpConfigUpload) return;
   if (!_portal._config.host.length()) { _mqttState = MqttState::Disabled; return; }
   if (!_portal.wifiConnected()) { _mqttState = MqttState::WaitingForWifi; return; }
@@ -135,7 +160,11 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
   if (_mqttState == MqttState::WaitingForWifi) _mqttState = MqttState::WaitingRetry;
   if (_mqttState == MqttState::WaitingRetry && uint32_t(now - _mqttSince) >= _portal._options.retryMs) {
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_145));
-    if (!connectMqttTransport()) { _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_151)); closeMqtt(); return; }
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+    _portal.logMessage(String("MQTT connecting: ")+_portal._config.host+":"+String(_portal._config.port)+
+      "; clientId="+_clientId+"; TLS="+String(_portal._config.mqttTls ? "yes" : "no"));
+#endif
+    if (!connectMqttTransport()) { _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_151)); closeMqtt("transport connect failed"); return; }
     _mqttState = MqttState::Connecting; _mqttSince = _lastTx = millis();
     String body; appendText(body, "MQTT"); body += char(4);
     uint8_t flags = 2;
@@ -153,21 +182,17 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
     if (!queuePacket(0x10, body)) { closeMqtt(); return; }
   }
   if (_mqttState != MqttState::Connecting && _mqttState != MqttState::Connected) return;
-  if (!mqttTransport().connected() && !mqttTransport().available()) { closeMqtt(); return; }
+  if (!mqttTransport().connected() && !mqttTransport().available()) { closeMqtt("transport closed"); return; }
   now = millis();
-  if ((_mqttState == MqttState::Connecting && uint32_t(now - _mqttSince) >= _portal._options.mqttTimeoutMs) ||
-      (_pingPending && uint32_t(now - _pingSince) >= _portal._options.mqttTimeoutMs) ||
-      (_subscriptionPending && uint32_t(now - _subscriptionSince) >= _portal._options.mqttTimeoutMs) ||
-      (_rxSize && uint32_t(now - _packetSince) >= _portal._options.mqttTimeoutMs)) { closeMqtt(); return; }
   if (_txSize) {
     size_t length = _txSize - _txOffset; if (length > 256) length = 256;
     size_t written = writeMqtt(_tx + _txOffset, length); _txOffset += written;
     if (_txOffset == _txSize) { _txSize = _txOffset = 0; _lastTx = millis(); }
-    else if (uint32_t(now - _txSince) >= _portal._options.mqttTimeoutMs) { closeMqtt(); return; }
+    else if (uint32_t(now - _txSince) >= _portal._options.mqttTimeoutMs) { closeMqtt("send timeout"); return; }
   }
   // Consume at most 256 bytes per loop. Remaining Length can span multiple loops.
   for (size_t budget = 0; budget < 256 && mqttTransport().available(); ++budget) {
-    if (_rxSize >= PacketCapacity) { closeMqtt(); return; }
+    if (_rxSize >= PacketCapacity) { closeMqtt("receive buffer full"); return; }
     int c = mqttTransport().read(); if (c < 0) break;
     if (!_rxSize) _packetSince = millis();
     _rx[_rxSize++] = c;
@@ -177,13 +202,19 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
       remaining += (_rx[i] & 127) * multiplier; multiplier *= 128; header = i + 1;
       if (!(_rx[i] & 128)) { complete = true; break; }
     }
-    if (!complete) { if (_rxSize >= 5) { closeMqtt(); return; } continue; }
-    if (remaining > PacketCapacity - header) { closeMqtt(); return; }
+    if (!complete) { if (_rxSize >= 5) { closeMqtt("invalid packet length"); return; } continue; }
+    if (remaining > PacketCapacity - header) { closeMqtt("packet too large"); return; }
     if (_rxSize == header + remaining) {
       bool ok = processPacket(_rx[0], _rx + header, remaining); _rxSize = 0;
-      if (!ok) { closeMqtt(); return; }
+      if (!ok) { closeMqtt("packet rejected"); return; }
     }
   }
+  // Consume buffered acknowledgements before judging deadlines after a slow loop.
+  now=millis();
+  if(_mqttState==MqttState::Connecting&&uint32_t(now-_mqttSince)>=_portal._options.mqttTimeoutMs){closeMqtt("CONNACK timeout");return;}
+  if(_pingPending&&uint32_t(now-_pingSince)>=_portal._options.mqttTimeoutMs){closeMqtt("PINGRESP timeout");return;}
+  if(_subscriptionPending&&uint32_t(now-_subscriptionSince)>=_portal._options.mqttTimeoutMs){closeMqtt("SUBACK timeout");return;}
+  if(_rxSize&&uint32_t(now-_packetSince)>=_portal._options.mqttTimeoutMs){closeMqtt("incomplete packet timeout");return;}
   if (connected() && !_pingPending && !_txSize && uint32_t(millis() - _lastTx) >= uint32_t(_portal._options.keepAliveSeconds) * 500) {
     if (queuePacket(0xc0, "")) { _pingPending = true; _pingSince = millis(); }
   }
@@ -223,6 +254,7 @@ bool ArdMqtt::connectMqttTransport() {
   _mqtt.setTimeout(_portal._options.tcpTimeoutMs);
   if (!_mqtt.connect(ip, _portal._config.port)) return false;
 #endif
+  _mqtt.protectConnection();
   _mqtt.setTimeout(100); _mqtt.setNoDelay(true); return true;
 }
 
