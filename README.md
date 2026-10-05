@@ -110,10 +110,16 @@ resource-limited `parse()` and `stringify()` operations. `ArdFSVolume.h` and
 
 ## Quick start
 
-Open `ArdUI.ino` in Arduino IDE. Select the correct board, physical flash size and
-a partition layout with space for ArdFS and OTA. The library in
-`src/ArdPortal` compiles with the sketch. For an independent sketch, copy that
-folder to your Arduino libraries directory as `ArdPortal`.
+ArdPortal is a standalone Arduino library. Its complete distribution contains
+`library.properties`, `src`, `examples`, `media`, this README and the MIT license.
+The external `ArdUI.ino` demo is not part of the library.
+
+To install, select **Sketch → Include Library → Add .ZIP Library** and choose a
+ZIP containing the `ArdPortal` library folder. If downloading the whole ArdUI
+project, the library is in `libraries/ArdPortal`: copy that folder into your
+sketchbook's `libraries` directory, or ZIP that folder for installation.
+Open an example from **File → Examples → ArdPortal**, then select the board,
+physical flash size and partition layout with space for ArdFS and OTA.
 
 ```cpp
 #include <ArdPortal.h>
@@ -262,7 +268,7 @@ needed for a custom selection of controls.
 
 ## Examples
 
-Examples are in `src/ArdPortal/Examples`:
+Examples are in `examples`:
 
 | Example | Purpose |
 | --- | --- |
@@ -276,7 +282,7 @@ Examples are in `src/ArdPortal/Examples`:
 | `AsyncStorage` | Standalone cooperative journal storage without a portal |
 | `JsonBasics` | Standalone JSON objects, arrays, serialization and parsing |
 
-The main `ArdUI.ino` additionally demonstrates MQTT subscriptions to device
+The main the external `ArdUI.ino` demo additionally demonstrates MQTT subscriptions to device
 commands/queries, publishing status and reacting to portal changes.
 
 Progress and successful actions appear in green notification boxes. Failed
@@ -578,7 +584,7 @@ definitions passed through `FPSTR()` remain in flash; only a compact index stays
 in RAM. String definitions retain their JSON text in RAM. Pages are parsed on
 demand and released after use. Application values use the existing journaled
 configuration storage.
-The main `ArdUI.ino` demonstrates every supported entity type across seven pages.
+The main the external `ArdUI.ino` demo demonstrates every supported entity type across seven pages.
 
 ### Dynamic JSON schema
 
@@ -858,7 +864,7 @@ or publication per pass, with yield between publications. Definitions remain in
 their registered source; compact masks track pending transitions.
 The main sketch includes a Dependencies page with a switch controlling visibility
 of a level slider and a note input. A minimal standalone version is available in
-`Examples/DynamicPagesWithDependencies/DynamicPagesWithDependencies.ino`.
+`examples/DynamicPagesWithDependencies/DynamicPagesWithDependencies.ino`.
 
 All controls accept optional `icon: "mdi:..."`. If omitted, no icon override is sent:
 Home Assistant selects its own icon. For basic select fields, HA displays option labels chosen from `name`/`names`;
@@ -1185,7 +1191,7 @@ For example, a humidifier with a narrower target range and a custom mode:
 
 Changing a preset without matching its HA topics/templates can produce a portal
 that works locally but does not communicate correctly with HA. The full demo in
-`ArdUI.ino` and `Examples/DynamicPages` are starting points; use actual hardware
+the external `ArdUI.ino` demo and `examples/DynamicPages` are starting points; use actual hardware
 feedback in production. The library does not enforce a whitelist of physical
 operating states for action-only devices; the state examples above identify the
 values recognized by the shipped portal button highlighting.
@@ -1685,7 +1691,7 @@ labels use their optional `names` translations and fall back to `name`.
 All portal descriptions, labels, confirmations and native system messages are
 configured in one JSON file per language:
 
-- `src/ArdPortal/languages/en.json` — English
+- `src/languages/en.json` — English
 
 The library includes only English, so the language selector is hidden by default.
 Dynamic examples use English default names. Additional languages can still be added.
@@ -1713,7 +1719,7 @@ To add another language:
 1. Copy `en.json` to a file named after the language code, for example `de.json`.
 2. Set `code` to `de`, `name` to `Deutsch`, and `locale` to `de-DE`.
 3. Translate `strings`, retaining every key and `{placeholder}` name.
-4. From the project root, run `python3 src/ArdPortal/tools/generate_languages.py`.
+4. From the project root, run `python3 libraries/ArdPortal/src/tools/generate_languages.py`.
 5. Recompile/upload the firmware. No separate filesystem upload is needed.
 
 From an installed library directory, run `python3 tools/generate_languages.py`.
@@ -1891,10 +1897,9 @@ use a trusted AP/LAN. Verified MQTT TLS does not add HTTP authentication.
 bash tests/run-host.sh
 node tests/portal-ui.cjs
 python3 tests/languages.py
-python3 src/ArdPortal/tools/generate_languages.py --check
-python3 src/ArdPortal/tools/generate_portal_assets.py --check
-python3 src/ArdPortal/tools/generate_state_schemas.py --check
-python3 src/ArdPortal/tools/sync_readme.py --check
+python3 libraries/ArdPortal/src/tools/generate_languages.py --check
+python3 libraries/ArdPortal/src/tools/generate_portal_assets.py --check
+python3 libraries/ArdPortal/src/tools/generate_state_schemas.py --check
 ```
 
 Host tests use AddressSanitizer/UndefinedBehaviorSanitizer and simulated core,
@@ -1906,20 +1911,19 @@ flash/radio timing, hardware power-loss behavior, OS captive window opening,
 sensor readings or actual HA/broker interoperability; verify those on hardware.
 
 For a standalone Arduino build, use your installed `arduino-cli`, board FQBN and
-`--library src/ArdPortal`. Measure the generated `.bin` as well as the reported
+`--library libraries/ArdPortal`. Measure the generated `.bin` as well as the reported
 code/static RAM sizes. Results depend on core version, board layout, feature
 flags, definitions and external sensor libraries; runtime heap/stack consumption
 is additional. Do not assume one example's measured size applies to your build.
 
 After editing generated-source inputs:
 
-- Languages: `python3 src/ArdPortal/tools/generate_languages.py`.
-- Portal markup/scripts/styles: `python3 src/ArdPortal/tools/generate_portal_assets.py`.
-- HA descriptors: `python3 src/ArdPortal/tools/generate_state_schemas.py`.
-- Project README: `python3 src/ArdPortal/tools/sync_readme.py`.
+- Languages: `python3 libraries/ArdPortal/src/tools/generate_languages.py`.
+- Portal markup/scripts/styles: `python3 libraries/ArdPortal/src/tools/generate_portal_assets.py`.
+- HA descriptors: `python3 libraries/ArdPortal/src/tools/generate_state_schemas.py`.
 
 Arduino builds consume the generated headers and do not require Python. Keep
-this README and Examples/README.md in English, and place translated portal
+this README and examples/README.md in English, and place translated portal
 labels in the language catalogs.
 
 ### Troubleshooting runtime failures
@@ -1941,7 +1945,7 @@ durable-save notification.
 
 ### DHT example
 
-`Examples/DHT/DHT.ino` uses Adafruit's DHT library and Unified Sensor dependency,
+`examples/DHT/DHT.ino` uses Adafruit's DHT library and Unified Sensor dependency,
 with a DHT22 on GPIO2, OTA, MQTT, HA and Console enabled. TLS, dependencies and
 unused controls are excluded; slider, text and select are enabled. Use a pull-up
 from DATA to 3.3 V and ensure GPIO2 is high during ESP8266 boot.

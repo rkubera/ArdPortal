@@ -14,8 +14,9 @@
 | `AsyncStorage/AsyncStorage.ino` | Standalone asynchronous/cooperative journal read/write without starting a portal. |
 | `JsonBasics/JsonBasics.ino` | JSON objects/arrays, serialization, parsing and field access; output goes to Serial at 115200 baud. |
 
-Copy `src/ArdPortal` into your Arduino libraries directory as `ArdPortal`, then
-open the desired `.ino` file from this `Examples` directory. Select a Wi-Fi
+Copy the complete `ArdPortal` library folder into your Arduino sketchbook’s
+`libraries` directory, then
+open the desired `.ino` file from this `examples` directory. Select a Wi-Fi
 capable ESP8266 or ESP32 board. Storage uses ArdFS and JSON uses ArdJSON. Only the DHT11 example needs external libraries: Adafruit DHT sensor library and its Adafruit Unified Sensor dependency.
 
 For ESP-12F, choose its actual flash size and a layout with filesystem/OTA space.
