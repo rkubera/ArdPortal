@@ -1,0 +1,227 @@
+{
+  "ui_050": [
+    "infrared",
+    "notify",
+    "vacuum"
+  ],
+  "ui_101": [
+    "climate",
+    "humidifier",
+    "water_heater"
+  ],
+  "ui_102": [
+    "climate",
+    "humidifier",
+    "water_heater"
+  ],
+  "ui_103": [
+    "climate",
+    "humidifier",
+    "water_heater"
+  ],
+  "ui_104": [
+    "climate",
+    "vacuum"
+  ],
+  "ui_107": [
+    "button"
+  ],
+  "ui_108": [
+    "scene"
+  ],
+  "ui_109": [
+    "notify"
+  ],
+  "ui_110": [
+    "infrared"
+  ],
+  "ui_111": [
+    "fan",
+    "humidifier",
+    "light",
+    "siren"
+  ],
+  "ui_112": [
+    "light"
+  ],
+  "ui_113": [
+    "light"
+  ],
+  "ui_114": [
+    "fan"
+  ],
+  "ui_115": [
+    "fan"
+  ],
+  "ui_116": [
+    "fan"
+  ],
+  "ui_117": [
+    "cover",
+    "lock",
+    "valve"
+  ],
+  "ui_118": [
+    "cover",
+    "valve"
+  ],
+  "ui_119": [
+    "cover",
+    "vacuum"
+  ],
+  "ui_120": [
+    "cover",
+    "valve"
+  ],
+  "ui_121": [
+    "cover"
+  ],
+  "ui_122": [
+    "lock"
+  ],
+  "ui_123": [
+    "lock"
+  ],
+  "ui_124": [
+    "alarm_control_panel"
+  ],
+  "ui_125": [
+    "alarm_control_panel"
+  ],
+  "ui_126": [
+    "alarm_control_panel"
+  ],
+  "ui_127": [
+    "alarm_control_panel"
+  ],
+  "ui_128": [
+    "alarm_control_panel"
+  ],
+  "ui_129": [
+    "humidifier"
+  ],
+  "ui_130": [
+    "siren"
+  ],
+  "ui_131": [
+    "siren"
+  ],
+  "ui_132": [
+    "siren"
+  ],
+  "ui_133": [
+    "vacuum"
+  ],
+  "ui_134": [
+    "lawn_mower",
+    "vacuum"
+  ],
+  "ui_135": [
+    "lawn_mower",
+    "vacuum"
+  ],
+  "ui_136": [
+    "vacuum"
+  ],
+  "ui_137": [
+    "vacuum"
+  ],
+  "ui_138": [
+    "vacuum"
+  ],
+  "ui_139": [
+    "lawn_mower"
+  ],
+  "ui_140": [
+    "update"
+  ],
+  "ui_141": [
+    "climate",
+    "humidifier",
+    "water_heater"
+  ],
+  "ui_142": [
+    "climate",
+    "humidifier",
+    "water_heater"
+  ],
+  "ui_143": [
+    "climate",
+    "humidifier",
+    "water_heater"
+  ],
+  "ui_144": [
+    "climate",
+    "water_heater"
+  ],
+  "ui_145": [
+    "climate"
+  ],
+  "ui_146": [
+    "climate",
+    "humidifier"
+  ],
+  "ui_147": [
+    "climate"
+  ],
+  "ui_148": [
+    "climate"
+  ],
+  "ui_159": [
+    "humidifier"
+  ],
+  "ui_160": [
+    "binary_sensor"
+  ],
+  "ui_161": [
+    "binary_sensor"
+  ],
+  "ui_162": [
+    "binary_sensor"
+  ],
+  "ui_167": [
+    "climate"
+  ],
+  "ui_168": [
+    "climate"
+  ],
+  "ui_169": [
+    "climate"
+  ],
+  "ui_170": [
+    "climate"
+  ],
+  "ui_171": [
+    "climate"
+  ],
+  "ui_172": [
+    "climate"
+  ],
+  "ui_173": [
+    "climate"
+  ],
+  "ui_174": [
+    "humidifier",
+    "water_heater"
+  ],
+  "ui_175": [
+    "humidifier",
+    "water_heater"
+  ],
+  "ui_176": [
+    "water_heater"
+  ],
+  "ui_177": [
+    "water_heater"
+  ],
+  "ui_178": [
+    "water_heater"
+  ],
+  "ui_179": [
+    "water_heater"
+  ],
+  "ui_186": [
+    "infrared",
+    "vacuum"
+  ]
+}
