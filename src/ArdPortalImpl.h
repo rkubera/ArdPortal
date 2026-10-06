@@ -298,7 +298,7 @@ void ArdPortal::loop() {
     if (storageBusy()) { flushConfig(); return; }
     if (!_beforeRestartCalled) {
       _beforeRestartCalled = true;
-      if (_restartReason != RestartReason::FactoryReset && _beforeRestart) {
+      if ((_restartReason == RestartReason::Portal || _restartReason == RestartReason::FirmwareUpdate) && _beforeRestart) {
         _beforeRestartRunning = true;
         _beforeRestart(_restartReason);
         _beforeRestartRunning = false;

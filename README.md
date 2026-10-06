@@ -506,7 +506,7 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | `setDeviceDescription(value)` / `setDeviceManufacturer(value)` | Merge and schedule one metadata change into the pending Config. |
 | `onConfigChanged(callback)` | `void(const Config&, ChangeSource)` after a changed Config is applied. |
 | `onPortalConfigChanged(callback)` | `void(const Config&)` for applied changes whose source is the portal. |
-| `onBeforeRestart(callback)` | `void(RestartReason)` once immediately before an ArdPortal restart; factory reset skips it. |
+| `onBeforeRestart(callback)` | `void(RestartReason)` once immediately before an ArdPortal restart; factory reset and storage formatting skip it. |
 | `onConfigSaved(callback)` | `void(bool ok, const String& error)` after storage completion or an identical-save skip. A successful network change can still await application. |
 | `getAppConfigValue(key)` | Copy of live RAM state first, then persisted application value, then registered default; missing unregistered key is Undefined. |
 | `setAppConfigValue(key, value)` | Persistent application update, except registered descriptor-based fields with `persist:false`, which use RAM state. Rejects invalid/Undefined values, invalid registered values and unavailable transactions. |
@@ -1329,7 +1329,7 @@ copy and other files remain. Explicit formatting deletes all ArdFS files and
 restarts the device. The default factory identity is `ArdUI-<chip ID>` and AP
 password `1234567890`.
 
-Before a manual restart, successful OTA or storage-format restart, register a
+Before a manual restart or successful OTA restart, register a
 cleanup callback:
 
 ```cpp
@@ -1343,8 +1343,8 @@ portal.onBeforeRestart([&](ArdPortal::RestartReason reason) {
 ```
 
 `RestartReason` identifies the triggering operation: `Portal` (Restart button),
-`FirmwareUpdate` (successful `.bin` or ESP8266 `.bin.gz` OTA), or `StorageFormat`.
-**Factory reset skips this callback**, so application cleanup cannot repopulate
+`FirmwareUpdate` (successful `.bin` or ESP8266 `.bin.gz` OTA).
+**Factory reset and storage formatting skip this callback**, so application cleanup cannot repopulate
 the freshly reset configuration. The callback runs once from `portal.loop()`, after the HTTP response connection
 has closed, the restart delay has elapsed and earlier storage operations have
 completed. During the callback, `setAppConfigValue()` and `removeAppConfigValue()`
@@ -1355,7 +1355,7 @@ passes. `ESP.restart()` runs only after storage finishes and `onConfigSaved()`
 has reported completion. If a configuration write fails, `onConfigSaved(false, error)` and
 `storageError()` report the failure; restart proceeds after the failed transaction
 has finished. An unsuccessful OTA/reset/format does
-not invoke the callback. **Factory reset still skips it.**
+not invoke the callback. **Factory reset and storage formatting still skip it.**
 
 Do not wait for an asynchronous save inside the callback: queue it and return.
 Reentrant `portal.loop()` calls from the callback are ignored. This mechanism
