@@ -157,9 +157,9 @@ bool ArdAppControls::applyAppState(const String& key,const V& value,ChangeSource
   return true;
 }
 
-bool ArdAppControls::setAppStateValue(const char* key,const V& value,bool publishMqtt) {return key&&applyAppState(key,value,ChangeSource::Application,publishMqtt);}
+bool ArdAppControls::setAppConfigStateValue(const char* key,const V& value,bool publishMqtt) {return key&&applyAppState(key,value,ChangeSource::Application,publishMqtt);}
 
-bool ArdAppControls::emitAppEvent(const char* key,const V& value) {
+bool ArdAppControls::emitAppConfigEvent(const char* key,const V& value) {
 #if ARDPORTAL_CONTROL_SUPPORT_EVENTS
   if(!key) return false;
   const V& f=_portal._dynamic.field(key);if((f["type"].asString()!="event"&&f["type"].asString()!="device_trigger"&&f["type"].asString()!="tag")||!ArdDynamicPages::validValue(f,value)) return false;
@@ -281,7 +281,7 @@ bool ArdAppControls::acceptMqttState(const String& key,V value) {
 }
 void ArdAppControls::prepareMqtt(uint32_t now) {
   // Only persistence waits for flash. Accepted commands have already run.
-  if(_mqttAppQueue.length()&&!_portal.storageBusy()&&!_portal._httpWaitingStorage) {
+  if(_mqttAppQueue.length()&&!_portal.portalAndAppConfigBusy()&&!_portal._httpWaitingStorage) {
     V app=_portal._appConfig,keys=_mqttAppQueue.keys();
     for(size_t i=0;i<keys.length();++i) {
       String key=keys[i].asString(); app[key]=_mqttAppQueue[key];

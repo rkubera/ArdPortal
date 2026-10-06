@@ -5,11 +5,11 @@
 #include "ConfigJson.h"
 using V = ArdJSON::JSONVar;
 
-bool ArdPortal::addPortalPage(const __FlashStringHelper* definition) {
-  if(!definition || !addPortalPage(String(definition)))return false;
+bool ArdPortal::addAppConfigPage(const __FlashStringHelper* definition) {
+  if(!definition || !addAppConfigPage(String(definition)))return false;
   _dynamic.pages.useFlash(_dynamic.pages.length()-1,definition);return true;
 }
-bool ArdPortal::addPortalPage(const String& definition) {
+bool ArdPortal::addAppConfigPage(const String& definition) {
   ArdJSON::Limits limits; limits.maxNodes=4096; limits.maxInputBytes=32768;
   V page=_json.parse(definition,nullptr,limits);
   if(page["fields"].type()!=V::Type::Array) return false;
@@ -104,7 +104,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     const V& field=_dynamic.field(request["field"].asString());bool belongs=false;
     for(size_t p=0;p<_dynamic.pages.length();++p) if(_dynamic.pages.id(p)==request["page"].asString()) if(_dynamic.pages.belongs(p,request["field"].asString())) belongs=true;
     _appControls.clearControlStage();uint64_t index;if(!belongs||!request["control"].toUnsignedInteger(index)||!_appControls.appControl(field,size_t(index),request["value"],ChangeSource::Portal)) {
-      const bool unavailable=belongs&&field["persist"].asBool()&&!_storage.mounted();String error=ArdUILanguage::text(unavailable?ArdUILanguage::Key::s_170:_appControls.controlStage()==6?ArdUILanguage::Key::s_207:ArdUILanguage::Key::s_177)+" ["+request["field"].asString()+" #"+String(_appControls.controlStage())+"]";log(error);reply(unavailable?503:storageBusy()?409:400,"text/plain",error);return true;
+      const bool unavailable=belongs&&field["persist"].asBool()&&!_storage.mounted();String error=ArdUILanguage::text(unavailable?ArdUILanguage::Key::s_170:_appControls.controlStage()==6?ArdUILanguage::Key::s_207:ArdUILanguage::Key::s_177)+" ["+request["field"].asString()+" #"+String(_appControls.controlStage())+"]";log(error);reply(unavailable?503:portalAndAppConfigBusy()?409:400,"text/plain",error);return true;
     }
     replyMessage(202,ArdUILanguage::Key::s_175);return true;
   }
@@ -134,8 +134,8 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
 }
 
 
-bool ArdPortal::setAppStateValue(const char* key,const V& value,bool publishMqtt) { return _appControls.setAppStateValue(key,value,publishMqtt); }
-bool ArdPortal::queueAppStatePublish(const char* key) {
+bool ArdPortal::setAppConfigStateValue(const char* key,const V& value,bool publishMqtt) { return _appControls.setAppConfigStateValue(key,value,publishMqtt); }
+bool ArdPortal::queueAppConfigStatePublish(const char* key) {
 #if ARDPORTAL_ENABLE_MQTT
   if(!key) return false;
   const auto& field=_dynamic.field(key);
@@ -145,5 +145,5 @@ bool ArdPortal::queueAppStatePublish(const char* key) {
   (void)key;return false;
 #endif
 }
-bool ArdPortal::emitAppEvent(const char* key,const V& value) { return _appControls.emitAppEvent(key, value); }
+bool ArdPortal::emitAppConfigEvent(const char* key,const V& value) { return _appControls.emitAppConfigEvent(key, value); }
 

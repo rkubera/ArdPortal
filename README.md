@@ -145,7 +145,7 @@ open a configuration window automatically.
 
 `begin()` starts initialization and returns immediately after validating options;
 storage initialization and configuration loading continue through `loop()`.
-Use `configurationReady()` or `onPortalAndAppConfigReady` before accessing saved settings.
+Use `portalAndAppConfigReady()` or `onPortalAndAppConfigReady` before accessing saved settings.
 Call `loop()` frequently. Methods and callbacks run in the Arduino task: do not
 call `loop()` recursively or access the portal concurrently from other tasks.
 
@@ -176,8 +176,8 @@ Unspecified options default to `1` (enabled):
 | `ARDPORTAL_ENABLE_DEPENDENCIES` | Removes `visibleWhen` evaluation, conditional portal visibility and HA discovery removal/recreation. |
 
 To omit dynamic forms entirely, add `#define ARDPORTAL_ENABLE_DYNAMIC_PAGES 0`
-before `ArdPortal.h`. It defaults to `1`. `addPortalPage()`, `setAppStateValue()`
-and `emitAppEvent()` then return false and `onAppCommand()` is a no-op. Generic
+before `ArdPortal.h`. It defaults to `1`. `addAppConfigPage()`, `setAppConfigStateValue()`
+and `emitAppConfigEvent()` then return false and `onAppConfigCommand()` is a no-op. Generic
 `getAppConfigValue()`, `setAppConfigValue()`, `removeAppConfigValue()` and their
 change callback remain available and persist through ArdFS. When Console is
 also disabled, WebSocket handling and buffers are omitted as well.
@@ -218,7 +218,7 @@ uses this four-control selection. `MinimalPortal` instead sets
 `ARDPORTAL_ENABLE_DYNAMIC_PAGES` to `0`, omitting all field types. This switch
 also overrides explicitly enabled control, HA and dependency flags. OTA, MQTT
 and Console can still be enabled independently. Disabled field definitions are
-rejected by `addPortalPage()`; they are not silently converted into another type.
+rejected by `addAppConfigPage()`; they are not silently converted into another type.
 Guard your own JSON definitions and registration calls too when they contain
 excluded types; literals owned by the sketch cannot be removed by the library.
 
@@ -355,6 +355,32 @@ DNS stops when the AP stops.
 
 ## Integrated configuration API
 
+Names explicitly identify the domain: `PortalConfig` covers Wi-Fi, MQTT and device
+settings; `AppConfig` covers custom JSON values, dynamic pages, commands, state and
+events. `PortalAndAppConfig` denotes shared loading/storage operations: both domains
+are persisted in one document. There are no compatibility aliases for old names.
+
+| Previous name | Current name |
+| --- | --- |
+| `ArdPortal::Config` | `ArdPortal::PortalConfig` |
+| `onConfigChanged` | `onPortalConfigChanged(config, source)` |
+| `addPortalPage` | `addAppConfigPage` |
+| `onAppCommand` | `onAppConfigCommand` |
+| `setAppStateValue` | `setAppConfigStateValue` |
+| `queueAppStatePublish` | `queueAppConfigStatePublish` |
+| `emitAppEvent` | `emitAppConfigEvent` |
+| `onConfigSaved` | `onPortalAndAppConfigSaved` |
+| `configurationReady` | `portalAndAppConfigReady` |
+| `flushConfig` | `flushPortalAndAppConfig` |
+| `storageBusy` | `portalAndAppConfigBusy` |
+| `storageOK` / `storageError` | `portalAndAppConfigStorageOK` / `portalAndAppConfigError` |
+| `validConfig` | `validPortalConfig` |
+| `setDeviceManufacturer` / `setDeviceDescription` | `setPortalConfigDeviceManufacturer` / `setPortalConfigDeviceDescription` |
+| `Options::configSaveDelayMs` / `configMinWriteIntervalMs` | `Options::appConfigSaveDelayMs` / `appConfigMinWriteIntervalMs` |
+
+`onPortalAndAppConfigReady` retains its explicit shared name.
+
+
 The portal owns storage initialization, configuration loading and saving.
 Application code uses the methods and notification callbacks below.
 
@@ -371,35 +397,40 @@ portal.onPortalAndAppConfigReady([](bool restored) {
   }
 });
 
-portal.onPortalConfigChanged([](const ArdPortal::Config& config) {
-  // Portal settings were persisted and applied successfully.
-});
-
-portal.onConfigChanged([](const ArdPortal::Config& config,
+portal.onPortalConfigChanged([](const ArdPortal::PortalConfig& config,
                          ArdPortal::ChangeSource source) {
+  // Called only when PortalConfig changes; AppConfig-only writes do not trigger it.
   // source: Application, Portal, Mqtt or FactoryReset.
 });
 
-portal.onConfigSaved([](bool ok, const String& error) {
+portal.onPortalAndAppConfigSaved([](bool ok, const String& error) {
   // Write/readback completed, or an identical document was skipped.
   // If ok is false, the pending update was rejected; application code may retry.
 });
 ```
 
+`onPortalConfigChanged` and `onAppConfigValueChanged` each use one callback for
+all change sources. Filter `source == ArdPortal::ChangeSource::Portal` to handle
+only web portal changes.
+For persisted settings, notifications follow successful saving and application;
+unchanged values and failed writes do not trigger change callbacks. AppConfig
+RAM-only state updates and MQTT commands also notify when applied in RAM.
+Use `onPortalAndAppConfigSaved` for the storage result, including unchanged or failed writes.
+
 Setters accept changes into RAM; `true` does not mean flash has already been
-written. `onConfigSaved` reports completion. Once configuration is ready:
+written. `onPortalAndAppConfigSaved` reports completion. Once configuration is ready:
 
 ```cpp
 portal.setAppConfigValue("reportInterval", 5000);
 portal.setAppConfigValue("enabled", true);
 portal.removeAppConfigValue("obsoleteKey");
 
-ArdPortal::Config changed = portal.getPortalConfig();
+ArdPortal::PortalConfig changed = portal.getPortalConfig();
 changed.deviceName = "My-Device";
 portal.setPortalConfig(changed);
 
 // Optional: bypass debounce/minimum interval; writing still happens in loop().
-portal.flushConfig();
+portal.flushPortalAndAppConfig();
 ```
 
 | Method | Meaning |
@@ -409,10 +440,10 @@ portal.flushConfig();
 | `getAppConfigValue(key)` | Copy the current application value, live state or registered field default |
 | `setAppConfigValue(key, value)` | Queue a persistent JSON value, or update a volatile extended entity |
 | `removeAppConfigValue(key)` | Queue removal of an application key |
-| `configurationReady()` | Startup loading has finished |
-| `storageBusy()` | Initialization, pending save, physical save or pending application |
-| `flushConfig()` | Bypass save delay; does not perform flash I/O in the caller |
-| `storageOK()` / `storageError()` | Result/error of the last storage operation |
+| `portalAndAppConfigReady()` | Startup loading has finished |
+| `portalAndAppConfigBusy()` | Initialization, pending save, physical save or pending application |
+| `flushPortalAndAppConfig()` | Bypass save delay; does not perform flash I/O in the caller |
+| `portalAndAppConfigStorageOK()` / `portalAndAppConfigError()` | Result/error of the last storage operation |
 
 Missing unregistered application keys return JSON `Undefined`; registered fields
 return their declared or type-specific default. Successive accepted application
@@ -420,7 +451,7 @@ updates merge into the pending document. Setters can return `false` while a writ
 OTA, MQTT trial or another settings transaction is running; retry later.
 Callbacks may read settings or queue another update when the API accepts it.
 Change callbacks are not invoked for unchanged settings or failed writes.
-`onConfigSaved` may precede applying a network change; change callbacks run after
+`onPortalAndAppConfigSaved` may precede applying a network change; change callbacks run after
 application. Register dynamic page definitions to expose selected `app` keys in
 portal forms and Home Assistant.
 
@@ -432,7 +463,7 @@ schema, and `ArdJSON.h` handles JSON parsing/serialization.
 
 ### Portal configuration fields
 
-`ArdPortal::Config` is the complete network/device configuration. Application
+`ArdPortal::PortalConfig` is the complete network/device configuration. Application
 keys belong to the separate `app` object, not to this struct. Length limits below
 are bytes, not Unicode characters. All strings reject embedded NUL bytes.
 
@@ -458,7 +489,7 @@ connect-before-save trial used by the Wi-Fi/MQTT portal forms. Network changes
 may disconnect current clients. Device-name changes update AP/hostname/MQTT
 identity; do not rely on the old MQTT topics afterward.
 
-`setDeviceManufacturer(value)` and `setDeviceDescription(value)` are dedicated
+`setPortalConfigDeviceManufacturer(value)` and `setPortalConfigDeviceDescription(value)` are dedicated
 persistent setters. They preserve an already pending application update and
 queue an ArdFS save automatically. Neither requires HA to be enabled; only their
 HA discovery metadata is conditional on `ARDPORTAL_ENABLE_HA`. Empty strings
@@ -470,13 +501,13 @@ applied configuration, not a general mutable reference to pending edits.
 // Register before begin(); apply device metadata after configuration readiness.
 portal.onPortalAndAppConfigReady([](bool restored) {
   if (!restored) {
-    if (!portal.setDeviceManufacturer("My company"))
+    if (!portal.setPortalConfigDeviceManufacturer("My company"))
       Serial.println("Manufacturer update rejected.");
-    if (!portal.setDeviceDescription("Living room sensor"))
+    if (!portal.setPortalConfigDeviceDescription("Living room sensor"))
       Serial.println("Description update rejected.");
   }
 });
-portal.onConfigSaved([](bool ok, const String& error) {
+portal.onPortalAndAppConfigSaved([](bool ok, const String& error) {
   if (!ok) Serial.println(error);
 });
 ```
@@ -486,7 +517,7 @@ can still return `false`. For required updates, retain the requested value and
 retry from a later `loop()` iteration when ready/not busy; do not wait in a loop.
 Avoid rebuilding a Config from an old snapshot for each successive edit: that
 can overwrite other pending portal settings. The two metadata setters explicitly
-merge into the pending Config.
+merge into the pending PortalConfig.
 
 ### Public ArdPortal API reference
 
@@ -498,28 +529,27 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | --- | --- |
 | `begin()` / `begin(const Options&)` | Start initialization using default/custom options; returns option-validation/start acceptance, not Wi-Fi/MQTT/storage readiness. Call once from setup. |
 | `loop()` | Advance HTTP, Wi-Fi, MQTT, OTA and storage work; call frequently from the Arduino task. |
-| `configurationReady()` | Configuration loading has completed; does not guarantee successful restoration or mounted storage. |
+| `portalAndAppConfigReady()` | Configuration loading has completed; does not guarantee successful restoration or mounted storage. |
 | `onPortalAndAppConfigReady(callback)` | One initialization notification: `void(bool restored)`; register before `begin()`. |
-| `getPortalConfig()` | `const Config&` of current portal settings; copy before editing. |
-| `validConfig(config)` | Static schema/length/value validation; does not test credentials, connectivity or available storage. |
+| `getPortalConfig()` | `const PortalConfig&` of current portal settings; copy before editing. |
+| `validPortalConfig(config)` | Static schema/length/value validation; does not test credentials, connectivity or available storage. |
 | `setPortalConfig(config)` | Persistent portal configuration transaction; returns acceptance. |
-| `setDeviceDescription(value)` / `setDeviceManufacturer(value)` | Merge and schedule one metadata change into the pending Config. |
-| `onConfigChanged(callback)` | `void(const Config&, ChangeSource)` after a changed Config is applied. |
-| `onPortalConfigChanged(callback)` | `void(const Config&)` for applied changes whose source is the portal. |
+| `setPortalConfigDeviceDescription(value)` / `setPortalConfigDeviceManufacturer(value)` | Merge and schedule one metadata change into the pending PortalConfig. |
+| `onPortalConfigChanged(callback)` | `void(const PortalConfig&, ChangeSource)` after a changed PortalConfig is applied. |
 | `onBeforeRestart(callback)` | `void(RestartReason)` once immediately before an ArdPortal restart; factory reset and storage formatting skip it. |
-| `onConfigSaved(callback)` | `void(bool ok, const String& error)` after storage completion or an identical-save skip. A successful network change can still await application. |
+| `onPortalAndAppConfigSaved(callback)` | `void(bool ok, const String& error)` after storage completion or an identical-save skip. A successful network change can still await application. |
 | `getAppConfigValue(key)` | Copy of live RAM state first, then persisted application value, then registered default; missing unregistered key is Undefined. |
 | `setAppConfigValue(key, value)` | Persistent application update, except registered descriptor-based fields with `persist:false`, which use RAM state. Rejects invalid/Undefined values, invalid registered values and unavailable transactions. |
 | `removeAppConfigValue(key)` | Remove the persisted application key through a save transaction; does not delete its field definition or clear a RAM state override. A registered field falls back to its default when no RAM/persisted value remains. |
 | `onAppConfigValueChanged(callback)` | `void(const String& key, const JSONVar& value, ChangeSource)` for changed effective application values, including RAM-only updates. It is not a durable-save notification. |
-| `flushConfig()` | Accept a request to bypass debounce/minimum write spacing for a pending save; no flash I/O in the caller. Returns false when no eligible pending save exists. |
-| `storageBusy()` | Storage initialization/operation, queued save or pending application; useful for deciding when to retry. |
-| `storageOK()` / `storageError()` | Last portal storage result/error, not a standalone filesystem handle. |
-| `addPortalPage(String)` / `addPortalPage(FPSTR(...))` | Validate and register an immutable dynamic definition. String source is retained in RAM; PROGMEM source must outlive the portal. Returns false with dynamic pages disabled. |
-| `setAppStateValue(key, value, publishMqtt=true)` | RAM-only update of a registered nontransient field; validates type/state, triggers change callback and live portal revision when changed; optionally queues MQTT state. |
-| `queueAppStatePublish(key)` | Queue the current registered nontransient field state even if unchanged. Works as a dirty flag while disconnected; returns false without MQTT/dynamic pages or for unknown/transient fields. |
-| `emitAppEvent(key, value)` | Validate a registered event/device_trigger/tag payload and update its RAM state/revision. With MQTT enabled, requires a connection and free emission FIFO slot to queue a nonretained message; without MQTT it updates local event state only. |
-| `onAppCommand(callback)` | `bool(const String& field, const String& command, const JSONVar& value, ChangeSource)` for supported explicit actions. Return whether accepted; report actual hardware state separately. No-op when action support is absent. |
+| `flushPortalAndAppConfig()` | Accept a request to bypass debounce/minimum write spacing for a pending save; no flash I/O in the caller. Returns false when no eligible pending save exists. |
+| `portalAndAppConfigBusy()` | Storage initialization/operation, queued save or pending application; useful for deciding when to retry. |
+| `portalAndAppConfigStorageOK()` / `portalAndAppConfigError()` | Last portal storage result/error, not a standalone filesystem handle. |
+| `addAppConfigPage(String)` / `addAppConfigPage(FPSTR(...))` | Validate and register an immutable dynamic definition. String source is retained in RAM; PROGMEM source must outlive the portal. Returns false with dynamic pages disabled. |
+| `setAppConfigStateValue(key, value, publishMqtt=true)` | RAM-only update of a registered nontransient field; validates type/state, triggers change callback and live portal revision when changed; optionally queues MQTT state. |
+| `queueAppConfigStatePublish(key)` | Queue the current registered nontransient field state even if unchanged. Works as a dirty flag while disconnected; returns false without MQTT/dynamic pages or for unknown/transient fields. |
+| `emitAppConfigEvent(key, value)` | Validate a registered event/device_trigger/tag payload and update its RAM state/revision. With MQTT enabled, requires a connection and free emission FIFO slot to queue a nonretained message; without MQTT it updates local event state only. |
+| `onAppConfigCommand(callback)` | `bool(const String& field, const String& command, const JSONVar& value, ChangeSource)` for supported explicit actions. Return whether accepted; report actual hardware state separately. No-op when action support is absent. |
 | `wifiConnected()` / `wifiState()` | Station connection boolean / `WifiState`. |
 | `mqttConnected()` / `mqttState()` | Broker CONNACK acceptance boolean / `MqttState`; false/Disabled when compiled out. |
 | `apActive()` / `localIP()` / `apIP()` | AP active flag, station IP and soft-AP IP. Check connectivity before using an IP. |
@@ -547,15 +577,15 @@ codes or elapsed-time promises.
 | --- | --- | --- | --- |
 | Save arbitrary application settings without a form | `setAppConfigValue()` | Yes | No automatic topic for unregistered keys; publish your own payload if needed. |
 | Save a registered editable basic field | `setAppConfigValue()` | Yes | Changed effective state is marked for retained publication. |
-| Update a descriptor-based field with `persist:false` | `setAppConfigValue()` or `setAppStateValue()` | No | Changed state is queued by default. |
-| Report a registered sensor/composite status | `setAppStateValue()` | No, regardless of field persistence | Changed state queued if the third argument is true. |
-| Update the portal without an immediate MQTT send | `setAppStateValue(key, value, false)` | No | Reconnect/get and configured periodic snapshots still apply. |
-| Send the latest field value on your own schedule | `queueAppStatePublish()` | No | Coalesced retained state, even when unchanged. |
+| Update a descriptor-based field with `persist:false` | `setAppConfigValue()` or `setAppConfigStateValue()` | No | Changed state is queued by default. |
+| Report a registered sensor/composite status | `setAppConfigStateValue()` | No, regardless of field persistence | Changed state queued if the third argument is true. |
+| Update the portal without an immediate MQTT send | `setAppConfigStateValue(key, value, false)` | No | Reconnect/get and configured periodic snapshots still apply. |
+| Send the latest field value on your own schedule | `queueAppConfigStatePublish()` | No | Coalesced retained state, even when unchanged. |
 | Send a custom JSON/text message | `publish()` | No | Caller chooses retain; caller retries rejection. |
-| Send a transient event | `emitAppEvent()` | No | Nonretained, never periodically replayed. |
+| Send a transient event | `emitAppConfigEvent()` | No | Nonretained, never periodically replayed. |
 
 For basic fields, `setAppConfigValue()` always takes the persistent path; use
-`setAppStateValue()` for RAM-only readings, including a `text` field marked
+`setAppConfigStateValue()` for RAM-only readings, including a `text` field marked
 `persist:false`. A RAM override has priority when reading/rendering/publishing a
 field. Do not mix a live override with persistent setters for the same key unless
 you intend that priority; use separate telemetry and configuration field IDs.
@@ -564,23 +594,23 @@ method to remove just one RAM override; reboot clears RAM-only state.
 
 ```cpp
 // Register a text field with id "temperature" before using these calls.
-// Invoke after configurationReady(), from the normal Arduino task.
-if (!portal.setAppStateValue("temperature", 22.5, false))
+// Invoke after portalAndAppConfigReady(), from the normal Arduino task.
+if (!portal.setAppConfigStateValue("temperature", 22.5, false))
   Serial.println("Invalid or unavailable temperature field.");
 // Later, on your own timer; this just marks the field for cooperative sending.
-if (!portal.queueAppStatePublish("temperature"))
+if (!portal.queueAppConfigStatePublish("temperature"))
   Serial.println("MQTT state publication is unavailable.");
 ```
 
 For a climate-style object, read the current value, change only reported properties
 such as `current_temperature` or `action`, and pass the complete object back to
-`setAppStateValue()`. Preserve required keys and valid modes. The library renders
+`setAppConfigStateValue()`. Preserve required keys and valid modes. The library renders
 and publishes state; application code controls the physical actuator.
 
 
 ## Dynamic portal pages and Home Assistant
 
-Register JSON definitions with `addPortalPage(definition)` before `begin()`, or
+Register JSON definitions with `addAppConfigPage(definition)` before `begin()`, or
 later from the Arduino task. Register definitions on every boot. The portal embeds only page menu metadata and fetches the active definition through `/api/pages?page=<id>`. Definitions are parsed at most once per page during a dynamic HTTP request; field defaults and dependency checks reuse those request-local trees. Static `PROGMEM`
 definitions passed through `FPSTR()` remain in flash; only a compact index stays
 in RAM. String definitions retain their JSON text in RAM. Pages are parsed on
@@ -654,7 +684,7 @@ static const char HOME_PAGE[] PROGMEM = R"JSON({
   ]
 })JSON";
 // Register before portal.begin().
-portal.addPortalPage(FPSTR(HOME_PAGE));
+portal.addAppConfigPage(FPSTR(HOME_PAGE));
 ```
 
 The DHT example registers Home for its two measurements and a separate Settings page
@@ -671,7 +701,7 @@ static const char LIGHTING_PAGE[] PROGMEM = R"JSON({
     {"id":"enabled","type":"switch","name":"Enabled","default":false}
   ]
 })JSON";
-portal.addPortalPage(FPSTR(LIGHTING_PAGE));
+portal.addAppConfigPage(FPSTR(LIGHTING_PAGE));
 portal.onAppConfigValueChanged([](const String& key, const ArdJSON::JSONVar& value,
                                  ArdPortal::ChangeSource source) {
   // Apply the current value to your hardware here; keep the callback short.
@@ -819,9 +849,9 @@ static const char DETAILS_PAGE[] PROGMEM = R"JSON({
 })JSON";
 
 // In setup(), before portal.begin():
-if (!portal.addPortalPage(FPSTR(ROOT_PAGE)) ||
-    !portal.addPortalPage(FPSTR(ADVANCED_PAGE)) ||
-    !portal.addPortalPage(FPSTR(DETAILS_PAGE))) {
+if (!portal.addAppConfigPage(FPSTR(ROOT_PAGE)) ||
+    !portal.addAppConfigPage(FPSTR(ADVANCED_PAGE)) ||
+    !portal.addAppConfigPage(FPSTR(DETAILS_PAGE))) {
   Serial.println("Page registration failed.");
 }
 ```
@@ -906,9 +936,9 @@ the core scheduler time before another publication; no delay or drain loop is us
 reconnect sends current states again. The library does not wait for HA to appear.
 
 Persistent application setters retain their debounce/wear-saving behavior;
-`flushConfig()` bypasses that delay. Basic dynamic controls update live state and
+`flushPortalAndAppConfig()` bypasses that delay. Basic dynamic controls update live state and
 MQTT immediately, with a debounced journal write afterward. Their change callback
-runs on live application; `onConfigSaved` reports durable completion. Ordinary
+runs on live application; `onPortalAndAppConfigSaved` reports durable completion. Ordinary
 persistent code changes invoke the callback after commit. Accepted MQTT control
 commands update live state and invoke the callback on receipt, independently
 of flash activity, just like portal controls. Persistence remains debounced and
@@ -996,7 +1026,7 @@ the matching button. Action acceptance alone does not change reported position.
 **`valve`** provides Open/Close buttons and a position slider (0–100, step 1).
 Its default is `{"state":"closed","position":0}`. The built-in Open and Close
 buttons send action payloads `100` and `0`; intermediate numeric positions use
-the same base command topic. Endpoint action payloads invoke `onAppCommand`.
+the same base command topic. Endpoint action payloads invoke `onAppConfigCommand`.
 Report the resulting state/position separately, for example
 `{"state":"open","position":100}`.
 
@@ -1034,7 +1064,7 @@ control. Custom ranges require matching slider `controls` and HA
 `min_temp`/`max_temp`; changing a top-level `min` alone is insufficient.
 
 Climate displays the optional reported `action` inside the dial, for example
-`heating`, `cooling`, `idle`, or `off`. Set it with `setAppStateValue` as part of
+`heating`, `cooling`, `idle`, or `off`. Set it with `setAppConfigStateValue` as part of
 the climate value; portal edits preserve it. Without an action, the portal shows
 Off for off mode and Idle otherwise. Humidifier displays its current mode in the
 same position. Standard action and mode names use the installed language catalog.
@@ -1082,7 +1112,7 @@ Fan speed accepts `quiet`, `normal` or `turbo` on `_fan`; custom JSON uses `_cus
 States such as `cleaning`, `idle`, `paused`, `returning` and `docked` highlight
 matching operating buttons. The program can additionally report an optional
 `action` property (`start`, `stop`, `pause`, `return_to_base`, `locate`, or
-`clean_spot`) using `setAppStateValue`. When present, this property selects the
+`clean_spot`) using `setAppConfigStateValue`. When present, this property selects the
 active button, including Locate and Clean spot, until the program updates it.
 There is no automatic timeout or local selection based on a click. The demo
 callback reports both operating state and the selected action. Raw state text is hidden.
@@ -1097,15 +1127,15 @@ navigation and safety interlocks belong to the application.
 Its default is
 `{"installed_version":"0.0.0","latest_version":"0.0.0","in_progress":false}`.
 The Install button sends `INSTALL` on the base command topic and invokes
-`onAppCommand`. This entity does not automatically fetch firmware or invoke the
+`onAppConfigCommand`. This entity does not automatically fetch firmware or invoke the
 portal's OTA upload flow. Implement the update process and report version/progress
 state from code. The separate built-in Update portal page handles uploaded images.
 
 #### Explicit actions
 
 These four field types keep `null` as their state/default. They invoke
-`onAppCommand`; they are not persistent switches and are not periodically replayed.
-Action submission requires an installed `onAppCommand` callback. Commands submitted
+`onAppConfigCommand`; they are not persistent switches and are not periodically replayed.
+Action submission requires an installed `onAppConfigCommand` callback. Commands submitted
 from the portal execute locally even when MQTT is disconnected. A callback returning
 `false` rejects the command; returning `true` acknowledges acceptance, not physical
 completion. This behavior also applies to action buttons in composite devices.
@@ -1134,7 +1164,7 @@ with at most 512 nodes; full MQTT packet limits still apply.
 
 #### Events and automation triggers
 
-These fields are read-only in the portal. Use `emitAppEvent` for an occurrence,
+These fields are read-only in the portal. Use `emitAppConfigEvent` for an occurrence,
 not a persistent setter: events are nonretained, queued only while MQTT is
 connected, and are not replayed on reconnect or during periodic refresh.
 
@@ -1142,7 +1172,7 @@ connected, and are not replayed on reconnect or during periodic refresh.
 | --- | --- | --- |
 | `event` | Default `{"event_type":"press"}`; preset types `press`, `double_press`, `long_press` | Publish an object whose `event_type` belongs to `ha.event_types`. Additional event data may be included. See the C++ publication example below. |
 | `device_trigger` | Default `"PRESS"` | Creates HA MQTT `device_automation` discovery with `automation_type: "trigger"`, preset type `button_short_press`, subtype `button_1` and payload `PRESS`. Override these in `ha` to describe your trigger; emit the configured payload string. |
-| `tag` | Default `""`; example `"tag-123"` | Creates MQTT tag discovery. Publish the scanned identifier as a string with `portal.emitAppEvent("reader", "tag-123")`; the library does not read a physical tag. |
+| `tag` | Default `""`; example `"tag-123"` | Creates MQTT tag discovery. Publish the scanned identifier as a string with `portal.emitAppConfigEvent("reader", "tag-123")`; the library does not read a physical tag. |
 
 For `event`, a longer C++ example avoids confusing JSON quoting:
 
@@ -1150,7 +1180,7 @@ For `event`, a longer C++ example avoids confusing JSON quoting:
 ArdJSON::JSONVar event = ArdJSON::JSONVar::object();
 event["event_type"] = "double_press";
 event["button"] = 1;
-portal.emitAppEvent("wall_button", event);
+portal.emitAppConfigEvent("wall_button", event);
 ```
 
 #### Customizing descriptor-based fields
@@ -1177,9 +1207,9 @@ are:
 | `color` | None | RGB object with integer `r`, `g`, `b` channels, each 0–255. |
 | `edit` | None | Editable string. |
 | `date`, `time`, `datetime` | None | Strings following the formats listed above. |
-| `action` | `payload` | Button invoking `onAppCommand` with the declared payload. |
-| `action_text` | None | Text input and explicit Send; invokes `onAppCommand`. |
-| `action_json` | None | JSON input and explicit Send; invokes `onAppCommand`. |
+| `action` | `payload` | Button invoking `onAppConfigCommand` with the declared payload. |
+| `action_text` | None | Text input and explicit Send; invokes `onAppConfigCommand`. |
+| `action_json` | None | JSON input and explicit Send; invokes `onAppConfigCommand`. |
 
 For example, a humidifier with a narrower target range and a custom mode:
 
@@ -1226,7 +1256,7 @@ the reported device state; clicking an action does not assume it succeeded.
 Lock, Alarm Control Panel, Vacuum and Lawn Mower hide raw state strings; their selected buttons show
 the reported state. The portal refreshes values after command completion as well
 as on WebSocket updates. The main sketch simulates reported Lock/alarm/robot states;
-hardware integrations must report the actual result with `setAppStateValue`.
+hardware integrations must report the actual result with `setAppConfigStateValue`.
 Sliders, selectors and custom-command inputs remain available below the row.
 
 `binary_sensor` is displayed as a read-only status badge with a colored dot and
@@ -1251,32 +1281,32 @@ Editable extended fields default to durable storage (`persist: true`), so their
 settings survive restart. Read-only telemetry and transient actions/events
 default to RAM (`persist: false`) to avoid writing measurements to flash.
 `setAppConfigValue` follows this policy for registered extended fields; an explicit
-`persist: false` keeps a field volatile. `setAppStateValue` always updates RAM only. Its optional third argument defaults
+`persist: false` keeps a field volatile. `setAppConfigStateValue` always updates RAM only. Its optional third argument defaults
 to `true` (publish changed state to MQTT). Pass `false` for local live updates
-without queuing MQTT; use `queueAppStatePublish(key)` to queue the latest value
+without queuing MQTT; use `queueAppConfigStatePublish(key)` to queue the latest value
 through the cooperative publisher, even if unchanged. This returns queue success,
 not broker confirmation. Periodic refresh and reconnect/get snapshots still apply;
 set `Options::appStateIntervalMs=0` when managing your own refresh schedule. All
 registered fields are read through `getAppConfigValue`.
 
 ```cpp
-portal.setAppStateValue("temperature", 22.5); // Telemetry: no flash write.
-portal.onAppCommand([](const String& field, const String& command,
+portal.setAppConfigStateValue("temperature", 22.5); // Telemetry: no flash write.
+portal.onAppConfigCommand([](const String& field, const String& command,
                        const ArdJSON::JSONVar& value, ArdPortal::ChangeSource source) {
   // Accept/queue a nonblocking hardware action; return false if rejected.
   return true;
 });
-portal.emitAppEvent("tag_reader", "tag-id"); // With MQTT enabled, connection required.
+portal.emitAppConfigEvent("tag_reader", "tag-id"); // With MQTT enabled, connection required.
 ```
 
-Actions require `onAppCommand`. When MQTT is connected, accepted actions attempt to
+Actions require `onAppConfigCommand`. When MQTT is connected, accepted actions attempt to
 queue a nonretained acceptance message containing `accepted`, `command` and `value`;
 stateful entities also attempt to queue their reported state. Disconnection or a
 full emission queue does not reject an action accepted by the callback.
-Report actual hardware results with `setAppStateValue`.
+Report actual hardware results with `setAppConfigStateValue`.
 With MQTT enabled, events and action replies share an eight-message FIFO; emission
 returns false when full or disconnected. Without MQTT, supported events update
-local RAM state/revision only. `emitAppEvent()` does not invoke the application
+local RAM state/revision only. `emitAppConfigEvent()` does not invoke the application
 value-change callback. Events/actions are never retained or replayed periodically.
 Binary console payloads are
 summarized by byte count; they are not rendered as text.
@@ -1310,9 +1340,9 @@ Both invalid records produce an error and an AP with default settings, without
 formatting the entire filesystem. Each stored configuration is a JSON document.
 
 Flash wear is reduced by comparing exact payloads, skipping identical writes,
-coalescing application updates for `configSaveDelayMs` (750 ms by default) and
-spacing application commits by `configMinWriteIntervalMs` (5 seconds). Built-in
-portal settings saves and explicit `flushConfig()` bypass these delays; automatic
+coalescing application updates for `appConfigSaveDelayMs` (750 ms by default) and
+spacing application commits by `appConfigMinWriteIntervalMs` (5 seconds). Built-in
+portal settings saves and explicit `flushPortalAndAppConfig()` bypass these delays; automatic
 dynamic control edits retain the debounce. Logs, uptime, connection
 states, NTP time and write statistics are not persisted.
 
@@ -1351,9 +1381,9 @@ completed. During the callback, `setAppConfigValue()` and `removeAppConfigValue(
 may queue application data despite the pending restart. Portal/network settings
 remain blocked. After the callback returns, ArdPortal forces the configuration
 save without debounce and continues servicing its storage in later `loop()`
-passes. `ESP.restart()` runs only after storage finishes and `onConfigSaved()`
-has reported completion. If a configuration write fails, `onConfigSaved(false, error)` and
-`storageError()` report the failure; restart proceeds after the failed transaction
+passes. `ESP.restart()` runs only after storage finishes and `onPortalAndAppConfigSaved()`
+has reported completion. If a configuration write fails, `onPortalAndAppConfigSaved(false, error)` and
+`portalAndAppConfigError()` report the failure; restart proceeds after the failed transaction
 has finished. An unsuccessful OTA/reset/format does
 not invoke the callback. **Factory reset and storage formatting still skip it.**
 
@@ -1662,7 +1692,7 @@ portal.onMqttMessage([](const String& topic, const uint8_t* bytes, size_t length
 
 Payloads of built-in fields are separate contracts: strings are sent as text,
 `switch`/`binary_sensor` use `ON`/`OFF`, and numbers/composite states are serialized
-JSON. `queueAppStatePublish()` publishes one of these current values; use
+JSON. `queueAppConfigStatePublish()` publishes one of these current values; use
 `publish()` for a custom object containing several readings.
 
 
@@ -1957,8 +1987,8 @@ member explicitly ends in `Seconds`.
 | `ntpServer2` | `"time.cloudflare.com"` | Optional secondary NTP hostname, up to 253 bytes; empty disables it. |
 | `appStateIntervalMs` | `600000` | Retained application state refresh; zero disables periodic snapshots, not change/reconnect/get publication. |
 | `discoveryIntervalMs` | `300000` | HA discovery refresh; zero disables periodic discovery, not initial/birth/dependency updates. |
-| `configSaveDelayMs` | `750` | Debounce/coalesce accepted application changes; zero removes debounce. |
-| `configMinWriteIntervalMs` | `5000` | Minimum spacing between debounced application commits; zero removes spacing. Portal saves/flush can bypass it. |
+| `appConfigSaveDelayMs` | `750` | Debounce/coalesce accepted application changes; zero removes debounce. |
+| `appConfigMinWriteIntervalMs` | `5000` | Minimum spacing between debounced application commits; zero removes spacing. Portal saves/flush can bypass it. |
 | `wifiTimeoutMs` | `30000` | Saved/requested Wi-Fi connection attempt timeout; must be nonzero. |
 | `retryMs` | `10000` | Retry spacing for network state machines; must be nonzero. |
 | `mqttTimeoutMs` | `15000` | MQTT connect/protocol-response timeout; must be nonzero. |
@@ -2040,7 +2070,7 @@ index request, `#1` normalization, `#2` control index, `#3` command value, `#4`
 composite state, `#5` persistence scheduling, `#6` hidden field. Check the complete
 JSON value against the registered descriptor, especially required properties and
 slider steps. A busy transaction may be retried; an invalid definition/value
-needs correction. A reboot loses uncommitted RAM changes; `onConfigSaved` is the
+needs correction. A reboot loses uncommitted RAM changes; `onPortalAndAppConfigSaved` is the
 durable-save notification.
 
 ### DHT example
@@ -2053,6 +2083,9 @@ from DATA to 3.3 V and ensure GPIO2 is high during ESP8266 boot.
 Home shows temperature and humidity; Settings contains C/F units, two calibration
 offsets and a persisted MQTT rate selector: on displayed-reading change, every
 10 seconds, minute, 10 minutes or hour. Corrected values use one decimal place.
+Changing calibration or C/F units immediately recalculates the last sensor sample
+and queues updated temperature/humidity for MQTT, bypassing the normal publishing
+interval. It does not trigger an extra DHT transaction.
 Temperature calibration is applied in Celsius before display conversion;
 humidity is clamped to 0–100%. HA's temperature template converts the selected
 unit back to Celsius. Live readings use RAM-only setters and their own MQTT

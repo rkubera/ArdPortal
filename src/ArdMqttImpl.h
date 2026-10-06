@@ -278,7 +278,7 @@ void ArdMqtt::finishMqttTrial(bool saved, const String& error) {
   _mqttResult = saved ? 1 : 2;
   _mqttResultMessage = saved ? ArdUILanguage::text(ArdUILanguage::Key::s_171) : error;
   if (!saved) { closeMqtt(); _portal._config = std::move(_mqttPrevious); _mqttSince = millis() - _portal._options.retryMs; }
-  _mqttPrevious = Config(); _portal.log(_mqttResultMessage);
+  _mqttPrevious = PortalConfig(); _portal.log(_mqttResultMessage);
 }
 
 void ArdMqtt::startTrial() {
@@ -305,11 +305,11 @@ void ArdMqtt::wifiAvailable(uint32_t now) { _mqttSince = now - _portal._options.
 void ArdMqtt::configurationLoaded() {
   _mqttState = _portal._config.host.length() ? MqttState::WaitingForWifi : MqttState::Disabled;
 }
-void ArdMqtt::prepareTrial(Config&& candidate) {
+void ArdMqtt::prepareTrial(PortalConfig&& candidate) {
   _portal._pending = std::move(candidate);
   _mqttTrialStart = true; ++_mqttRevision; _mqttResult = 0; _mqttResultMessage = "";
 }
-const ArdMqtt::Config& ArdMqtt::saveBaseline() const {
+const ArdMqtt::PortalConfig& ArdMqtt::saveBaseline() const {
   return _mqttSaveWaiting ? _mqttPrevious : _portal._config;
 }
 void ArdMqtt::completeTrialSave(bool saved, const String& error, bool stillConnected) {

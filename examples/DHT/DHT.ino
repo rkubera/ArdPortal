@@ -30,7 +30,7 @@ ArdPortal portal;
 DHT dht(DHT_PIN, DHT22);
 float rawTemperature = NAN, rawHumidity = NAN;
 uint32_t lastRead = 0, lastMqttUpdate = 0, mqttIntervalMs = 0;
-bool readingsChanged = false;
+bool readingsChanged = false, measurementSettingsChanged = false;
 uint8_t failedReads = 0;
 
 static const char HOME_PAGE[] PROGMEM = R"JSON({
@@ -59,7 +59,7 @@ static const char SENSOR_PAGE[] PROGMEM = R"JSON({
 void updateMeasurement(const char* key, const ArdJSON::JSONVar& value) {
   readingsChanged |= ArdJSON::JSON.stringify(portal.getAppConfigValue(key)) != ArdJSON::JSON.stringify(value);
   // Live portal updates are separate from the MQTT publishing schedule.
-  if (!portal.setAppStateValue(key,value,false)) Serial.println(F("DHT: portal value rejected."));
+  if (!portal.setAppConfigStateValue(key,value,false)) Serial.println(F("DHT: portal value rejected."));
 }
 
 void loadMqttInterval() {
@@ -69,10 +69,10 @@ void loadMqttInterval() {
 
 void serviceMqttUpdates(uint32_t now) {
   if(!portal.mqttConnected() || portal.ota().active()) return;
-  if(mqttIntervalMs ? uint32_t(now-lastMqttUpdate)<mqttIntervalMs : !readingsChanged) return;
+  if(!measurementSettingsChanged && (mqttIntervalMs ? uint32_t(now-lastMqttUpdate)<mqttIntervalMs : !readingsChanged)) return;
   // Only queue state: the portal publishes one field at a time and yields.
-  if(portal.queueAppStatePublish("temperature") && portal.queueAppStatePublish("humidity")) {
-    lastMqttUpdate=now;readingsChanged=false;
+  if(portal.queueAppConfigStatePublish("temperature") && portal.queueAppConfigStatePublish("humidity")) {
+    lastMqttUpdate=now;readingsChanged=false;measurementSettingsChanged=false;
   }
 }
 
@@ -85,7 +85,7 @@ String oneDecimal(float number) {
 }
 
 void updateReadings() {
-  if (!portal.configurationReady()) return;
+  if (!portal.portalAndAppConfigReady()) return;
   if (isnan(rawTemperature) || isnan(rawHumidity)) {
     updateMeasurement("temperature", "Unavailable");
     updateMeasurement("humidity", "Unavailable");
@@ -106,12 +106,15 @@ void updateReadings() {
 void setup() {
   Serial.begin(115200);
   dht.begin();
-  if (!portal.addPortalPage(FPSTR(HOME_PAGE))) Serial.println(F("Invalid Home page."));
-  if (!portal.addPortalPage(FPSTR(SENSOR_PAGE))) Serial.println(F("Invalid DHT page."));
+  if (!portal.addAppConfigPage(FPSTR(HOME_PAGE))) Serial.println(F("Invalid Home page."));
+  if (!portal.addAppConfigPage(FPSTR(SENSOR_PAGE))) Serial.println(F("Invalid DHT page."));
   portal.onAppConfigValueChanged([](const String& key, const ArdJSON::JSONVar&,
                                    ArdPortal::ChangeSource) {
     if (key == "mqtt_update") loadMqttInterval();
-    if (key == "units" || key == "temperature_offset" || key == "humidity_offset") updateReadings();
+    if (key == "units" || key == "temperature_offset" || key == "humidity_offset") {
+      updateReadings(); // Reuse the latest sample without another DHT transaction.
+      measurementSettingsChanged=true; // Publish even when a long MQTT interval is selected.
+    }
   });
   portal.onPortalAndAppConfigReady([](bool) {
     loadMqttInterval();
@@ -125,7 +128,7 @@ void setup() {
 void loop() {
   portal.loop();
   uint32_t now = millis();
-  if (!portal.configurationReady() || portal.ota().active()) return;
+  if (!portal.portalAndAppConfigReady() || portal.ota().active()) return;
   if(uint32_t(now-lastRead)>=READ_INTERVAL_MS) {
     lastRead = now;
     rawTemperature = dht.readTemperature();

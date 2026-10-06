@@ -29,8 +29,8 @@ private:
   void applyAppConfig(ArdJSON::JSONVar app);
   bool appControl(const ArdJSON::JSONVar& field, size_t control, const ArdJSON::JSONVar& value, ChangeSource source);
   bool applyAppState(const String& key, const ArdJSON::JSONVar& value, ChangeSource source, bool publishMqtt = true);
-  bool setAppStateValue(const char* key, const ArdJSON::JSONVar& value, bool publishMqtt);
-  bool emitAppEvent(const char* key, const ArdJSON::JSONVar& value);
+  bool setAppConfigStateValue(const char* key, const ArdJSON::JSONVar& value, bool publishMqtt);
+  bool emitAppConfigEvent(const char* key, const ArdJSON::JSONVar& value);
   void markDirty(const String& key);
 #if ARDPORTAL_ENABLE_MQTT
   uint64_t _stateDirty=0, _mqttAckPending=0, _mqttAckInFlight=0;

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.5 — 2026-10-06
+
+### Breaking changes
+- Configuration API now explicitly distinguishes `PortalConfig` (network/device settings), `AppConfig` (custom values and dynamic pages), and shared `PortalAndAppConfig` storage operations. Old names and type aliases have been removed; update application code to the new API.
+- Use `onPortalConfigChanged(config, source)` for network/device changes and `onAppConfigValueChanged(key, value, source)` for custom application values.
+
+### Fixed
+- AppConfig-only saves and unchanged PortalConfig no longer trigger `onPortalConfigChanged`. Durable-save results remain available through `onPortalAndAppConfigSaved`.
+- DHT example immediately queues updated temperature/humidity after calibration or unit changes, bypassing the regular MQTT reporting interval. It reuses the last sensor sample and retries after reconnection.
+
+### Documentation and validation
+- Updated examples and README, including an API migration table.
+- ESP8266 compilation of ApplicationConfig and DHT examples; host tests with AddressSanitizer/UndefinedBehaviorSanitizer for configuration notifications and storage-aware restart ordering.
+
 ## 0.7.4 — 2026-10-06
 
 ### Added

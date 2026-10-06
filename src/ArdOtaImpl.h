@@ -61,7 +61,7 @@ bool ArdOta::writeUpgrade(uint8_t* data, size_t length) {
 }
 
 void ArdOta::startUpload(uint32_t bodySize, int split) {
-    if (!_portal._configurationReady || _portal.storageBusy() || _portal.mqttTrialActive() || _portal._rebootPending || _portal._scanning) { _portal.replyMessage(409,ArdUILanguage::Key::s_132); return; }
+    if (!_portal._configurationReady || _portal.portalAndAppConfigBusy() || _portal.mqttTrialActive() || _portal._rebootPending || _portal._scanning) { _portal.replyMessage(409,ArdUILanguage::Key::s_132); return; }
     if (!bodySize || bodySize > ESP.getFreeSketchSpace()) { _portal.replyMessage(413,ArdUILanguage::Key::s_116); return; }
     _portal.closeMqtt();
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_117));

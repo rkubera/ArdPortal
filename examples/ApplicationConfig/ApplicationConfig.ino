@@ -19,10 +19,11 @@ void setup() {
     if (value.toInteger(interval) && interval >= 1000 && interval <= 60000) reportInterval = uint32_t(interval);
     else needsDefaults = true;
   });
-  portal.onPortalConfigChanged([](const ArdPortal::Config& config) {
+  portal.onPortalConfigChanged([](const ArdPortal::PortalConfig& config, ArdPortal::ChangeSource source) {
+    if (source != ArdPortal::ChangeSource::Portal) return;
     Serial.print("Portal change: "); Serial.println(config.deviceName);
   });
-  portal.onConfigSaved([](bool ok, const String& error) {
+  portal.onPortalAndAppConfigSaved([](bool ok, const String& error) {
     Serial.println(ok ? "Configuration committed (or unchanged)." : error);
   });
   portal.begin();
@@ -30,12 +31,12 @@ void setup() {
 
 void loop() {
   portal.loop();
-  if (needsDefaults && portal.configurationReady() && !portal.storageBusy()) {
+  if (needsDefaults && portal.portalAndAppConfigReady() && !portal.portalAndAppConfigBusy()) {
     if (portal.setAppConfigValue("reportInterval", reportInterval)) needsDefaults = false;
   }
   if (uint32_t(millis() - lastReport) >= reportInterval) {
     lastReport = millis(); Serial.println("The application is still running.");
   }
-  // Setters accept data in RAM. Save completion is reported by onConfigSaved.
+  // Setters accept data in RAM. Save completion is reported by onPortalAndAppConfigSaved.
   // To update portal settings: copy portal.getPortalConfig(), edit and call setPortalConfig().
 }

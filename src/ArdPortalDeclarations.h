@@ -44,7 +44,7 @@ public:
   ArdPortal& operator=(const ArdPortal&) = delete;
   ArdPortal(ArdPortal&&) = delete;
   ArdPortal& operator=(ArdPortal&&) = delete;
-  using Config = ArdPortalConfig;
+  using PortalConfig = ArdPortalConfig;
   struct Options {
     const char* deviceName = nullptr; // Default: ArdUI- + chip ID; also the AP SSID.
     const char* apPassword = "1234567890";
@@ -52,8 +52,8 @@ public:
     const char* ntpServer2 = "time.cloudflare.com";
     uint32_t appStateIntervalMs = 600000; // Retained application state refresh.
     uint32_t discoveryIntervalMs = 300000; // Retained Home Assistant discovery refresh.
-    uint32_t configSaveDelayMs = 750; // Coalesce application changes.
-    uint32_t configMinWriteIntervalMs = 5000;
+    uint32_t appConfigSaveDelayMs = 750; // Coalesce application changes.
+    uint32_t appConfigMinWriteIntervalMs = 5000;
     uint32_t wifiTimeoutMs = 30000;
     uint32_t retryMs = 10000;
     uint32_t mqttTimeoutMs = 15000;
@@ -66,44 +66,42 @@ public:
   using ChangeSource = ArdPortalChangeSource;
   using RestartReason = ArdPortalRestartReason;
   using RestartCallback = std::function<void(RestartReason)>;
-  using ConfigCallback = std::function<void(const Config&, ChangeSource)>;
-  using PortalCallback = std::function<void(const Config&)>;
-  using SavedCallback = std::function<void(bool, const String&)>;
-  using ReadyCallback = std::function<void(bool)>;
+  using PortalConfigChangedCallback = std::function<void(const PortalConfig&, ChangeSource)>;
+  using PortalAndAppConfigSavedCallback = std::function<void(bool, const String&)>;
+  using PortalAndAppConfigReadyCallback = std::function<void(bool)>;
   using MessageCallback = std::function<void(const String&, const uint8_t*, size_t)>;
-  void onConfigChanged(ConfigCallback callback) { _changed = callback; }
-  void onPortalConfigChanged(PortalCallback callback) { _portalChanged = callback; }
+  void onPortalConfigChanged(PortalConfigChangedCallback callback) { _changed = callback; }
   void onBeforeRestart(RestartCallback callback) { _beforeRestart = callback; }
-  void onConfigSaved(SavedCallback callback) { _saved = callback; }
-  void onPortalAndAppConfigReady(ReadyCallback callback) { _readyCallback = callback; }
-  bool configurationReady() const { return _configurationReady; }
-  bool storageBusy() const { return _storage.busy() || _savePending || _pendingReady; }
-  // true = accepted in RAM; onConfigSaved signals durable completion.
-  bool setPortalConfig(const Config& config);
-  bool setDeviceManufacturer(const String& manufacturer);
-  bool setDeviceDescription(const String& description);
+  void onPortalAndAppConfigSaved(PortalAndAppConfigSavedCallback callback) { _saved = callback; }
+  void onPortalAndAppConfigReady(PortalAndAppConfigReadyCallback callback) { _readyCallback = callback; }
+  bool portalAndAppConfigReady() const { return _configurationReady; }
+  bool portalAndAppConfigBusy() const { return _storage.busy() || _savePending || _pendingReady; }
+  // true = accepted in RAM; onPortalAndAppConfigSaved signals durable completion.
+  bool setPortalConfig(const PortalConfig& config);
+  bool setPortalConfigDeviceManufacturer(const String& manufacturer);
+  bool setPortalConfigDeviceDescription(const String& description);
   ArdJSON::JSONVar getAppConfigValue(const char* key) const;
   bool setAppConfigValue(const char* key, const ArdJSON::JSONVar& value);
   bool removeAppConfigValue(const char* key);
-  bool addPortalPage(const String& definition);
-  bool addPortalPage(const __FlashStringHelper* definition); // Source must remain valid for the portal lifetime.
-  using AppCommandCallback = std::function<bool(const String&, const String&, const ArdJSON::JSONVar&, ChangeSource)>;
-  void onAppCommand(AppCommandCallback callback) {
+  bool addAppConfigPage(const String& definition);
+  bool addAppConfigPage(const __FlashStringHelper* definition); // Source must remain valid for the portal lifetime.
+  using AppConfigCommandCallback = std::function<bool(const String&, const String&, const ArdJSON::JSONVar&, ChangeSource)>;
+  void onAppConfigCommand(AppConfigCommandCallback callback) {
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
     _appCommand=callback;
 #else
     (void)callback;
 #endif
   }
-  bool setAppStateValue(const char* key, const ArdJSON::JSONVar& value, bool publishMqtt = true);
-  bool queueAppStatePublish(const char* key);
-  bool emitAppEvent(const char* key, const ArdJSON::JSONVar& value);
-  using AppConfigCallback = std::function<void(const String&, const ArdJSON::JSONVar&, ChangeSource)>;
-  void onAppConfigValueChanged(AppConfigCallback callback) { _appChanged = callback; }
-  bool flushConfig(); // Skip debounce, never perform flash I/O here.
+  bool setAppConfigStateValue(const char* key, const ArdJSON::JSONVar& value, bool publishMqtt = true);
+  bool queueAppConfigStatePublish(const char* key);
+  bool emitAppConfigEvent(const char* key, const ArdJSON::JSONVar& value);
+  using AppConfigValueChangedCallback = std::function<void(const String&, const ArdJSON::JSONVar&, ChangeSource)>;
+  void onAppConfigValueChanged(AppConfigValueChangedCallback callback) { _appChanged = callback; }
+  bool flushPortalAndAppConfig(); // Skip debounce, never perform flash I/O here.
   void log(const String& message); // Diagnostic messages in Console > Messages.
   void logMessage(const String& message) { log(message); } // Explicit diagnostic logging; no Serial interception.
-  const String& storageError() const { return _storageError; }
+  const String& portalAndAppConfigError() const { return _storageError; }
   static String chipId();
   static String defaultDeviceName() { return "ArdUI-" + chipId(); }
   void onMqttMessage(MessageCallback callback) {
@@ -146,16 +144,16 @@ public:
   }
   bool apActive() const { return _apActive; }
   bool tlsClockReady() const { return time(nullptr) >= 1704067200; } // 2024-01-01
-  bool storageOK() const { return _storageOK; }
+  bool portalAndAppConfigStorageOK() const { return _storageOK; }
   IPAddress localIP() const { return WiFi.localIP(); }
   IPAddress apIP() const { return WiFi.softAPIP(); }
-  const Config& getPortalConfig() const { return _config; }
+  const PortalConfig& getPortalConfig() const { return _config; }
   // QoS 0; false means disconnected, invalid arguments or a busy send buffer.
   String mqttTopic(const char* kind, const char* command) const;
   bool validMqttTopic(const String& topic, bool subscription = false) const;
   bool publish(const char* topic, const char* payload, bool retain = false);
   bool subscribe(const char* topic);
-  static bool validConfig(const Config& config);
+  static bool validPortalConfig(const PortalConfig& config);
 private:
   friend class ArdMqtt;
   friend class ArdHomeAssistant;
@@ -219,23 +217,22 @@ private:
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   ArdDynamicPages _dynamic;
 #endif
-  AppConfigCallback _appChanged;
+  AppConfigValueChangedCallback _appChanged;
   uint32_t _appRevision = 0;
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
-  AppCommandCallback _appCommand;
+  AppConfigCommandCallback _appCommand;
 #endif
   bool dynamicHttp(const String& method, const String& path);
   String _apName, _apPassword, _ntpServer1, _ntpServer2;
-  Config _config, _pending;
+  PortalConfig _config, _pending;
   ArdFS _storage;
   ArdJsonCodec _json;
   DNSServer _dns;
   ArdJSON::JSONVar _appConfig = ArdJSON::JSONVar::object(), _pendingApp = ArdJSON::JSONVar::object();
-  ConfigCallback _changed;
-  PortalCallback _portalChanged;
-  SavedCallback _saved;
+  PortalConfigChangedCallback _changed;
+  PortalAndAppConfigSavedCallback _saved;
   RestartCallback _beforeRestart;
-  ReadyCallback _readyCallback;
+  PortalAndAppConfigReadyCallback _readyCallback;
   ChangeSource _saveSource = ChangeSource::Application;
   bool _configurationReady = false, _loadStarted = false, _savePending = false, _saveQueued = false;
   bool _forceSave = false, _httpWaitingStorage = false, _resetAfterSave = false;
@@ -243,7 +240,7 @@ private:
   uint32_t _dirtySince = 0, _lastCommit = 0;
   void serviceStorage(uint32_t now);
   void finishLoad(const ArdFS::Result& result);
-  bool scheduleConfig(const Config& config, const ArdJSON::JSONVar& app, ChangeSource source, bool immediate);
+  bool scheduleConfig(const PortalConfig& config, const ArdJSON::JSONVar& app, ChangeSource source, bool immediate);
   void finishSave(const ArdFS::Result& result);
   void notifyConfig();
   bool _wifiConnectAfterSave = false;

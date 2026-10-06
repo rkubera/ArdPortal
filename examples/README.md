@@ -40,8 +40,8 @@ JSON file, run `python3 ../tools/generate_languages.py` from this directory, the
 recompile. Translation assets are built into firmware, not uploaded to ArdFS.
 
 `begin()` starts storage initialization; call `loop()` repeatedly until
-`configurationReady()` before reading saved values. Setters accept updates in
-RAM; `onConfigSaved` confirms durable completion. Application changes are merged
+`portalAndAppConfigReady()` before reading saved values. Setters accept updates in
+RAM; `onPortalAndAppConfigSaved` confirms durable completion. Application changes are merged
 and identical writes skipped. See `ApplicationConfig` and the library README
 for the full API and journal behavior.
 
@@ -61,7 +61,7 @@ ready/change/save callbacks and connection state reporting.
 Keep this guide and all example code comments in English when updating examples.
 
 The project root `ArdUI.ino` also demonstrates JSON-defined dynamic pages, all supported MQTT entity/control types, optional climate modes/fan modes/icons, Home Assistant MQTT discovery
-and `onAppConfigValueChanged`/`onAppCommand` callbacks. Dynamic controls apply
+and `onAppConfigValueChanged`/`onAppConfigCommand` callbacks. Dynamic controls apply
 changes automatically and refresh through WebSocket notifications. See the library README for the definition
 schema. Minimal examples remain focused on their individual features.
 

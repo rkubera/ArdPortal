@@ -22,7 +22,7 @@ class ArdPortal;
 // Owns the MQTT protocol, transport, TLS session and connection trial.
 class ArdMqtt {
 public:
-  using Config = ArdPortalConfig;
+  using PortalConfig = ArdPortalConfig;
   using MqttState = ArdMqttState;
   using ChangeSource = ArdPortalChangeSource;
   using MessageCallback = std::function<void(const String&, const uint8_t*, size_t)>;
@@ -59,8 +59,8 @@ private:
   void wifiAvailable(uint32_t now);
   void configurationLoaded();
   void configureIdentity(const String& name) { _clientId = name; }
-  void prepareTrial(Config&& candidate);
-  const Config& saveBaseline() const;
+  void prepareTrial(PortalConfig&& candidate);
+  const PortalConfig& saveBaseline() const;
   void completeTrialSave(bool saved, const String& error, bool stillConnected);
 
   ArdMqttTransport _mqtt;
@@ -76,7 +76,7 @@ private:
   String _clientId;
   MqttState _mqttState = MqttState::Disabled;
   MessageCallback _message;
-  Config _mqttPrevious;
+  PortalConfig _mqttPrevious;
   bool _mqttTrial = false, _mqttTrialStart = false, _mqttTrialFailed = false, _mqttSaveWaiting = false;
   uint32_t _mqttRevision = 0, _mqttTrialSince = 0;
   uint8_t _mqttResult = 0;

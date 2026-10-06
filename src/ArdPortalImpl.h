@@ -126,7 +126,7 @@ ArdPortal::ArdPortal(ArdPortalBuildTag<ARDPORTAL_FEATURE_MASK>)
 #endif
 {}
 
-bool ArdPortal::validConfig(const Config& c) {
+bool ArdPortal::validPortalConfig(const PortalConfig& c) {
   for(size_t i=0;i<sizeof(ArdPortalJson::TextFields)/sizeof(ArdPortalJson::TextFields[0]);++i) {
     auto entry=ArdPortalJson::field(i);const String& value=c.*entry.member;
     if(value.length()>entry.limit)return false;
@@ -156,7 +156,7 @@ bool ArdPortal::begin(const Options& options) {
   _config.deviceName = _apName;
   _apName = ArdDeviceName::ap(_config.deviceName);
   _config.apName = _apName; _config.apPassword = _apPassword;
-  if (!validConfig(_config)) return false;
+  if (!validPortalConfig(_config)) return false;
   WiFi.persistent(false); WiFi.setAutoReconnect(false); WiFi.mode(WIFI_STA);
   // Stop any SDK/core association inherited at startup. Storage loading gives
   // the network stack time to settle before the explicit saved-config attempt.
@@ -289,13 +289,13 @@ void ArdPortal::loop() {
 #endif
     WiFi.disconnect(); _wasConnected = false; _attempting = false;
     if (_config.ssid.length()) connectWifi(); else startAP();
-    _pending = Config();
+    _pending = PortalConfig();
     if (_notifyPending) { _notifyPending = false; notifyConfig(); }
   }
 
   if (_rebootPending && !_http && uint32_t(tick - _rebootSince) >= 300) {
     // Drain old transactions, including debounced saves, before running cleanup.
-    if (storageBusy()) { flushConfig(); return; }
+    if (portalAndAppConfigBusy()) { flushPortalAndAppConfig(); return; }
     if (!_beforeRestartCalled) {
       _beforeRestartCalled = true;
       if ((_restartReason == RestartReason::Portal || _restartReason == RestartReason::FirmwareUpdate) && _beforeRestart) {
@@ -303,10 +303,10 @@ void ArdPortal::loop() {
         _beforeRestart(_restartReason);
         _beforeRestartRunning = false;
       }
-      flushConfig(); // The callback may have scheduled application data.
-      if (storageBusy()) return;
+      flushPortalAndAppConfig(); // The callback may have scheduled application data.
+      if (portalAndAppConfigBusy()) return;
     }
-    // Storage completion (and onConfigSaved) precedes the actual restart.
+    // Storage completion (and onPortalAndAppConfigSaved) precedes the actual restart.
     ESP.restart(); return;
   }
 
@@ -618,15 +618,15 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     replyMessage(202,ArdUILanguage::Key::s_179);scheduleRestart(RestartReason::Portal);return;
   }
   if (method == "POST" && path == "/api/factory-reset") {
-    if (!_configurationReady || storageBusy() || mqttTrialActive() || _rebootPending) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
+    if (!_configurationReady || portalAndAppConfigBusy() || mqttTrialActive() || _rebootPending) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
     if (_request.substring(_request.indexOf("\r\n\r\n") + 4) != "confirm=RESET") { replyMessage(400,ArdUILanguage::Key::s_124); return; }
-    Config defaults; defaults.deviceName = defaultDeviceName(); defaults.apName = defaults.deviceName;
+    PortalConfig defaults; defaults.deviceName = defaultDeviceName(); defaults.apName = defaults.deviceName;
     closeMqtt();
     if (!scheduleConfig(defaults, ArdJSON::JSONVar::object(), ChangeSource::FactoryReset, true)) { replyMessage(500,ArdUILanguage::Key::s_107); return; }
     _resetAfterSave = true; _httpWaitingStorage = true; return;
   }
   if (method == "POST" && path == "/api/storage/format") {
-    if (!_configurationReady || storageBusy() || mqttTrialActive() || _rebootPending) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
+    if (!_configurationReady || portalAndAppConfigBusy() || mqttTrialActive() || _rebootPending) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
     if (_request.substring(_request.indexOf("\r\n\r\n") + 4) != "confirm=FORMAT") { replyMessage(400,ArdUILanguage::Key::s_124); return; }
     closeMqtt(); _httpWaitingStorage = true;
     if (!_storage.format([this](const ArdFS::Result& result) {
@@ -644,7 +644,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     out += F(",\"ap\":"); out += _apActive ? "true" : "false"; out += F(",\"ip\":"); appendQuoted(out,localIP().toString());
     out += F(",\"apIp\":"); appendQuoted(out,apIP().toString()); out += F(",\"storage\":"); out += _storageOK ? "true" : "false"; out += F(",\"tls\":"); out += _config.mqttTls ? "true" : "false";
     out += F(",\"clockReady\":"); out += tlsClockReady() ? "true" : "false"; out += F(",\"filesystemMounted\":"); out += _storageMounted ? "true" : "false";
-    out += F(",\"configurationReady\":"); out += _configurationReady ? "true" : "false"; out += F(",\"storageBusy\":"); out += storageBusy() ? "true" : "false"; out += F(",\"storageError\":"); appendQuoted(out,_storageError); out += F(",\"scanCompletedId\":"); out += String(_scanCompletedId); out += F(",\"deviceName\":"); appendQuoted(out,_config.deviceName); out += "}";
+    out += F(",\"configurationReady\":"); out += _configurationReady ? "true" : "false"; out += F(",\"storageBusy\":"); out += portalAndAppConfigBusy() ? "true" : "false"; out += F(",\"storageError\":"); appendQuoted(out,_storageError); out += F(",\"scanCompletedId\":"); out += String(_scanCompletedId); out += F(",\"deviceName\":"); appendQuoted(out,_config.deviceName); out += "}";
     reply(200, "application/json", out); return;
   }
   if (method == "GET" && path == "/api/config") {
@@ -669,7 +669,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
   }
   if (method == "GET" && path == "/api/networks") { reply(200, "application/json", _networks); return; }
   if (method != "POST" || (path != "/api/config" && path != "/api/mqtt/connect")) { replyMessage(404,ArdUILanguage::Key::s_131); return; }
-  if (!_configurationReady || storageBusy() || mqttTrialActive()) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
+  if (!_configurationReady || portalAndAppConfigBusy() || mqttTrialActive()) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
   const char* keys[] = {"ssid", "password", "host", "port", "user", "mqttPassword", "mqttTls", "caCert", "apName", "apPassword", "deviceName", "clearWifi", "deviceDescription"};
   String values[13]; uint16_t seen = 0;
   String body = _request.substring(_request.indexOf("\r\n\r\n") + 4);
@@ -689,7 +689,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
   if(seen & 252) { replyMessage(404,ArdUILanguage::Key::s_131); return; }
 #endif
   if (!seen) { replyMessage(400,ArdUILanguage::Key::s_120); return; }
-  Config c = _config;
+  PortalConfig c = _config;
   if (seen & 1) c.ssid = values[0];
   if (seen & 2) c.password = values[1].length() || c.ssid != _config.ssid ? values[1] : _config.password;
   else if (c.ssid != _config.ssid) c.password = "";
@@ -729,7 +729,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
   }
   if ((seen & 256) && values[8] != ArdDeviceName::ap(c.deviceName)) { replyMessage(400,ArdUILanguage::Key::s_142); return; }
   c.apName = ArdDeviceName::ap(c.deviceName);
-  if (!validConfig(c)) { replyMessage(400,ArdUILanguage::Key::s_142); return; }
+  if (!validPortalConfig(c)) { replyMessage(400,ArdUILanguage::Key::s_142); return; }
 #if ARDPORTAL_ENABLE_MQTT
   if (path == "/api/mqtt/connect" && ((seen & ~252) || !(seen & 4))) { replyMessage(400,ArdUILanguage::Key::s_142); return; }
   if (path == "/api/mqtt/connect" && c.host.length()) {
@@ -813,7 +813,7 @@ String ArdPortal::infoJson() {
   out += F(",\"wifiState\":"); out += String(int(_wifiState)); out += F(",\"mqttState\":"); out += String(int(mqttState()));
   out += F(",\"ip\":"); appendQuoted(out,localIP().toString()); out += F(",\"apIp\":"); appendQuoted(out,apIP().toString());
   out += F(",\"storageBackend\":"); appendQuoted(out,"ArdFS"); out += F(",\"jsonBackend\":"); appendQuoted(out,"ArdJSON");
-  out += F(",\"filesystemMounted\":"); out += _storageMounted ? "true" : "false"; out += F(",\"configurationReady\":"); out += _configurationReady ? "true" : "false"; out += F(",\"storageBusy\":"); out += storageBusy() ? "true" : "false"; out += F(",\"storageError\":"); appendQuoted(out,_storageError); out += "}";
+  out += F(",\"filesystemMounted\":"); out += _storageMounted ? "true" : "false"; out += F(",\"configurationReady\":"); out += _configurationReady ? "true" : "false"; out += F(",\"storageBusy\":"); out += portalAndAppConfigBusy() ? "true" : "false"; out += F(",\"storageError\":"); appendQuoted(out,_storageError); out += "}";
   return out;
 }
 
@@ -968,7 +968,7 @@ void ArdPortal::finishLoad(const ArdFS::Result& result) {
   if (result.ok && result.found) {
     ArdJSON::JSONVar root = _json.parse(result.data, nullptr, snapshotLimits());
     const ArdJSON::JSONVar& view=root;
-    Config loaded;
+    PortalConfig loaded;
     if (root.isValid() && root.type() == ArdJSON::JSONVar::Type::Object && root.length() == 2 &&
         view.hasOwnProperty("config") && validApp(view["app"]) &&
         ArdPortalJson::decodeValue(view["config"], loaded)) {
@@ -998,8 +998,8 @@ void ArdPortal::serviceStorage(uint32_t now) {
     }
   }
   if (!_savePending || _saveQueued || _storage.busy() || !_configurationReady) return;
-  if (!_forceSave && (uint32_t(now - _dirtySince) < _options.configSaveDelayMs ||
-      (_hasCommitted && uint32_t(now - _lastCommit) < _options.configMinWriteIntervalMs))) return;
+  if (!_forceSave && (uint32_t(now - _dirtySince) < _options.appConfigSaveDelayMs ||
+      (_hasCommitted && uint32_t(now - _lastCommit) < _options.appConfigMinWriteIntervalMs))) return;
   String json;
   {
     ArdJSON::JSONVar root = ArdJSON::JSONVar::object();
@@ -1013,22 +1013,21 @@ void ArdPortal::serviceStorage(uint32_t now) {
     }
   }
 #if ARDPORTAL_ENABLE_MQTT
-  const Config& active = _mqttClient.saveBaseline();
+  const PortalConfig& active = _mqttClient.saveBaseline();
 #else
-  const Config& active = _config;
+  const PortalConfig& active = _config;
 #endif
-  _saveHasChanges = !ArdPortalJson::equal(active, _pending) ||
-    _json.stringify(_appConfig) != _json.stringify(_pendingApp);
+  _saveHasChanges = !ArdPortalJson::equal(active, _pending);
   _saveQueued = true;
   if (!json.length() || !_storage.write("/ardportal.json", json, [this](const ArdFS::Result& result) { finishSave(result); })) {
     ArdFS::Result result; result.error = _storage.mounted() ? ArdUILanguage::text(ArdUILanguage::Key::s_169) : ArdUILanguage::text(ArdUILanguage::Key::s_170);
     finishSave(result);
   }
 }
-bool ArdPortal::scheduleConfig(const Config& config, const ArdJSON::JSONVar& app, ChangeSource source, bool immediate) {
+bool ArdPortal::scheduleConfig(const PortalConfig& config, const ArdJSON::JSONVar& app, ChangeSource source, bool immediate) {
   if (!_configurationReady || _saveQueued || _pendingReady || !_storage.mounted() || otaActive() ||
       (_rebootPending && !(_beforeRestartRunning && source == ChangeSource::Application && ArdPortalJson::equal(config,_config))) ||
-      !validConfig(config) || !validApp(app)) return false;
+      !validPortalConfig(config) || !validApp(app)) return false;
   if (_savePending && (source != ChangeSource::Application || _saveSource != source)) return false;
   _pending = config;
   if (!_pending.deviceName.length()) _pending.deviceName = defaultDeviceName();
@@ -1036,17 +1035,17 @@ bool ArdPortal::scheduleConfig(const Config& config, const ArdJSON::JSONVar& app
   _pendingApp = app; _saveSource = source; _savePending = true; _forceSave = immediate; _dirtySince = millis();
   return true;
 }
-bool ArdPortal::setDeviceManufacturer(const String& manufacturer) {
-  Config config = _savePending ? _pending : _config;
+bool ArdPortal::setPortalConfigDeviceManufacturer(const String& manufacturer) {
+  PortalConfig config = _savePending ? _pending : _config;
   config.deviceManufacturer = manufacturer;
   return setPortalConfig(config);
 }
-bool ArdPortal::setDeviceDescription(const String& description) {
-  Config config = _savePending ? _pending : _config;
+bool ArdPortal::setPortalConfigDeviceDescription(const String& description) {
+  PortalConfig config = _savePending ? _pending : _config;
   config.deviceDescription = description;
   return setPortalConfig(config);
 }
-bool ArdPortal::setPortalConfig(const Config& config) {
+bool ArdPortal::setPortalConfig(const PortalConfig& config) {
 #if !ARDPORTAL_ENABLE_MQTT_TLS
   if(config.mqttTls)return false;
 #endif
@@ -1071,7 +1070,7 @@ bool ArdPortal::setAppConfigValue(const char* key, const ArdJSON::JSONVar& value
   if (!key || !*key || strlen(key) > 64 || !value.isValid() || value.isUndefined() ||
       (_rebootPending && !_beforeRestartRunning) || mqttTrialActive() || _httpWaitingStorage) return false;
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  if (ArdHa::extended(_dynamic.field(key)) && !_dynamic.field(key)["persist"].asBool()) return setAppStateValue(key,value);
+  if (ArdHa::extended(_dynamic.field(key)) && !_dynamic.field(key)["persist"].asBool()) return setAppConfigStateValue(key,value);
   if (!_dynamic.field(key).isUndefined() && !ArdDynamicPages::validValue(_dynamic.field(key),value)) return false;
 #endif
   ArdJSON::JSONVar app = _savePending ? _pendingApp : _appConfig; app[key] = value;
@@ -1082,14 +1081,13 @@ bool ArdPortal::removeAppConfigValue(const char* key) {
   ArdJSON::JSONVar app = _savePending ? _pendingApp : _appConfig; app.remove(key);
   return scheduleConfig(_savePending ? _pending : _config, app, ChangeSource::Application, false);
 }
-bool ArdPortal::flushConfig() {
+bool ArdPortal::flushPortalAndAppConfig() {
   if (!_configurationReady || !_savePending || _saveQueued) return false;
   _forceSave = true; return true;
 }
 void ArdPortal::notifyConfig() {
   ChangeSource source = _saveSource;
   if (_changed) _changed(_config, source);
-  if (source == ChangeSource::Portal && _portalChanged) _portalChanged(_config);
 }
 
 void ArdPortal::finishSave(const ArdFS::Result& result) {
@@ -1109,7 +1107,7 @@ void ArdPortal::finishSave(const ArdFS::Result& result) {
 #endif
   if (result.ok) {
     if (_resetAfterSave) {
-      _config = std::move(_pending); applyAppConfig(std::move(_pendingApp)); notifyConfig();
+      _config = std::move(_pending); applyAppConfig(std::move(_pendingApp)); if (_saveHasChanges) notifyConfig();
       scheduleRestart(RestartReason::FactoryReset);
     } else if (!_wifiConnectAfterSave && ArdPortalJson::equal(_config, _pending)) {
       applyAppConfig(std::move(_pendingApp)); if (_saveHasChanges) notifyConfig();
@@ -1145,9 +1143,9 @@ void ArdPortal::applyAppConfig(ArdJSON::JSONVar app) {
 #endif
 }
 #if !ARDPORTAL_ENABLE_DYNAMIC_PAGES
-bool ArdPortal::addPortalPage(const String&) {return false;}
-bool ArdPortal::addPortalPage(const __FlashStringHelper*) {return false;}
-bool ArdPortal::setAppStateValue(const char*,const ArdJSON::JSONVar&,bool) {return false;}
-bool ArdPortal::queueAppStatePublish(const char*) {return false;}
-bool ArdPortal::emitAppEvent(const char*,const ArdJSON::JSONVar&) {return false;}
+bool ArdPortal::addAppConfigPage(const String&) {return false;}
+bool ArdPortal::addAppConfigPage(const __FlashStringHelper*) {return false;}
+bool ArdPortal::setAppConfigStateValue(const char*,const ArdJSON::JSONVar&,bool) {return false;}
+bool ArdPortal::queueAppConfigStatePublish(const char*) {return false;}
+bool ArdPortal::emitAppConfigEvent(const char*,const ArdJSON::JSONVar&) {return false;}
 #endif

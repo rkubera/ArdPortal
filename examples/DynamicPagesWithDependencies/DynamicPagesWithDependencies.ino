@@ -49,7 +49,7 @@ static const char CONTROL_PAGE[] PROGMEM = R"JSON({
 void setup() {
   Serial.begin(115200);
   // Register definitions on every boot, before starting the portal.
-  if (!portal.addPortalPage(FPSTR(CONTROL_PAGE))) {
+  if (!portal.addAppConfigPage(FPSTR(CONTROL_PAGE))) {
     Serial.println("Invalid dynamic page definition.");
   }
   portal.onAppConfigValueChanged([](const String& key,
