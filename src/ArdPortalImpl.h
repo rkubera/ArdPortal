@@ -263,12 +263,15 @@ void ArdPortal::serviceScan() {
   }
   _networks += ']'; WiFi.scanDelete(); _scanning = false; _scanCompletedId = _scanId;
 }
+void ArdPortal::scheduleRestart(RestartReason reason) {
+  _restartReason = reason; _beforeRestartCalled = false;
+  _rebootPending = true; _rebootSince = millis();
+}
 void ArdPortal::loop() {
-  if (!_started) return;
+  if (!_started || _beforeRestartRunning) return;
   uint32_t tick = millis();uint32_t freeHeap=ESP.getFreeHeap();if(freeHeap<_minimumFreeHeap)_minimumFreeHeap=freeHeap;serviceStorage(tick);
   if (_apActive) _dns.processNextRequest();
   _uptimeMs += uint32_t(tick - _lastLoopMs); _lastLoopMs = tick;
-  if (_rebootPending && !_http && uint32_t(tick - _rebootSince) >= 300) { ESP.restart(); return; }
   // Apply settings only after the HTTP response has been sent/closed.
   if (_pendingReady && !_http && !_scanning) {
     bool apChanged = _config.apName != _pending.apName || _config.apPassword != _pending.apPassword;
@@ -288,6 +291,23 @@ void ArdPortal::loop() {
     if (_config.ssid.length()) connectWifi(); else startAP();
     _pending = Config();
     if (_notifyPending) { _notifyPending = false; notifyConfig(); }
+  }
+
+  if (_rebootPending && !_http && uint32_t(tick - _rebootSince) >= 300) {
+    // Drain old transactions, including debounced saves, before running cleanup.
+    if (storageBusy()) { flushConfig(); return; }
+    if (!_beforeRestartCalled) {
+      _beforeRestartCalled = true;
+      if (_restartReason != RestartReason::FactoryReset && _beforeRestart) {
+        _beforeRestartRunning = true;
+        _beforeRestart(_restartReason);
+        _beforeRestartRunning = false;
+      }
+      flushConfig(); // The callback may have scheduled application data.
+      if (storageBusy()) return;
+    }
+    // Storage completion (and onConfigSaved) precedes the actual restart.
+    ESP.restart(); return;
   }
 
 #if ARDPORTAL_ENABLE_MQTT
@@ -593,9 +613,9 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     return;
   }
   if (method == "POST" && path == "/api/restart") {
-    if (!_configurationReady || storageBusy() || mqttTrialActive() || _rebootPending) {replyMessage(409,ArdUILanguage::Key::s_132);return;}
+    if (!_configurationReady || mqttTrialActive() || _rebootPending) {replyMessage(409,ArdUILanguage::Key::s_132);return;}
     if(_request.substring(_request.indexOf("\r\n\r\n")+4)!="confirm=RESTART") {replyMessage(400,ArdUILanguage::Key::s_124);return;}
-    replyMessage(202,ArdUILanguage::Key::s_179);_rebootPending=true;_rebootSince=millis();return;
+    replyMessage(202,ArdUILanguage::Key::s_179);scheduleRestart(RestartReason::Portal);return;
   }
   if (method == "POST" && path == "/api/factory-reset") {
     if (!_configurationReady || storageBusy() || mqttTrialActive() || _rebootPending) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
@@ -613,7 +633,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
       _storageMounted = _storage.mounted(); _storageOK = false; _storageError = result.error;
       bool respond = _httpWaitingStorage; _httpWaitingStorage = false;
       if (respond) reply(result.ok ? 200 : 500, "text/plain", result.ok ? ArdUILanguage::text(ArdUILanguage::Key::s_128) : result.error);
-      if (result.ok) { _rebootPending = true; _rebootSince = millis(); }
+      if (result.ok) scheduleRestart(RestartReason::StorageFormat);
     })) { _httpWaitingStorage = false; replyMessage(500,ArdUILanguage::Key::s_129); }
     return;
   }
@@ -1006,7 +1026,8 @@ void ArdPortal::serviceStorage(uint32_t now) {
   }
 }
 bool ArdPortal::scheduleConfig(const Config& config, const ArdJSON::JSONVar& app, ChangeSource source, bool immediate) {
-  if (!_configurationReady || _saveQueued || _pendingReady || !_storage.mounted() || otaActive() || _rebootPending ||
+  if (!_configurationReady || _saveQueued || _pendingReady || !_storage.mounted() || otaActive() ||
+      (_rebootPending && !(_beforeRestartRunning && source == ChangeSource::Application && ArdPortalJson::equal(config,_config))) ||
       !validConfig(config) || !validApp(app)) return false;
   if (_savePending && (source != ChangeSource::Application || _saveSource != source)) return false;
   _pending = config;
@@ -1029,7 +1050,7 @@ bool ArdPortal::setPortalConfig(const Config& config) {
 #if !ARDPORTAL_ENABLE_MQTT_TLS
   if(config.mqttTls)return false;
 #endif
-  if (mqttTrialActive() || _httpWaitingStorage) return false;
+  if (_rebootPending || mqttTrialActive() || _httpWaitingStorage) return false;
   return scheduleConfig(config, _savePending ? _pendingApp : _appConfig, ChangeSource::Application, false);
 }
 ArdJSON::JSONVar ArdPortal::getAppConfigValue(const char* key) const {
@@ -1048,7 +1069,7 @@ ArdJSON::JSONVar ArdPortal::getAppConfigValue(const char* key) const {
 }
 bool ArdPortal::setAppConfigValue(const char* key, const ArdJSON::JSONVar& value) {
   if (!key || !*key || strlen(key) > 64 || !value.isValid() || value.isUndefined() ||
-      mqttTrialActive() || _httpWaitingStorage) return false;
+      (_rebootPending && !_beforeRestartRunning) || mqttTrialActive() || _httpWaitingStorage) return false;
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   if (ArdHa::extended(_dynamic.field(key)) && !_dynamic.field(key)["persist"].asBool()) return setAppStateValue(key,value);
   if (!_dynamic.field(key).isUndefined() && !ArdDynamicPages::validValue(_dynamic.field(key),value)) return false;
@@ -1057,7 +1078,7 @@ bool ArdPortal::setAppConfigValue(const char* key, const ArdJSON::JSONVar& value
   return scheduleConfig(_savePending ? _pending : _config, app, ChangeSource::Application, false);
 }
 bool ArdPortal::removeAppConfigValue(const char* key) {
-  if (!key || mqttTrialActive() || _httpWaitingStorage) return false;
+  if (!key || (_rebootPending && !_beforeRestartRunning) || mqttTrialActive() || _httpWaitingStorage) return false;
   ArdJSON::JSONVar app = _savePending ? _pendingApp : _appConfig; app.remove(key);
   return scheduleConfig(_savePending ? _pending : _config, app, ChangeSource::Application, false);
 }
@@ -1089,7 +1110,7 @@ void ArdPortal::finishSave(const ArdFS::Result& result) {
   if (result.ok) {
     if (_resetAfterSave) {
       _config = std::move(_pending); applyAppConfig(std::move(_pendingApp)); notifyConfig();
-      _rebootPending = true; _rebootSince = millis();
+      scheduleRestart(RestartReason::FactoryReset);
     } else if (!_wifiConnectAfterSave && ArdPortalJson::equal(_config, _pending)) {
       applyAppConfig(std::move(_pendingApp)); if (_saveHasChanges) notifyConfig();
     } else { _pendingReady = true; _notifyPending = _saveHasChanges; }

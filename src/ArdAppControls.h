@@ -47,6 +47,7 @@ private:
   bool queueAppEmission(const String& topic, const String& payload);
   void resetMqtt();
   bool canServiceMqtt() const;
+  bool acceptMqttState(const String& key, ArdJSON::JSONVar value);
   void prepareMqtt(uint32_t now);
   bool publishCommands();
   bool publishState();

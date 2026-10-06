@@ -14,3 +14,5 @@ struct ArdPortalConfig {
 
 enum class ArdMqttState { Disabled, WaitingForWifi, WaitingRetry, Connecting, Connected, WaitingForTime };
 enum class ArdPortalChangeSource { Application, Portal, FactoryReset, Mqtt };
+
+enum class ArdPortalRestartReason { Portal, FirmwareUpdate, FactoryReset, StorageFormat };

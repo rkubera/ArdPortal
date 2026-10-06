@@ -506,6 +506,7 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | `setDeviceDescription(value)` / `setDeviceManufacturer(value)` | Merge and schedule one metadata change into the pending Config. |
 | `onConfigChanged(callback)` | `void(const Config&, ChangeSource)` after a changed Config is applied. |
 | `onPortalConfigChanged(callback)` | `void(const Config&)` for applied changes whose source is the portal. |
+| `onBeforeRestart(callback)` | `void(RestartReason)` once immediately before an ArdPortal restart; factory reset skips it. |
 | `onConfigSaved(callback)` | `void(bool ok, const String& error)` after storage completion or an identical-save skip. A successful network change can still await application. |
 | `getAppConfigValue(key)` | Copy of live RAM state first, then persisted application value, then registered default; missing unregistered key is Undefined. |
 | `setAppConfigValue(key, value)` | Persistent application update, except registered descriptor-based fields with `persist:false`, which use RAM state. Rejects invalid/Undefined values, invalid registered values and unavailable transactions. |
@@ -909,8 +910,9 @@ Persistent application setters retain their debounce/wear-saving behavior;
 MQTT immediately, with a debounced journal write afterward. Their change callback
 runs on live application; `onConfigSaved` reports durable completion. Ordinary
 persistent code changes invoke the callback after commit. Accepted MQTT control
-commands update live state and invoke the callback when their save is scheduled,
-just like portal controls. A previously reported hardware state cannot hide the
+commands update live state and invoke the callback on receipt, independently
+of flash activity, just like portal controls. Persistence remains debounced and
+coalesces commands while storage is busy. A previously reported hardware state cannot hide the
 requested value; later hardware confirmation remains the application’s responsibility.
 Save completion does not repeat the callback. Unchanged effective values do not
 invoke the change callback. Startup restoration uses
@@ -1327,6 +1329,42 @@ copy and other files remain. Explicit formatting deletes all ArdFS files and
 restarts the device. The default factory identity is `ArdUI-<chip ID>` and AP
 password `1234567890`.
 
+Before a manual restart, successful OTA or storage-format restart, register a
+cleanup callback:
+
+```cpp
+portal.onBeforeRestart([&](ArdPortal::RestartReason reason) {
+  // Queue application data; ArdPortal waits for the storage result after return.
+  portal.setAppConfigValue("uptimeAtRestartMs", millis());
+  // Put outputs in their safe state, stop peripherals or flush a UART.
+  digitalWrite(RELAY_PIN, LOW);
+  Serial.flush();
+});
+```
+
+`RestartReason` identifies the triggering operation: `Portal` (Restart button),
+`FirmwareUpdate` (successful `.bin` or ESP8266 `.bin.gz` OTA), or `StorageFormat`.
+**Factory reset skips this callback**, so application cleanup cannot repopulate
+the freshly reset configuration. The callback runs once from `portal.loop()`, after the HTTP response connection
+has closed, the restart delay has elapsed and earlier storage operations have
+completed. During the callback, `setAppConfigValue()` and `removeAppConfigValue()`
+may queue application data despite the pending restart. Portal/network settings
+remain blocked. After the callback returns, ArdPortal forces the configuration
+save without debounce and continues servicing its storage in later `loop()`
+passes. `ESP.restart()` runs only after storage finishes and `onConfigSaved()`
+has reported completion. If a configuration write fails, `onConfigSaved(false, error)` and
+`storageError()` report the failure; restart proceeds after the failed transaction
+has finished. An unsuccessful OTA/reset/format does
+not invoke the callback. **Factory reset still skips it.**
+
+Do not wait for an asynchronous save inside the callback: queue it and return.
+Reentrant `portal.loop()` calls from the callback are ignored. This mechanism
+waits for ArdPortal's own storage; a separate application-owned ArdFS instance
+needs its own completion handling and is not automatically serviced by ArdPortal.
+
+Direct application calls to `ESP.restart()`, watchdog resets, exceptions and power
+loss do not pass through this callback. Clear it with `portal.onBeforeRestart(nullptr)`.
+
 ### ArdFS storage format
 
 ArdFS is implemented in `ArdFSVolume.cpp`, with its own disk format and flash
@@ -1687,6 +1725,24 @@ history described above. Serial output is not automatically captured. Log timest
 date/time afterward. Existing log text keeps the language in which it was emitted.
 
 OTA accepts a raw `.bin` compiled for the same board and partition layout.
+On ESP8266 it also accepts a gzip-compressed `.bin.gz`, both from the file picker
+and the firmware URL. Compress the **complete firmware binary**, for example:
+
+```sh
+gzip -9 -c firmware.bin > firmware.bin.gz
+```
+
+The ESP8266 core writes the compressed upload to the OTA staging area and its
+eboot bootloader decompresses it during restart. ArdPortal does not decompress
+it in RAM. The compressed upload must fit `ESP.getFreeSketchSpace()`; the
+uncompressed image must fit the device's application area and preserve its flash
+layout. Compression can make OTA possible with less free flash, but does not
+reduce the installed firmware size. Use a valid gzip file containing one complete
+firmware image. ArdPortal checks the gzip signature, compression method and
+reserved header flags; it does not fully decompress/validate its payload before
+restart. ESP8266 core/eboot with gzip support is required (including core 3.1.2).
+First install compatible firmware/bootloader through the serial port if upgrading
+from a legacy core. ESP32 gzip uploads are rejected.
 On ESP32, use the application image, not a merged image or filesystem image.
 The upload is streamed, verified by the core's Update implementation, and only
 a successful completed image schedules a restart. Interrupted/invalid uploads

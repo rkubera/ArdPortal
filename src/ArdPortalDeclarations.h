@@ -64,6 +64,8 @@ public:
   enum class WifiState { NoCredentials, Connecting, Connected, FallbackAP };
   using MqttState = ArdMqttState;
   using ChangeSource = ArdPortalChangeSource;
+  using RestartReason = ArdPortalRestartReason;
+  using RestartCallback = std::function<void(RestartReason)>;
   using ConfigCallback = std::function<void(const Config&, ChangeSource)>;
   using PortalCallback = std::function<void(const Config&)>;
   using SavedCallback = std::function<void(bool, const String&)>;
@@ -71,6 +73,7 @@ public:
   using MessageCallback = std::function<void(const String&, const uint8_t*, size_t)>;
   void onConfigChanged(ConfigCallback callback) { _changed = callback; }
   void onPortalConfigChanged(PortalCallback callback) { _portalChanged = callback; }
+  void onBeforeRestart(RestartCallback callback) { _beforeRestart = callback; }
   void onConfigSaved(SavedCallback callback) { _saved = callback; }
   void onPortalAndAppConfigReady(ReadyCallback callback) { _readyCallback = callback; }
   bool configurationReady() const { return _configurationReady; }
@@ -231,6 +234,7 @@ private:
   ConfigCallback _changed;
   PortalCallback _portalChanged;
   SavedCallback _saved;
+  RestartCallback _beforeRestart;
   ReadyCallback _readyCallback;
   ChangeSource _saveSource = ChangeSource::Application;
   bool _configurationReady = false, _loadStarted = false, _savePending = false, _saveQueued = false;
@@ -309,7 +313,9 @@ private:
   size_t beginAsset(const ArdAssetChunk* chunks,size_t count);
   uint32_t _httpSince = 0;
   bool _httpConfigUpload = false;
-  bool _rebootPending = false;
+  bool _rebootPending = false, _beforeRestartCalled = false, _beforeRestartRunning = false;
+  RestartReason _restartReason = RestartReason::Portal;
+  void scheduleRestart(RestartReason reason);
 
   uint32_t _rebootSince = 0;
   uint64_t _uptimeMs = 0;

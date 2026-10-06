@@ -18,10 +18,35 @@ void ArdOta::abortUpgrade() {
   Update.end(false); // Incomplete image is rejected; ESP8266 has no public abort().
 #endif
   _otaActive = false;
+#if defined(ESP8266)
+  _gzipPrefixSize = 0;
+#endif
 }
 
 bool ArdOta::writeUpgrade(uint8_t* data, size_t length) {
-  if (!_otaReceived && length && data[0] != 0xe9) { abortUpgrade(); _portal.replyMessage(400,ArdUILanguage::Key::s_152); return false; }
+  if (!_otaReceived && length && data[0] != 0xe9
+#if defined(ESP8266)
+      && data[0] != 0x1f
+#endif
+  ) { abortUpgrade(); _portal.replyMessage(400,ArdUILanguage::Key::s_152); return false; }
+#if defined(ESP8266)
+  // Buffer only the gzip signature/method/flags, even if HTTP splits each byte.
+  // The core streams the compressed image to flash; eboot decompresses on restart.
+  if (length && ((!_otaReceived && data[0] == 0x1f) || _gzipPrefixSize)) {
+    if (_otaExpected < 18) { abortUpgrade(); _portal.replyMessage(400,ArdUILanguage::Key::s_152); return false; }
+    while (length && _gzipPrefixSize < sizeof(_gzipPrefix)) {
+      _gzipPrefix[_gzipPrefixSize++] = *data++; --length; ++_otaReceived;
+    }
+    if (_gzipPrefixSize < sizeof(_gzipPrefix)) return true;
+    if (_gzipPrefix[1] != 0x8b || _gzipPrefix[2] != 8 || (_gzipPrefix[3] & 0xe0)) {
+      abortUpgrade(); _portal.replyMessage(400,ArdUILanguage::Key::s_152); return false;
+    }
+    if (Update.write(_gzipPrefix,sizeof(_gzipPrefix)) != sizeof(_gzipPrefix)) {
+      abortUpgrade(); _portal.reply(500,"text/plain",ArdUILanguage::text(ArdUILanguage::Key::s_153)+String(Update.getError())); return false;
+    }
+    _gzipPrefixSize = 0;
+  }
+#endif
   size_t written = Update.write(data, length);
   if (written != length) { abortUpgrade(); _portal.reply(500, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_153) + String(Update.getError())); return false; }
   _otaReceived += length;
@@ -29,7 +54,7 @@ bool ArdOta::writeUpgrade(uint8_t* data, size_t length) {
     bool ok = Update.end(false); _otaActive = false;
     if (!ok) { _portal.reply(500, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_153) + String(Update.getError())); return false; }
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_155));
-    _portal._rebootPending = true; _portal._rebootSince = millis();
+    _portal.scheduleRestart(ArdPortal::RestartReason::FirmwareUpdate);
     _portal.replyMessage(200,ArdUILanguage::Key::s_155);
   }
   return true;
@@ -41,6 +66,9 @@ void ArdOta::startUpload(uint32_t bodySize, int split) {
     _portal.closeMqtt();
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_117));
     if (!Update.begin(bodySize, U_FLASH)) { _portal.reply(500, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_153) + String(Update.getError())); return; }
+#if defined(ESP8266)
+    _gzipPrefixSize = 0;
+#endif
     _otaActive = true; _otaExpected = bodySize; _otaReceived = 0; _portal._httpSince = millis();
     String initial = _portal._request.substring(split + 4); _portal._request = String();
     size_t length = initial.length(); if (length > bodySize) length = bodySize;

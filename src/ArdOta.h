@@ -24,6 +24,10 @@ private:
   ArdPortal& _portal;
   bool _otaActive = false;
   size_t _otaExpected = 0, _otaReceived = 0;
+#if defined(ESP8266)
+  uint8_t _gzipPrefix[4] = {};
+  uint8_t _gzipPrefixSize = 0;
+#endif
   void abortUpgrade();
   bool writeUpgrade(uint8_t* data, size_t length);
   void startUpload(uint32_t bodySize, int split);

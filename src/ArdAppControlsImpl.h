@@ -88,7 +88,7 @@ void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t 
           for(size_t j=0;j<entity["controls"].length();++j) {const V& part=entity["controls"][j];String key=part["key"].asString();if(input.hasOwnProperty(key)) {if(!ArdHa::validControl(part,input[key])) return;next[key]=input[key];changed=true;}}
           if(!changed||!ArdDynamicPages::validValue(entity,next)) return;
           if(!entity["persist"].asBool()) {if(applyAppState(id,next,ChangeSource::Mqtt)) _stateDirty|=uint64_t(1)<<i;}
-          else {_mqttAppQueue[id]=next;_mqttAckPending|=uint64_t(1)<<i;}
+          else {acceptMqttState(id,next);}
           return;
         }
         if(!appControl(f,c,input,ChangeSource::Mqtt)) _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177));
@@ -123,7 +123,7 @@ void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t 
 #endif
     }
     if(!appFieldVisible(f)){_portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_207));return;}
-    if(ArdDynamicPages::validValue(f,value)) { _mqttAppQueue[id]=value; _mqttAckPending|=uint64_t(1)<<i; }
+    if(ArdDynamicPages::validValue(f,value)) { acceptMqttState(id,value); }
     else _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177));
     return;
   }
@@ -207,7 +207,7 @@ bool ArdAppControls::appControl(const V& definition,size_t index,const V& value,
   if(!f["persist"].asBool()) {if(!applyAppState(key,next,source)) return false;markDirty(key);return true;}
   _appControlStage=5;V app=_portal._savePending?_portal._pendingApp:_portal._appConfig;app[key]=next;
 #if ARDPORTAL_ENABLE_MQTT
-  if(source==ChangeSource::Mqtt) {_mqttAppQueue[key]=next;for(size_t i=0;i<_portal._dynamic.count();++i) if(_portal._dynamic.idAt(i)==key) _mqttAckPending|=uint64_t(1)<<i;return true;}
+  if(source==ChangeSource::Mqtt) return acceptMqttState(key,next);
 #endif
   if(_portal._saveQueued||_portal._pendingReady||_portal._storage.busy()||_portal.mqttTrialActive()) return false;
   if(_portal._savePending) {if(_portal._saveSource!=source) return false;_portal._pendingApp=app;_portal._dirtySince=millis();}
@@ -243,7 +243,8 @@ void ArdAppControls::applyAppConfig(V app) {
     V value=_portal.getAppConfigValue(key.c_str());
     if(ArdJSON::JSON.stringify(old)==ArdJSON::JSON.stringify(value)) continue;
     markDirty(key);
-    if(_portal._appChanged) { V copy=value; _portal._appChanged(key,copy,source); }
+    // MQTT intent was already dispatched on receipt. A flash commit is not a new command.
+    if(source!=ChangeSource::Mqtt && _portal._appChanged) { V copy=value; _portal._appChanged(key,copy,source); }
   }
 }
 
@@ -268,23 +269,27 @@ bool ArdAppControls::canServiceMqtt() const {
 void ArdAppControls::resetMqtt() {
   _subscriptions=0; _stateDirty=stateMask(); _stateSince=millis();
 }
+bool ArdAppControls::acceptMqttState(const String& key,V value) {
+  // Own the command value: application callbacks can replace the reported state.
+  if(!applyAppState(key,value,ChangeSource::Mqtt)) return false;
+  markDirty(key);
+  _mqttAppQueue[key]=value;
+  if(!_mqttAppQueue.isValid()) return false;
+  for(size_t i=0;i<_portal._dynamic.count();++i)
+    if(_portal._dynamic.idAt(i)==key) _mqttAckPending|=uint64_t(1)<<i;
+  return true;
+}
 void ArdAppControls::prepareMqtt(uint32_t now) {
-  // Commands received during a flash operation are coalesced by field, then retried.
+  // Only persistence waits for flash. Accepted commands have already run.
   if(_mqttAppQueue.length()&&!_portal.storageBusy()&&!_portal._httpWaitingStorage) {
-    V app=_portal._appConfig,keys=_mqttAppQueue.keys(); for(size_t i=0;i<keys.length();++i) {
-      String key=keys[i].asString();if(!appFieldVisible(_portal._dynamic.field(key))) {_mqttAppQueue.remove(key);for(size_t f=0;f<_portal._dynamic.count();++f) if(_portal._dynamic.idAt(f)==key) _mqttAckPending&=~(uint64_t(1)<<f);_portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_207));continue;}
-      app[key]=_mqttAppQueue[key];
+    V app=_portal._appConfig,keys=_mqttAppQueue.keys();
+    for(size_t i=0;i<keys.length();++i) {
+      String key=keys[i].asString(); app[key]=_mqttAppQueue[key];
     }
-    if(!_mqttAppQueue.length()) {_mqttAckPending=0;}
-    else if(_portal.scheduleConfig(_portal._config,app,ChangeSource::Mqtt,true)) {
+    if(_portal.scheduleConfig(_portal._config,app,ChangeSource::Mqtt,false)) {
       _mqttAckInFlight=_mqttAckPending; _mqttAckPending=0;
-      V commands=std::move(_mqttAppQueue); _mqttAppQueue=V::object();
-      // Dispatch the accepted intent before a reported state can hide it at save completion.
-      // HTTP controls use the same path; hardware confirmation remains application-owned.
-      V commandKeys=commands.keys();
-      for(size_t i=0;i<commandKeys.length();++i) {String key=commandKeys[i].asString();applyAppState(key,commands[key],ChangeSource::Mqtt);}
+      _mqttAppQueue=V::object();
     }
-    else if(_portal._configurationReady) { _mqttAckPending=0; _mqttAppQueue=V::object(); _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177)); }
   }
   if(_portal._options.appStateIntervalMs && uint32_t(now-_stateSince)>=_portal._options.appStateIntervalMs) {
     _stateDirty=stateMask(); _stateSince=now;
