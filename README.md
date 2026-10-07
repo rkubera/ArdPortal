@@ -176,7 +176,7 @@ Unspecified options default to `1` (enabled):
 | `ARDPORTAL_ENABLE_DEPENDENCIES` | Removes `visibleWhen` evaluation, conditional portal visibility and HA discovery removal/recreation. |
 
 To omit dynamic forms entirely, add `#define ARDPORTAL_ENABLE_DYNAMIC_PAGES 0`
-before `ArdPortal.h`. It defaults to `1`. `addAppConfigPage()`, `setAppConfigStateValue()`
+before `ArdPortal.h`. It defaults to `1`. `startAppConfigPageRegistration()`, `setAppConfigStateValue()`
 and `emitAppConfigEvent()` then return false and `onAppConfigCommand()` is a no-op. Generic
 `getAppConfigValue()`, `setAppConfigValue()`, `removeAppConfigValue()` and their
 change callback remain available and persist through ArdFS. When Console is
@@ -218,7 +218,7 @@ uses this four-control selection. `MinimalPortal` instead sets
 `ARDPORTAL_ENABLE_DYNAMIC_PAGES` to `0`, omitting all field types. This switch
 also overrides explicitly enabled control, HA and dependency flags. OTA, MQTT
 and Console can still be enabled independently. Disabled field definitions are
-rejected by `addAppConfigPage()`; they are not silently converted into another type.
+rejected by `startAppConfigPageRegistration()`; they are not silently converted into another type.
 Guard your own JSON definitions and registration calls too when they contain
 excluded types; literals owned by the sketch cannot be removed by the library.
 
@@ -279,6 +279,7 @@ Examples are in `examples`:
 | `DynamicPagesWithDependencies` | Dynamic fields with visibility dependencies |
 | `BasicPortal` | Minimal `begin()` / `loop()` portal with integrated storage |
 | `DynamicPages` | Two JSON-defined pages with switch, slider, editable text, select and a change callback |
+| `HomeAssistantEntities` | HA sensor/switch registration without dynamic panel pages, cooperative HA work settings |
 | `ApplicationConfig` | Application JSON values and configuration callbacks |
 | `AsyncStorage` | Standalone cooperative journal storage without a portal |
 | `JsonBasics` | Standalone JSON objects, arrays, serialization and parsing |
@@ -364,7 +365,7 @@ are persisted in one document. There are no compatibility aliases for old names.
 | --- | --- |
 | `ArdPortal::Config` | `ArdPortal::PortalConfig` |
 | `onConfigChanged` | `onPortalConfigChanged(config, source)` |
-| `addPortalPage` | `addAppConfigPage` |
+| `addPortalPage` | `startAppConfigPageRegistration` |
 | `onAppCommand` | `onAppConfigCommand` |
 | `setAppStateValue` | `setAppConfigStateValue` |
 | `queueAppStatePublish` | `queueAppConfigStatePublish` |
@@ -456,7 +457,8 @@ application. Register dynamic page definitions to expose selected `app` keys in
 portal forms and Home Assistant.
 
 The configuration payload contains `config` and `app` objects. The complete
-payload is limited to 8192 bytes, the serialized application object to 2048 bytes
+payload is limited to 13376 bytes, serialized PortalConfig to 5120 bytes and
+serialized AppConfig to 8192 bytes
 and a CA certificate to 4096 bytes. Available RAM, particularly with TLS on
 ESP8266, can impose lower practical limits. `ConfigJson.h` validates the portal
 schema, and `ArdJSON.h` handles JSON parsing/serialization.
@@ -545,7 +547,8 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | `flushPortalAndAppConfig()` | Accept a request to bypass debounce/minimum write spacing for a pending save; no flash I/O in the caller. Returns false when no eligible pending save exists. |
 | `portalAndAppConfigBusy()` | Storage initialization/operation, queued save or pending application; useful for deciding when to retry. |
 | `portalAndAppConfigStorageOK()` / `portalAndAppConfigError()` | Last portal storage result/error, not a standalone filesystem handle. |
-| `addAppConfigPage(String)` / `addAppConfigPage(FPSTR(...))` | Validate and register an immutable dynamic definition. String source is retained in RAM; PROGMEM source must outlive the portal. Returns false with dynamic pages disabled. |
+| `startAppConfigPageRegistration(String)` / `startAppConfigPageRegistration(FPSTR(...))` | Queue registration: small pages (≤2048 bytes/8 fields) finish in one loop pass, larger pages cooperatively. `true` means accepted pending work; use state/progress and `onAppConfigPageRegistrationFinished(bool)`. |
+| `addAppConfigEntity(String)` / `addAppConfigEntity(FPSTR(...))` | Register one HA-only field using the same definition schema. It has no portal page/menu/control, and shares IDs, commands, state and the 1024-field/configurable definition budgets (256 KiB by default) with panel fields. Requires HA and dynamic AppConfig support; otherwise returns false. |
 | `setAppConfigStateValue(key, value, publishMqtt=true)` | RAM-only update of a registered nontransient field; validates type/state, triggers change callback and live portal revision when changed; optionally queues MQTT state. |
 | `queueAppConfigStatePublish(key)` | Queue the current registered nontransient field state even if unchanged. Works as a dirty flag while disconnected; returns false without MQTT/dynamic pages or for unknown/transient fields. |
 | `emitAppConfigEvent(key, value)` | Validate a registered event/device_trigger/tag payload and update its RAM state/revision. With MQTT enabled, requires a connection and free emission FIFO slot to queue a nonretained message; without MQTT it updates local event state only. |
@@ -570,6 +573,194 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 `MqttState` values are `Disabled`, `WaitingForWifi`, `WaitingRetry`, `Connecting`,
 `Connected` and `WaitingForTime`. These enum values are runtime states, not error
 codes or elapsed-time promises.
+
+### Cooperative registration of large pages
+
+`startAppConfigPageRegistration()` uses the same public lifecycle for all page sizes.
+`true` means the job was accepted; state is `Pending`, and the page is not yet
+registered. Validation success/failure is always delivered exactly once through
+`onAppConfigPageRegistrationFinished(bool)` from `portal.loop()`, after the start
+method returns. `false` means immediate rejection (input/busy/features/resources);
+no completion callback is issued for a job that was not accepted.
+
+Definitions up to 2048 bytes with at most 8 fields are completely validated and
+registered in one loop pass. Larger definitions/field counts use the cooperative
+work budget across passes. Both modes use the same schema, limits, diagnostics,
+atomic commit and callback contract. Install the callback before registering,
+call `portal.begin()` and keep calling `portal.loop()` to advance pending jobs.
+
+```cpp
+portal.onAppConfigPageRegistrationFinished([](bool success) {
+  if (success) {
+    // The page and its fields are now registered. Restore application hardware
+    // only once portalAndAppConfigReady() is also true.
+    Serial.println("Page registered");
+  } else {
+    const auto& error = portal.appConfigRegistrationError();
+    Serial.printf("%s: %s: %s\n", error.stage, error.fieldId.c_str(),
+                  error.reason.c_str());
+  }
+  // This callback may queue the next page with startAppConfigPageRegistration().
+});
+if (!portal.startAppConfigPageRegistration(FPSTR(PAGE_DEFINITION))) {
+  Serial.println(portal.appConfigRegistrationError().reason);
+}
+portal.begin();
+```
+
+`appConfigPageRegistrationState()` returns `Idle`, `Pending`, `Succeeded` or
+`Failed` from `ArdPortal::AppConfigPageRegistrationState`.
+`appConfigPageRegistrationBusy()` reports a pending job.
+`appConfigPageRegistrationProcessedFields()` and
+`appConfigPageRegistrationTotalFields()` report index-building progress; the total
+becomes available after the initial scan. Discovery is checked while building
+the index; dependency and command-collision checks can remain after the field
+count reaches its total.
+
+For larger pages, each loop runs up to 16 registration units within a cooperative
+2 ms budget, after servicing HTTP, MQTT and HA. Tune
+`Options::appConfigRegistrationMaxOperationsPerLoop` and
+`Options::appConfigRegistrationWorkBudgetMs` (both nonzero) when necessary.
+Scanning consumes at most 1024 source bytes per unit. The first pass scans the
+structure, counts fields and parses the header; the index pass parses/validates
+each field once and checks its Discovery payload. Only fields with dependencies
+or generated command names need an additional read. Existing command owners are
+read only when a new ID could collide with their generated topic suffixes; other
+registered definitions are not reparsed. No whole-page DOM or whole PROGMEM
+source copy is created.
+
+The time budget is checked between units; parsing/normalizing one unusually large
+field/header value cannot be interrupted. Small pages finish in one loop pass
+and are not constrained by the cooperative time budget.
+
+Only one job can be pending. Other page/entity registrations are rejected with a
+`busy` error until it finishes. Queue successive pages from the completion
+callback; it runs after staging allocations are released. Callbacks run once for
+accepted jobs, including validation failures, not for immediate input/busy/feature rejection.
+Any page queued from inside a completion callback starts work in a later loop pass,
+avoiding recursive callbacks and processing another job in the same batch. Page
+registration requires dynamic AppConfig support and does not advance during OTA
+or a pending restart. The `const String&` overload owns a copy of the input. The `String&&` overload
+takes ownership on acceptance without copying the source buffer; PROGMEM sources
+must remain immutable and alive for the portal lifetime.
+
+A staged page is invisible to HTTP, MQTT and HA until final commit. Failure frees
+it without changing registered pages, field indices or Discovery. Field references
+may point forward within the same page or to already registered fields, not to
+pages still waiting to be queued. Startup configuration loading and page
+registration complete independently: check both before reading/applying newly
+registered field defaults. An open portal detects new pages through its regular status refresh and fetches
+only the lightweight menu catalog (`/api/page-catalog`). New menu entries appear
+without reloading or rebuilding existing controls; only a newly active page
+definition is fetched. All page sizes finish through `loop()`. Sketches should use
+the completion callback to queue each next page, or wait until the pending job
+finishes before submitting another. See `examples/DynamicPages/DynamicPages.ino`
+for a pattern that supports both modes.
+
+### Page registration diagnostics
+
+`startAppConfigPageRegistration()` returns `false` only when the job cannot be accepted. Inspect the
+error after a rejected call and inside `onAppConfigPageRegistrationFinished(false)` for later
+validation, memory or Discovery failures:
+
+```cpp
+auto reportError = []() {
+  const auto& error = portal.appConfigRegistrationError();
+  Serial.printf("Registration: stage=%s field=%s reason=%s\n",
+                error.stage, error.fieldId.c_str(), error.reason.c_str());
+};
+portal.onAppConfigPageRegistrationFinished([reportError](bool success) {
+  if (!success) reportError();
+});
+if (!portal.startAppConfigPageRegistration(FPSTR(PAGE_DEFINITION))) reportError();
+```
+
+The result contains `stage`, `fieldId` and `reason`. Stages distinguish input,
+JSON parsing, page/field validation, descriptor normalization, limits, registry
+allocation, serialization, field indexing, command collisions and HA Discovery.
+Parser errors include the byte offset and distinguish memory exhaustion from
+input/node/depth/string/container limits. Discovery overflow reports payload
+size and MQTT capacity. `fieldId` is empty when no field can be identified, for
+example a JSON parse error or page allocation failure. A successful page
+registration clears the previous error; copy the result if retaining it across
+another registration. The getter works even with Console diagnostics disabled.
+Failures are also sent to Console > Messages when
+`ARDPORTAL_ENABLE_CONSOLE_MESSAGES` is enabled. Rejected pages are rolled back and do not
+restart Discovery.
+
+### Home Assistant entities without panel pages
+
+Use `addAppConfigEntity()` for telemetry or controls that belong in Home Assistant
+but do not need a dynamic page. Pass a single field object, not a page containing
+`fields`. Both basic and descriptor-based controls use the same validation,
+MQTT topic namespace, callbacks, state setters and persistence rules as panel
+fields. Entity IDs must be unique across the entire application. HA-only entities
+have their own source registry, consume no slots from the 16 panel pages, and do
+not appear in `/api/pages` or the portal menu. Their current values remain available
+through `getAppConfigValue()` and the complete `/api/app` values endpoint. The 1024-field and configurable source
+budgets cover both registries together. `ARDPORTAL_ENABLE_HA` and
+`ARDPORTAL_ENABLE_DYNAMIC_PAGES` must be enabled.
+
+```cpp
+const char TEMPERATURE_ENTITY[] PROGMEM = R"JSON({
+  "id":"air_temperature", "name":"Air temperature", "type":"text",
+  "default":0, "unit_of_measurement":"°C", "device_class":"temperature",
+  "state_class":"measurement"
+})JSON";
+
+// During setup; check registration failures.
+if (!portal.addAppConfigEntity(FPSTR(TEMPERATURE_ENTITY)))
+  Serial.println("Invalid HA entity");
+
+// After portalAndAppConfigReady(), report sensor readings in RAM.
+portal.setAppConfigStateValue("air_temperature", 22.5);
+```
+
+For writable entities, register `onAppConfigValueChanged()` or
+`onAppConfigCommand()` exactly as for panel controls. Reporting a sensor value
+with `setAppConfigStateValue()` does not write flash. See
+`examples/HomeAssistantEntities/HomeAssistantEntities.ino` for an HA sensor and
+switch with no dynamic panel pages.
+
+### Bounded Home Assistant work
+
+```cpp
+ArdPortal::Options options;
+options.haWorkBudgetMs = 2;
+options.haMaxOperationsPerLoop = 1;
+portal.begin(options);
+```
+
+HA advances through preparation, subscriptions/availability, dependencies, state
+and discovery in stages. The default is one work unit per `portal.loop()` call.
+A unit handles one dependency edge, one preparation pass, or at most one MQTT
+message. `haWorkBudgetMs` stops starting additional units once the elapsed budget
+is reached; `haMaxOperationsPerLoop` is the operation ceiling. Both must be
+nonzero. HTTP is serviced before HA, and the caller regains control between HA
+units for UART and application work. Long dependency chains, shared dependencies
+and cycles are processed across calls using a resumable traversal; no full graph
+walk runs in one HA unit.
+
+The time budget is cooperative: parsing/normalizing one field, serializing a
+payload or a core transport call cannot be interrupted and may exceed it.
+Application callbacks and MQTT connection/TLS handshakes have their own timing;
+this budget is not a hard deadline for the entire portal loop.
+
+Registration appends only the new fields to pending state/dependency/discovery
+work. It preserves the discovery cursor, availability and subscriptions. Stable
+field indices allow HA-only entities and panel pages to be registered in any
+order. A broker reconnect or Home Assistant's `online` birth message still
+requests complete rediscovery; periodic refresh is disabled by default and can
+be explicitly enabled.
+
+Single-field lookups parse only the field's indexed JSON slice, including for
+PROGMEM-backed page sources. Registration, HTTP definition/state streaming and
+single-entity discovery operate on individual fields. Each page stores compact
+field metadata and a shared null-terminated ID pool rather than retaining one
+`String` object per field. The ID pool is built directly during registration,
+without a temporary ID array or final pool copy; spare capacity is bounded to
+31 bytes per page. Flash
+source arrays must remain immutable and alive for the portal lifetime.
 
 ### Persistent settings versus live status
 
@@ -610,13 +801,46 @@ and publishes state; application code controls the physical actuator.
 
 ## Dynamic portal pages and Home Assistant
 
-Register JSON definitions with `addAppConfigPage(definition)` before `begin()`, or
-later from the Arduino task. Register definitions on every boot. The portal embeds only page menu metadata and fetches the active definition through `/api/pages?page=<id>`. Definitions are parsed at most once per page during a dynamic HTTP request; field defaults and dependency checks reuse those request-local trees. Static `PROGMEM`
+Queue JSON definitions with `startAppConfigPageRegistration(definition)` before `begin()`, or
+later from the Arduino task. Call `loop()` to complete registration and queue
+subsequent pages from `onAppConfigPageRegistrationFinished()`. Register definitions on
+every boot. The portal embeds only page menu metadata and fetches the active definition through `/api/pages?page=<id>`. Definition and selected-page state responses are generated cooperatively, one field per `loop()`, and transmitted in chunks of at most 256 bytes. They do not build a whole-page JSON tree or a whole response in RAM. Defaults and visibility use indexed field slices; memory is bounded by the page header and largest individual field/value, which must still fit in RAM. Selected-page state responses use HTTP connection-close framing because their length can change with current values. Static `PROGMEM`
 definitions passed through `FPSTR()` remain in flash; only a compact index stays
-in RAM. String definitions retain their JSON text in RAM. Pages are parsed on
-demand and released after use. Application values use the existing journaled
+in RAM. String definitions retain their JSON text in RAM. Individual fields are parsed on
+demand and released after use. Pages larger than 32 KiB use the same
+cooperative registration and HTTP streaming; 32-bit field offsets support sources
+beyond 64 KiB. Use `PROGMEM` for large definitions to avoid retaining their source
+text in RAM. The 4096-node page limit and individual-field JSON/memory limits remain. Application values use the existing journaled
 configuration storage.
 The main the external `ArdUI.ino` demo demonstrates every supported entity type across seven pages.
+
+The shared page/entity definition budget defaults to 256 KiB and can be overridden
+in bytes before
+including the library:
+
+```cpp
+#define ARDPORTAL_APP_CONFIG_MAX_DEFINITION_BYTES (128UL * 1024UL)
+#include <ArdPortal.h>
+```
+
+This changes the definition budget, independently of persistent AppConfig storage.
+It does not allocate a buffer of that size. Large definitions should use `PROGMEM`;
+field counts, per-field JSON limits and available RAM still apply. Use the same
+value in every translation unit that includes ArdPortal.
+
+For a definition built dynamically, transfer its source buffer when it is no
+longer needed by the application:
+
+```cpp
+String definition = buildPageDefinition();
+if (!portal.startAppConfigPageRegistration(std::move(definition))) {
+  // Rejection before acceptance leaves definition available for retry.
+}
+// After acceptance, definition has been moved; the portal retains its source.
+```
+
+This saves the additional source copy at registration; it still retains the text
+in RAM. For fixed schemas, prefer the direct `FPSTR(PROGMEM_ARRAY)` overload.
 
 ### Dynamic JSON schema
 
@@ -649,7 +873,8 @@ normalization metadata, not application configuration keys or feature switches.
 A field ID does not create a C++ variable: access its value through
 `getAppConfigValue(id)`. Definitions are immutable after registration; the public
 API does not remove/replace a page or edit a registered schema. Runtime additions
-require a browser reload to rebuild the static catalog.
+appear automatically during the portal status refresh (normally every 1 second),
+without resetting existing controls or unsaved edits.
 
 | `visibleWhen` property | Required | Meaning |
 | --- | --- | --- |
@@ -683,8 +908,8 @@ static const char HOME_PAGE[] PROGMEM = R"JSON({
      "default":"Unavailable", "persist":false}
   ]
 })JSON";
-// Register before portal.begin().
-portal.addAppConfigPage(FPSTR(HOME_PAGE));
+// Queue before portal.begin(); completion is reported from loop().
+portal.startAppConfigPageRegistration(FPSTR(HOME_PAGE));
 ```
 
 The DHT example registers Home for its two measurements and a separate Settings page
@@ -701,7 +926,8 @@ static const char LIGHTING_PAGE[] PROGMEM = R"JSON({
     {"id":"enabled","type":"switch","name":"Enabled","default":false}
   ]
 })JSON";
-portal.addAppConfigPage(FPSTR(LIGHTING_PAGE));
+// Queue this page only once the preceding registration has completed.
+portal.startAppConfigPageRegistration(FPSTR(LIGHTING_PAGE));
 portal.onAppConfigValueChanged([](const String& key, const ArdJSON::JSONVar& value,
                                  ArdPortal::ChangeSource source) {
   // Apply the current value to your hardware here; keep the callback short.
@@ -725,11 +951,26 @@ Select options use `value`, `name` and optional `names` in the same way.
 IDs contain 1–48 ASCII letters, digits, underscores or hyphens. Field IDs must be
 unique across all pages; they are application keys and MQTT command names.
 `availability` and `status` are reserved; climate command suffixes must not collide
-with other field IDs. Registration returns `false` for invalid definitions,
-duplicate IDs, unsupported controls or resource limits. Limits: 16 pages, 48 fields,
-32 KB of total definitions, 80-byte labels, 16 select options, 128-byte editable
+with other field IDs. The completion callback reports `false` for invalid definitions, duplicate IDs,
+unsupported controls or resource limits. Only immediate rejection returns `false` from `startAppConfigPageRegistration()`. Limits: 16 pages, 1024 fields in total across all pages,
+256 KiB of total definitions by default (configurable; no separate 32 KiB page limit), 80-byte labels, 16 select options, 128-byte editable
 text values (512 bytes for read-only text),
-and the existing 2 KB application configuration payload. Each discovery message
+and the 8 KiB application configuration payload. The 1024-field limit
+does not guarantee that all values fit in persistent AppConfig or available heap.
+The storage budget is designed for a 128 KiB region: serialized PortalConfig is
+limited to 5 KiB (`MaxPortalConfigBytes`), including a CA certificate of up to
+4096 bytes, and serialized AppConfig to 8192 bytes (`MaxAppConfigBytes`). These
+budgets count JSON keys, quotes and escaping. Certificate and remaining network/
+device settings must fit together within the PortalConfig budget. Both parts,
+including the outer JSON object, fit within `MaxConfigDocumentBytes` (13376 bytes).
+Even worst-case journal escaping fits each record in seven 4 KiB sectors; two
+journal slots fit within one 64 KiB bank after its 4 KiB header. Additional ArdFS
+files consume the remaining space and can still cause capacity errors. This is a
+flash-size guarantee for the portal document, not a guarantee of available heap.
+Configure at least 128 KiB of filesystem/storage space in the board flash layout
+(or ESP32 partition table) to use the full budgets. ArdPortal does not resize it.
+Field tracking uses fixed masks covering all 1024 fields, including MQTT and HA
+dependencies. Each discovery message
 must fit the bounded MQTT buffer, including space for a future device name.
 
 | `type` | Value and definition | HA entity |
@@ -848,12 +1089,20 @@ static const char DETAILS_PAGE[] PROGMEM = R"JSON({
               "name": "Note", "default": ""}]
 })JSON";
 
-// In setup(), before portal.begin():
-if (!portal.addAppConfigPage(FPSTR(ROOT_PAGE)) ||
-    !portal.addAppConfigPage(FPSTR(ADVANCED_PAGE)) ||
-    !portal.addAppConfigPage(FPSTR(DETAILS_PAGE))) {
-  Serial.println("Page registration failed.");
-}
+// In setup(), before portal.begin(): register in dependency order.
+const __FlashStringHelper* definitions[] = {
+  FPSTR(ROOT_PAGE), FPSTR(ADVANCED_PAGE), FPSTR(DETAILS_PAGE)
+};
+portal.onAppConfigPageRegistrationFinished([definitions, next = size_t(1)](bool success) mutable {
+  if (!success) {
+    Serial.println(portal.appConfigRegistrationError().reason);
+    return;
+  }
+  if (next < 3 && !portal.startAppConfigPageRegistration(definitions[next++]))
+    Serial.println(portal.appConfigRegistrationError().reason);
+});
+if (!portal.startAppConfigPageRegistration(definitions[0]))
+  Serial.println(portal.appConfigRegistrationError().reason);
 ```
 
 | Advanced enabled | Details enabled (stored) | Visible pages |
@@ -926,8 +1175,12 @@ application values are also republished every ten minutes
 (`Options::appStateIntervalMs`, default 600000; zero disables periodic state
 refresh), independently of the discovery interval. Definitions
 and current states are sent after connection, after HA's `homeassistant/status`
-`online` birth message, and discovery is refreshed every five minutes
-(`Options::discoveryIntervalMs`; zero disables periodic refresh). MQTT availability
+`online` birth message. Periodic discovery is disabled by default
+(`Options::discoveryIntervalMs = 0`); a nonzero interval explicitly enables it.
+Discovery is retained, so HA does not require periodic configuration messages
+to keep entities. Dependency visibility changes can still remove/recreate an
+entity. After publishing its Discovery, the current state is queued again so HA
+can restore the control promptly. MQTT availability
 uses a retained `online` state and retained `offline` Last Will. State updates
 have priority over periodic discovery and are queued as soon as a value commits,
 then sent in the next available MQTT slot. Only one HA publication is queued per
@@ -1467,7 +1720,7 @@ the portal uses it.
 | `error()` | Last storage error; returns a const String reference. |
 | `commits()` | Completed changed document commits in this boot; RAM-only counter. |
 | `skipped()` | Identical document saves skipped in this boot; RAM-only counter. |
-| `MaxBytes` | `8192`, maximum input document bytes. JSON limits and heap can impose smaller bounds. |
+| `MaxBytes` | `14336`, maximum input document bytes. JSON limits and heap can impose smaller bounds. |
 
 `read`, `write` and `format` return acceptance, not completion. If a call returns
 false, its callback will not run. Retry a busy rejection later; invalid paths or
@@ -1699,8 +1952,8 @@ JSON. `queueAppConfigStatePublish()` publishes one of these current values; use
 ## Console and OTA
 
 The console uses `/api/console` WebSocket, supports one browser console client
-and retains up to 16 log records within an 8 KiB history budget in device RAM.
-When free heap falls below 24 KiB, that budget shrinks to 2 KiB for the rest of
+and retains separate MQTT and Messages histories in device RAM: up to 16 records and 4 KiB per channel (1 KiB per channel under low heap). MQTT traffic cannot evict Messages. Both channels still use the Console WebSocket; reconnect replays their retained records in chronological order.
+When free heap falls below 24 KiB, each channel budget shrinks to 1 KiB for the rest of
 the boot. Older records are evicted; the newest MQTT text remains complete.
 MQTT text is not truncated; older records are evicted when the budget is reached.
 The default console tab is **MQTT**. To add **Messages** for library and
@@ -1910,7 +2163,7 @@ chunks. Serialization work within each chunk remains synchronous.
 
 `ArdJSON::Limits` can bound input/output, strings, nodes and depth. Defaults are
 32768 input/output bytes, 8192 string bytes, 256 nodes and depth 16; hard depth
-limit is 32 and a container may have at most 256 elements. Parsing, serializing,
+limit is 32 and a container may have at most 1024 elements. Parsing, serializing,
 CRC and memory allocation are synchronous CPU operations.
 
 ### ArdJSON method reference and checked access
@@ -1986,7 +2239,11 @@ member explicitly ends in `Seconds`.
 | `ntpServer1` | `"pool.ntp.org"` | Required nonempty NTP hostname, up to 253 bytes. |
 | `ntpServer2` | `"time.cloudflare.com"` | Optional secondary NTP hostname, up to 253 bytes; empty disables it. |
 | `appStateIntervalMs` | `600000` | Retained application state refresh; zero disables periodic snapshots, not change/reconnect/get publication. |
-| `discoveryIntervalMs` | `300000` | HA discovery refresh; zero disables periodic discovery, not initial/birth/dependency updates. |
+| `appConfigRegistrationWorkBudgetMs` | `2` | Cooperative registration budget in milliseconds, checked between work units; nonzero. Small pages finish in one loop pass. |
+| `appConfigRegistrationMaxOperationsPerLoop` | `16` | Maximum registration units per loop; nonzero. |
+| `haWorkBudgetMs` | `2` | Cooperative HA budget in milliseconds, checked between work units; nonzero. |
+| `haMaxOperationsPerLoop` | `1` | Maximum HA work units per portal loop; nonzero. |
+| `discoveryIntervalMs` | `0` | HA discovery refresh; zero disables periodic discovery, not initial/birth/dependency updates. |
 | `appConfigSaveDelayMs` | `750` | Debounce/coalesce accepted application changes; zero removes debounce. |
 | `appConfigMinWriteIntervalMs` | `5000` | Minimum spacing between debounced application commits; zero removes spacing. Portal saves/flush can bypass it. |
 | `wifiTimeoutMs` | `30000` | Saved/requested Wi-Fi connection attempt timeout; must be nonzero. |

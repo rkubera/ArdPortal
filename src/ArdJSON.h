@@ -14,6 +14,7 @@
 
 // Standalone JSON DOM and strict parser. No portal, filesystem or third-party dependencies.
 namespace ArdJSON {
+constexpr size_t MaxContainerElements = 1024;
 struct Limits {
   size_t maxInputBytes = 32768;
   size_t maxOutputBytes = 32768;
@@ -207,7 +208,7 @@ inline void JSONVar::clear() {
 inline JSONVar::~JSONVar() { clear(); }
 inline JSONVar::Member* JSONVar::append(const String& key) { return appendKey(key); }
 template<class Key> inline JSONVar::Member* JSONVar::appendKey(const Key& key) {
-  if(_size>=256 || _failed) { _failed=true;return nullptr; }
+  if(_size>=MaxContainerElements || _failed) { _failed=true;return nullptr; }
   std::unique_ptr<Member> item(new(std::nothrow) Member());
   if(!item) { _failed=true;return nullptr; }
   if(!item->key.assign(key)) { _failed=true;return nullptr; }
@@ -291,7 +292,7 @@ inline const JSONVar& JSONVar::operator[](const String& key) const {
 }
 inline JSONVar& JSONVar::operator[](size_t index) {
   if(_type==Type::Undefined && !_failed)_type=Type::Array;
-  if(_type!=Type::Array || index>=256 || _failed)return failure();
+  if(_type!=Type::Array || index>=MaxContainerElements || _failed)return failure();
   while(_size<=index) { Member* item=append("");if(!item)return failure();item->value=nullptr; }
   Member* item=_children.get();while(index--)item=item->next.get();return item->value;
 }
@@ -307,7 +308,7 @@ inline bool JSONVar::push(const JSONVar& value) {
   JSONVar& slot=(*this)[_size];if(_failed)return false;slot=std::move(copy);return true;
 }
 inline bool JSONVar::tryPush(const JSONVar& value) {
-  if(_type!=Type::Array||_failed||_size>=256) return false;
+  if(_type!=Type::Array||_failed||_size>=MaxContainerElements) return false;
   std::unique_ptr<Member> item(new(std::nothrow) Member());if(!item) return false;
   item->value=value;if(!item->value.isValid()) return false;
   auto* tail=&_children;while(*tail) tail=&(*tail)->next;*tail=std::move(item);++_size;return true;
@@ -354,6 +355,7 @@ public:
   }
   const char* error()const{return _error;}
   size_t offset()const{return _offset;}
+  size_t nodes()const{return _nodes;}
 private:
   ArdCooperativeBudget _budget;
   const String& _input;const Limits& _limits;size_t _offset=0,_nodes=0;const char* _error=nullptr;
@@ -426,7 +428,8 @@ private:
       if(take(end))return true;
       do{
         String key;if(object){if(!string(key) || !take(':'))return fail("expected object member");if(value.hasOwnProperty(key))return fail("duplicate key");}
-        JSONVar::Member* item=value.append(key);if(!item)return fail("out of memory or container limit");
+        if(value.length()>=MaxContainerElements)return fail("container limit");
+        JSONVar::Member* item=value.append(key);if(!item)return fail("out of memory");
         if(!readValue(item->value,depth+1))return false;
         if(take(end))return true;
       }while(take(','));return fail("expected comma or closing bracket");

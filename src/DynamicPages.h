@@ -1,82 +1,71 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "AppConfigFields.h"
+#include "AppConfigRegistrationError.h"
 #include "ArdJSON.h"
 #include "HaEntities.h"
 #include "JsonCodec.h"
+#include "JsonFieldSlices.h"
 
 // Definitions are immutable after registration. IDs are also MQTT command names.
 class ArdDynamicPages {
 public:
+  ArdAppConfigFieldMask commandOwners;
+  ArdAppConfigRegistrationError error;
+  bool fail(const char* stage,const String& field,const String& reason) {error={stage,field,reason};return false;}
   using V = ArdJSON::JSONVar;
   using T = V::Type;
   // Keep only a compact index and the source. Parsed pages are temporary values.
   class PageStore {
-    struct Field {String id;bool extended=false,persist=false,transient=false;
-#if ARDPORTAL_ENABLE_DEPENDENCIES
-    bool dependent=false;
-#endif
-    };
-    struct Entry {String id,source,menu;V condition;const __FlashStringHelper* flash=nullptr;std::unique_ptr<Field[]> fields;size_t count=0,jsonLength=0;};
-    std::unique_ptr<Entry> entries[16];size_t size=0;
   public:
-    class ReadScope;
+    struct Field {uint32_t offset=0;uint16_t length=0,index=0,idOffset=0;bool extended:1,persist:1,transient:1;
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+    bool dependent:1;
+#endif
+      Field():extended(false),persist(false),transient(false)
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+      ,dependent(false)
+#endif
+      {}
+    };
+    struct Entry {String id,source,menu,headerPrefix,ids;V condition;const __FlashStringHelper* flash=nullptr;std::unique_ptr<Field[]> fields;size_t count=0,jsonLength=0,sourceLength=0;};
   private:
-    mutable ReadScope* scope=nullptr;
+    std::unique_ptr<Entry> entries[16];size_t size=0;
   public:
     ArdJsonCodec codec;
     size_t length() const {return size;}
     const String& id(size_t index) const {return entries[index]->id;}
     size_t fields(size_t index) const {return entries[index]->count;}
-    const String& fieldId(size_t p,size_t f) const {return entries[p]->fields[f].id;}
+    const char* fieldId(size_t p,size_t f) const {return entries[p]->ids.c_str()+entries[p]->fields[f].idOffset;}
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     bool dependent(size_t p,size_t f) const {return entries[p]->fields[f].dependent;}
 #endif
     bool transient(size_t p,size_t f) const {return entries[p]->fields[f].transient;}
-    bool belongs(size_t index,const String& key) const {for(size_t f=0;f<fields(index);++f)if(entries[index]->fields[f].id==key)return true;return false;}
-    bool tryPush(const V& page) {
-      if(size>=16)return false;
-      std::unique_ptr<Entry> entry(new(std::nothrow) Entry());if(!entry)return false;
-      entry->id=page["id"].asString();entry->count=page["fields"].length();
-      entry->fields.reset(new(std::nothrow) Field[entry->count]);if(!entry->fields)return false;
-      for(size_t i=0;i<entry->count;++i){const V& f=page["fields"][i];entry->fields[i].id=f["id"].asString();if(entry->fields[i].id!=f["id"].asString())return false;entry->fields[i].extended=f["extended"].asBool();entry->fields[i].persist=f["persist"].asBool();entry->fields[i].transient=ArdHa::transient(f);
-#if ARDPORTAL_ENABLE_DEPENDENCIES
-        entry->fields[i].dependent=page.hasOwnProperty("visibleWhen")||f.hasOwnProperty("visibleWhen");
-#endif
-      }
-      ArdJSON::Limits limits;limits.maxNodes=4096;entry->source=codec.stringify(page,false,nullptr,limits);
-      if(entry->id!=page["id"].asString()||!entry->source.length())return false;
-      entry->jsonLength=entry->source.length();
-      V menu=V::object();for(const char* key:{"id","name","names","order","visibleWhen"})if(page.hasOwnProperty(key))menu[key]=page[key];
-      limits.escapeHtml=true;entry->menu=codec.stringify(menu,false,nullptr,limits);entry->condition=page["visibleWhen"];
-      if(!entry->menu.length())return false;
-      entries[size++]=std::move(entry);return true;
+    bool belongs(size_t index,const String& key) const {for(size_t f=0;f<fields(index);++f)if(key==fieldId(index,f))return true;return false;}
+    void commit(std::unique_ptr<Entry> entry) {entries[size++]=std::move(entry);}
+    size_t fieldIndex(size_t p,size_t f) const {return entries[p]->fields[f].index;}
+    V fieldValue(size_t p,size_t f) const {
+      const Entry& entry=*entries[p];V value;
+      {const Field& meta=entry.fields[f];String source=entry.flash?ArdJsonFieldSlices(entry.flash,entry.sourceLength).slice(meta.offset,meta.length):entry.source.substring(meta.offset,meta.offset+meta.length);ArdJSON::Limits limits;limits.maxNodes=4096;value=codec.parse(source,nullptr,limits);}
+      if(value.isUndefined()||!value.isValid())return V();
+      if(entry.fields[f].extended){value["extended"]=true;if(!value.hasOwnProperty("persist"))value["persist"]=entry.fields[f].persist;}
+      if(!entry.condition.isUndefined())value["_pageVisibleWhen"]=entry.condition;
+      return value;
     }
-    void remove(size_t index) {if(index>=size)return;for(size_t i=index;i+1<size;++i)entries[i]=std::move(entries[i+1]);entries[--size].reset();}
-    void useFlash(size_t index,const __FlashStringHelper* source) {entries[index]->flash=source;entries[index]->source=String();}
     bool flashBacked(size_t index) const {return entries[index]->flash!=nullptr;}
     size_t ownedSourceBytes() const {size_t bytes=0;for(size_t i=0;i<size;++i)bytes+=entries[i]->source.length();return bytes;}
     V parsePage(size_t index) const {
       if(index>=size)return V();
-      ArdJSON::Limits limits;limits.maxNodes=4096;limits.maxInputBytes=32768;
+      ArdJSON::Limits limits;limits.maxNodes=4096;limits.maxInputBytes=ArdAppConfigMaxDefinitionBytes;
       const Entry& entry=*entries[index];V page=codec.parse(entry.flash?String(entry.flash):entry.source,nullptr,limits);
       if(!page.isValid()||page["fields"].length()!=entry.count)return V();
       for(size_t f=0;f<entry.count;++f)if(entry.fields[f].extended){page["fields"][f]["extended"]=true;if(!page["fields"][f].hasOwnProperty("persist"))page["fields"][f]["persist"]=entry.fields[f].persist;}
       return page;
     }
-    // Request-local trees are destroyed before any HTTP transmission begins.
-    class ReadScope {
-      PageStore& store;ReadScope* previous;
-      std::unique_ptr<V> cache[16];bool tried[16]={};V missing;
-    public:
-      explicit ReadScope(PageStore& value):store(value),previous(value.scope){store.scope=this;}
-      ~ReadScope(){store.scope=previous;}
-      const V& get(size_t index){if(index>=store.length())return missing;if(!tried[index]){tried[index]=true;cache[index].reset(new(std::nothrow) V(store.parsePage(index)));}return cache[index]?*cache[index]:missing;}
-      void release(size_t index){cache[index].reset();}
-      ReadScope(const ReadScope&)=delete;ReadScope& operator=(const ReadScope&)=delete;
-    };
-    const V* cachedPage(size_t index) const {return scope?&scope->get(index):nullptr;}
-    V operator[](size_t index) const {if(const V* page=cachedPage(index))return *page;return parsePage(index);}
+    V operator[](size_t index) const {return parsePage(index);}
+    const String& headerPrefix(size_t index) const {return entries[index]->headerPrefix;}
+    size_t jsonLength(size_t index) const {return entries[index]->jsonLength;}
     const String& menu(size_t index) const {return entries[index]->menu;}
     const V& pageCondition(size_t index) const {return entries[index]->condition;}
     size_t menuLength() const {size_t n=2;for(size_t p=0;p<size;++p)n+=entries[p]->menu.length()+(p?1:0);return n;}
@@ -118,28 +107,40 @@ public:
     return false;
   }
 #endif
-  V field(const String& id) const {
-    for(size_t p=0;p<pages.length();++p)if(pages.belongs(p,id)){if(const V* cached=pages.cachedPage(p)){for(size_t f=0;f<(*cached)["fields"].length();++f)if((*cached)["fields"][f]["id"].asString()==id){V field=(*cached)["fields"][f];if(cached->hasOwnProperty("visibleWhen"))field["_pageVisibleWhen"]=(*cached)["visibleWhen"];return field;}return V();}V page=pages[p];for(size_t f=0;f<page["fields"].length();++f)if(page["fields"][f]["id"].asString()==id)return inheritCondition(page,f);}
-    return V();
+  struct Entity {String id,source;const __FlashStringHelper* flash=nullptr;uint16_t index=0;bool extended=false,persist=false,transient=false,dependent=false;std::unique_ptr<Entity> next;};
+  std::unique_ptr<Entity> entities;size_t totalFields=0,entityBytes=0;
+  ~ArdDynamicPages(){while(entities){auto next=std::move(entities->next);entities=std::move(next);}}
+  size_t indexOf(const String& id) const {
+    for(size_t p=0;p<pages.length();++p)for(size_t f=0;f<pages.fields(p);++f)if(id==pages.fieldId(p,f))return pages.fieldIndex(p,f);
+    for(const Entity* e=entities.get();e;e=e->next.get())if(e->id==id)return e->index;return count();
   }
-  size_t count() const {size_t n=0;for(size_t p=0;p<pages.length();++p)n+=pages.fields(p);return n;}
+  V entityValue(const Entity& entity) const {
+    ArdJSON::Limits limits;limits.maxNodes=4096;V value=ArdJSON::JSON.parse(entity.flash?String(entity.flash):entity.source,nullptr,limits);
+    if(value.isUndefined()||!value.isValid())return V();
+    if(entity.extended){value["extended"]=true;if(!value.hasOwnProperty("persist"))value["persist"]=entity.persist;}return value;
+  }
+  V field(const String& id) const {
+    for(size_t p=0;p<pages.length();++p)for(size_t f=0;f<pages.fields(p);++f)if(id==pages.fieldId(p,f))return pages.fieldValue(p,f);
+    for(const Entity* e=entities.get();e;e=e->next.get())if(e->id==id)return entityValue(*e);return V();
+  }
+  size_t count() const {return totalFields;}
   V at(size_t index) const {
-    for(size_t p=0;p<pages.length();++p){size_t n=pages.fields(p);if(index<n){if(const V* cached=pages.cachedPage(p)){V field=(*cached)["fields"][index];if(cached->hasOwnProperty("visibleWhen"))field["_pageVisibleWhen"]=(*cached)["visibleWhen"];return field;}V page=pages[p];return inheritCondition(page,index);}index-=n;}
-    return V();
+    for(size_t p=0;p<pages.length();++p)for(size_t f=0;f<pages.fields(p);++f)if(pages.fieldIndex(p,f)==index)return pages.fieldValue(p,f);
+    for(const Entity* e=entities.get();e;e=e->next.get())if(e->index==index)return entityValue(*e);return V();
   }
   String idAt(size_t index) const {
-    for(size_t p=0;p<pages.length();++p){size_t n=pages.fields(p);if(index<n)return pages.fieldId(p,index);index-=n;}
-    return String();
+    for(size_t p=0;p<pages.length();++p)for(size_t f=0;f<pages.fields(p);++f)if(pages.fieldIndex(p,f)==index)return pages.fieldId(p,f);
+    for(const Entity* e=entities.get();e;e=e->next.get())if(e->index==index)return e->id;return String();
   }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   bool dependentAt(size_t index) const {
-    for(size_t p=0;p<pages.length();++p){size_t n=pages.fields(p);if(index<n)return pages.dependent(p,index);index-=n;}
-    return false;
+    for(size_t p=0;p<pages.length();++p)for(size_t f=0;f<pages.fields(p);++f)if(pages.fieldIndex(p,f)==index)return pages.dependent(p,f);
+    for(const Entity* e=entities.get();e;e=e->next.get())if(e->index==index)return e->dependent;return false;
   }
 #endif
   bool transientAt(size_t index) const {
-    for(size_t p=0;p<pages.length();++p){size_t n=pages.fields(p);if(index<n)return pages.transient(p,index);index-=n;}
-    return true;
+    for(size_t p=0;p<pages.length();++p)for(size_t f=0;f<pages.fields(p);++f)if(pages.fieldIndex(p,f)==index)return pages.transient(p,f);
+    for(const Entity* e=entities.get();e;e=e->next.get())if(e->index==index)return e->transient;return true;
   }
   static bool contains(const V& values,const String& value) {
     for(size_t i=0;i<values.length();++i) if((values[i].type()==T::String?values[i].asString():values[i]["value"].asString())==value) return true;
@@ -196,54 +197,76 @@ public:
 #endif
     return false;
   }
-  bool add(const V& page) {
-    if(pages.length()>=16 || page.type()!=T::Object || !identifier(page["id"].asString()) || !title(page) || !page["order"].isInteger() || page["fields"].type()!=T::Array || !page["fields"].length() || count()+page["fields"].length()>48) return false;
-    for(size_t p=0;p<pages.length();++p) if(pages.id(p)==page["id"].asString()) return false;
-    const V& fields=page["fields"];
-#if ARDPORTAL_ENABLE_DEPENDENCIES
-    if(page.hasOwnProperty("visibleWhen")&&!validCondition(page["visibleWhen"],fields))return false;
-#else
-    if(page.hasOwnProperty("visibleWhen"))return false;
-#endif
-    for(size_t i=0;i<fields.length();++i) {
-      const V& f=fields[i]; String id=f["id"].asString(),type=f["type"].asString();
-      if(id=="availability" || id=="status" || !identifier(id) || !field(id).isUndefined() || !title(f)) return false;
-      for(size_t j=0;j<i;++j) if(fields[j]["id"].asString()==id) return false;
-      if(!ardPortalBasicControl(type)&&(!ArdHa::extended(f)||ArdHa::descriptor(type,true).isUndefined())) return false;
-      if(f.hasOwnProperty("ha")&&f["ha"].type()!=T::Object) return false;
-      if(f.hasOwnProperty("icon")) { String icon=f["icon"].asString(); if(icon.indexOf("mdi:")!=0 || icon.length()>80 || icon.length()<5) return false; }
+  bool validateField(const V& f,const V& fields,bool checkDependencies=true) {
+      (void)fields;(void)checkDependencies;
+      String id=f["id"].asString(),type=f["type"].asString();
+      if(id=="availability"||id=="status")return fail("field",id,"reserved id");
+      if(!identifier(id))return fail("field",id,"invalid id: use 1..48 ASCII letters, digits, - or _");
+      if(indexOf(id)<count())return fail("field",id,"duplicate field id");
+      if(!title(f))return fail("field",id,"invalid name/names (1..80 bytes)");
+
+      if(!ardPortalBasicControl(type)&&(!ArdHa::extended(f)||ArdHa::descriptor(type,true).isUndefined())) return fail("field",id,"unsupported or disabled control type");
+      if(f.hasOwnProperty("ha")&&f["ha"].type()!=T::Object) return fail("field",id,"ha must be an object");
+      if(f.hasOwnProperty("icon")) { String icon=f["icon"].asString(); if(icon.indexOf("mdi:")!=0 || icon.length()>80 || icon.length()<5) return fail("field",id,"invalid icon: expected mdi: name, 5..80 bytes"); }
 #if (ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_CLIMATE)
-    if(type=="slider" || type=="climate") { double lo,hi,step; if(!f["min"].toDouble(lo)||!f["max"].toDouble(hi)||lo>=hi) return false; if(f.hasOwnProperty("step")&&(!f["step"].toDouble(step)||step<=0)) return false; }
+    if(type=="slider" || type=="climate") { double lo,hi,step; if(!f["min"].toDouble(lo)||!f["max"].toDouble(hi)||lo>=hi) return fail("field",id,"invalid min/max: expected numbers and min < max"); if(f.hasOwnProperty("step")&&(!f["step"].toDouble(step)||step<=0)) return fail("field",id,"step must be a positive number"); }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SELECT
-    if(type=="select") { const V& o=f["options"]; if(o.type()!=T::Array||!o.length()||o.length()>16) return false; for(size_t j=0;j<o.length();++j) { if(o[j]["value"].type()!=T::String || o[j]["value"].asString().length()>128 || strlen(o[j]["value"].asString().c_str())!=o[j]["value"].asString().length() || !title(o[j])) return false; for(size_t k=0;k<j;++k) if(o[j]["value"].asString()==o[k]["value"].asString()) return false; } }
+    if(type=="select") { const V& o=f["options"]; if(o.type()!=T::Array||!o.length()||o.length()>16) return fail("field",id,"options must contain 1..16 entries"); for(size_t j=0;j<o.length();++j) { if(o[j]["value"].type()!=T::String || o[j]["value"].asString().length()>128 || strlen(o[j]["value"].asString().c_str())!=o[j]["value"].asString().length() || !title(o[j])) return fail("field",id,"invalid option value/title"); for(size_t k=0;k<j;++k) if(o[j]["value"].asString()==o[k]["value"].asString()) return fail("field",id,"duplicate option value"); } }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
-    if(type=="climate") for(const char* key:{"modes","fan_modes"}) if(f.hasOwnProperty(key)) { const V& modes=f[key]; if(modes.type()!=T::Array||!modes.length()||modes.length()>10) return false; for(size_t j=0;j<modes.length();++j) { String m=modes[j].asString(); if(!identifier(m)) return false; if(String(key)=="modes"&&m!="off"&&m!="heat"&&m!="cool"&&m!="auto"&&m!="dry"&&m!="fan_only") return false; for(size_t k=0;k<j;++k) if(m==modes[k].asString()) return false; } }
+    if(type=="climate") for(const char* key:{"modes","fan_modes"}) if(f.hasOwnProperty(key)) { const V& modes=f[key]; if(modes.type()!=T::Array||!modes.length()||modes.length()>10) return fail("field",id,"modes/fan_modes must contain 1..10 entries"); for(size_t j=0;j<modes.length();++j) { String m=modes[j].asString(); if(!identifier(m)) return fail("field",id,"invalid mode identifier"); if(String(key)=="modes"&&m!="off"&&m!="heat"&&m!="cool"&&m!="auto"&&m!="dry"&&m!="fan_only") return fail("field",id,"unsupported climate mode"); for(size_t k=0;k<j;++k) if(m==modes[k].asString()) return fail("field",id,"duplicate mode"); } }
 #endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-      if(f.hasOwnProperty("visibleWhen")&&!validCondition(f["visibleWhen"],fields))return false;
+      if(checkDependencies&&f.hasOwnProperty("visibleWhen")&&!validCondition(f["visibleWhen"],fields))return fail("field",id,"invalid visibleWhen condition or referenced field");
 #else
       // Reject unsupported dependencies rather than exposing conditional fields.
-      if(f.hasOwnProperty("visibleWhen")) return false;
+      if(f.hasOwnProperty("visibleWhen")) return fail("field",id,"dependencies are disabled");
 #endif
-      if(!validValue(f,initial(f))) return false;
+      if(!validValue(f,initial(f))) return fail("field",id,"invalid default value for control");
+    return true;
+  }
+  bool addEntity(const V& page) {
+    error={};
+    if(page.type()!=T::Object)return fail("page","","page must be an object");
+    if(!identifier(page["id"].asString()))return fail("page","","invalid page id");
+    if(!title(page))return fail("page","","invalid page name/names (1..80 bytes)");
+    if(!page["order"].isInteger())return fail("page","","order must be an integer");
+    if(page["fields"].type()!=T::Array||!page["fields"].length())return fail("page","","fields must be a nonempty array");
+    if(count()+page["fields"].length()>ArdAppConfigMaxFields)return fail("limits","","field limit: 1024");
+    const V& fields=page["fields"];
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+    if(page.hasOwnProperty("visibleWhen")&&!validCondition(page["visibleWhen"],fields))return fail("page","","invalid page visibleWhen condition");
+#else
+    if(page.hasOwnProperty("visibleWhen"))return fail("page","","dependencies are disabled");
+#endif
+    for(size_t i=0;i<fields.length();++i) {
+      if(!validateField(fields[i],fields))return false;
+      for(size_t j=0;j<i;++j)if(fields[j]["id"].asString()==fields[i]["id"].asString())return fail("field",fields[i]["id"].asString(),"duplicate field id in page");
     }
-    if(!pages.tryPush(page)) return false;
-    PageStore& next=pages;
-    struct Rollback {PageStore& pages;bool keep=false;~Rollback(){if(!keep) pages.remove(pages.length()-1);}} rollback{pages};
-    ArdJSON::Limits limits; limits.maxNodes=4096; limits.maxOutputBytes=32768;
-    if(!next.measure(limits)) return false;
+    const size_t previousCount=totalFields;
+    {
+      if(fields.length()!=1)return fail("registry","","expected one HA-only field");
+      std::unique_ptr<Entity> entry(new(std::nothrow) Entity());if(!entry)return fail("registry","","out of memory allocating entity");
+      entry->id=fields[0]["id"].asString();ArdJSON::Limits limits;limits.maxNodes=4096;entry->source=ArdJSON::JSON.stringify(fields[0],false,nullptr,limits);if(!entry->source.length())return fail("registry",entry->id,"entity serialization failed");
+      entry->index=uint16_t(totalFields);entry->extended=fields[0]["extended"].asBool();entry->persist=fields[0]["persist"].asBool();entry->transient=ArdHa::transient(fields[0]);entry->dependent=fields[0].hasOwnProperty("visibleWhen");
+      entityBytes+=entry->source.length();entry->next=std::move(entities);entities=std::move(entry);
+    }
+    totalFields+=fields.length();
+    struct Rollback {ArdDynamicPages& owner;size_t previous;bool keep=false;~Rollback(){if(keep)return;owner.totalFields=previous;owner.entityBytes-=owner.entities->source.length();auto next=std::move(owner.entities->next);owner.entities=std::move(next);}} rollback{*this,previousCount};
+    ArdJSON::Limits limits;limits.maxNodes=4096;limits.maxOutputBytes=ArdAppConfigMaxDefinitionBytes;
+    size_t bytes=pages.measure(limits);if(!bytes)return fail("registry","","definition measurement failed");
+    if(bytes+entityBytes>ArdAppConfigMaxDefinitionBytes)return fail("limits","",String("total definition limit: ")+String(ArdAppConfigMaxDefinitionBytes)+" bytes");
     // Every generated command and acknowledgement name must be unambiguous.
-    for(size_t p=0;p<next.length();++p) {V definition=next[p];for(size_t i=0;i<definition["fields"].length();++i) {
-      const V& f=static_cast<const V&>(definition)["fields"][i];V suffixes=V::array();
+    for(size_t i=0;i<count();++i) {V f=at(i);V suffixes=V::array();
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
-    if(f["type"].asString()=="climate") for(const char* suffix:{"temperature","mode","fan"}) suffixes.push(suffix);
+      if(f["type"].asString()=="climate")for(const char* suffix:{"temperature","mode","fan"})suffixes.push(suffix);
 #endif
-      if(ArdHa::extended(f)) {V resolved=f;if(!ArdHa::normalize(resolved,true)) return false;for(size_t c=0;c<resolved["controls"].length();++c) if(resolved["controls"][c]["command"].asString().length()) suffixes.push(resolved["controls"][c]["command"]);suffixes.push("ack");}
-      for(size_t k=0;k<suffixes.length();++k) for(size_t q=0;q<next.length();++q) if(next.belongs(q,f["id"].asString()+"_"+suffixes[k].asString())) return false;
-      yield();
-    }}
+      if(ArdHa::extended(f)){V resolved=f;if(!ArdHa::normalize(resolved,true))return fail("commands",f["id"].asString(),"descriptor normalization failed");for(size_t c=0;c<resolved["controls"].length();++c)if(resolved["controls"][c]["command"].asString().length())suffixes.push(resolved["controls"][c]["command"]);suffixes.push("ack");}
+      for(size_t k=0;k<suffixes.length();++k)if(indexOf(f["id"].asString()+"_"+suffixes[k].asString())<count())return fail("commands",f["id"].asString(),"generated command/ack id collides with field: "+f["id"].asString()+"_"+suffixes[k].asString());yield();
+    }
+    if(fields[0]["extended"].asBool()||fields[0]["type"].asString()=="climate")commandOwners|=ArdAppConfigFieldMask::forField(previousCount);
     rollback.keep=true; return true;
   }
+
 };

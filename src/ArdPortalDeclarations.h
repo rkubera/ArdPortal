@@ -12,8 +12,10 @@ namespace ArdUILanguageData { enum class Key : uint16_t; }
 #include "ArdFS.h"
 #include "ArdJSON.h"
 #include "JsonCodec.h"
+#include "AppConfigRegistrationError.h"
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
 #include "DynamicPages.h"
+#include "AppConfigPageRegistration.h"
 #endif
 #include "PortalTypes.h"
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
@@ -45,13 +47,20 @@ public:
   ArdPortal(ArdPortal&&) = delete;
   ArdPortal& operator=(ArdPortal&&) = delete;
   using PortalConfig = ArdPortalConfig;
+  static constexpr size_t MaxPortalConfigBytes = 5 * 1024;
+  static constexpr size_t MaxAppConfigBytes = 8 * 1024;
+  static constexpr size_t MaxConfigDocumentBytes = 13 * 1024 + 64;
   struct Options {
     const char* deviceName = nullptr; // Default: ArdUI- + chip ID; also the AP SSID.
     const char* apPassword = "1234567890";
     const char* ntpServer1 = "pool.ntp.org";
     const char* ntpServer2 = "time.cloudflare.com";
     uint32_t appStateIntervalMs = 600000; // Retained application state refresh.
-    uint32_t discoveryIntervalMs = 300000; // Retained Home Assistant discovery refresh.
+    uint32_t discoveryIntervalMs = 0; // Retained Home Assistant discovery refresh.
+    uint32_t haWorkBudgetMs = 2; // Cooperative budget between HA work units.
+    uint32_t appConfigRegistrationWorkBudgetMs = 2; // Cooperative budget between registration units.
+    uint16_t appConfigRegistrationMaxOperationsPerLoop = 16;
+    uint16_t haMaxOperationsPerLoop = 1; // Return control between HA work units.
     uint32_t appConfigSaveDelayMs = 750; // Coalesce application changes.
     uint32_t appConfigMinWriteIntervalMs = 5000;
     uint32_t wifiTimeoutMs = 30000;
@@ -83,8 +92,20 @@ public:
   ArdJSON::JSONVar getAppConfigValue(const char* key) const;
   bool setAppConfigValue(const char* key, const ArdJSON::JSONVar& value);
   bool removeAppConfigValue(const char* key);
-  bool addAppConfigPage(const String& definition);
-  bool addAppConfigPage(const __FlashStringHelper* definition); // Source must remain valid for the portal lifetime.
+  const ArdAppConfigRegistrationError& appConfigRegistrationError() const { return _appConfigRegistrationError; }
+  enum class AppConfigPageRegistrationState { Idle, Pending, Succeeded, Failed };
+  using AppConfigPageRegistrationFinishedCallback=std::function<void(bool)>;
+  void onAppConfigPageRegistrationFinished(AppConfigPageRegistrationFinishedCallback callback) { _appConfigPageRegistrationFinished=callback; }
+  AppConfigPageRegistrationState appConfigPageRegistrationState() const {return _appConfigPageRegistrationState;}
+  bool appConfigPageRegistrationBusy() const {return _appConfigPageRegistrationState==AppConfigPageRegistrationState::Pending;}
+  size_t appConfigPageRegistrationProcessedFields() const {return _appConfigPageRegistrationProcessed;}
+  size_t appConfigPageRegistrationTotalFields() const {return _appConfigPageRegistrationTotal;}
+  // All accepted jobs finish through loop(); small pages take one pass.
+  bool startAppConfigPageRegistration(const String& definition);
+  bool startAppConfigPageRegistration(String&& definition); // Transfers the source on acceptance.
+  bool startAppConfigPageRegistration(const __FlashStringHelper* definition); // Immutable source must outlive the portal.
+  bool addAppConfigEntity(const String& definition);
+  bool addAppConfigEntity(const __FlashStringHelper* definition);
   using AppConfigCommandCallback = std::function<bool(const String&, const String&, const ArdJSON::JSONVar&, ChangeSource)>;
   void onAppConfigCommand(AppConfigCommandCallback callback) {
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
@@ -155,6 +176,24 @@ public:
   bool subscribe(const char* topic);
   static bool validPortalConfig(const PortalConfig& config);
 private:
+  ArdAppConfigRegistrationError _appConfigRegistrationError;
+  AppConfigPageRegistrationFinishedCallback _appConfigPageRegistrationFinished;
+  AppConfigPageRegistrationState _appConfigPageRegistrationState=AppConfigPageRegistrationState::Idle;
+  size_t _appConfigPageRegistrationProcessed=0,_appConfigPageRegistrationTotal=0;
+#if ARDPORTAL_ENABLE_DYNAMIC_PAGES
+  std::unique_ptr<ArdAppConfigPageRegistration> _appConfigPageRegistration;
+  bool beginAppConfigPageRegistration(const String* source,const __FlashStringHelper* flash,String* owned=nullptr);
+  void serviceAppConfigPageRegistration();
+  void serviceAppConfigPageRegistrationUnit();
+  bool _appConfigPageRegistrationDriving=false;
+  uint32_t _appConfigPageRegistrationGeneration=0;
+  void finishAppConfigPageRegistration(bool success);
+  __attribute__((noinline)) void failAppConfigPageRegistration(const char* stage,const String& field,const __FlashStringHelper* reason);
+#endif
+  bool appConfigRegistrationFailed(const char* stage,const String& field,const String& reason) {
+    _appConfigRegistrationError={stage,field,reason};
+    log(String("AppConfig registration: stage=")+stage+" field="+field+" reason="+reason);return false;
+  }
   friend class ArdMqtt;
   friend class ArdHomeAssistant;
   friend class ArdOta;
@@ -252,13 +291,24 @@ private:
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   bool _httpDynamicPages = false, _httpDynamicPageStarted = false, _httpPortalTail = false;
   String _httpDynamicText;
+  // 0: definition list, 1: selected definition, 2: selected state, 3: menu catalog.
+  uint8_t _httpDynamicMode=0, _httpDynamicStage=0;
+  size_t _httpDynamicField=0;
+  bool _httpDynamicConditionFirst=true;
+  uint32_t _httpDynamicRevision=0;
+  bool prepareDynamicHttpPart();
   size_t _httpDynamicPageIndex = 0, _httpDynamicPageCount = 0, _httpDynamicPageOffset = 0, _httpDynamicPageLength = 0;
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE
   struct ConsoleLine { uint32_t id = 0; bool mqtt = false; String text; };
   static constexpr size_t ConsoleCapacity = 16;
-  ConsoleLine _console[ConsoleCapacity];
-  size_t _consoleHistoryBudget = 8192;
+  ConsoleLine _console[ConsoleCapacity]; // MQTT history.
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  ConsoleLine _consoleMessages[ConsoleCapacity];
+  uint32_t _consoleMessagesCount = 0;
+#endif
+  uint32_t _consoleMqttCount = 0;
+  size_t _consoleHistoryBudget = 4096; // Per channel, never shared.
   uint32_t _consoleId = 0;
 #endif
 #if ARDPORTAL_SUPPORT_WEBSOCKET

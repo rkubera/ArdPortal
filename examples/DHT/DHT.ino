@@ -103,11 +103,20 @@ void updateReadings() {
   updateMeasurement("humidity", oneDecimal(humidity));
 }
 
+unsigned registeredPages = 0;
+bool applicationReady = false;
+
 void setup() {
   Serial.begin(115200);
   dht.begin();
-  if (!portal.addAppConfigPage(FPSTR(HOME_PAGE))) Serial.println(F("Invalid Home page."));
-  if (!portal.addAppConfigPage(FPSTR(SENSOR_PAGE))) Serial.println(F("Invalid DHT page."));
+  portal.onAppConfigPageRegistrationFinished([](bool success) {
+    if (!success) { Serial.println(portal.appConfigRegistrationError().reason); return; }
+    ++registeredPages;
+    if (registeredPages == 1 && !portal.startAppConfigPageRegistration(FPSTR(SENSOR_PAGE)))
+      Serial.println(portal.appConfigRegistrationError().reason);
+  });
+  if (!portal.startAppConfigPageRegistration(FPSTR(HOME_PAGE)))
+    Serial.println(portal.appConfigRegistrationError().reason);
   portal.onAppConfigValueChanged([](const String& key, const ArdJSON::JSONVar&,
                                    ArdPortal::ChangeSource) {
     if (key == "mqtt_update") loadMqttInterval();
@@ -115,10 +124,6 @@ void setup() {
       updateReadings(); // Reuse the latest sample without another DHT transaction.
       measurementSettingsChanged=true; // Publish even when a long MQTT interval is selected.
     }
-  });
-  portal.onPortalAndAppConfigReady([](bool) {
-    loadMqttInterval();
-    lastRead=millis(); // Leave two seconds for sensor startup before reading.
   });
   ArdPortal::Options options;
   options.appStateIntervalMs=0; // The example owns periodic measurement refresh.
@@ -128,7 +133,12 @@ void setup() {
 void loop() {
   portal.loop();
   uint32_t now = millis();
-  if (!portal.portalAndAppConfigReady() || portal.ota().active()) return;
+  if (!portal.portalAndAppConfigReady() || registeredPages != 2 || portal.ota().active()) return;
+  if (!applicationReady) {
+    applicationReady = true;
+    loadMqttInterval();
+    lastRead = now; // Wait two seconds before the first sensor transaction.
+  }
   if(uint32_t(now-lastRead)>=READ_INTERVAL_MS) {
     lastRead = now;
     rawTemperature = dht.readTemperature();

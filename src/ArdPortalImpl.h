@@ -133,6 +133,8 @@ bool ArdPortal::validPortalConfig(const PortalConfig& c) {
     for(size_t j=0;j<value.length();++j)if(value[j]==0)return false;
   }
   if(!ArdDeviceName::valid(c.deviceName))return false;
+  auto limits = ArdPortalJson::limits(); limits.maxOutputBytes = MaxPortalConfigBytes;
+  if(!ArdJSON::JSON.measure(ArdPortalJson::value(c),nullptr,limits))return false;
   return c.apName.length() > 0 &&
          (!c.apPassword.length() || c.apPassword.length() >= 8) && c.port != 0 && (!c.mqttTls || !c.host.length() ||
            (c.caCert.indexOf("-----BEGIN CERTIFICATE-----") >= 0 &&
@@ -152,7 +154,7 @@ bool ArdPortal::begin(const Options& options) {
       (_apPassword.length() && (_apPassword.length() < 8 || _apPassword.length() > 63)) ||
       !_options.wifiTimeoutMs || !_options.retryMs || !_options.mqttTimeoutMs ||
       !_options.tcpTimeoutMs || !_options.keepAliveSeconds ||
-      !_options.tlsHandshakeTimeoutSeconds) return false;
+      !_options.tlsHandshakeTimeoutSeconds || !_options.haWorkBudgetMs || !_options.haMaxOperationsPerLoop || !_options.appConfigRegistrationWorkBudgetMs || !_options.appConfigRegistrationMaxOperationsPerLoop) return false;
   _config.deviceName = _apName;
   _apName = ArdDeviceName::ap(_config.deviceName);
   _config.apName = _apName; _config.apPassword = _apPassword;
@@ -329,6 +331,9 @@ void ArdPortal::loop() {
 #elif ARDPORTAL_ENABLE_MQTT && ARDPORTAL_ENABLE_DYNAMIC_PAGES
   _appControls.serviceMqttValues(millis());
 #endif
+#if ARDPORTAL_ENABLE_DYNAMIC_PAGES
+  if(!otaActive()&&!_rebootPending)serviceAppConfigPageRegistration();
+#endif
   budget.checkpoint();
   // Yield after discovery temporaries have left the stack; never drain MQTT in a loop.
 #if ARDPORTAL_ENABLE_MQTT && ARDPORTAL_ENABLE_DYNAMIC_PAGES
@@ -348,7 +353,7 @@ void ArdPortal::responseHeader(int code, const char* type, size_t length, bool g
   if (gzip) _response += F("Content-Encoding: gzip\r\n");
   _response += F("Content-Type: "); _response += type;
   if (utf8) _response += F("; charset=utf-8");
-  _response += F("\r\nContent-Length: "); _response += String(length);
+  if(length!=size_t(-1)){_response += F("\r\nContent-Length: "); _response += String(length);}
   _response += F("\r\n\r\n");
   _responseOffset = 0; _httpSince = millis();
 }
@@ -381,7 +386,7 @@ void ArdPortal::closeHttp() {
 #endif
   stopClient(_http); _http = WiFiClient(); _request = String(); _response = String();
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  _httpDynamicText=String();
+  _httpDynamicText=String();_httpDynamicMode=_httpDynamicStage=0;_httpDynamicField=0;_httpDynamicConditionFirst=true;
   _httpDynamicPages = _httpDynamicPageStarted = _httpPortalTail = false; _httpDynamicPageIndex = _httpDynamicPageCount = _httpDynamicPageOffset = _httpDynamicPageLength = 0;
 #endif
   _httpConfigUpload = false; _httpWaitingStorage = false;
@@ -425,26 +430,23 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
 
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
     } else if(_httpDynamicPages) {
-      if(!_httpDynamicPageStarted) {_response="[";_httpDynamicPageStarted=true;}
-      else if(_httpDynamicPageIndex<_httpDynamicPageCount) {
-        String part;
-        if(_httpPortalTail){const String& menu=_dynamic.pages.menu(_httpDynamicPageIndex);_httpDynamicPageLength=menu.length();part=menu.substring(_httpDynamicPageOffset,_httpDynamicPageOffset+256);}
-        else {
-          if(!_httpDynamicPageOffset){
-            ArdJSON::Limits limits;limits.maxNodes=4096;
-            const auto page=_dynamic.pages[_httpDynamicPageIndex];
-            if(!page.isValid()||page.isUndefined()){closeHttp();return;}
-            _httpDynamicText=ArdJSON::JSON.stringify(page,false,nullptr,limits);
-            _httpDynamicPageLength=_httpDynamicText.length();
-          }
-          part=_httpDynamicText.substring(_httpDynamicPageOffset,_httpDynamicPageOffset+256);
+      if(_httpPortalTail) {
+        if(!_httpDynamicPageStarted){_response="[";_httpDynamicPageStarted=true;}
+        else if(_httpDynamicPageIndex<_httpDynamicPageCount){
+          const String& menu=_dynamic.pages.menu(_httpDynamicPageIndex);
+          String part=menu.substring(_httpDynamicPageOffset,_httpDynamicPageOffset+256);
+          _response=(_httpDynamicPageIndex&&!_httpDynamicPageOffset?String(","):String())+part;
+          _httpDynamicPageOffset+=part.length();
+          if(_httpDynamicPageOffset==menu.length()){++_httpDynamicPageIndex;_httpDynamicPageOffset=0;}
+        }else{_response="]";_httpDynamicPages=false;}
+      }else{
+        if(_httpDynamicPageOffset>=_httpDynamicText.length()){
+          _httpDynamicText=String();_httpDynamicPageOffset=0;
+          if(!prepareDynamicHttpPart()){closeHttp();return;}
         }
-
-        if(!part.length()) {closeHttp();return;}
-        _response=(_httpDynamicPageIndex&&!_httpDynamicPageOffset?String(","):String())+part;
-        _httpDynamicPageOffset+=part.length();
-        if(_httpDynamicPageOffset==_httpDynamicPageLength) {++_httpDynamicPageIndex;_httpDynamicPageOffset=0;_httpDynamicText=String();}
-      } else {_response="]";_httpDynamicPages=false;}
+        _response=_httpDynamicText.substring(_httpDynamicPageOffset,_httpDynamicPageOffset+256);
+        _httpDynamicPageOffset+=_response.length();
+      }
       _responseOffset=0;
     } else if(_httpPortalTail) {
       _page=PORTAL_HTML;_pageLength=strlen_P(_page);_pageOffset=0;_httpPortalTail=false;
@@ -457,7 +459,7 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
         ws.client = _http; _http = WiFiClient(); _wsUpgrade = false;
         _request = String(); _response = String(); _responseOffset = 0;
 #if ARDPORTAL_ENABLE_CONSOLE
-        ws.cursor = _consoleId > ConsoleCapacity ? _consoleId - ConsoleCapacity : 0;
+        ws.cursor = 0; // Replay both independently retained histories in ID order.
 #endif
         ws.appSent = false; ws.statusSent = false; ws.rxSize = 0; ws.since = ws.pingSince = millis(); ws.pingPending = ws.closing = ws.pongPending = false; return;
       }
@@ -644,6 +646,9 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     out += F(",\"ap\":"); out += _apActive ? "true" : "false"; out += F(",\"ip\":"); appendQuoted(out,localIP().toString());
     out += F(",\"apIp\":"); appendQuoted(out,apIP().toString()); out += F(",\"storage\":"); out += _storageOK ? "true" : "false"; out += F(",\"tls\":"); out += _config.mqttTls ? "true" : "false";
     out += F(",\"clockReady\":"); out += tlsClockReady() ? "true" : "false"; out += F(",\"filesystemMounted\":"); out += _storageMounted ? "true" : "false";
+#if ARDPORTAL_ENABLE_DYNAMIC_PAGES
+    out += F(",\"appConfigPageCount\":");out += String(_dynamic.pages.length());
+#endif
     out += F(",\"configurationReady\":"); out += _configurationReady ? "true" : "false"; out += F(",\"storageBusy\":"); out += portalAndAppConfigBusy() ? "true" : "false"; out += F(",\"storageError\":"); appendQuoted(out,_storageError); out += F(",\"scanCompletedId\":"); out += String(_scanCompletedId); out += F(",\"deviceName\":"); appendQuoted(out,_config.deviceName); out += "}";
     reply(200, "application/json", out); return;
   }
@@ -820,11 +825,16 @@ String ArdPortal::infoJson() {
 #if ARDPORTAL_ENABLE_CONSOLE
 void ArdPortal::consoleLine(bool mqtt, const String& text) {
   if(!mqtt && !ARDPORTAL_ENABLE_CONSOLE_MESSAGES) return;
-  if(ESP.getFreeHeap()<24576) _consoleHistoryBudget=2048;
-  ConsoleLine& line = _console[_consoleId % ConsoleCapacity];line=ConsoleLine();
-  size_t used=0;for(const auto& entry:_console) used+=entry.text.length();
+  if(ESP.getFreeHeap()<24576) _consoleHistoryBudget=1024;
+  ConsoleLine* history=_console;uint32_t* count=&_consoleMqttCount;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  if(!mqtt){history=_consoleMessages;count=&_consoleMessagesCount;}
+#endif
+  const size_t slot=(*count)%ConsoleCapacity;
+  ConsoleLine& line=history[slot];line=ConsoleLine();++(*count);
+  size_t used=0;for(size_t i=0;i<ConsoleCapacity;++i)used+=history[i].text.length();
   size_t incoming=(mqtt?text.length():(text.length()>320?320:text.length()))+64;
-  for(size_t i=1;used+incoming>_consoleHistoryBudget&&i<ConsoleCapacity;++i) {auto& old=_console[(_consoleId+i)%ConsoleCapacity];used-=old.text.length();old=ConsoleLine();}
+  for(size_t i=1;used+incoming>_consoleHistoryBudget&&i<ConsoleCapacity;++i) {auto& old=history[(slot+i)%ConsoleCapacity];used-=old.text.length();old=ConsoleLine();}
   line.id = ++_consoleId; line.mqtt = mqtt;
   String timestamp = String(millis()) + " ms";
   if (tlsClockReady()) {
@@ -832,8 +842,8 @@ void ArdPortal::consoleLine(bool mqtt, const String& text) {
     if (utcTimestamp(current, formatted, sizeof(formatted))) timestamp = formatted;
   }
   line.text = "[" + timestamp + "] " + (mqtt?text:text.substring(0,320));
-  size_t total=0;for(const auto& entry:_console) total+=entry.text.length();
-  for(size_t i=1;total>_consoleHistoryBudget&&i<ConsoleCapacity;++i) {auto& old=_console[(_consoleId-1+i)%ConsoleCapacity];total-=old.text.length();old=ConsoleLine();}
+  size_t total=0;for(size_t i=0;i<ConsoleCapacity;++i)total+=history[i].text.length();
+  for(size_t i=1;total>_consoleHistoryBudget&&i<ConsoleCapacity;++i) {auto& old=history[(slot+i)%ConsoleCapacity];total-=old.text.length();old=ConsoleLine();}
 }
 #else
 void ArdPortal::consoleLine(bool , const String& ) {}
@@ -933,11 +943,15 @@ void ArdPortal::serviceWebSocket(WebSocketState& ws,uint32_t now) {
     }
 #if ARDPORTAL_ENABLE_CONSOLE
     if(!ws.tx.length() && ws.logs) {
-      uint32_t oldest=_consoleId>ConsoleCapacity?_consoleId-ConsoleCapacity:0;
-      if(ws.cursor<oldest)ws.cursor=oldest;
-      if(ws.cursor<_consoleId) {
-        const ConsoleLine& line=_console[ws.cursor%ConsoleCapacity];++ws.cursor;
-        if(line.id==ws.cursor&&line.text.length()) queueWebSocket(ws,1,String("{\"type\":\"log\",\"channel\":")+quote(line.mqtt?"mqtt":"messages")+String(F(",\"id\":")) +String(line.id)+String(F(",\"text\":")) +quote(line.text)+"}");
+      const ConsoleLine* next=nullptr;
+      auto consider=[&](const ConsoleLine* history){for(size_t i=0;i<ConsoleCapacity;++i){const auto& line=history[i];if(line.id>ws.cursor&&line.text.length()&&(!next||line.id<next->id))next=&line;}};
+      consider(_console);
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+      consider(_consoleMessages);
+#endif
+      if(next) {
+        ws.cursor=next->id;
+        queueWebSocket(ws,1,String("{\"type\":\"log\",\"channel\":")+quote(next->mqtt?"mqtt":"messages")+String(F(",\"id\":")) +String(next->id)+String(F(",\"text\":")) +quote(next->text)+"}");
       }
     }
 #endif
@@ -952,13 +966,13 @@ void ArdPortal::serviceWebSocket(WebSocketState& ws,uint32_t now) {
 #endif
 namespace {
 ArdJSON::Limits snapshotLimits() {
-  ArdJSON::Limits limits; limits.maxInputBytes = ArdFS::MaxBytes;
-  limits.maxOutputBytes = ArdFS::MaxBytes; limits.maxStringBytes = 4096;
-  limits.maxDepth = 10; limits.maxNodes = 256; return limits;
+  ArdJSON::Limits limits; limits.maxInputBytes = ArdPortal::MaxConfigDocumentBytes;
+  limits.maxOutputBytes = ArdPortal::MaxConfigDocumentBytes; limits.maxStringBytes = ArdPortal::MaxAppConfigBytes;
+  limits.maxDepth = 10; limits.maxNodes = 4096; return limits;
 }
 bool validApp(const ArdJSON::JSONVar& value) {
   if (value.type() != ArdJSON::JSONVar::Type::Object || !value.isValid()) return false;
-  ArdJSON::Limits limits = snapshotLimits(); limits.maxOutputBytes = 2048;
+  ArdJSON::Limits limits = snapshotLimits(); limits.maxOutputBytes = ArdPortal::MaxAppConfigBytes;
   return ArdJSON::JSON.measure(value, nullptr, limits) != 0;
 }
 }
@@ -971,9 +985,9 @@ void ArdPortal::finishLoad(const ArdFS::Result& result) {
     PortalConfig loaded;
     if (root.isValid() && root.type() == ArdJSON::JSONVar::Type::Object && root.length() == 2 &&
         view.hasOwnProperty("config") && validApp(view["app"]) &&
-        ArdPortalJson::decodeValue(view["config"], loaded)) {
+        ArdPortalJson::decodeValue(view["config"], loaded) && validPortalConfig(loaded)) {
       _config = std::move(loaded); _appConfig = std::move(root["app"]); restored = true;
-    } else if (ArdPortalJson::decode(result.data, loaded, _json)) { _config = std::move(loaded); restored = true; }
+    } else if (ArdPortalJson::decode(result.data, loaded, _json) && validPortalConfig(loaded)) { _config = std::move(loaded); restored = true; }
     else _storageError = ArdUILanguage::text(ArdUILanguage::Key::s_166);
   }
   _storageOK = _storageMounted && result.ok && !_storageError.length();
@@ -1139,12 +1153,15 @@ void ArdPortal::applyAppConfig(ArdJSON::JSONVar app) {
   if(!_appChanged)return;
   auto keys=previous.keys(),next=_appConfig.keys();
   for(size_t i=0;i<next.length();++i)if(!previous.hasOwnProperty(next[i].asString()))keys.push(next[i]);
-  for(size_t i=0;i<keys.length();++i){String key=keys[i].asString();auto value=getAppConfigValue(key.c_str());if(_json.stringify(previous[key])!=_json.stringify(value))_appChanged(key,value,_saveSource);}
+  for(size_t i=0;i<keys.length();++i){String key=keys[i].asString();auto value=getAppConfigValue(key.c_str());if(_json.stringify(previous[key],false,nullptr,snapshotLimits())!=_json.stringify(value,false,nullptr,snapshotLimits()))_appChanged(key,value,_saveSource);}
 #endif
 }
 #if !ARDPORTAL_ENABLE_DYNAMIC_PAGES
-bool ArdPortal::addAppConfigPage(const String&) {return false;}
-bool ArdPortal::addAppConfigPage(const __FlashStringHelper*) {return false;}
+bool ArdPortal::startAppConfigPageRegistration(String&&) {_appConfigPageRegistrationState=AppConfigPageRegistrationState::Failed;return appConfigRegistrationFailed("features","","dynamic AppConfig pages are disabled");}
+bool ArdPortal::startAppConfigPageRegistration(const String&) {_appConfigPageRegistrationState=AppConfigPageRegistrationState::Failed;return appConfigRegistrationFailed("features","","dynamic AppConfig pages are disabled");}
+bool ArdPortal::startAppConfigPageRegistration(const __FlashStringHelper*) {_appConfigPageRegistrationState=AppConfigPageRegistrationState::Failed;return appConfigRegistrationFailed("features","","dynamic AppConfig pages are disabled");}
+bool ArdPortal::addAppConfigEntity(const String&) {return false;}
+bool ArdPortal::addAppConfigEntity(const __FlashStringHelper*) {return false;}
 bool ArdPortal::setAppConfigStateValue(const char*,const ArdJSON::JSONVar&,bool) {return false;}
 bool ArdPortal::queueAppConfigStatePublish(const char*) {return false;}
 bool ArdPortal::emitAppConfigEvent(const char*,const ArdJSON::JSONVar&) {return false;}

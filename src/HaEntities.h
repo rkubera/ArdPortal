@@ -153,14 +153,16 @@ inline bool validValue(const V& f,const V& value) {
   if(f["controls"].length()&&f["controls"][0]["type"].asString().indexOf("action")!=0) return validControl(f["controls"][0],value);
   return string(value);
 }
-inline bool normalize(V& field,bool stateOnly=false) {
-  V spec=descriptor(field["type"].asString(),stateOnly); if(spec.isUndefined()) return false;
-  V supplied=field["ha"];
-  V keys=spec.keys();for(size_t i=0;i<keys.length();++i) { String key=keys[i].asString(); if(!field.hasOwnProperty(key)) field[key]=spec[key]; }
-  V ha=spec["ha"]; if(!supplied.isUndefined()) { if(supplied.type()!=V::Type::Object) return false; V options=supplied.keys();for(size_t i=0;i<options.length();++i) ha[options[i].asString()]=supplied[options[i].asString()]; }
-  field["ha"]=ha; field["extended"]=true; if(!field.hasOwnProperty("persist")) field["persist"]=!readonly(field)&&!transient(field);
+inline bool normalize(V& field,bool stateOnly=false,String* error=nullptr) {
+  auto fail=[&](const String& reason){if(error)*error=reason;return false;};
+  if(error)*error=String();
+  V spec=descriptor(field["type"].asString(),stateOnly); if(spec.isUndefined()) return fail("unsupported/disabled descriptor type: "+field["type"].asString());
+  V supplied=std::move(field["ha"]);
+  V keys=spec.keys();for(size_t i=0;i<keys.length();++i) { String key=keys[i].asString(); if(key!="ha"&&!field.hasOwnProperty(key)) field[key]=std::move(spec[key]); }
+  V ha=std::move(spec["ha"]); if(!supplied.isUndefined()) { if(supplied.type()!=V::Type::Object) return fail("ha must be an object"); V options=supplied.keys();for(size_t i=0;i<options.length();++i) ha[options[i].asString()]=std::move(supplied[options[i].asString()]); }
+  field["ha"]=std::move(ha); field["extended"]=true; if(!field.hasOwnProperty("persist")) field["persist"]=!readonly(field)&&!transient(field);
   for(const char* key:{"unit_of_measurement","device_class","state_class","entity_category"}) if(field.hasOwnProperty(key)) field["ha"][key]=field[key];
-  if(field["controls"].type()!=V::Type::Array) return false;
+  if(field["controls"].type()!=V::Type::Array) return fail("controls must be an array");
   for(size_t i=0;i<field["controls"].length();++i) {
     const V& c=static_cast<const V&>(field)["controls"][i];String t=c["type"].asString();
     bool supported=false;
@@ -197,14 +199,14 @@ inline bool normalize(V& field,bool stateOnly=false) {
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
     supported=supported||t=="edit";
 #endif
-    if(!supported) return false;
-    if(!c["command"].isUndefined()&&!string(c["command"],24)) return false;
-    if(t=="slider"&&(!c["min"].isValid()||c["min"].asDouble()>=c["max"].asDouble()||c["step"].asDouble()<=0)) return false;
+    if(!supported) return fail("unsupported/disabled control type at controls["+String(i)+"]: "+t);
+    if(!c["command"].isUndefined()&&!string(c["command"],24)) return fail("invalid command at controls["+String(i)+"] (maximum 24 bytes)");
+    if(t=="slider"&&(!c["min"].isValid()||c["min"].asDouble()>=c["max"].asDouble()||c["step"].asDouble()<=0)) return fail("invalid slider min/max/step at controls["+String(i)+"]");
   }
-  return validValue(field,field["default"]);
+  return validValue(field,field["default"]) || fail("invalid descriptor default value");
 }
 #else
-inline bool normalize(V&,bool=false) {return false;}
+inline bool normalize(V&,bool=false,String* error=nullptr) {if(error)*error="extended controls are disabled";return false;}
 inline bool validControl(const V&,const V&) {return false;}
 inline bool validValue(const V&,const V&) {return false;}
 #endif

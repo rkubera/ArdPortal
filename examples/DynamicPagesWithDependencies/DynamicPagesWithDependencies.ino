@@ -46,11 +46,18 @@ static const char CONTROL_PAGE[] PROGMEM = R"JSON({
   ]
 })JSON";
 
+bool pageRegistered = false;
+bool startupApplied = false;
+
 void setup() {
   Serial.begin(115200);
-  // Register definitions on every boot, before starting the portal.
-  if (!portal.addAppConfigPage(FPSTR(CONTROL_PAGE))) {
-    Serial.println("Invalid dynamic page definition.");
+  portal.onAppConfigPageRegistrationFinished([](bool success) {
+    pageRegistered = success;
+    if (!success) Serial.println(portal.appConfigRegistrationError().reason);
+  });
+  // Queue definitions on every boot; loop() completes registration.
+  if (!portal.startAppConfigPageRegistration(FPSTR(CONTROL_PAGE))) {
+    Serial.println(portal.appConfigRegistrationError().reason);
   }
   portal.onAppConfigValueChanged([](const String& key,
                                    const ArdJSON::JSONVar& value,
@@ -60,14 +67,17 @@ void setup() {
     Serial.println(ArdJSON::JSON.stringify(value));
   });
   portal.onPortalAndAppConfigReady([](bool loaded) {
-    // Read restored values here; change callbacks do not run for startup loading.
+    // Storage is ready; page registration may still be pending.
     Serial.println(loaded ? "Configuration loaded" : "Using defaults");
-    bool enabled = portal.getAppConfigValue("enabled").asBool();
-    Serial.println(enabled ? "Enabled at startup" : "Disabled at startup");
   });
   if (!portal.begin()) Serial.println("Could not start the portal.");
 }
 
 void loop() {
-  portal.loop(); // Services live controls, MQTT and journaled configuration.
+  portal.loop(); // Services registration, live controls, MQTT and storage.
+  if (!startupApplied && pageRegistered && portal.portalAndAppConfigReady()) {
+    startupApplied = true;
+    Serial.println(portal.getAppConfigValue("enabled").asBool()
+                   ? "Enabled at startup" : "Disabled at startup");
+  }
 }

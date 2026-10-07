@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #include "ArdFSVolume.h"
+#include "ArdFSStorageLimits.h"
 #if defined(ESP8266)
 #include <flash_hal.h>
 #endif
@@ -63,7 +64,7 @@ bool ArdFSVolume::scan(uint32_t bank,std::vector<Entry>& entries,uint32_t& next)
  while(next+Header<=_bankSize){uint8_t h[Header];if(!readRaw(bank+next,h,sizeof(h)))return false;
  if(get(h)==0xffffffff){return true;}
  uint32_t extent=get(h+4),name=get(h+8),length=get(h+12);
- if(get(h)!=RecordMagic||extent!=aligned(Header+name+length)||extent>_bankSize-next||!name||name>72||length>20000){next=_bankSize;return true;}
+ if(get(h)!=RecordMagic||extent!=aligned(Header+name+length)||extent>_bankSize-next||!name||name>72||length>ArdFSMaxJournalBytes){next=_bankSize;return true;}
  if(get(h+24)==Commit){uint8_t bytes[256];uint32_t c=crc(h,16);String path;if(!path.reserve(name))return false;
  for(uint32_t offset=0;offset<name+length;offset+=sizeof(bytes)){size_t count=std::min<size_t>(size_t(name+length-offset),sizeof(bytes));if(!readRaw(bank+next+Header+offset,bytes,count))return false;c=crc(bytes,count,c);for(size_t j=0;j<count&&offset+j<name;++j)path+=char(bytes[j]);}
  if(~c==get(h+16)){auto it=std::find_if(entries.begin(),entries.end(),[&](const Entry&e){return e.path==path;});Entry e{path,bank+next+Header+name,length};if(it==entries.end()){if(entries.size()>=32)return false;entries.push_back(e);}else *it=e;}}
@@ -108,7 +109,7 @@ size_t ArdFSFile::size() const{if(!_handle)return 0;
 int ArdFSFile::read(uint8_t*p,size_t n){if(!_handle)return -1;
  auto&h=*_handle;n=std::min<size_t>(n,h.data.length()-h.offset);memcpy(p,h.data.c_str()+h.offset,n);h.offset+=n;return n;}
 size_t ArdFSFile::write(const uint8_t*p,size_t n){if(!_handle||!_handle->writing)return 0;
- if(_handle->data.length()+n>20000)return 0;
+ if(_handle->data.length()+n>ArdFSMaxJournalBytes)return 0;
  if(!_handle->data.reserve(_handle->data.length()+n))return 0;
  size_t prior=_handle->data.length();for(size_t i=0;i<n;++i)_handle->data+=char(p[i]);if(_handle->data.length()!=prior+n)return 0;_handle->dirty=true;return n;}
 bool ArdFSFile::flush(){if(!_handle)return false;

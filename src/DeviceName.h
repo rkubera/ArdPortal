@@ -3,9 +3,13 @@
 #pragma once
 #include "DeviceNameCharacters.h"
 namespace ArdDeviceName {
+inline uint32_t characterBound(size_t index,size_t edge) {
+  const uint8_t* bytes=&Characters[index][edge*3];
+  return uint32_t(pgm_read_byte(bytes))|(uint32_t(pgm_read_byte(bytes+1))<<8)|(uint32_t(pgm_read_byte(bytes+2))<<16);
+}
 inline bool letterOrNumber(uint32_t cp) {
   size_t lo=0,hi=sizeof(Characters)/sizeof(Characters[0]);
-  while(lo<hi){size_t mid=lo+(hi-lo)/2;uint32_t first=pgm_read_dword(&Characters[mid][0]),last=pgm_read_dword(&Characters[mid][1]);if(cp<first)hi=mid;else if(cp>last)lo=mid+1;else return true;}
+  while(lo<hi){size_t mid=lo+(hi-lo)/2;uint32_t first=characterBound(mid,0),last=characterBound(mid,1);if(cp<first)hi=mid;else if(cp>last)lo=mid+1;else return true;}
   return false;
 }
 inline bool valid(const String& name) {

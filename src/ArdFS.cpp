@@ -6,8 +6,13 @@
 #undef ARDUI_DEFINE_STORAGE_MESSAGES
 
 namespace {
+ArdJSON::Limits documentLimits() {
+  ArdJSON::Limits limits; limits.maxInputBytes = ArdFS::MaxBytes;
+  limits.maxStringBytes = ArdFS::MaxBytes; limits.maxNodes = 4096;
+  return limits;
+}
 ArdJSON::Limits journalLimits() {
-  ArdJSON::Limits limits; limits.maxInputBytes = 20000; limits.maxOutputBytes = 20000;
+  ArdJSON::Limits limits; limits.maxInputBytes = ArdFSMaxJournalBytes; limits.maxOutputBytes = ArdFSMaxJournalBytes;
   limits.maxStringBytes = ArdFS::MaxBytes; limits.maxDepth = 1; limits.maxNodes = 5;
   return limits;
 }
@@ -97,7 +102,7 @@ void ArdFS::loop() {
       _file = _volume.open(slotPath(_slot).c_str(), "r");
       if (!_file) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_199)); return; }
       _expected = _file.size(); _offset = 0;
-      if (!_expected || _expected > 20000) { _file.close(); _phase = Phase::Validate; return; }
+      if (!_expected || _expected > ArdFSMaxJournalBytes) { _file.close(); _phase = Phase::Validate; return; }
       if (!_buffer.reserve(_expected)) { _file.close(); finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return; }
       _phase = Phase::Read; return;
     case Phase::Read: {
@@ -142,7 +147,7 @@ void ArdFS::loop() {
     }
     case Phase::Prepare: {
       if (_best >= 0 && _match[_best]) { ++_skipped; finish(true); return; }
-      if (!_json.parse(_input).isValid()) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_200)); return; }
+      if (!_json.parse(_input, nullptr, documentLimits()).isValid()) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_200)); return; }
       uint32_t generation = _best >= 0 ? _generation[_best] + 1 : 1;
       JSONVar record = JSONVar::object(); record["journal"] = 1; record["generation"] = generation;
       record["crc32"] = checksum(generation, _input); record["data"] = _input;

@@ -8,8 +8,9 @@
 | `DHT/DHT.ino` | DHT22 on GPIO2: temperature/humidity, C/F selection, calibration, MQTT/HA and OTA; three control types, no TLS/Console. |
 | `MinimalPortal/MinimalPortal.ino` | Portal with OTA enabled and MQTT disabled; HA and Console are disabled automatically. |
 | `BasicPortal/BasicPortal.ino` | Minimal portal; configuration, JSON and ArdFS journal are managed by the library. The loop only calls `portal.loop()`. |
-| `DynamicPages/DynamicPages.ino` | Two JSON-defined pages: Controls with a toggle/slider and Settings with editable text/a select; restored values and a shared change callback. |
+| `DynamicPages/DynamicPages.ino` | Two JSON-defined pages registered cooperatively in sequence; completion/error callbacks and startup values applied after both storage and registration are ready. |
 | `DynamicPagesWithDependencies/DynamicPagesWithDependencies.ino` | A toggle controls slider and text-field visibility, including retained HA discovery removal/recreation. |
+| `HomeAssistantEntities/HomeAssistantEntities.ino` | HA sensor and switch without panel pages; bounded HA work and shared AppConfig callbacks. |
 | `ApplicationConfig/ApplicationConfig.ino` | Using getAppConfigValue/setAppConfigValue for application JSON values, queuing updates and handling configuration callbacks. |
 | `AsyncStorage/AsyncStorage.ino` | Standalone asynchronous/cooperative journal read/write without starting a portal. |
 | `JsonBasics/JsonBasics.ino` | JSON objects/arrays, serialization, parsing and field access; output goes to Serial at 115200 baud. |

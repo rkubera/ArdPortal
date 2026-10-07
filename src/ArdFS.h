@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "ArdFSStorageLimits.h"
 #include <Arduino.h>
 #if defined(ARDFS_HOST_TEST)
 #include <ArdFSHostVolume.h>
@@ -31,7 +32,7 @@ public:
   const String& error() const { return _error; }
   uint32_t commits() const { return _commits; }
   uint32_t skipped() const { return _skipped; }
-  static constexpr size_t MaxBytes = 8192;
+  static constexpr size_t MaxBytes = ArdFSMaxDocumentBytes;
 private:
   enum class Phase { Mount, End, Format, Remount, Idle, OpenRead, Read, Validate,
                      Prepare, OpenWrite, Write, Flush, CloseWrite, OpenVerify, Verify, CloseVerify };

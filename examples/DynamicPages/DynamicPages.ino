@@ -1,7 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 /*
- * Register two dynamic pages from JSON definitions stored in flash.
+ * Register two dynamic pages cooperatively, without building a whole-page DOM.
  * Controls contains a switch and slider; Settings contains text and a select.
  * Values are saved, restored and reported through an application change callback.
  */
@@ -57,31 +57,40 @@ static const char SETTINGS_PAGE[] PROGMEM = R"JSON({
   ]
 })JSON";
 
+unsigned registeredPages = 0;
+bool startupApplied = false;
+
 void setup() {
   Serial.begin(115200);
-  // Register definitions on every boot, before starting the portal.
-  if (!portal.addAppConfigPage(FPSTR(CONTROL_PAGE))) {
-    Serial.println("Invalid dynamic page definition.");
-  }
-  if (!portal.addAppConfigPage(FPSTR(SETTINGS_PAGE))) {
-    Serial.println("Invalid settings page definition.");
-  }
+  portal.onAppConfigPageRegistrationFinished([](bool success) {
+    if (!success) {
+      const auto& error = portal.appConfigRegistrationError();
+      Serial.printf("Registration: %s field=%s reason=%s\n",
+                    error.stage, error.fieldId.c_str(), error.reason.c_str());
+      return;
+    }
+    ++registeredPages;
+    if (registeredPages == 1 && !portal.startAppConfigPageRegistration(FPSTR(SETTINGS_PAGE)))
+      Serial.println(portal.appConfigRegistrationError().reason);
+  });
   portal.onAppConfigValueChanged([](const String& key,
                                    const ArdJSON::JSONVar& value,
                                    ArdPortal::ChangeSource) {
-    // Apply the value to your hardware here without blocking.
+    // Apply user changes to hardware without blocking.
     Serial.print(key); Serial.print(" = ");
     Serial.println(ArdJSON::JSON.stringify(value));
   });
-  portal.onPortalAndAppConfigReady([](bool loaded) {
-    // Read restored values here; change callbacks do not run for startup loading.
-    Serial.println(loaded ? "Configuration loaded" : "Using defaults");
-    bool enabled = portal.getAppConfigValue("enabled").asBool();
-    Serial.println(enabled ? "Enabled at startup" : "Disabled at startup");
-  });
+  if (!portal.startAppConfigPageRegistration(FPSTR(CONTROL_PAGE)))
+    Serial.println(portal.appConfigRegistrationError().reason);
   if (!portal.begin()) Serial.println("Could not start the portal.");
 }
 
 void loop() {
-  portal.loop(); // Services live controls, MQTT and journaled configuration.
+  portal.loop(); // One registration unit; UART/application work can run next.
+  if (!startupApplied && registeredPages == 2 && portal.portalAndAppConfigReady()) {
+    startupApplied = true;
+    // Config loading may finish before page registration. Wait for both.
+    Serial.println(portal.getAppConfigValue("enabled").asBool()
+                   ? "Enabled at startup" : "Disabled at startup");
+  }
 }

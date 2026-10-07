@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "AppConfigFields.h"
 #include "ArdPortalFeatures.h"
 #include "PortalTypes.h"
 #include "ArdJSON.h"
@@ -33,7 +34,7 @@ private:
   bool emitAppConfigEvent(const char* key, const ArdJSON::JSONVar& value);
   void markDirty(const String& key);
 #if ARDPORTAL_ENABLE_MQTT
-  uint64_t _stateDirty=0, _mqttAckPending=0, _mqttAckInFlight=0;
+  ArdAppConfigFieldMask _stateDirty=0, _mqttAckPending=0, _mqttAckInFlight=0;
   uint32_t _stateSince=0;
   uint8_t _subscriptions=0;
   bool _yieldPending=false;
@@ -43,7 +44,7 @@ private:
   AppEmission _appEmissions[8];
   uint8_t _emissionHead=0, _emissionCount=0;
 #endif
-  uint64_t stateMask() const;
+  ArdAppConfigFieldMask stateMask() const;
   bool queueAppEmission(const String& topic, const String& payload);
   void resetMqtt();
   bool canServiceMqtt() const;
