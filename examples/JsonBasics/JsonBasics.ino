@@ -10,6 +10,10 @@
 using ArdJSON::JSON;
 using ArdJSON::JSONVar;
 
+/**
+ * @brief Initialize the example hardware, callbacks and portal.
+ * @return No value.
+ */
 void setup() {
   Serial.begin(115200);
 
@@ -31,4 +35,8 @@ void setup() {
   Serial.println(int(restored["values"][0]));
 }
 
+/**
+ * @brief Advance the component work; call repeatedly from the Arduino main loop.
+ * @return No value.
+ */
 void loop() {}

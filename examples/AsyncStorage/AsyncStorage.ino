@@ -10,11 +10,19 @@
 ArdFS storage;
 bool started = false;
 
+/**
+ * @brief Initialize the example hardware, callbacks and portal.
+ * @return No value.
+ */
 void setup() {
   Serial.begin(115200);
   storage.begin(); // Automatic mount/format will run from loop().
 }
 
+/**
+ * @brief Advance the component work; call repeatedly from the Arduino main loop.
+ * @return No value.
+ */
 void loop() {
   storage.loop();
   if (!started && storage.ready()) {

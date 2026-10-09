@@ -16,10 +16,22 @@ private:
   bool quoted=false,escape=false,stringToken=false,composite=false,afterComma=false;
   size_t tokenStart=0,depth=0;
   char closing[32];
+  /**
+   * @brief Initialize the structural scanner state for the value at the current offset.
+   * @param source Input source or origin of a configuration change, as indicated by its type.
+   * @return No value; scanner token state is initialized.
+   */
   template<class Source> void beginToken(const Source& source) {
     tokenStart=offset;char c=source.character(offset);quoted=false;escape=false;depth=0;
     stringToken=c=='"';composite=c=='{'||c=='[';
   }
+  /**
+   * @brief Consume a JSON token within the remaining byte budget, recording malformed input.
+   * @param source Input source or origin of a configuration change, as indicated by its type.
+   * @param budget Maximum work or byte budget available to this call.
+   * @param finished Output flag indicating that the current token is complete.
+   * @return True for a valid token or partial token; false for malformed JSON. finished distinguishes completion from exhausted budget.
+   */
   template<class Source> bool token(const Source& source,size_t& budget,bool& finished) {
     finished=false;
     while(offset<source.size()&&budget){char c=source.character(offset);
@@ -34,7 +46,17 @@ private:
     if(finished&&offset==tokenStart){reason="expected value";return false;}return true;
   }
 public:
+  /**
+   * @brief Restore the component state to its initial values.
+   * @return No value; state is reset for reuse.
+   */
   void reset(){*this=ArdAppConfigPageScanner();}
+  /**
+   * @brief Advance structural scanning until an event, failure or exhausted byte budget.
+   * @param source Input source or origin of a configuration change, as indicated by its type.
+   * @param budget Maximum work or byte budget available to this call.
+   * @return Waiting when more work is needed, Member or Field for a discovered value, Complete at end of input, or Failed with reason set.
+   */
   template<class Source> Event step(const Source& source,size_t budget=256) {
     if(state==Done)return Complete;
     auto fail=[&](const char* text){reason=String(text)+" at byte "+String(offset);return Failed;};

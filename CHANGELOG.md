@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.7.7 — 2026-10-09
+
+### Added
+- Resolve `$device` in HA topic overrides from the current normalized MQTT device name. RAM and flash page sources stay immutable, and registration, discovery and HTTP use the same resolved topics.
+- Nested `and`/`or` groups in field and page `visibleWhen` conditions, while retaining single-field leaves and optional `property` comparisons. Conditions support six nested groups and 64 total nodes.
+- Shared Boolean evaluation for portal visibility, HTTP/MQTT command checks and incremental HA discovery; page and field conditions remain combined with AND.
+
+### Fixed
+- Default HA switch icons to `mdi:toggle-switch`, preserving explicitly configured icons and `optimistic` settings; do not add an explicit optimistic-mode option.
+- Allow `.gz` firmware files in the Upload picker using the final extension and both common gzip MIME types, avoiding browsers that reject the compound `.bin.gz` filter.
+- Stage only modified persistent application fields for Portal, MQTT/HA and application setters instead of cloning the complete saved configuration. Merge staged deletions and edits; preserve full replacement APIs and change callbacks.
+- Save generated configuration JSON through bounded ArdFS journal chunks (at most 256 bytes) without a whole-document serialization, journal DOM or full old-envelope buffer for canonical records. Retain the existing two-slot format, generation/CRC validation, unchanged-save suppression and readback verification. Legacy/noncanonical records retain the compatibility reader; initial loading still uses the full-document reader.
+- Add ASan/UBSan regression coverage for patch capacity/allocation refusal, Portal/MQTT saves, restart restoration, bounded buffers, corrupt/write-failed records and 152 raw-flash power-cut points: `bash tests/run-config-memory.sh`.
+- Report the ESP8266 DRAM heap arena size from the core allocator configuration; keep free heap, minimum sampled free heap and largest block separate from total RAM.
+- Distinguish aggregate field working memory from the largest individual buffer in registration, HTTP, dependencies and HA discovery. Estimate basic definition parsing from JSON node counts; retain conservative fallback estimates for unknown/extended parser work. Network reserve amounts are unchanged.
+- Stream validated basic and extended field definitions without a complete DOM, preserving topic expansion and registration's extended/persist flags. Resolve explicit basic defaults and HTTP visibility rules without parsing unrelated HA metadata. Tests: `tests/run-topic-templates.sh`, `python3 tests/page-stream-test.py`.
+- Release consumed HTTP fragments before checking the next allocation, drain pending fragments without a new working-set reservation, and release WebSocket frame buffers after transmission.
+- Reclaim older Console history under dynamic HTTP memory pressure while retaining the newest MQTT record and three newest diagnostic messages. Reserve memory for the unscoped combined app snapshot before copying its members. Test: `python3 tests/http-memory-test.py`.
+- Avoid allocating runtime state members for values already supplied by saved configuration or field defaults. Preserve first readings and real change notifications; reject serialization failures instead of treating them as equality. Regression test: `python3 tests/runtime-state-test.py`.
+- Honor explicit `persist:false` for basic form submissions, MQTT state commands and `setAppConfigValue()`, retaining volatile values only in RAM. Mixed forms save only persistent fields; omitted persistence keeps existing defaults.
+- Dynamic HTTP admission reserves the largest field working set before sending success headers. Streamed definitions use connection-close framing so topic expansion and identity changes cannot leave a stale Content-Length. Retryable fragment failures roll back stream cursors instead of skipping fields or being mistaken for end-of-stream.
+- Measure ESP32 byte-addressable internal heap with INTERNAL|8BIT capabilities, including free/minimum/largest blocks; expose DMA separately in Info. Use ESP8266 free/largest-block measurements on that platform.
+- Preserve configurable network headroom before cooperative registration, dependency/Discovery and dynamic HTTP work, with HTTP 503 for new requests under pressure. Add heap8/DMA registration diagnostics and a pressure-test example; store page conditions as compact JSON instead of permanent DOM copies.
+- Use class-local malloc/free allocation for JSON members and library-owned nothrow objects/arrays, returning errors on allocation refusal instead of relying on throwing global allocation paths. Add an ESP32 allocation-refusal/HTTP/UART diagnostic sketch.
+- Avoid deep-copying basic HA discovery definitions; normalize copies only for extended controls. Retry failed discovery and dependency work after one second without treating memory failure as hidden visibility.
+- Build a sparse reverse dependency index during atomic registration; invalidate only direct/transitive dependents on actual value changes, preserving HA traversal during unrelated telemetry or publication requests.
+
+### Memory and firmware
+- Grow dependency traversal buffers according to actual graph depth instead of allocating one frame for every field; reuse two registration masks and share Boolean/schema traversal code without allocating callback wrappers.
+- ESP8266 DynamicPagesWithDependencies comparison: firmware 554848 → 554000 bytes (848 bytes saved); initial traversal buffer for 1024 fields 4096 → 32 bytes for short chains.
+
+### Changed
+- Add English documentation for functions and parameters across the library and examples.
+- Reject dependency cycles during atomic page registration instead of accepting permanently hidden cyclic definitions. Cycle checks run within the registration work budget.
+- Document grouped conditions in README and demonstrate them in DynamicPagesWithDependencies.
+
+
 ## 0.7.6 — 2026-10-07
 
 ### Breaking changes

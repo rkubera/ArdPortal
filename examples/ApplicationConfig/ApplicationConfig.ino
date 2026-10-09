@@ -11,6 +11,10 @@ ArdPortal portal;
 uint32_t reportInterval = 5000, lastReport = 0;
 bool needsDefaults = false;
 
+/**
+ * @brief Initialize the example hardware, callbacks and portal.
+ * @return No value.
+ */
 void setup() {
   Serial.begin(115200);
   portal.onPortalAndAppConfigReady([](bool) {
@@ -29,6 +33,10 @@ void setup() {
   portal.begin();
 }
 
+/**
+ * @brief Advance the component work; call repeatedly from the Arduino main loop.
+ * @return No value.
+ */
 void loop() {
   portal.loop();
   if (needsDefaults && portal.portalAndAppConfigReady() && !portal.portalAndAppConfigBusy()) {

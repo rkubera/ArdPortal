@@ -12,6 +12,10 @@
 // ESP8266 lwIP must reclaim a TCP PCB. No additional connection buffer is used.
 class ArdMqttTransport : public WiFiClient {
 public:
+  /**
+   * @brief Keep the active connection available during configuration changes.
+   * @return No value.
+   */
   void protectConnection() {
 #if ARDPORTAL_TCP_PRIORITY_AVAILABLE
     if(_client&&_client->getPCB())tcp_setprio(_client->getPCB(),TCP_PRIO_MAX);

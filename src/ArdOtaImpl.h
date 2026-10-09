@@ -11,6 +11,10 @@
 #include <Updater.h>
 #endif
 
+/**
+ * @brief Abort the OTA update and release its transport state.
+ * @return No value.
+ */
 void ArdOta::abortUpgrade() {
 #if defined(ESP32)
   Update.abort();
@@ -23,6 +27,12 @@ void ArdOta::abortUpgrade() {
 #endif
 }
 
+/**
+ * @brief Write firmware bytes to the OTA updater and check the result.
+ * @param data Data buffer or value used by the operation.
+ * @param length Number of bytes or elements to process.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 bool ArdOta::writeUpgrade(uint8_t* data, size_t length) {
   if (!_otaReceived && length && data[0] != 0xe9
 #if defined(ESP8266)
@@ -60,6 +70,12 @@ bool ArdOta::writeUpgrade(uint8_t* data, size_t length) {
   return true;
 }
 
+/**
+ * @brief Prepare the OTA updater for an incoming firmware upload.
+ * @param bodySize Expected upload body length in bytes.
+ * @param split Header/body boundary in the received HTTP request.
+ * @return No value.
+ */
 void ArdOta::startUpload(uint32_t bodySize, int split) {
     if (!_portal._configurationReady || _portal.portalAndAppConfigBusy() || _portal.mqttTrialActive() || _portal._rebootPending || _portal._scanning) { _portal.replyMessage(409,ArdUILanguage::Key::s_132); return; }
     if (!bodySize || bodySize > ESP.getFreeSketchSpace()) { _portal.replyMessage(413,ArdUILanguage::Key::s_116); return; }
@@ -76,6 +92,10 @@ void ArdOta::startUpload(uint32_t bodySize, int split) {
     return;
 }
 
+/**
+ * @brief Feed the next HTTP upload bytes into the OTA updater.
+ * @return No value.
+ */
 void ArdOta::receiveUpload() {
     uint8_t data[512]; size_t count = 0;
     while (count < sizeof(data) && count < _otaExpected - _otaReceived && _portal._http.available()) {

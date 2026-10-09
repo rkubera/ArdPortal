@@ -56,17 +56,32 @@ static const char SENSOR_PAGE[] PROGMEM = R"JSON({
   ]
 })JSON";
 
+/**
+ * @brief Update measurement.
+ * @param key Configuration key or JSON object member name.
+ * @param value Input value, or output destination when passed by mutable reference.
+ * @return No value.
+ */
 void updateMeasurement(const char* key, const ArdJSON::JSONVar& value) {
   readingsChanged |= ArdJSON::JSON.stringify(portal.getAppConfigValue(key)) != ArdJSON::JSON.stringify(value);
   // Live portal updates are separate from the MQTT publishing schedule.
   if (!portal.setAppConfigStateValue(key,value,false)) Serial.println(F("DHT: portal value rejected."));
 }
 
+/**
+ * @brief Load mqtt interval.
+ * @return No value.
+ */
 void loadMqttInterval() {
   mqttIntervalMs = uint32_t(atoi(portal.getAppConfigValue("mqtt_update").asString().c_str())) * 1000;
   lastMqttUpdate = millis();
 }
 
+/**
+ * @brief Advance mqtt updates.
+ * @param now Current time used to evaluate deadlines.
+ * @return No value.
+ */
 void serviceMqttUpdates(uint32_t now) {
   if(!portal.mqttConnected() || portal.ota().active()) return;
   if(!measurementSettingsChanged && (mqttIntervalMs ? uint32_t(now-lastMqttUpdate)<mqttIntervalMs : !readingsChanged)) return;
@@ -76,6 +91,11 @@ void serviceMqttUpdates(uint32_t now) {
   }
 }
 
+/**
+ * @brief Round a sensor value to one decimal place.
+ * @param number Sensor reading to round.
+ * @return The reading rounded to one decimal place.
+ */
 String oneDecimal(float number) {
   int tenths = int(number * 10 + (number < 0 ? -0.5f : 0.5f));
   String value;
@@ -84,6 +104,10 @@ String oneDecimal(float number) {
   return value;
 }
 
+/**
+ * @brief Update readings.
+ * @return No value.
+ */
 void updateReadings() {
   if (!portal.portalAndAppConfigReady()) return;
   if (isnan(rawTemperature) || isnan(rawHumidity)) {
@@ -106,6 +130,10 @@ void updateReadings() {
 unsigned registeredPages = 0;
 bool applicationReady = false;
 
+/**
+ * @brief Initialize the example hardware, callbacks and portal.
+ * @return No value.
+ */
 void setup() {
   Serial.begin(115200);
   dht.begin();
@@ -130,6 +158,10 @@ void setup() {
   if (!portal.begin(options)) Serial.println(F("Could not start portal."));
 }
 
+/**
+ * @brief Advance the component work; call repeatedly from the Arduino main loop.
+ * @return No value.
+ */
 void loop() {
   portal.loop();
   uint32_t now = millis();

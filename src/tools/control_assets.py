@@ -14,6 +14,11 @@ GROUPS={
  'SELECT':['select','climate','fan','humidifier','siren','water_heater','vacuum'],
  'ACTIONS':['button','scene','notify','infrared','cover','valve','lock','alarm_control_panel','vacuum','lawn_mower','update'],
  'GROUPED_ACTIONS':['cover','valve','lock','alarm_control_panel','vacuum','lawn_mower']}
+# @brief Evaluate an asset feature expression against the selected control set.
+# @param condition Visibility dependency condition to validate or evaluate.
+# @param controls Optional set of controls included in the asset.
+# @param features Feature selections used to evaluate the asset guard.
+# @return True if the feature expression is enabled for the chosen controls.
 def condition_enabled(condition, controls=None, features=None):
  values={'ARDPORTAL_ENABLE_DEPENDENCIES':1,'ARDPORTAL_ENABLE_DYNAMIC_PAGES':1}
  values.update({PREFIX+c.upper():int(controls is None or c in controls) for c in CONTROLS})
@@ -21,6 +26,9 @@ def condition_enabled(condition, controls=None, features=None):
  if features:values.update({'ARDPORTAL_ENABLE_'+k:int(v) for k,v in features.items()})
  expression=re.sub(r'\bARDPORTAL_\w+\b',lambda m:str(values[m[0]]),condition)
  return bool(eval(expression.replace('&&',' and ').replace('||',' or ').replace('!',' not '),{'__builtins__':{}},{}))
+# @brief Split source text into feature-guarded asset segments.
+# @param source Input source or origin of a configuration change, as indicated by its type.
+# @return Sequence of feature conditions and their corresponding source text.
 def segments(source):
  stack=[];cursor=0;parts=[]
  for marker in re.finditer(r'/\*@(?:(if) ([^*]+)|(endif))\*/',source):
@@ -38,9 +46,19 @@ def segments(source):
   else:merged.append((condition,text))
  return merged
 
+# @brief Join only asset segments enabled for the selected controls.
+# @param source Input source or origin of a configuration change, as indicated by its type.
+# @param controls Optional set of controls included in the asset.
+# @param features Feature selections used to evaluate the asset guard.
+# @return Source text containing only enabled asset segments.
 def selected(source,controls=None,features=None):
  return ''.join(text for condition,text in segments(source) if condition_enabled(condition,controls,features))
 
+# @brief Emit C++ declarations and feature guards for a set of asset chunks.
+# @param name Fallback name or generated symbol name.
+# @param parts Feature-guarded asset segments.
+# @param gzip_array Encoder converting asset text to gzip C++ declarations.
+# @return Generated C++ lines for the supplied chunk set.
 def emit_chunks(name,parts,gzip_array):
  # A single part uses ordinary gzip. Conditional parts form one DEFLATE stream,
  # not multiple gzip members: browsers need one checksum/footer for the response.
@@ -68,6 +86,11 @@ def emit_chunks(name,parts,gzip_array):
  return lines
 
 
+# @brief Emit shared and profile-specific asset chunks without duplicate declarations.
+# @param name Fallback name or generated symbol name.
+# @param source Input source or origin of a configuration change, as indicated by its type.
+# @param gzip_array Encoder converting asset text to gzip C++ declarations.
+# @return Generated C++ lines for shared and conditional profile chunks.
 def emit_profile_chunks(name, source, gzip_array):
     lines=['#if !ARDPORTAL_ENABLE_DYNAMIC_PAGES']
     lines += emit_chunks(name,[('1',selected(source,[],{'DYNAMIC_PAGES':0,'DEPENDENCIES':0}))],gzip_array)

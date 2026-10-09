@@ -2,9 +2,31 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+/**
+ * @brief Accept an AppConfig page registration job; complete accepted jobs from loop(), including small pages.
+ * @param definition JSON definition to register; flash sources must remain valid for the portal lifetime.
+ * @return True if accepted; loop() later delivers the completion callback. False rejects the job without a callback.
+ */
 bool ArdPortal::startAppConfigPageRegistration(const String& definition) {return beginAppConfigPageRegistration(&definition,nullptr);}
+/**
+ * @brief Accept an AppConfig page registration job; complete accepted jobs from loop(), including small pages.
+ * @param definition JSON definition to register; flash sources must remain valid for the portal lifetime.
+ * @return True if accepted; loop() later delivers the completion callback. False rejects the job without a callback.
+ */
 bool ArdPortal::startAppConfigPageRegistration(String&& definition) {return beginAppConfigPageRegistration(&definition,nullptr,&definition);}
+/**
+ * @brief Accept an AppConfig page registration job; complete accepted jobs from loop(), including small pages.
+ * @param definition JSON definition to register; flash sources must remain valid for the portal lifetime.
+ * @return True if accepted; loop() later delivers the completion callback. False rejects the job without a callback.
+ */
 bool ArdPortal::startAppConfigPageRegistration(const __FlashStringHelper* definition) {return beginAppConfigPageRegistration(nullptr,definition);}
+/**
+ * @brief Prepare the source and staging state for an atomic page registration.
+ * @param source Input source or origin of a configuration change, as indicated by its type.
+ * @param flash Immutable definition in program memory; must outlive the portal.
+ * @param owned Optional RAM string whose ownership is transferred on acceptance.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 bool ArdPortal::beginAppConfigPageRegistration(const String* source,const __FlashStringHelper* flash,String* owned) {
   if(appConfigPageRegistrationBusy())return appConfigRegistrationFailed("busy","",F("another page registration is pending"));
   if(otaActive()||_rebootPending)return appConfigRegistrationFailed("busy","",F("OTA or restart is in progress"));
@@ -12,19 +34,37 @@ bool ArdPortal::beginAppConfigPageRegistration(const String* source,const __Flas
   _appConfigRegistrationError={};_appConfigPageRegistrationProcessed=_appConfigPageRegistrationTotal=0;
   if(!source&&!flash)return appConfigRegistrationFailed("input","",F("null definition"));
   if(_dynamic.pages.length()>=16)return appConfigRegistrationFailed("limits","",F("page limit: 16"));
+  const auto heapBefore=ArdHeap::sample();
   std::unique_ptr<ArdAppConfigPageRegistration> work(new(std::nothrow) ArdAppConfigPageRegistration());
   if(!work)return appConfigRegistrationFailed("registry","",F("out of memory allocating registration"));
+  work->heapBefore=heapBefore;
   work->length=source?source->length():strlen_P(reinterpret_cast<const char*>(flash));
   if(!work->length||work->length>ArdAppConfigMaxDefinitionBytes)return appConfigRegistrationFailed("input","",String("definition is empty or exceeds the definition budget: ")+String(ArdAppConfigMaxDefinitionBytes)+" bytes");
+  if(source&&!owned&&!ArdHeap::permits(work->length))return appConfigRegistrationFailed("memory","",F("network heap reserve prevents definition copy"));
   if(source){if(owned)work->source=std::move(*owned);else work->source=*source;if(work->source.length()!=work->length)return appConfigRegistrationFailed("input","",F("out of memory copying definition"));}
-  work->flash=flash;work->first=_dynamic.count();
+  work->flash=flash;work->first=_dynamic.count();work->topicDevice=_dynamic.pages.topicDevice;
   work->wholePass=work->length<=2048;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  log(String("AppConfig registration accepted: ")+ArdHeap::describe(work->heapBefore));
+#endif
   _appConfigPageRegistration=std::move(work);_appConfigPageRegistrationState=AppConfigPageRegistrationState::Pending;
   ++_appConfigPageRegistrationGeneration;
   return true;
 }
+/**
+ * @brief Commit the completed page and arrange delivery of its completion callback.
+ * @param success Whether registration completed successfully.
+ * @return No value.
+ */
 void ArdPortal::finishAppConfigPageRegistration(bool success) {
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  auto before=_appConfigPageRegistration->heapBefore;
+#endif
   _appConfigPageRegistration.reset();
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  auto after=ArdHeap::sample();
+  log(String("AppConfig registration ")+(success?"completed":"FAILED")+"; before "+ArdHeap::describe(before)+"; after "+ArdHeap::describe(after)+"; used8="+String(int32_t(before.free8)-int32_t(after.free8))+" usedDMA="+String(int32_t(before.freeDma)-int32_t(after.freeDma)));
+#endif
   _appConfigPageRegistrationState=success?AppConfigPageRegistrationState::Succeeded:AppConfigPageRegistrationState::Failed;
   if(success)_appConfigRegistrationError={};
   // Release all staging allocations before invoking application code. The
@@ -33,9 +73,20 @@ void ArdPortal::finishAppConfigPageRegistration(bool success) {
 }
 // Keep conversion/logging of flash-resident reasons in one place instead of
 // emitting String construction and destruction at every validation branch.
+/**
+ * @brief Record a registration failure and discard its uncommitted staging state.
+ * @param stage Registration stage recorded in the error report.
+ * @param field Application field definition or identifier.
+ * @param reason Restart or failure reason.
+ * @return No value.
+ */
 void ArdPortal::failAppConfigPageRegistration(const char* stage,const String& field,const __FlashStringHelper* reason) {
   appConfigRegistrationFailed(stage,field,String(reason));finishAppConfigPageRegistration(false);
 }
+/**
+ * @brief Advance page registration within the configured cooperative work budget.
+ * @return No value.
+ */
 void ArdPortal::serviceAppConfigPageRegistration() {
   if(!_appConfigPageRegistration||_appConfigPageRegistrationDriving)return;
   _appConfigPageRegistrationDriving=true;
@@ -46,6 +97,15 @@ void ArdPortal::serviceAppConfigPageRegistration() {
       if(unit>=_options.appConfigRegistrationMaxOperationsPerLoop)break;
       if(unit&&uint32_t(millis()-start)>=_options.appConfigRegistrationWorkBudgetMs)break;
     }
+    if(!ArdHeap::permits(_appConfigPageRegistration->maximumFieldWork,_appConfigPageRegistration->maximumFieldBlock)){
+      if(!_appConfigPageRegistration->memoryDeferred){_appConfigPageRegistration->memoryDeferred=true;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+        log(String("AppConfig registration deferred: ")+ArdHeap::describe(ArdHeap::sample()));
+#endif
+      }
+      break;
+    }
+    _appConfigPageRegistration->memoryDeferred=false;
     serviceAppConfigPageRegistrationUnit();++unit;
     // Small definitions finish in this loop pass. A ninth field switches the
     // same job to budgeted work, preserving the public lifecycle in both cases.
@@ -54,6 +114,10 @@ void ArdPortal::serviceAppConfigPageRegistration() {
   }
   _appConfigPageRegistrationDriving=false;
 }
+/**
+ * @brief Perform one bounded unit of page registration work.
+ * @return No value.
+ */
 void ArdPortal::serviceAppConfigPageRegistrationUnit() {
   if(!_appConfigPageRegistration)return;
   auto& work=*_appConfigPageRegistration;
@@ -77,8 +141,8 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
         work.entry->count=work.scanner.fieldCount;
         work.entry->fields.reset(new(std::nothrow) ArdDynamicPages::PageStore::Field[work.entry->count]);
         if(!work.entry->fields){failAppConfigPageRegistration("registry","",F("out of memory allocating field index"));return;}
-        work.entry->id=header["id"].asString();work.entry->sourceLength=work.length;work.entry->condition=header["visibleWhen"];
-        if(work.entry->id!=header["id"].asString()||(header.hasOwnProperty("visibleWhen")&&!work.entry->condition.isValid())){failAppConfigPageRegistration("registry","",F("out of memory copying page metadata"));return;}
+        work.entry->id=header["id"].asString();work.entry->sourceLength=work.length;if(header.hasOwnProperty("visibleWhen"))work.entry->condition=_json.stringify(header["visibleWhen"]);
+        if(work.entry->id!=header["id"].asString()||(header.hasOwnProperty("visibleWhen")&&!work.entry->condition.length())){failAppConfigPageRegistration("registry","",F("out of memory copying page metadata"));return;}
         V menu=V::object();for(const char* key:{"id","name","names","order","visibleWhen"})if(header.hasOwnProperty(key))menu[key]=header[key];
         ArdJSON::Limits limits;limits.maxNodes=4096;limits.escapeHtml=true;String reason;
         work.entry->menu=_json.stringify(menu,false,&reason,limits);if(!work.entry->menu.length()){failed("serialize","",reason);return;}
@@ -88,6 +152,11 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     }
     if(event==ArdAppConfigPageScanner::Member&&!scanning)return;
     if(event==ArdAppConfigPageScanner::Field&&scanning){
+      size_t estimate=ArdHeap::fieldWork(work.scanner.bytes);if(estimate>work.maximumFieldWork)work.maximumFieldWork=estimate;
+      size_t block=ArdHeap::fieldBlock(work.scanner.bytes),indexBytes=work.scanner.fieldCount*sizeof(ArdDynamicPages::PageStore::Field);
+      if(indexBytes>block)block=indexBytes;
+      if(block>work.maximumFieldBlock)work.maximumFieldBlock=block;
+      if(indexBytes>work.maximumFieldWork)work.maximumFieldWork=indexBytes;
       if(work.first+work.scanner.fieldCount>ArdAppConfigMaxFields){failAppConfigPageRegistration("limits","",F("field limit: 1024"));return;}
       return; // Index pass parses each field only once, after its exact count is known.
     }
@@ -105,6 +174,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
       return;
     }
     work.nodes+=parser.nodes();if(work.nodes>4096){failAppConfigPageRegistration("parse","",F("node limit: 4096"));return;}
+    if(!ArdTopicTemplates::resolve(value,work.topicDevice)){failAppConfigPageRegistration("topics","",F("cannot resolve topic template"));return;}
     const size_t index=work.processed;const String id=static_cast<const V&>(value)["id"].asString();String reason;
     if(!ardPortalBasicControl(value["type"].asString())){
       V resolved=value;if(!ArdHa::normalize(resolved,false,&reason)){failed("normalize",id,reason);return;}
@@ -133,6 +203,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
       failAppConfigPageRegistration("registry",id,F("out of memory growing field id pool"));return;
     }
     meta.idOffset=uint16_t(idOffset);
+    meta.sourceNodes=parser.nodes()<=UINT8_MAX?uint8_t(parser.nodes()):0;
     meta.offset=uint32_t(work.scanner.start);meta.length=uint16_t(work.scanner.bytes);meta.index=uint16_t(work.first+index);
     const V& read=value;
     meta.extended=read["extended"].asBool();meta.persist=read["persist"].asBool();meta.transient=ArdHa::transient(value);
@@ -144,7 +215,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     if(value.hasOwnProperty("visibleWhen"))work.checksMask|=ArdAppConfigFieldMask::forField(index);
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     meta.dependent=value.hasOwnProperty("visibleWhen")||work.header.hasOwnProperty("visibleWhen");
-    if(meta.dependent)work.dependencyMask|=ArdAppConfigFieldMask::forField(meta.index);
+    if(meta.dependent){work.dependencyMask|=ArdAppConfigFieldMask::forField(meta.index);work.checksMask|=ArdAppConfigFieldMask::forField(index);}
 #endif
     size_t encoded=ArdJSON::JSON.measure(value,&reason,limits);if(!encoded){failed("serialize",id,reason);return;}
     work.encodedFields+=encoded+(index?1:0);++work.processed;_appConfigPageRegistrationProcessed=work.processed;return;
@@ -152,23 +223,31 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   auto conditionValid=[&](const V& condition){
     if(condition.isUndefined())return true;
-    if(condition.type()!=V::Type::Object||!ArdDynamicPages::identifier(condition["field"].asString())||!condition.hasOwnProperty("equals"))return false;
-    if(condition.hasOwnProperty("property")&&!ArdDynamicPages::identifier(condition["property"].asString()))return false;
-    const V& expected=condition["equals"];if(expected.type()!=V::Type::String&&expected.type()!=V::Type::Boolean&&expected.type()!=V::Type::Number&&!expected.isNull())return false;
-    String id=condition["field"].asString();return _dynamic.indexOf(id)<_dynamic.count()||work.indexOf(id)<work.entry->count;
+    auto resolve=[&](const V& leaf){
+      if(!ArdDynamicPages::identifier(leaf["field"].asString()))return false;
+      if(leaf.hasOwnProperty("property")&&!ArdDynamicPages::identifier(leaf["property"].asString()))return false;
+      const String id=leaf["field"].asString();
+      return _dynamic.indexOf(id)<_dynamic.count()||work.indexOf(id)<work.entry->count;
+    };
+    size_t nodes=0;return ArdDependencies::validate(condition,resolve,nodes);
   };
 #endif
   if(work.stage==ArdAppConfigPageRegistration::Checks||work.stage==ArdAppConfigPageRegistration::ExistingCommands){
     const bool existing=work.stage==ArdAppConfigPageRegistration::ExistingCommands;
     auto& pending=existing?work.existingCommands:work.checksMask;
     work.checkIndex=pending.firstSet();
-    if(work.checkIndex>=ArdAppConfigMaxFields){work.stage=existing?ArdAppConfigPageRegistration::Commit:ArdAppConfigPageRegistration::ExistingCommands;return;}
+    if(work.checkIndex>=ArdAppConfigMaxFields){work.stage=existing?ArdAppConfigPageRegistration::Cycles:ArdAppConfigPageRegistration::ExistingCommands;return;}
     V field=existing?_dynamic.at(work.checkIndex):work.field(work.checkIndex);
     if(field.isUndefined()||!field.isValid()){failed("parse",existing?_dynamic.idAt(work.checkIndex):String(work.idAt(work.checkIndex)),"cannot read indexed field (memory or JSON failure)");return;}
     String id=static_cast<const V&>(field)["id"].asString();
     if(!existing){
 #if ARDPORTAL_ENABLE_DEPENDENCIES
       if(!conditionValid(static_cast<const V&>(field)["visibleWhen"])){failAppConfigPageRegistration("field",id,F("invalid visibleWhen condition or referenced field"));return;}
+      if(work.header.hasOwnProperty("visibleWhen"))field["_pageVisibleWhen"]=static_cast<const V&>(work.header)["visibleWhen"];
+      auto resolve=[&](const String& id){size_t i=_dynamic.indexOf(id);return i<work.first?i:work.first+work.indexOf(id);};
+      if(!field.isValid()||!work.entry->edges.addField(field,work.first+work.checkIndex,resolve)){
+        failAppConfigPageRegistration("registry",id,F("out of memory indexing dependencies"));return;
+      }
 #else
       if(work.header.hasOwnProperty("visibleWhen")){failAppConfigPageRegistration("page","",F("dependencies are disabled"));return;}
 #endif
@@ -182,6 +261,44 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     for(size_t i=0;i<suffixes.length();++i){String generated=id+"_"+suffixes[i].asString();if(work.indexOf(generated)<work.entry->count||(!existing&&_dynamic.indexOf(generated)<work.first)){failed("commands",id,"generated command/ack id collides with field: "+generated);return;}}
     pending&=~ArdAppConfigFieldMask::forField(work.checkIndex);return;
   }
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+  if(work.stage==ArdAppConfigPageRegistration::Cycles) {
+    const size_t count=work.first+work.entry->count;
+    if(!work.cycleStack) {
+      if(!conditionValid(static_cast<const V&>(work.header)["visibleWhen"])){
+        failAppConfigPageRegistration("page","",F("invalid page visibleWhen condition or referenced field"));return;
+      }
+      work.checksMask=work.dependencyMask;
+      if(work.checksMask) {
+        if(!work.cycleStack.reserve(1,count)){failAppConfigPageRegistration("registry","",F("out of memory checking dependency cycles"));return;}
+      } else {work.stage=ArdAppConfigPageRegistration::Commit;return;}
+    }
+    if(!work.cycleDepth) {
+      work.cycleRoot=work.checksMask.firstSet();
+      if(work.cycleRoot>=count){work.cycleStack.reset();work.stage=ArdAppConfigPageRegistration::Commit;return;}
+      work.cycleStack[0]={uint16_t(work.cycleRoot),0,0};work.cycleDepth=1;
+      if(work.cycleComplete.test(work.cycleRoot)){work.checksMask&=~ArdAppConfigFieldMask::forField(work.cycleRoot);work.cycleDepth=0;return;}
+      work.cycleActive=ArdAppConfigFieldMask::forField(work.cycleRoot);
+    }
+    auto load=[&](size_t index){
+      if(index<work.first)return _dynamic.at(index);
+      V field=work.field(index-work.first);
+      if(work.header.hasOwnProperty("visibleWhen"))field["_pageVisibleWhen"]=static_cast<const V&>(work.header)["visibleWhen"];
+      return field;
+    };
+    auto indexOf=[&](const String& id){size_t index=_dynamic.indexOf(id);return index<work.first?index:work.first+work.indexOf(id);};
+    auto dependent=[&](size_t i){return i<work.first?_dynamic.dependentAt(i):work.entry->fields[i-work.first].dependent;};
+    // Cycle checks ignore values: every completed acyclic field is visible.
+    // Reuse the completion mask as visibility and the consumed checks mask as pending roots.
+    auto match=[](const V&){return true;};
+    auto result=ArdDependencies::step(work.cycleStack,work.cycleDepth,work.cycleActive,work.cycleComplete,
+                                     work.cycleComplete,count,load,indexOf,dependent,match);
+    if(result==ArdDependencies::Result::Cycle){failed("field",String(work.idAt(work.cycleRoot-work.first)),"dependency cycle");return;}
+    if(result==ArdDependencies::Result::Invalid){failed("field",String(work.idAt(work.cycleRoot-work.first)),"cannot read dependency graph (memory or JSON failure)");return;}
+    if(result!=ArdDependencies::Result::Running)work.checksMask&=~ArdAppConfigFieldMask::forField(work.cycleRoot);
+    return;
+  }
+#endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   if(!conditionValid(static_cast<const V&>(work.header)["visibleWhen"])){failAppConfigPageRegistration("page","",F("invalid page visibleWhen condition or referenced field"));return;}
 #else
@@ -202,6 +319,9 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
   size_t existingBytes=_dynamic.pages.measure(limits);
   if(!existingBytes||existingBytes+work.entry->jsonLength+(_dynamic.pages.length()?1:0)+_dynamic.entityBytes>ArdAppConfigMaxDefinitionBytes){failed("limits","",String("total definition limit: ")+String(ArdAppConfigMaxDefinitionBytes)+" bytes");return;}
   work.entry->flash=work.flash;work.entry->source=std::move(work.source);
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+  work.entry->edges.controllers(_dynamic.dependencyControllers);
+#endif
   const size_t first=work.first;_dynamic.commandOwners|=work.commandsMask;_dynamic.totalFields+=work.entry->count;_dynamic.pages.commit(std::move(work.entry));
 #if ARDPORTAL_ENABLE_HA
   _homeAssistant.registered(first,work.stateMask,work.dependencyMask);

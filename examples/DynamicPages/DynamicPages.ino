@@ -60,6 +60,10 @@ static const char SETTINGS_PAGE[] PROGMEM = R"JSON({
 unsigned registeredPages = 0;
 bool startupApplied = false;
 
+/**
+ * @brief Initialize the example hardware, callbacks and portal.
+ * @return No value.
+ */
 void setup() {
   Serial.begin(115200);
   portal.onAppConfigPageRegistrationFinished([](bool success) {
@@ -85,6 +89,10 @@ void setup() {
   if (!portal.begin()) Serial.println("Could not start the portal.");
 }
 
+/**
+ * @brief Advance the component work; call repeatedly from the Arduino main loop.
+ * @return No value.
+ */
 void loop() {
   portal.loop(); // One registration unit; UART/application work can run next.
   if (!startupApplied && registeredPages == 2 && portal.portalAndAppConfigReady()) {

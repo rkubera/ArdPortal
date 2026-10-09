@@ -12,6 +12,12 @@ using ArdNetworkIo::writeChunk;
 using ArdNetworkIo::stopClient;
 namespace { void appendText(String& packet, const String& text) { packet += char(text.length() >> 8); packet += char(text.length() & 255); packet += text; } }
 
+/**
+ * @brief Queue an encoded MQTT packet for cooperative transmission.
+ * @param type JSON, control or protocol type being examined.
+ * @param body HTTP or MQTT message body.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 bool ArdMqtt::queuePacket(uint8_t type, const String& body) {
   if (_txSize || body.length() > PacketCapacity - 5) return false;
   size_t length = body.length(), index = 0; _tx[index++] = type;
@@ -19,12 +25,24 @@ bool ArdMqtt::queuePacket(uint8_t type, const String& body) {
   memcpy(_tx + index, body.c_str(), body.length()); _txSize = index + body.length(); _txOffset = 0; _txSince = millis(); return true;
 }
 
+/**
+ * @brief Build an MQTT topic from its prefix, configured device name and suffix.
+ * @param kind Topic prefix such as cmnd or stat.
+ * @param command Command or state suffix appended to the topic.
+ * @return The assembled MQTT topic.
+ */
 String ArdMqtt::mqttTopic(const char* kind, const char* command) const {
   if (!kind || !command) return "";
   String topic = String(kind) + "/" + ArdDeviceName::mqtt(_portal._config.deviceName) + "/" + command;
   return validMqttTopic(topic, true) ? topic : String();
 }
 
+/**
+ * @brief Validate an MQTT topic or subscription filter, including wildcard placement.
+ * @param topic MQTT topic to publish, subscribe or match.
+ * @param subscription Whether wildcard subscription-filter rules are allowed.
+ * @return True for a supported topic/filter; false for invalid characters, length or wildcard use.
+ */
 bool ArdMqtt::validMqttTopic(const String& topic, bool subscription) const {
   int first = topic.indexOf('/'), second = topic.indexOf('/', first + 1);
   if (first < 0 || second < 0 || topic.indexOf('/', second + 1) >= 0) return false;
@@ -35,10 +53,24 @@ bool ArdMqtt::validMqttTopic(const String& topic, bool subscription) const {
   return true;
 }
 
+/**
+ * @brief Queue an MQTT message for cooperative transmission.
+ * @param topic MQTT topic to publish, subscribe or match.
+ * @param payload Message bytes or text to send or decode.
+ * @param retain Whether the broker should retain this MQTT message.
+ * @return True if queued; false if disconnected, the topic is invalid or the packet cannot fit.
+ */
 bool ArdMqtt::publish(const char* topic, const char* payload, bool retain) {
   return topic && validMqttTopic(topic) && publishRaw(topic, payload, retain);
 }
 
+/**
+ * @brief Queue a QoS 0 MQTT PUBLISH packet on the active transport.
+ * @param topic MQTT topic to publish, subscribe or match.
+ * @param payload Message bytes or text to send or decode.
+ * @param retain Whether the broker should retain this MQTT message.
+ * @return True if the packet is accepted for transmission; false if disconnected or it exceeds packet capacity.
+ */
 bool ArdMqtt::publishRaw(const char* topic, const char* payload, bool retain) {
   if (!connected() || !topic || !*topic || !payload || strchr(topic, '#') || strchr(topic, '+') ||
       strlen(topic) + strlen(payload) + 2 > PacketCapacity - 5) return false;
@@ -48,11 +80,21 @@ bool ArdMqtt::publishRaw(const char* topic, const char* payload, bool retain) {
   return queued;
 }
 
+/**
+ * @brief Queue an MQTT subscription request.
+ * @param topic MQTT topic to publish, subscribe or match.
+ * @return True if queued; false if disconnected or the topic/filter or packet is invalid.
+ */
 bool ArdMqtt::subscribe(const char* topic) {
   if (!topic || !validMqttTopic(topic,true)) return false;
   return subscribeRaw(topic);
 }
 
+/**
+ * @brief Queue an MQTT SUBSCRIBE packet on the active transport.
+ * @param topic MQTT topic to publish, subscribe or match.
+ * @return True if accepted for transmission; false if disconnected or the packet cannot be constructed.
+ */
 bool ArdMqtt::subscribeRaw(const char* topic) {
   if (!connected() || !topic || _subscriptionPending || strlen(topic) + 5 > PacketCapacity - 5) return false;
   uint16_t id = ++_packetId; if (!id) id = ++_packetId;
@@ -61,6 +103,11 @@ bool ArdMqtt::subscribeRaw(const char* topic) {
   _subscriptionId = id; _subscriptionPending = true; _subscriptionSince = millis(); return true;
 }
 
+/**
+ * @brief Close the MQTT transport and clear its protocol state.
+ * @param reason Restart or failure reason.
+ * @return No value.
+ */
 void ArdMqtt::closeMqtt(const char* reason) {
   if (reason || _mqttState == MqttState::Connecting || _mqttState == MqttState::Connected) {
     String message=ArdUILanguage::text(ArdUILanguage::Key::s_147);
@@ -70,7 +117,7 @@ void ArdMqtt::closeMqtt(const char* reason) {
       const uint32_t now=millis();
       message+=String(" [")+reason+"; state="+(_mqttState==MqttState::Connected?"connected":_mqttState==MqttState::Connecting?"connecting":"retry");
       message+="; sessionMs="+String(uint32_t(now-_mqttSince))+"; txIdleMs="+String(uint32_t(now-_lastTx));
-      message+="; maxLoopGapMs="+String(_maxServiceGapMs)+"; heap="+String(ESP.getFreeHeap())+"]";
+      message+="; maxLoopGapMs="+String(_maxServiceGapMs)+"; heap="+String(ArdHeap::sample().free8)+"]";
     }
     _portal.logMessage(message);
 #else
@@ -92,6 +139,13 @@ void ArdMqtt::closeMqtt(const char* reason) {
   _mqttState = !_portal._config.host.length() ? MqttState::Disabled : (_portal.wifiConnected() ? MqttState::WaitingRetry : MqttState::WaitingForWifi);
 }
 
+/**
+ * @brief Decode and handle the completed MQTT protocol packet.
+ * @param type JSON, control or protocol type being examined.
+ * @param body HTTP or MQTT message body.
+ * @param length Number of bytes or elements to process.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 bool ArdMqtt::processPacket(uint8_t type, const uint8_t* body, size_t length) {
   if (_mqttState == MqttState::Connecting) {
     if (type != 0x20 || length != 2 || body[0] != 0 || body[1] != 0) {
@@ -141,6 +195,11 @@ _portal._appControls.resetMqtt();
   return false;
 }
 
+/**
+ * @brief Advance MQTT connection, protocol and reconnect work.
+ * @param now Current time used to evaluate deadlines.
+ * @return No value.
+ */
 void ArdMqtt::serviceMqtt(uint32_t now) {
   if(_mqttState==MqttState::Connected){const uint32_t gap=uint32_t(now-_lastServiceMs);if(gap>_maxServiceGapMs)_maxServiceGapMs=gap;}
   _lastServiceMs=now;
@@ -220,10 +279,14 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
   }
 }
 
+/**
+ * @brief Open the configured plain or TLS MQTT transport.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 bool ArdMqtt::connectMqttTransport() {
 #if ARDPORTAL_ENABLE_MQTT_TLS
   if (_portal._config.mqttTls) {
-    _tls.reset(new (std::nothrow) WiFiClientSecure());
+    _tls.reset(ArdAllocation::create<WiFiClientSecure>());
     if (!_tls) return false;
 #if defined(ESP32)
     _tls->setCACert(_portal._config.caCert.c_str());
@@ -231,7 +294,7 @@ bool ArdMqtt::connectMqttTransport() {
     // Keep the hostname: the TLS layer uses it for SNI and certificate verification.
     if (!_tls->connect(_portal._config.host.c_str(), _portal._config.port, _portal._options.tcpTimeoutMs)) return false;
 #else
-    _trustAnchors.reset(new (std::nothrow) BearSSL::X509List(_portal._config.caCert.c_str()));
+    _trustAnchors.reset(ArdAllocation::create<BearSSL::X509List>(_portal._config.caCert.c_str()));
     if (!_trustAnchors || !_trustAnchors->getCount()) return false;
     _tls->setTrustAnchors(_trustAnchors.get());
     _tls->setX509Time(time(nullptr));
@@ -258,6 +321,12 @@ bool ArdMqtt::connectMqttTransport() {
   _mqtt.setTimeout(100); _mqtt.setNoDelay(true); return true;
 }
 
+/**
+ * @brief Transmit a bounded portion of queued MQTT bytes.
+ * @param data Data buffer or value used by the operation.
+ * @param length Number of bytes or elements to process.
+ * @return Transmit a bounded portion of queued MQTT bytes.
+ */
 size_t ArdMqtt::writeMqtt(const uint8_t* data, size_t length) {
 #if ARDPORTAL_ENABLE_MQTT_TLS
   if (!_tls) return writeChunk(_mqtt, data, length);
@@ -273,6 +342,12 @@ size_t ArdMqtt::writeMqtt(const uint8_t* data, size_t length) {
 #endif
 }
 
+/**
+ * @brief Record the MQTT trial result and arrange its configuration save.
+ * @param saved Result of the persistent save operation.
+ * @param error Output error text; populated when the operation fails.
+ * @return No value.
+ */
 void ArdMqtt::finishMqttTrial(bool saved, const String& error) {
   _mqttTrial = false; _mqttSaveWaiting = false;
   _mqttResult = saved ? 1 : 2;
@@ -281,6 +356,10 @@ void ArdMqtt::finishMqttTrial(bool saved, const String& error) {
   _mqttPrevious = PortalConfig(); _portal.log(_mqttResultMessage);
 }
 
+/**
+ * @brief Start a connection trial without committing the proposed settings.
+ * @return No value.
+ */
 void ArdMqtt::startTrial() {
   if (_mqttTrialStart && !_portal._http) {
     closeMqtt(); _mqttPrevious = std::move(_portal._config); _portal._config = std::move(_portal._pending);
@@ -290,6 +369,10 @@ void ArdMqtt::startTrial() {
   }
 }
 
+/**
+ * @brief Advance a temporary connection attempt and handle its timeout or result.
+ * @return No value.
+ */
 void ArdMqtt::serviceTrial() {
   if (_mqttTrial && !_mqttSaveWaiting && (connected() || _mqttTrialFailed || uint32_t(millis() - _mqttTrialSince) >= _portal._options.mqttTimeoutMs)) {
     if (connected()) {
@@ -301,17 +384,42 @@ void ArdMqtt::serviceTrial() {
   }
 }
 
+/**
+ * @brief Notify MQTT of a change in station connectivity.
+ * @param now Current time used to evaluate deadlines.
+ * @return No value.
+ */
 void ArdMqtt::wifiAvailable(uint32_t now) { _mqttSince = now - _portal._options.retryMs; }
+/**
+ * @brief Notify the MQTT component that persisted configuration is available.
+ * @return No value.
+ */
 void ArdMqtt::configurationLoaded() {
   _mqttState = _portal._config.host.length() ? MqttState::WaitingForWifi : MqttState::Disabled;
 }
+/**
+ * @brief Prepare a temporary connection using proposed settings.
+ * @param candidate Proposed portal settings to test.
+ * @return No value.
+ */
 void ArdMqtt::prepareTrial(PortalConfig&& candidate) {
   _portal._pending = std::move(candidate);
   _mqttTrialStart = true; ++_mqttRevision; _mqttResult = 0; _mqttResultMessage = "";
 }
+/**
+ * @brief Remember the current settings as the rollback baseline for connection trials.
+ * @return Reference to the requested stored value or component.
+ */
 const ArdMqtt::PortalConfig& ArdMqtt::saveBaseline() const {
   return _mqttSaveWaiting ? _mqttPrevious : _portal._config;
 }
+/**
+ * @brief Finish committing settings from a successful connection trial.
+ * @param saved Result of the persistent save operation.
+ * @param error Output error text; populated when the operation fails.
+ * @param stillConnected Whether the existing connection can be retained during the trial.
+ * @return No value.
+ */
 void ArdMqtt::completeTrialSave(bool saved, const String& error, bool stillConnected) {
   finishMqttTrial(saved, error.length() ? error : ArdUILanguage::text(ArdUILanguage::Key::s_107));
   if (saved && !stillConnected) _mqttResultMessage = ArdUILanguage::text(ArdUILanguage::Key::s_147);

@@ -541,7 +541,7 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | `onBeforeRestart(callback)` | `void(RestartReason)` once immediately before an ArdPortal restart; factory reset and storage formatting skip it. |
 | `onPortalAndAppConfigSaved(callback)` | `void(bool ok, const String& error)` after storage completion or an identical-save skip. A successful network change can still await application. |
 | `getAppConfigValue(key)` | Copy of live RAM state first, then persisted application value, then registered default; missing unregistered key is Undefined. |
-| `setAppConfigValue(key, value)` | Persistent application update, except registered descriptor-based fields with `persist:false`, which use RAM state. Rejects invalid/Undefined values, invalid registered values and unavailable transactions. |
+| `setAppConfigValue(key, value)` | Persistent application update, except registered fields with `persist:false`, which use RAM state. Rejects invalid/Undefined values, invalid registered values and unavailable transactions. |
 | `removeAppConfigValue(key)` | Remove the persisted application key through a save transaction; does not delete its field definition or clear a RAM state override. A registered field falls back to its default when no RAM/persisted value remains. |
 | `onAppConfigValueChanged(callback)` | `void(const String& key, const JSONVar& value, ChangeSource)` for changed effective application values, including RAM-only updates. It is not a durable-save notification. |
 | `flushPortalAndAppConfig()` | Accept a request to bypass debounce/minimum write spacing for a pending save; no flash I/O in the caller. Returns false when no eligible pending save exists. |
@@ -768,7 +768,7 @@ source arrays must remain immutable and alive for the portal lifetime.
 | --- | --- | --- | --- |
 | Save arbitrary application settings without a form | `setAppConfigValue()` | Yes | No automatic topic for unregistered keys; publish your own payload if needed. |
 | Save a registered editable basic field | `setAppConfigValue()` | Yes | Changed effective state is marked for retained publication. |
-| Update a descriptor-based field with `persist:false` | `setAppConfigValue()` or `setAppConfigStateValue()` | No | Changed state is queued by default. |
+| Update a registered field with `persist:false` | `setAppConfigValue()` or `setAppConfigStateValue()` | No | Changed state is queued by default. |
 | Report a registered sensor/composite status | `setAppConfigStateValue()` | No, regardless of field persistence | Changed state queued if the third argument is true. |
 | Update the portal without an immediate MQTT send | `setAppConfigStateValue(key, value, false)` | No | Reconnect/get and configured periodic snapshots still apply. |
 | Send the latest field value on your own schedule | `queueAppConfigStatePublish()` | No | Coalesced retained state, even when unchanged. |
@@ -878,16 +878,28 @@ without resetting existing controls or unsaved edits.
 
 | `visibleWhen` property | Required | Meaning |
 | --- | --- | --- |
-| `field` | Yes | ID of a registered field on this page or an earlier registered page; arbitrary unregistered App Config keys cannot control visibility. |
+| `field` | Leaf only | ID of a registered field on this page or an earlier registered page; arbitrary unregistered App Config keys cannot control visibility. |
 | `property` | No | One direct property of a composite field, such as `state`; dotted/nested paths are not supported. |
-| `equals` | Yes | Exact scalar JSON comparison: string, boolean, number or null. Objects/arrays are rejected. String `"1"` differs from number `1`. Numeric comparison uses serialized
+| `equals` | Leaf only | Exact scalar JSON comparison: string, boolean, number or null. Objects/arrays are rejected. String `"1"` differs from number `1`. Numeric comparison uses serialized
 JSON text too, so lexemes such as `1` and `1.0` can differ. |
 
-There is one rule per field/page; no `enabledWhen`, expression language, `and`,
-`or` or `not` property. Combining a page rule with a field rule provides an AND.
-Rules never erase stored values. Cycles are hidden at evaluation time; references
-to missing/later fields are rejected at registration. This includes dependencies
-on hidden upstream fields/pages, as detailed in the cascade example below.
+A condition is either a leaf (`field`, `equals`, optional `property`) or a
+single `and`/`or` group containing a nonempty array of conditions. Groups can nest:
+`and` requires every child; `or` requires at least one. A group cannot also contain
+leaf properties, and a condition cannot contain both `and` and `or`. There is no
+`not`, `enabledWhen` or expression language.
+
+Each field/page condition supports up to 6 nested groups and 64 total condition
+nodes, including groups and leaves. These bounds protect the device stack and
+loop work. Page and field conditions are still combined with AND. A leaf whose
+referenced field is hidden evaluates false, even if its saved value matches;
+another true OR branch can still make the dependent field visible.
+
+Rules never erase stored values. Missing references and dependency cycles are
+rejected during registration, even when a cyclic branch is currently false or
+another OR branch is true. Fields in the same registration job or earlier
+registered pages/entities can be referenced. Rejected page jobs remain atomic;
+no partial fields or HA entities are exposed.
 
 
 ### Home controls on Start
@@ -1034,8 +1046,46 @@ Fields can declare a `visibleWhen` dependency:
 }
 ```
 
-Entire pages can use the same rule, referencing a field on the same page or a
-previously registered page:
+The original single-field syntax remains supported. To show D when A is true
+and either B or C is true, define D once and use a grouped condition:
+
+```json
+{
+  "id": "D", "type": "edit", "name": "D",
+  "visibleWhen": {
+    "and": [
+      {"field": "A", "equals": true},
+      {"or": [
+        {"field": "B", "equals": true},
+        {"field": "C", "equals": true}
+      ]}
+    ]
+  }
+}
+```
+
+A, B and C must be registered fields (or fields in the same page job). Leaves
+inside any group can use `property` for composite values. The same evaluator
+controls portal visibility, HTTP/MQTT command acceptance and HA discovery.
+HA processes dependency edges incrementally; registration cycle checks also
+advance within the configured registration budget. No extra define is needed.
+
+Dependency traversal starts with at most eight 4-byte frames and grows only when
+an ancestor chain needs more space, up to the registered field count. Short
+chains with 1024 registered fields therefore start at 32 bytes rather than
+reserving 4096 bytes per traversal. During buffer growth, old and new arrays
+briefly coexist; allocation failure preserves the old array and fails safely.
+Registration cycle checks reuse their completed-node and pending-root masks.
+Boolean evaluation and schema validation share non-templated traversal code;
+callback adapters borrow their context without allocating `std::function` objects.
+
+Measured on ESP8266 generic (`eesz=1M128`) with
+DynamicPagesWithDependencies: this optimization reduced `.bin` size from 554848
+to 554000 bytes (848 bytes). Static RAM remained 43748 bytes and IRAM 60691 bytes;
+heap savings depend on field count and dependency depth.
+
+Entire pages can use the same simple or grouped conditions, referencing a field
+on a previously registered page:
 
 ```json
 {
@@ -1118,8 +1168,8 @@ field's stored value matches `equals`.
 
 Do not make a page depend on one of its own fields: that field inherits the
 page condition and creates a cycle. Likewise, mutually dependent fields and
-self-referencing fields remain hidden. The definition may register successfully,
-but a matching value cannot make a cyclic chain visible. A shared upstream
+self-referencing fields are rejected at registration with `dependency cycle`.
+This check includes every AND/OR branch regardless of current values. A shared upstream
 controller used by several branches is allowed and is not a cycle.
 
 The existing `ARDPORTAL_ENABLE_DEPENDENCIES` flag controls field rules, page rules
@@ -1128,6 +1178,15 @@ Advanced also removes the retained discovery configurations for its fields and
 all hidden descendants. Showing it again restores the eligible entities and
 publishes their current values. With HA disabled, portal visibility and command
 checks still work.
+
+Registration builds a sparse reverse index from each condition controller to its
+dependent fields (including inherited page rules). Value changes invalidate only
+direct and transitive dependents. Telemetry that is not used in a condition still
+updates the portal but does not restart an HA dependency traversal. Explicitly
+queuing MQTT publication without changing a value also leaves traversal alone.
+Discovery uses basic definitions directly and only copies extended definitions
+that require normalization. Allocation/serialization failures keep pending work
+and retry after one second; they do not remove entities as if a rule were false.
 
 The portal hides the field when the rule fails. Changes from the program, MQTT
 and portal refresh visibility through WebSocket revision notifications. Commands
@@ -1534,7 +1593,7 @@ Editable extended fields default to durable storage (`persist: true`), so their
 settings survive restart. Read-only telemetry and transient actions/events
 default to RAM (`persist: false`) to avoid writing measurements to flash.
 `setAppConfigValue` follows this policy for registered extended fields; an explicit
-`persist: false` keeps a field volatile. `setAppConfigStateValue` always updates RAM only. Its optional third argument defaults
+`persist: false` keeps a field volatile. This applies to basic form controls, extended controls, MQTT commands and `setAppConfigValue()`. A basic form containing both kinds saves only persistent fields; volatile changes remain in RAM. Forms containing only volatile fields do not start a storage transaction. Basic editable fields without `persist` retain their default durable behavior. `setAppConfigStateValue` always updates RAM only. Its optional third argument defaults
 to `true` (publish changed state to MQTT). Pass `false` for local live updates
 without queuing MQTT; use `queueAppConfigStatePublish(key)` to queue the latest value
 through the cooperative publisher, even if unchanged. This returns queue success,
@@ -2356,6 +2415,93 @@ Serial diagnostics distinguish sensor failures from rejected portal values.
 On-change mode publishes when the rounded displayed value changes, so changes
 smaller than the displayed resolution do not necessarily send another packet.
 
+## Network memory reserves
+
+On ESP32, memory diagnostics and Console pressure checks use
+`MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT` for free bytes, total heap and largest
+blocks. DMA measurements additionally require `MALLOC_CAP_DMA`; these pools
+overlap and must not be added together. `/api/info` exposes `heap8FreeBytes`,
+`heap8LargestBlockBytes`, `dmaAvailable`, `dmaFreeBytes`,
+`dmaLargestBlockBytes` and `minimumDmaFreeBytes`. Existing free/minimum/maximum
+heap keys also report byte-addressable memory; Info displays DMA separately.
+ESP8266 uses `getFreeHeap()`/`getMaxFreeBlockSize()` and reports DMA unavailable.
+Under pressure Console history shrinks to 1 KiB per stream; below 2 KiB free or
+a 512-byte largest block, new records are skipped to preserve networking.
+
+Before registration, dependency traversal, Discovery or a new dynamic HTTP
+fragment, ArdPortal checks an estimated working set plus network headroom.
+It leaves pending work intact while memory is constrained; new dynamic API
+requests receive HTTP 503 rather than beginning an incomplete JSON response.
+Basic flash/static HTTP and existing buffered writes continue. Estimates account
+for per-field source length and JSON/output overhead; they are precautionary,
+not a guarantee against another task allocating concurrently.
+
+Override these defines globally in the library build when needed:
+
+| Define | ESP32 default | ESP8266 default |
+| --- | ---: | ---: |
+| `ARDPORTAL_NETWORK_HEAP_RESERVE` | 24576 bytes | 4096 bytes |
+| `ARDPORTAL_NETWORK_DMA_RESERVE` | 16384 bytes | Unavailable |
+| `ARDPORTAL_NETWORK_BLOCK_RESERVE` | 4096 bytes | 1024 bytes |
+
+Reserves are additional to the estimated work allocation. The ESP32 defaults
+were exercised with two concurrent HTTP clients and a connected MQTT broker:
+HTTP/network activity consumed roughly 8–11 KiB temporarily. Registration was
+held pending below the reserve and completed after pressure was released.
+These measurements cover the included test, not every TLS/radio/project load.
+ESP8266 defaults are conservative starting values verified by compilation and
+host tests; calibrate them on the actual device/workload.
+
+With `ARDPORTAL_ENABLE_CONSOLE_MESSAGES=1`, registration reports accepted,
+deferred and completed/failed states with before/after heap8 and DMA samples,
+largest blocks and signed free-space deltas. Deltas include concurrent network
+activity and diagnostic history; they are not an exact registry allocation count.
+Page conditions are stored as compact JSON text rather than persistent JSON trees;
+flash page sources remain in flash, RAM sources are moved into the registry, and
+fields retain compact indexes instead of permanent parsed definitions.
+
+`examples/HeapPressure` exercises controlled memory pressure on ESP32/ESP8266.
+UART commands `0` release memory, `1`–`4` target 32/24/16/8 KiB free memory and `r`
+queues its sample page. Watch the actual reported pools, registration state and
+HTTP/MQTT behavior. Use a dedicated test board; press `0` after the experiment.
+
+## ESP32 allocation-failure check
+
+Library-owned JSON members, keys, registration objects and traversal arrays use
+`malloc` with matching `free`, bypassing global `nothrow new` implementations that
+can terminate on allocation refusal. SDK internals retain their own allocator
+behavior. Failed JSON operations must be checked with `isValid()` or their Boolean
+return value.
+
+`examples/ESP32AllocationFailure` forces one member allocation and one traversal
+array allocation to fail on the ESP32 Arduino task, verifies error returns and a
+subsequent successful JSON parse, then runs HTTP and a UART echo. Build with:
+
+```sh
+arduino-cli compile --fqbn esp32:esp32:esp32doit-devkit-v1 \
+  --build-property 'compiler.c.elf.extra_flags=-Wl,--wrap=malloc' \
+  examples/ESP32AllocationFailure
+```
+
+Use the FQBN and port for your test board. Uploading replaces its firmware. Open
+Serial at 115200 baud and verify `PASS: Member and array OOM; JSON recovered`,
+`PASS: runtime OOM; HTTP/UART continue` after five seconds, continuing loop
+reports, and echoed UART input. Connect to the portal/AP and
+request `http://<device-ip>:8080/` repeatedly: responses must remain `PASS` with
+increasing `loopTicks`; also verify the normal portal remains accessible.
+Compilation alone does not establish this hardware result.
+
+For host fault-injection builds, define `ARDPORTAL_TEST_ALLOCATE` globally to a
+function name with signature `void* name(size_t) noexcept`. That function must
+return malloc-compatible storage or nullptr; production builds omit the define.
+
+HA switch fields publish a state topic and default to the
+`mdi:toggle-switch` icon. ArdPortal does not add or override `optimistic`; HA
+uses its defaults unless the field specifies it. An explicit field/HA icon
+remains unchanged. Updated
+Discovery is published after device reconnect; existing dashboard customizations
+can independently override how a control is displayed.
+
 ## License
 
 Author: **Radoslaw Kubera** ([rkubera on GitHub](https://github.com/rkubera)).
@@ -2371,3 +2517,23 @@ liability arising from the software or its use. See the full license for its exa
 terms. Board cores and optional external libraries retain their own licenses.
 The standard license text is published by the
 [Open Source Initiative](https://opensource.org/license/mit).
+
+### Flash page definitions and MQTT identity
+
+The existing `startAppConfigPageRegistration(const __FlashStringHelper*)` overload keeps the page source in flash for the portal lifetime. HA topic overrides may contain `$device`, for example `"state_topic":"stat/$device/temperature"`. Only `ha.topic` and HA properties ending in `_topic` expand this token, using the current normalized MQTT device name. Names, payloads and Jinja templates are unchanged. Identity changes are resolved when a field is read; field IDs and HA unique IDs are unchanged.
+
+Dynamic page definition responses are framed by connection close, without Content-Length. Clients must consume the body until EOF. Memory admission checks the largest field working set before committing HTTP success, and temporary fragment failures preserve cursors for cooperative retry. The existing inactivity deadline still bounds stalled responses.
+
+### Flash page definitions and MQTT identity
+
+The existing `startAppConfigPageRegistration(const __FlashStringHelper*)` overload keeps the page source in flash for the portal lifetime. HA topic overrides may contain `$device`, for example `"state_topic":"stat/$device/temperature"`. Only `ha.topic` and HA properties ending in `_topic` expand this token, using the current normalized MQTT device name. Names, payloads and Jinja templates are unchanged. Identity changes are resolved when a field is read; field IDs and HA unique IDs are unchanged.
+
+Dynamic page definition responses are framed by connection close, without Content-Length. Clients must consume the body until EOF. Memory admission checks the largest field working set before committing HTTP success, and temporary fragment failures preserve cursors for cooperative retry. The existing inactivity deadline still bounds stalled responses.
+
+## Configuration write memory
+
+Persistent single-field changes from forms, MQTT/HA and `setAppConfigValue()` stage only changed members. The saved application tree is updated after verified storage completion; the normal optimistic form behavior and callbacks are retained. Complete configuration replacement continues to use the existing replacement semantics.
+
+ArdFS `writeJson(path, length, source, callback)` accepts a **validated, immutable JSON serialization producer**. The producer must return exactly `min(maximum, length-offset)` bytes or an empty String on failure and remain available until completion. Portal supplies its strict JSON writer. Journal CRC, encoding and readback verification advance in chunks up to 256 bytes; the journal format and alternating slots are unchanged. Existing `read()` and `write()` remain compatible. Legacy or noncanonical envelopes use the full reader, and initial configuration loading still requires full-document memory. This optimization reduces write peaks, not the permanent settings tree or all startup allocations; source serialization and core flash operations remain synchronous.
+
+Run `bash tests/run-config-memory.sh` for host memory/recovery regression tests.

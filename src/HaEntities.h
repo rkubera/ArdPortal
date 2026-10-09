@@ -6,6 +6,12 @@
 
 namespace ArdHa {
 using V=ArdJSON::JSONVar;
+/**
+ * @brief Build a normalized Home Assistant entity descriptor.
+ * @param type JSON, control or protocol type being examined.
+ * @param stateOnly Whether to use only runtime state rather than persisted configuration.
+ * @return A normalized Home Assistant entity descriptor.
+ */
 inline V descriptor(const String& type,bool stateOnly=false) {
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
   for(size_t i=0;i<ARD_HA_SPEC_COUNT;++i) {
@@ -17,6 +23,11 @@ inline V descriptor(const String& type,bool stateOnly=false) {
 #endif
   return V();
 }
+/**
+ * @brief Resolve the Home Assistant component associated with a field.
+ * @param field Application field definition or identifier.
+ * @return The resulting text; an empty value indicates no available text or failure where applicable.
+ */
 inline String component(const V& field) {
   String type=field["type"].asString();
 #if ARDPORTAL_CONTROL_SUPPORT_SLIDER
@@ -36,7 +47,17 @@ inline String component(const V& field) {
 #endif
   return type;
 }
+/**
+ * @brief Check the normalized extended-control flag.
+ * @param field Application field definition or identifier.
+ * @return True if the field extended flag is set.
+ */
 inline bool extended(const V& field) { return field["extended"].asBool(); }
+/**
+ * @brief Check whether the field uses a transient event instead of retained state.
+ * @param field Application field definition or identifier.
+ * @return True if the field uses a transient event instead of retained state; false otherwise.
+ */
 inline bool transient(const V& field) {String type=field["type"].asString();return false
 #if ARDPORTAL_ENABLE_CONTROL_EVENT
   || type=="event"
@@ -61,6 +82,11 @@ inline bool transient(const V& field) {String type=field["type"].asString();retu
 #endif
   ;}
 
+/**
+ * @brief Check whether the field rejects user changes.
+ * @param field Application field definition or identifier.
+ * @return True when the field is read-only; false otherwise.
+ */
 inline bool readonly(const V& field) {String t=field["type"].asString();return false
   || field["readonly"].asBool()
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
@@ -83,11 +109,29 @@ inline bool readonly(const V& field) {String t=field["type"].asString();return f
 #endif
   ;}
 
+/**
+ * @brief Validate a bounded JSON string without embedded NUL characters.
+ * @param value Input value, or output destination when passed by mutable reference.
+ * @param max Maximum allowed value.
+ * @return True for a string within the byte limit and without NULs; false otherwise.
+ */
 inline bool string(const V& value,size_t max=512) { String s=value.asString(); return value.type()==V::Type::String && s.length()<=max && strlen(s.c_str())==s.length(); }
 #if ARDPORTAL_ENABLE_CONTROL_DATE || ARDPORTAL_ENABLE_CONTROL_TIME || ARDPORTAL_ENABLE_CONTROL_DATETIME
+/**
+ * @brief Decode a decimal digit range into an unsigned value.
+ * @param text Text to read, encode or display.
+ * @param count Number of items or bytes to process.
+ * @return The decoded value; callers must validate the digits first.
+ */
 inline unsigned decimalDigits(const char* text, size_t count) {
   unsigned value=0; for(size_t i=0;i<count;++i)value=value*10+unsigned(text[i]-'0'); return value;
 }
+/**
+ * @brief Validate YYYY-MM-DD syntax and calendar ranges, including leap years.
+ * @param text Text to read, encode or display.
+ * @param length Number of bytes or elements to process.
+ * @return True for a valid calendar date; false otherwise.
+ */
 inline bool dateParts(const char* text, size_t length) {
   if(length!=10||text[4]!='-'||text[7]!='-') return false;
   for(size_t i=0;i<10;++i) if(i!=4&&i!=7&&(text[i]<'0'||text[i]>'9')) return false;
@@ -95,15 +139,37 @@ inline bool dateParts(const char* text, size_t length) {
   static const uint8_t days[] PROGMEM={31,28,31,30,31,30,31,31,30,31,30,31};
   return y>=1&&m>=1&&m<=12&&d>=1&&d<=unsigned(pgm_read_byte(days+m-1)+(m==2&&y%4==0&&(y%100!=0||y%400==0)));
 }
+/**
+ * @brief Validate or format a calendar date value.
+ * @param text Text to read, encode or display.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 inline bool date(const String& text) { return dateParts(text.c_str(),text.length()); }
+/**
+ * @brief Validate HH:MM or HH:MM:SS syntax and time ranges.
+ * @param text Text to read, encode or display.
+ * @param length Number of bytes or elements to process.
+ * @return True for a valid clock value; false otherwise.
+ */
 inline bool clockParts(const char* text, size_t length) {
   if((length!=5&&length!=8)||text[2]!=':'||(length==8&&text[5]!=':'))return false;
   for(size_t i=0;i<length;++i) if(i!=2&&i!=5&&(text[i]<'0'||text[i]>'9'))return false;
   return decimalDigits(text,2)<24&&decimalDigits(text+3,2)<60&&(length==5||decimalDigits(text+6,2)<60);
 }
+/**
+ * @brief Validate the time control value and its range.
+ * @param text Text to read, encode or display.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 inline bool time(const String& text) { return text.length()==8&&clockParts(text.c_str(),8); }
 #endif
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
+/**
+ * @brief Validate a proposed value against its extended control definition.
+ * @param c Control definition specifying type and allowed values.
+ * @param value Input value, or output destination when passed by mutable reference.
+ * @return True if the value satisfies the control type, range and options; false otherwise.
+ */
 inline bool validControl(const V& c,const V& value) {
   String type=c["type"].asString();
 #if ARDPORTAL_CONTROL_SUPPORT_SLIDER
@@ -132,6 +198,12 @@ inline bool validControl(const V& c,const V& value) {
 #endif
   return (type=="edit"||type=="action_text")&&string(value);
 }
+/**
+ * @brief Validate a value against the application control type and constraints.
+ * @param f Field definition to inspect or normalize.
+ * @param value Input value, or output destination when passed by mutable reference.
+ * @return True if the supplied value satisfies the field constraints.
+ */
 inline bool validValue(const V& f,const V& value) {
   String type=f["type"].asString();
   if(f["action_only"].asBool()) return value.isNull();
@@ -153,6 +225,13 @@ inline bool validValue(const V& f,const V& value) {
   if(f["controls"].length()&&f["controls"][0]["type"].asString().indexOf("action")!=0) return validControl(f["controls"][0],value);
   return string(value);
 }
+/**
+ * @brief Normalize a field definition and merge its control or Home Assistant defaults.
+ * @param field Application field definition or identifier.
+ * @param stateOnly Whether to use only runtime state rather than persisted configuration.
+ * @param error Output error text; populated when the operation fails.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 inline bool normalize(V& field,bool stateOnly=false,String* error=nullptr) {
   auto fail=[&](const String& reason){if(error)*error=reason;return false;};
   if(error)*error=String();
@@ -206,8 +285,27 @@ inline bool normalize(V& field,bool stateOnly=false,String* error=nullptr) {
   return validValue(field,field["default"]) || fail("invalid descriptor default value");
 }
 #else
+/**
+ * @brief Normalize a field definition and merge its control or Home Assistant defaults.
+ * Input: V&.
+ * Input: bool.
+ * @param error Output error text; populated when the operation fails.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 inline bool normalize(V&,bool=false,String* error=nullptr) {if(error)*error="extended controls are disabled";return false;}
+/**
+ * @brief Validate a proposed value against its extended control definition.
+ * Input: const V&.
+ * Input: const V&.
+ * @return True if the value satisfies the control type, range and options; false otherwise.
+ */
 inline bool validControl(const V&,const V&) {return false;}
+/**
+ * @brief Validate a value against the application control type and constraints.
+ * Input: const V&.
+ * Input: const V&.
+ * @return True if the supplied value satisfies the field constraints.
+ */
 inline bool validValue(const V&,const V&) {return false;}
 #endif
 }

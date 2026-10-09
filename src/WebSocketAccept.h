@@ -4,7 +4,18 @@
 #include <Arduino.h>
 // RFC 6455 handshake, bounded to the 24-byte base64 key plus the fixed GUID.
 namespace ArdPortalWS {
+/**
+ * @brief Rotate a 32-bit word left for the SHA-1 calculation.
+ * @param v Word to rotate.
+ * @param n Rotation count, from 1 to 31.
+ * @return Word with its bits rotated left by n positions.
+ */
 inline uint32_t rotate(uint32_t v, unsigned n) { return (v << n) | (v >> (32-n)); }
+/**
+ * @brief Compute the RFC 6455 Sec-WebSocket-Accept handshake value.
+ * @param key 24-byte Sec-WebSocket-Key header value.
+ * @return Base64-encoded SHA-1 result, or an empty string if the key length is invalid.
+ */
 inline String accept(const String& key) {
   if (key.length() != 24) return "";
   String input = key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";

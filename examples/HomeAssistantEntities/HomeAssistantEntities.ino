@@ -14,6 +14,10 @@ const char INDICATOR_ENTITY[] PROGMEM = R"JSON({
   "id":"indicator", "name":"Indicator", "type":"switch", "default":false
 })JSON";
 
+/**
+ * @brief Initialize the example hardware, callbacks and portal.
+ * @return No value.
+ */
 void setup() {
   Serial.begin(115200);
   pinMode(IndicatorPin, OUTPUT);
@@ -35,6 +39,10 @@ void setup() {
   portal.begin(options);
 }
 
+/**
+ * @brief Advance the component work; call repeatedly from the Arduino main loop.
+ * @return No value.
+ */
 void loop() {
   portal.loop();
   // UART, sensors and other application work get control after every portal pass.

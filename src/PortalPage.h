@@ -32,14 +32,39 @@ select{appearance:none;-webkit-appearance:none;min-height:46px;margin-top:7px;pa
 <div id="caField" hidden><label><span data-i18n="ui_031"></span><textarea name="caCert" rows="6" maxlength="4096" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label><small><span data-i18n="ui_032"></span></small></div>
 /*@endif*/<label><span data-i18n="ui_033"></span><input name="port" type="number" min="1" max="65535" value="1883" required></label><label><span data-i18n="ui_034"></span><input name="user" maxlength="128"></label><label><span data-i18n="ui_035"></span><input name="mqttPassword" type="password" maxlength="128" autocomplete="new-password"></label><p><small><span data-i18n="ui_036"></span></small></p><button><span data-i18n="ui_018"></span></button></form><button type="button" class="secondary" onclick="location.href='/'"><span data-i18n="ui_010"></span></button></section>
 
-<section id="upgrade" hidden><h2><span data-i18n="ui_038"></span></h2><p><span data-i18n="ui_039"></span> <strong>.bin / .bin.gz</strong> <span data-i18n="ui_040"></span></p><form id="upgradeForm"><label><span data-i18n="ui_041"></span><input id="firmware" type="file" accept=".bin,.bin.gz,application/octet-stream,application/gzip" required></label><button><span data-i18n="ui_042"></span></button></form><form id="upgradeUrlForm"><label><span data-i18n="ui_191"></span><input id="firmwareUrl" type="url" placeholder="https://example.com/firmware.bin" required></label><button><span data-i18n="ui_192"></span></button></form><progress id="otaProgress" value="0" max="100" hidden></progress><p id="otaResult" class="message" role="status" hidden></p><small><span data-i18n="ui_043"></span></small><button type="button" class="secondary" onclick="location.href='/'"><span data-i18n="ui_010"></span></button></section>
+<section id="upgrade" hidden><h2><span data-i18n="ui_038"></span></h2><p><span data-i18n="ui_039"></span> <strong>.bin / .bin.gz</strong> <span data-i18n="ui_040"></span></p><form id="upgradeForm"><label><span data-i18n="ui_041"></span><input id="firmware" type="file" accept=".bin,.gz,application/octet-stream,application/gzip,application/x-gzip" required></label><button><span data-i18n="ui_042"></span></button></form><form id="upgradeUrlForm"><label><span data-i18n="ui_191"></span><input id="firmwareUrl" type="url" placeholder="https://example.com/firmware.bin" required></label><button><span data-i18n="ui_192"></span></button></form><progress id="otaProgress" value="0" max="100" hidden></progress><p id="otaResult" class="message" role="status" hidden></p><small><span data-i18n="ui_043"></span></small><button type="button" class="secondary" onclick="location.href='/'"><span data-i18n="ui_010"></span></button></section>
 <section id="console" hidden><h2><span data-i18n="ui_044"></span></h2><p id="consoleState" class="message" role="status" hidden></p><div class="consoleTabs" role="tablist" aria-label="Console"><button type="button" id="mqttTab" role="tab" aria-selected="true" aria-controls="mqttPanel" onclick="selectConsoleTab('mqtt')">MQTT</button><button type="button" id="messagesTab" role="tab" aria-selected="false" aria-controls="messagesPanel" onclick="selectConsoleTab('messages')">Messages</button></div><div id="messagesPanel" role="tabpanel" aria-labelledby="messagesTab" hidden><pre id="messagesLog" class="consoleLog" aria-live="polite"></pre></div><div id="mqttPanel" role="tabpanel" aria-labelledby="mqttTab"><pre id="mqttLog" class="consoleLog" aria-live="polite"></pre><form id="publishForm"><label><span data-i18n="ui_048"></span><input name="topic" maxlength="253" required></label><label><span data-i18n="ui_049"></span><textarea name="value" maxlength="700" rows="3"></textarea></label><button id="publishButton" disabled><span data-i18n="ui_050"></span></button></form><small><span data-i18n="ui_051"></span></small></div><button type="button" class="secondary" onclick="location.href='/'"><span data-i18n="ui_010"></span></button></section>
 </main><div id="restartOverlay" class="restartOverlay" hidden><div class="card" role="status" aria-live="polite"><h2 data-i18n="ui_163"></h2><p data-i18n="ui_164"></p><progress id="restartProgress" max="60" value="0"></progress></div></div><script>
 let translations={},languageCode='',languageLocale=undefined,availableLanguages=[],configurationLoaded=false;
+/**
+ * @brief Translate a UI string and substitute its named parameters.
+ * @param key Configuration key or JSON object member name.
+ * @param values Application values or translation substitutions.
+ * @return Localized text with named placeholders substituted.
+ */
 function t(key,values={}){const text=translations[key]??key;return text.replace(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g,(match,name)=>Object.prototype.hasOwnProperty.call(values,name)?String(values[name]):match)}
+/**
+ * @brief Apply translations.
+ * @return Apply translations.
+ */
 function applyTranslations(){document.documentElement.lang=languageCode;for(const node of document.querySelectorAll('[data-i18n]'))node.textContent=t(node.dataset.i18n);for(const node of document.querySelectorAll('[data-i18n-placeholder]'))node.placeholder=t(node.dataset.i18nPlaceholder)}
+/**
+ * @brief Mark language.
+ * @return Mark language.
+ */
 function markLanguage(){for(const button of document.querySelector('#languageChoice').children)if(button.dataset.language)button.setAttribute('aria-pressed',String(button.dataset.language===languageCode))}
+/**
+ * @brief Load and apply the chosen language to built-in and dynamic UI labels.
+ * @param code Protocol, language or error code.
+ * @param remember Whether to persist the selected language in browser storage.
+ * @return No value (undefined).
+ */
 async function changeLanguage(code,remember=false){const entry=availableLanguages.find(item=>item.code===code);if(!entry)return;const scanWasVisible=notice.textContent===scanNotice();const dictionary=await(await request(`/api/language?code=${encodeURIComponent(code)}`)).json();translations=dictionary;languageCode=entry.code;languageLocale=entry.locale;markLanguage();if(remember)try{localStorage.setItem('ardui.language',languageCode)}catch(error){}applyTranslations();/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/translateDynamic();/*@endif*/if(scanWasVisible)showNotice(scanNotice());if(wifiAttempt)showNotice(t('ui_057'));if(mqttAttempt)showNotice(t('ui_058'));if(!configurationLoaded){await loadConfig();configurationLoaded=true}else document.querySelector('#publishForm').elements.topic.placeholder=t('ui_097',{device:document.querySelector('#publishForm').dataset.device});if(currentPage?.id==='console')setMessage(document.querySelector('#consoleState'),consoleErrorKey?t(consoleErrorKey):'',!!consoleErrorKey);await refresh()}
+/**
+ * @brief Choose the saved browser language or the best supported browser preference.
+ * @param catalog Page metadata to merge; null fetches the current catalog.
+ * @return The supported language code selected from saved or browser preferences.
+ */
 function preferredLanguage(catalog){
  const normalize=value=>String(value||'').replace(/_/g,'-').toLowerCase();
  let saved='';try{saved=localStorage.getItem('ardui.language')||''}catch(error){}
@@ -48,28 +73,70 @@ function preferredLanguage(catalog){
  for(const locale of browser){const wanted=normalize(locale);if(!wanted)continue;const exact=availableLanguages.find(entry=>normalize(entry.code)===wanted||normalize(entry.locale)===wanted);if(exact)return exact.code;const base=wanted.split('-')[0],related=availableLanguages.find(entry=>normalize(entry.code).split('-')[0]===base||normalize(entry.locale).split('-')[0]===base);if(related)return related.code;}
  return availableLanguages.find(entry=>entry.code===catalog.default)?.code||availableLanguages[0]?.code;
 }
+/**
+ * @brief Load languages.
+ * @return A promise resolving when the asynchronous operation completes; rejects on an unhandled failure.
+ */
 async function loadLanguages(){const catalog=await(await request('/api/languages')).json();availableLanguages=catalog.languages;const selector=document.querySelector('#languageChoice');
  for(const entry of availableLanguages){const button=document.createElement('button');button.type='button';button.textContent=entry.code.toUpperCase();button.dataset.language=entry.code;button.title=entry.name;button.setAttribute('aria-label',entry.name);button.setAttribute('lang',entry.code);button.onclick=async()=>{for(const item of selector.children)if(item.dataset.language)item.disabled=true;try{await changeLanguage(entry.code,true)}catch(error){showNotice(error.message,true)}finally{for(const item of selector.children)if(item.dataset.language)item.disabled=false;markLanguage()}};selector.append(button)}
  selector.hidden=availableLanguages.length<=1;await changeLanguage(preferredLanguage(catalog));}
 
 // Add another entry and section to extend navigation; pages have their own URLs.
 const pages=[{id:'device',path:'/device',label:'ui_005'},{id:'wifi',path:'/wifi',label:'ui_011'},{id:'ap',path:'/ap',label:'ui_021'},{id:'mqtt',path:'/mqtt',label:'ui_026'},{id:'upgrade',path:'/upgrade',label:'ui_052'},{id:'console',path:'/console',label:'ui_044'}];
+/**
+ * @brief Set message.
+ * @param node HTML element to update.
+ * @param text Text to read, encode or display.
+ * @param failed Whether to apply error styling to the displayed message.
+ * @return No value (undefined).
+ */
 function setMessage(node,text,failed=false){node.textContent=text;node.hidden=!text;node.className=failed?'message messageError':'message';node.setAttribute('role',failed?'alert':'status')}
+/**
+ * @brief Display a portal notice and apply its error styling when requested.
+ * @param text Text to read, encode or display.
+ * @param failed Whether to apply error styling to the displayed message.
+ * @return No value (undefined).
+ */
 function showNotice(text,failed=false){setMessage(notice,text,failed)}
 const notice=document.querySelector('#notice'),status=document.querySelector('#status'),mqttForm=document.querySelector('#mqttForm'),wifiForm=document.querySelector('#wifiForm'),networks=document.querySelector('#networks');let apSwitchPending=false,otaBusy=false,currentPage=null,wifiAttempt=null,mqttAttempt=null,scanAttempt=null;const scanNotice=()=>t('ui_054');
+/**
+ * @brief Create a navigation link with the given label and target.
+ * @param label Visible label text or translation key.
+ * @param path Journal file path.
+ * @return The newly created navigation link.
+ */
 function link(label,path){const a=document.createElement('a');a.dataset.i18n=label;a.textContent=t(label);a.href=path;if(location.pathname===path)a.setAttribute('aria-current','page');return a}
 const nav=document.querySelector('#navigation');nav.append(link('ui_053','/'));for(const page of pages)nav.append(link(page.label,page.path));currentPage=pages.find(p=>p.path===location.pathname);
 if(currentPage)document.getElementById(currentPage.id).hidden=false;/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/else if(location.pathname.startsWith('/p/')){currentPage={id:'dynamic-loading',path:location.pathname};document.querySelector('#dynamicLoading').hidden=false}/*@endif*/else document.querySelector('#info').hidden=false;
 let requestTail=Promise.resolve();
+/**
+ * @brief Send an HTTP request with portal error handling.
+ * @param url Endpoint or navigation URL.
+ * @param options Initialization options and cooperative work limits.
+ * @return Promise resolving to the HTTP Response; rejects on transport or HTTP errors.
+ */
 async function request(url,options={}){const previous=requestTail;let release;requestTail=new Promise(resolve=>release=resolve);await previous;try{options={...options,headers:{...(options.headers||{}),...(languageCode?{'X-ArdUI-Language':languageCode}:{})}};let r;try{r=await fetch(url,options)}catch(error){const failure=Error(t('ui_149'));failure.network=true;throw failure;}if(!r.ok){const error=Error(await r.text()||t('ui_092',{status:r.status}));error.status=r.status;throw error;}return {json:async()=>{try{return await r.json()}catch(error){throw Error(t('ui_149'))}finally{release()}},text:async()=>{try{return await r.text()}catch(error){const failure=Error(t('ui_149'));failure.network=true;throw failure;}finally{release()}}};}catch(error){release();throw error;}}
 /*@if ARDPORTAL_ENABLE_MQTT_TLS*/function setCaVisibility(){document.querySelector('#caField').hidden=mqttForm.elements.mqttTls.value!=='1'}
 mqttForm.elements.mqttTls.onchange=()=>{setCaVisibility();const tls=mqttForm.elements.mqttTls.value==='1';if(tls&&mqttForm.elements.port.value==='1883')mqttForm.elements.port.value='8883';else if(!tls&&mqttForm.elements.port.value==='8883')mqttForm.elements.port.value='1883'};/*@endif*/
 let restartPending=false,restartStarted=0;
+/**
+ * @brief Advance restart progress and navigate home after the restart wait.
+ * @param now Current time used to evaluate deadlines.
+ * @return No value (undefined).
+ */
 function updateRestart(now=Date.now()){const seconds=Math.min(60,Math.max(0,(now-restartStarted)/1000));document.querySelector('#restartProgress').value=seconds;if(seconds>=60){location.href='/';return}setTimeout(updateRestart,250)}
+/**
+ * @brief Show the restart overlay, close live updates and start the progress timer.
+ * @return No value (undefined).
+ */
 function beginRestart(){if(restartPending)return;restartPending=true;restartStarted=Date.now();showNotice('');document.querySelector('#restartOverlay').hidden=false;document.querySelector('#restartProgress').setAttribute('aria-label',t('ui_163'));consoleSocket?.close();updateRestart()}
 document.querySelector('#restartDevice').onclick=async()=>{if(restartPending||!confirm(t('ui_151')))return;const button=document.querySelector('#restartDevice');button.disabled=true;try{await(await request('/api/restart',{method:'POST',body:new URLSearchParams({confirm:'RESTART'})})).text();beginRestart()}catch(e){button.disabled=false;showNotice(e.message,true)}};
 document.querySelector('#factoryReset').onclick=async()=>{if(!confirm(t('ui_055')))return;try{showNotice(await(await request('/api/factory-reset',{method:'POST',body:new URLSearchParams({confirm:'RESET'})})).text())}catch(e){showNotice(e.message,true)}};
 const deviceNameInput=document.querySelector('[name=deviceName]');deviceNameInput.addEventListener('input',()=>deviceNameInput.setCustomValidity(new TextEncoder().encode(deviceNameInput.value).length>32?t('ui_007'):''));
+/**
+ * @brief Fetch portal settings and populate the built-in configuration forms.
+ * @return A promise resolving when the asynchronous operation completes; rejects on an unhandled failure.
+ */
 async function loadConfig(){const c=await(await request('/api/config')).json();for(const form of document.querySelectorAll('[data-config]'))for(const key of ['deviceName','deviceDescription','ssid','host','port','user','mqttTls','caCert','apName'])if(form.elements[key])form.elements[key].value=c[key]??'';document.title=c.deviceName;document.querySelector('#deviceTitle').textContent=c.deviceName;document.querySelector('#apSsid').value=c.apName;document.querySelector('#publishForm').dataset.device=c.mqttName;document.querySelector('#publishForm').elements.topic.placeholder=t('ui_097',{device:c.mqttName});/*@if ARDPORTAL_ENABLE_MQTT_TLS*/setCaVisibility()/*@endif*/}
 for(const form of document.querySelectorAll('[data-config]'))form.onsubmit=async e=>{
  e.preventDefault();const button=form.querySelector('button');button.disabled=true;
@@ -82,38 +149,108 @@ for(const form of document.querySelectorAll('[data-config]'))form.onsubmit=async
  }catch(e){showNotice(e.message,true);wifiAttempt=null}
  finally{button.disabled=(form===wifiForm&&wifiAttempt!==null)||(form===mqttForm&&mqttAttempt!==null)}
 };
+/**
+ * @brief Convert RSSI into the Wi-Fi icon strength level.
+ * @param rssi Wi-Fi signal strength in dBm.
+ * @return Icon strength from 0 to 4.
+ */
 function wifiSignalLevel(rssi){const value=Number(rssi);return !Number.isFinite(value)?0:value>=-55?4:value>=-67?3:value>=-80?2:1}
+/**
+ * @brief Render scanned networks ordered by signal strength and bind selection buttons.
+ * @param list Scanned Wi-Fi network records.
+ * @return No value (undefined).
+ */
 function renderWifiNetworks(list){const container=document.querySelector('#wifiNetworks');container.replaceChildren();for(const n of [...list].sort((a,b)=>b.rssi-a.rssi)){const button=document.createElement('button');button.type='button';button.className='wifiNetwork';button.dataset.ssid=n.ssid;button.setAttribute('aria-pressed',String(networks.value===n.ssid));const level=wifiSignalLevel(n.rssi);button.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">'+['M3 10a20 20 0 0 1 26 0','M7 15a14 14 0 0 1 18 0','M11 20a8 8 0 0 1 10 0'].map((d,i)=>'<path d="'+d+'" opacity="'+(level>=4-i?1:.18)+'"/>').join('')+'<circle cx="16" cy="25" r="1.7" fill="currentColor" stroke="none" opacity="'+(level?1:.18)+'"/></svg>';const text=dynamicElement('span',button);text.textContent=t('ui_185',{ssid:n.ssid||t('ui_065'),rssi:n.rssi});button.onclick=()=>{networks.value=n.ssid;networks.onchange();for(const row of container.children)row.setAttribute('aria-pressed',String(row===button))};const security=dynamicElement('span',button);security.className='wifiSecurity';security.setAttribute('aria-label',t(n.secured?'ui_165':'ui_166'));security.title=t(n.secured?'ui_165':'ui_166');security.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="'+(n.secured?'M8 10V7a4 4 0 0 1 8 0v3':'M8 10V7a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';container.append(button)}}
 networks.onchange=()=>wifiForm.elements.ssid.value=networks.value;
 document.querySelector('#scan').onclick=async()=>{const button=document.querySelector('#scan');button.disabled=true;try{const result=await(await request('/api/scan',{method:'POST'})).json();scanAttempt=result.scanId;showNotice(scanNotice())}catch(e){scanAttempt=null;button.disabled=false;showNotice(e.message,true)}};
 document.querySelector('#clearWifi').onclick=async()=>{if(!confirm(t('ui_059')))return;try{showNotice(await(await request('/api/config',{method:'POST',body:new URLSearchParams({clearWifi:'1'})})).text());wifiForm.reset()}catch(e){showNotice(e.message,true)}};
 const bytes=n=>t('ui_184',{value:Number(n).toLocaleString(languageLocale)});
 let refreshing=false;
+/**
+ * @brief Poll portal status and active-page values while avoiding overlapping requests.
+ * @return A promise resolving when the asynchronous operation completes; rejects on an unhandled failure.
+ */
 async function refresh(){if(restartPending||apSwitchPending||otaBusy||refreshing)return;refreshing=true;try{/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/try{await refreshAppFields()}catch(error){}/*@endif*/const s=await(await request('/api/status')).json();/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/if(portalReady&&Number.isInteger(s.appConfigPageCount)&&s.appConfigPageCount!==dynamicCatalogCount)await refreshDynamicCatalog();/*@endif*/if(notice.textContent===t('ui_084'))showNotice('');if(s.deviceName){document.title=s.deviceName;document.querySelector('#deviceTitle').textContent=s.deviceName}status.textContent=t('ui_098',{wifi:t(s.wifi?'ui_078':'ui_079'),mqtt:t(s.mqtt?'ui_078':'ui_079'),tls:s.tls?t('ui_182'):'',clock:s.tls&&!s.clockReady?t('ui_063'):'',ip:s.ip,ap:s.ap?t('ui_183',{ip:s.apIp}):''});if(currentPage?.id==='wifi'&&wifiAttempt&&s.wifiRevision!==wifiAttempt.revision&&s.wifiResult){if(s.wifiResult===1&&s.wifi&&s.ip!=='0.0.0.0'){showNotice('');wifiAttempt=null}else if(s.wifiResult===2){showNotice(t('ui_064'),true);wifiAttempt=null}if(!wifiAttempt)wifiForm.querySelector('button').disabled=false}if(currentPage?.id==='mqtt'&&mqttAttempt&&s.mqttRevision!==mqttAttempt.revision&&s.mqttResult){showNotice(s.mqttResultMessage,s.mqttResult!==1);mqttAttempt=null;mqttForm.querySelector('button').disabled=false}if(s.storageError&&!notice.textContent)showNotice(s.storageError,true);
 if(currentPage?.id==='wifi'){const list=await(await request('/api/networks')).json(),selected=networks.value;networks.replaceChildren(new Option(t('ui_014'),''));for(const n of list)networks.add(new Option(t('ui_185',{ssid:n.ssid||t('ui_065'),rssi:n.rssi}),n.ssid));networks.value=selected;renderWifiNetworks(list);if(scanAttempt!==null&&s.scanCompletedId===scanAttempt){scanAttempt=null;document.querySelector('#scan').disabled=false;if(notice.textContent===scanNotice())showNotice('')}}
-if(!currentPage){const i=await(await request('/api/info')).json(),dl=document.querySelector('#details');dl.replaceChildren();const rows=[[t('ui_066'),i.deviceName],[t('ui_067'),i.chip],[t('ui_068'),i.chipId],[t('ui_069'),bytes(i.flashBytes)],[t('ui_070'),bytes(i.physicalFlashBytes)],[t('ui_071'),i.heapBytes?bytes(i.heapBytes):t('ui_072')],[t('ui_073'),bytes(i.freeHeapBytes)],[t('ui_157'),bytes(i.minimumFreeHeapBytes)],[t('ui_158'),bytes(i.maximumHeapBlockBytes)],[t('ui_156'),i.resetReason],[t('ui_041'),bytes(i.sketchBytes)],[t('ui_074'),bytes(i.otaFreeBytes)],[t('ui_075'),t('ui_096',{days:Math.floor(i.uptimeSeconds/86400),hours:Math.floor(i.uptimeSeconds%86400/3600),minutes:Math.floor(i.uptimeSeconds%3600/60),seconds:i.uptimeSeconds%60})],[t('ui_076'),i.utc?new Date(i.utc).toLocaleString(languageLocale):t('ui_077')],[t('ui_180'),i.wifi?t('ui_078'):t('ui_079')],[t('ui_181'),i.mqtt?t('ui_078'):t('ui_079')],[t('ui_080'),i.ip],[t('ui_081'),i.apIp],[t('ui_189'),i.storageError||t(i.filesystemMounted?'ui_082':'ui_083')]];if(i.deviceDescription)rows.splice(1,0,[t('ui_187'),i.deviceDescription]);if(i.deviceManufacturer)rows.splice(1,0,[t('ui_188'),i.deviceManufacturer]);/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/if(homeHeading)homeHeading.textContent=i.deviceName;/*@endif*/for(const [label,value]of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;dl.append(dt,dd)}}
+if(!currentPage){const i=await(await request('/api/info')).json(),dl=document.querySelector('#details');dl.replaceChildren();const rows=[[t('ui_066'),i.deviceName],[t('ui_067'),i.chip],[t('ui_068'),i.chipId],[t('ui_069'),bytes(i.flashBytes)],[t('ui_070'),bytes(i.physicalFlashBytes)],[t('ui_071'),i.heapBytes?bytes(i.heapBytes):t('ui_072')],[t('ui_073'),bytes(i.freeHeapBytes)],[t('ui_157'),bytes(i.minimumFreeHeapBytes)],[t('ui_158'),bytes(i.maximumHeapBlockBytes)],[t('ui_156'),i.resetReason],[t('ui_041'),bytes(i.sketchBytes)],[t('ui_074'),bytes(i.otaFreeBytes)],[t('ui_075'),t('ui_096',{days:Math.floor(i.uptimeSeconds/86400),hours:Math.floor(i.uptimeSeconds%86400/3600),minutes:Math.floor(i.uptimeSeconds%3600/60),seconds:i.uptimeSeconds%60})],[t('ui_076'),i.utc?new Date(i.utc).toLocaleString(languageLocale):t('ui_077')],[t('ui_180'),i.wifi?t('ui_078'):t('ui_079')],[t('ui_181'),i.mqtt?t('ui_078'):t('ui_079')],[t('ui_080'),i.ip],[t('ui_081'),i.apIp],[t('ui_189'),i.storageError||t(i.filesystemMounted?'ui_082':'ui_083')]];if(i.dmaAvailable)rows.push(['DMA: '+t('ui_073'),bytes(i.dmaFreeBytes)],['DMA: '+t('ui_158'),bytes(i.dmaLargestBlockBytes)],['DMA: '+t('ui_157'),bytes(i.minimumDmaFreeBytes)]);if(i.deviceDescription)rows.splice(1,0,[t('ui_187'),i.deviceDescription]);if(i.deviceManufacturer)rows.splice(1,0,[t('ui_188'),i.deviceManufacturer]);/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/if(homeHeading)homeHeading.textContent=i.deviceName;/*@endif*/for(const [label,value]of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;dl.append(dt,dd)}}
 }catch(e){if(apSwitchPending)return;status.textContent=t('ui_084');showNotice(t('ui_084'),true)}finally{refreshing=false}}
 document.querySelector('#upgradeForm').onsubmit=async e=>{e.preventDefault();const source=e.target.id==='upgradeUrlForm'?document.querySelector('#firmwareUrl').value.trim():document.querySelector('#firmware').files[0];if(!source||otaBusy)return;if(!confirm(t('ui_094',{name:typeof source==='string'?source:source.name})))return;otaBusy=true;const button=e.target.querySelector('button'),progress=document.querySelector('#otaProgress'),output=document.querySelector('#otaResult');button.disabled=true;progress.hidden=false;progress.value=0;setMessage(output,t('ui_085'));try{let file=source;if(typeof source==='string'){const url=new URL(source);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error(t('ui_193'));setMessage(output,t('ui_194'));const response=await fetch(url.href,{cache:'no-store',credentials:'omit'});if(!response.ok)throw Error(t('ui_095',{status:response.status}));file=await response.blob();if(!file.size)throw Error(t('ui_193'));setMessage(output,t('ui_085'))}await new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open('POST','/api/upgrade');xhr.setRequestHeader('Content-Type','application/octet-stream');if(languageCode)xhr.setRequestHeader('X-ArdUI-Language',languageCode);xhr.timeout=180000;xhr.upload.onprogress=e=>{if(e.lengthComputable)progress.value=Math.round(e.loaded/e.total*100)};xhr.onload=()=>xhr.status===200?(setMessage(output,xhr.responseText),resolve()):reject(Error(xhr.responseText||t('ui_095',{status:xhr.status})));xhr.onerror=()=>reject(Error(t('ui_086')));xhr.ontimeout=()=>reject(Error(t('ui_087')));xhr.send(file)});beginRestart()}catch(error){setMessage(output,error instanceof TypeError?t('ui_195'):error.message,true)}finally{otaBusy=false;button.disabled=false}};
 document.querySelector('#upgradeUrlForm').onsubmit=document.querySelector('#upgradeForm').onsubmit;
 let consoleSocket=null,consoleConnected=false,consoleMqtt=false,consoleErrorKey='',consoleRetry=null,socketLastSeen=0;const consoleRows={mqtt:[],messages:[]};
+/**
+ * @brief Show the selected Console channel and update its tab accessibility state.
+ * @param channel Console channel to select.
+ * @return No value (undefined).
+ */
 function selectConsoleTab(channel){for(const name of ['mqtt','messages']){document.querySelector(`#${name}Panel`).hidden=name!==channel;document.querySelector(`#${name}Tab`).setAttribute('aria-selected',String(name===channel))}}
+/**
+ * @brief Enable MQTT publishing only while Console and MQTT are connected.
+ * @return No value (undefined).
+ */
 function consoleAvailability(){document.querySelector('#publishButton').disabled=!consoleConnected||!consoleMqtt}
+/**
+ * @brief Open the Console or application-events WebSocket and maintain reconnect handling.
+ * @return No value (undefined).
+ */
 function openConsole(){if(restartPending)return;if(currentPage?.id!=='console'/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/&&!dynamicBindings.length/*@if ARDPORTAL_ENABLE_DEPENDENCIES*/&&!dynamicDefinitions.some(p=>p.visibleWhen)/*@endif*//*@endif*/)return;if(consoleSocket&&(consoleSocket.readyState===0||consoleSocket.readyState===1))return;const socket=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}${currentPage?.id==='console'?'/api/console':'/api/events'}`);consoleSocket=socket;consoleSocket.onopen=()=>{if(consoleSocket!==socket)return;socketLastSeen=Date.now();consoleConnected=true;consoleErrorKey='';/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/refreshAppFields().catch(()=>{});/*@endif*/setMessage(document.querySelector('#consoleState'),'');consoleAvailability()};consoleSocket.onmessage=e=>{if(consoleSocket!==socket)return;socketLastSeen=Date.now();try{const message=JSON.parse(e.data);/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/if(message.type==='app'){refreshAppFields().catch(()=>{})}else /*@endif*/if(message.type==='status'){consoleMqtt=message.mqtt;consoleAvailability()}else if(message.type==='log'&&consoleRows[message.channel]){const rows=consoleRows[message.channel];if(rows.some(row=>row.id===message.id))return;rows.push(message);if(rows.length>200)rows.shift();const box=document.querySelector(`#${message.channel}Log`),atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<30;box.textContent=rows.map(row=>row.text.replace(/^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\]/,(_,utc)=>`[${new Date(utc).toLocaleString(languageLocale)}]`)).join('\n');if(atEnd)box.scrollTop=box.scrollHeight}}catch(error){consoleErrorKey='ui_089';setMessage(document.querySelector('#consoleState'),t(consoleErrorKey),true)}};consoleSocket.onclose=()=>{if(consoleSocket!==socket)return;consoleSocket=null;consoleConnected=false;consoleMqtt=false;consoleAvailability();consoleErrorKey='ui_090';setMessage(document.querySelector('#consoleState'),t(consoleErrorKey),true);consoleRetry=setTimeout(openConsole,3000)};socket.onerror=()=>socket.close()}
 document.querySelector('#publishForm').onsubmit=e=>{e.preventDefault();if(!consoleConnected||!consoleMqtt)return;const form=e.target,command=new URLSearchParams(new FormData(form)).toString();if(command.length>1024){setMessage(document.querySelector('#consoleState'),t('ui_091'),true);return}consoleSocket.send(command)};
 if(currentPage?.id==='console')consoleAvailability();
+/**
+ * @brief Create an HTML element and append it to its parent.
+ * @param tag HTML tag name of the element to create.
+ * @param parent HTML element receiving the newly created child.
+ * @return The newly created and appended HTML element.
+ */
 function dynamicElement(tag,parent){const node=document.createElement(tag);parent.append(node);return node}
 /*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/let activeDynamicId="",dynamicDefinitions=[],dynamicBindings=[],dynamicLabels=[],dynamicQueue=new Map(),dynamicSending=false,dynamicActionId=0;
+/**
+ * @brief Resolve text for the selected language with language and English fallbacks.
+ * @param names Localized text indexed by language code.
+ * @param name Fallback name or generated symbol name.
+ * @return Text selected by language, base language, fallback name, English or the first available translation.
+ */
 function localized(names,name){return names?.[languageCode]??names?.[languageCode.split('-')[0]]??name??names?.en??Object.values(names||{})[0]??''}
+/**
+ * @brief Bind a dynamic label to its localized name definition.
+ * @param node HTML element to update.
+ * @param names Localized text indexed by language code.
+ * @param name Fallback name or generated symbol name.
+ * @return No value (undefined).
+ */
 function dynamicLabel(node,names,name){dynamicLabels.push({node,names,name});node.textContent=localized(names,name)}
+/**
+ * @brief Refresh the localized labels and control text of dynamic pages.
+ * @return No value (undefined).
+ */
 function translateDynamic(){for(const item of dynamicLabels)item.node.textContent=localized(item.names,item.name);for(const b of dynamicBindings)if(b.translate)b.translate()}
 /*@if ARDPORTAL_CONTROL_SUPPORT_SWITCH*/function styleToggle(node,parent){const wrap=dynamicElement('span',parent);wrap.className='toggleSwitch';wrap.append(node);node.type='checkbox';node.setAttribute('role','switch');dynamicElement('span',wrap).className='toggleTrack'}/*@endif*/
+/**
+ * @brief Queue a changed control value, preserving action commands as separate jobs.
+ * @param binding Dynamic control binding and its local edit state.
+ * @param page Application page definition or identifier.
+ * @param control Control index within the field, if applicable.
+ * @param value Input value, or output destination when passed by mutable reference.
+ * @return Promise for queued update processing; disabled controls return a resolved promise.
+ */
 function queueDynamic(binding,page,control,value){if(binding.enabled===false)return Promise.resolve();binding.dirty=true;binding.version=(binding.version||0)+1;const action=control!==undefined&&binding.field.controls?.[control]?.type.startsWith('action');const key=page.id+'/'+binding.field.id+'/'+(control??'value')+(action?'/'+(++dynamicActionId):'');dynamicQueue.set(key,{key,binding,page,control,value,action,version:binding.version});return flushDynamic()}
+/**
+ * @brief Send the next queued control update and manage save errors or retries.
+ * @return A promise resolving when the asynchronous operation completes; rejects on an unhandled failure.
+ */
 async function flushDynamic(){if(dynamicSending||!dynamicQueue.size)return;dynamicSending=true;let retryDelay=0;const job=dynamicQueue.values().next().value;dynamicQueue.delete(job.key);job.binding.saving=true;try{
  const body=job.control===undefined?{page:job.page.id,values:{[job.binding.field.id]:job.value}}:{page:job.page.id,field:job.binding.field.id,control:job.control,value:job.value};
  await(await request(job.control===undefined?'/api/app':'/api/app/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).text();if(job.binding.version===job.version)job.binding.dirty=false;
 }catch(error){if(error.status===409||(error.network&&!job.action)){if(!dynamicQueue.has(job.key)){if(job.action)dynamicQueue=new Map([[job.key,job],...dynamicQueue]);else dynamicQueue.set(job.key,job)}retryDelay=error.status===409?250:1000}else{if(job.binding.version===job.version)job.binding.dirty=false;showNotice(error.message,true)}}finally{job.binding.saving=false;dynamicSending=false;if(!job.binding.dirty)refreshAppFields().catch(()=>{});if(dynamicQueue.size)setTimeout(flushDynamic,retryDelay)}}
 let appError='',appRead=null,appReadAgain=false;
+/**
+ * @brief Coalesce overlapping requests for current application field values.
+ * @return Promise for the shared current-value request, or an already resolved promise when no request is needed.
+ */
 function refreshAppFields(){if(restartPending||(!dynamicBindings.length/*@if ARDPORTAL_ENABLE_DEPENDENCIES*/&&!dynamicDefinitions.some(p=>p.visibleWhen)/*@endif*/))return Promise.resolve();if(appRead){appReadAgain=true;return appRead}appRead=readAppFields().finally(()=>{appRead=null;if(appReadAgain){appReadAgain=false;refreshAppFields().catch(()=>{})}});return appRead}
+/**
+ * @brief Fetch active-page values and visibility conditions while preserving local edits.
+ * @return A promise resolving when the asynchronous operation completes; rejects on an unhandled failure.
+ */
 async function readAppFields(){try{/*@if ARDPORTAL_ENABLE_DEPENDENCIES*/if(dynamicDefinitions.some(p=>p.visibleWhen)){const visibility=await(await request('/api/page-conditions')).json();for(const page of dynamicDefinitions){const visible=visibility[page.id]!==false;if(page.menuLink)page.menuLink.hidden=!visible;if(page.section)page.section.hidden=!visible}document.querySelector('#dynamicNavigation').hidden=!dynamicDefinitions.some(p=>p.menuLink&&!p.menuLink.hidden)}/*@endif*/if(!dynamicBindings.length)return;const result=await(await request('/api/app?page='+encodeURIComponent(activeDynamicId))).json();for(const binding of dynamicBindings){/*@if ARDPORTAL_ENABLE_DEPENDENCIES*/const conditions=result.conditions?.[binding.field.id];binding.enabled=conditions?.visible??true;if(binding.container){binding.container.hidden=conditions?.visible===false;binding.container.disabled=!binding.enabled}if(binding.node)binding.node.disabled=!binding.enabled;if(binding.dial){binding.dial.setAttribute('aria-disabled',String(!binding.enabled));binding.dial.tabIndex=binding.enabled?0:-1;}/*@endif*/if(binding.dirty||binding.saving||binding.dragging)continue;const value=result.values[binding.field.id];if(value!==undefined)try{binding.write(value)}catch(error){throw Error(t('ui_153',{field:localized(binding.field.names,binding.field.name)}))}}/*@if ARDPORTAL_ENABLE_DEPENDENCIES*/for(const group of new Set(dynamicBindings.map(b=>b.group).filter(Boolean)))group.hidden=dynamicBindings.filter(b=>b.group===group).every(b=>b.container.hidden);/*@endif*/if(appError&&notice.textContent===appError)showNotice('');appError='';}catch(error){appError=t('ui_152',{error:error.message});showNotice(appError,true);throw error;}}
 
 /*@if ARDPORTAL_CONTROL_SUPPORT_DIAL*/function operatingLabel(value){const keys={/*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE || ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER || ARDPORTAL_ENABLE_CONTROL_WATER_HEATER*/off:'ui_143',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE || ARDPORTAL_ENABLE_CONTROL_WATER_HEATER*/heat:'ui_144',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/cool:'ui_145',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE || ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER*/auto:'ui_146',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/dry:'ui_147',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/fan_only:'ui_148',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/idle:'ui_167',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/heating:'ui_168',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/cooling:'ui_169',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/drying:'ui_170',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/fan:'ui_171',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/preheating:'ui_172',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_CLIMATE*/defrosting:'ui_173',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER || ARDPORTAL_ENABLE_CONTROL_WATER_HEATER*/normal:'ui_174',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER || ARDPORTAL_ENABLE_CONTROL_WATER_HEATER*/eco:'ui_175',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER*/electric:'ui_176',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER*/performance:'ui_177',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER*/heat_pump:'ui_178',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER*/high_demand:'ui_179',/*@endif*/};return keys[value]?t(keys[value]):String(value??'—')}/*@endif*/
@@ -126,12 +263,31 @@ async function readAppFields(){try{/*@if ARDPORTAL_ENABLE_DEPENDENCIES*/if(dynam
  const current=dynamicElement('small',center);const adjust=dynamicElement('div',wrap);adjust.className='climateAdjust';const minus=dynamicElement('button',adjust),plus=dynamicElement('button',adjust);minus.type=plus.type='button';minus.textContent='−';plus.textContent='+';minus.setAttribute('aria-label',t('ui_141'));plus.setAttribute('aria-label',t('ui_142'));
  let last={},modeButtons=[],fan=null;
  const modeLabels={off:'ui_143',heat:'ui_144',cool:'ui_145',auto:'ui_146',dry:'ui_147',fan_only:'ui_148'};
+ /**
+  * @brief Render the current control value or interactive dial position.
+  * @return No value (undefined).
+  */
  function paint(){activity.textContent=operatingLabel(field.type==='climate'?(last.action??(last.mode==='off'?'off':'idle')):last.mode);const temperature=Number(target.value),position=value=>Math.max(0,Math.min(1,(value-field.min)/(field.max-field.min))),targetPosition=position(temperature),currentValue=last[currentKey],known=currentValue!==null&&currentValue!==undefined&&currentValue!==''&&Number.isFinite(Number(currentValue)),currentPosition=known?position(Number(currentValue)):targetPosition;
+ /**
+  * @brief Position a control marker within its display area.
+  * @param node HTML element to update.
+  * @param percent Normalized control position in percent.
+  * @return No value (undefined).
+  */
  function place(node,percent){const angle=(225+percent*270)*Math.PI/180;node.style.left=(50+45.2*Math.sin(angle))+'%';node.style.top=(50-45.2*Math.cos(angle))+'%'}
  place(knob,targetPosition);currentDot.hidden=!known;if(known)place(currentDot,currentPosition);currentDot.dataset.above=String(known&&currentPosition>targetPosition);dial.style.setProperty('--arc-low',Math.min(targetPosition,currentPosition)*270+'deg');dial.style.setProperty('--arc-high',targetPosition*270+'deg');dial.style.setProperty('--cool-low',targetPosition*270+'deg');dial.style.setProperty('--cool-high',Math.max(targetPosition,currentPosition)*270+'deg');const cooling=!humidity&&last.mode==='cool';currentCap.hidden=!known||(humidity?last.state==='OFF':last.mode==='off')||!(cooling?currentPosition>targetPosition:currentPosition<targetPosition);if(!currentCap.hidden)place(currentCap,currentPosition);dial.style.setProperty('--cap-start',cooling?(targetPosition>0?'#e6e8eb':currentPosition>0?'var(--climate-color)':'var(--climate-light)'):(Math.min(targetPosition,currentPosition)>0?'var(--climate-light)':targetPosition>0?'var(--climate-color)':'#e6e8eb'));dial.style.setProperty('--cap-end',cooling?(currentPosition===1&&targetPosition<1?'var(--climate-color)':'var(--climate-light)'):(targetPosition<1?'#e6e8eb':currentPosition<1?'var(--climate-color)':'var(--climate-light)'));
  dial.setAttribute('aria-valuenow',temperature);dial.dataset.mode=humidity?(last.state==='OFF'?'off':''):(field.type==='water_heater'?(last.mode==='off'?'off':'heat'):(last.mode||''));minus.disabled=temperature<=field.min;plus.disabled=temperature>=field.max;for(const item of modeButtons)item.node.setAttribute('aria-pressed',String(item.value===last.mode));current.textContent=t(humidity?'ui_159':'ui_102')+': '+(last[currentKey]??'—')+unit}
+ /**
+  * @brief Queue the edited control value for persistence.
+  * @return No value (undefined).
+  */
  function changed(){if(binding.enabled===false)return Promise.resolve();if(binding.timer)clearTimeout(binding.timer);const raw=target.value===''?Number(last[valueKey]??field.min):Number(target.value),step=Number(target.step);target.value=Math.max(field.min,Math.min(field.max,Number((field.min+Math.round((raw-field.min)/step)*step).toFixed(6))));last[valueKey]=Number(target.value);paint();return submit()}
  target.onchange=changed;target.oninput=()=>{binding.dirty=true;if(binding.timer)clearTimeout(binding.timer);const n=Number(target.value);if(target.value!==''&&Number.isFinite(n)&&n>=field.min&&n<=field.max)binding.timer=setTimeout(changed,200)};minus.onclick=()=>{target.value=Math.max(field.min,Number(target.value)-Number(target.step));return changed()};plus.onclick=()=>{target.value=Math.min(field.max,Number(target.value)+Number(target.step));return changed()};
+ /**
+  * @brief Convert a pointer event to a position within the control.
+  * @param event Pointer or input event to process.
+  * @return Convert a pointer event to a position within the control.
+  */
  function point(event){if(binding.enabled===false)return;const rect=dial.getBoundingClientRect(),dx=event.clientX-(rect.left+rect.width/2),dy=event.clientY-(rect.top+rect.height/2);let sweep=(Math.atan2(dx,-dy)*180/Math.PI-225+720)%360;if(sweep>270)sweep=sweep>315?0:270;const step=Number(target.step),value=field.min+Math.round((field.max-field.min)*sweep/270/step)*step;target.value=Math.max(field.min,Math.min(field.max,Number(value.toFixed(6))));last[valueKey]=Number(target.value);binding.dirty=true;paint();if(binding.timer)clearTimeout(binding.timer);binding.timer=setTimeout(changed,200)}
  dial.onpointerdown=event=>{if(binding.enabled===false)return;if(event.target===target)return;const rect=dial.getBoundingClientRect(),distance=Math.hypot(event.clientX-rect.left-rect.width/2,event.clientY-rect.top-rect.height/2);if(distance<rect.width*.35)return;event.preventDefault();binding.dragging=true;dial.setPointerCapture(event.pointerId);point(event)};
  dial.onpointermove=event=>{if(binding.dragging)point(event)};
@@ -143,6 +299,10 @@ async function readAppFields(){try{/*@if ARDPORTAL_ENABLE_DEPENDENCIES*/if(dynam
 }/*@endif*/
 /*@if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR*/function binarySensorControl(field,parent,binding){
  const indicator=dynamicElement('output',parent);indicator.className='binaryIndicator';indicator.setAttribute('aria-live','polite');const dot=dynamicElement('span',indicator);dot.className='binaryDot';dot.setAttribute('aria-hidden','true');const caption=dynamicElement('span',indicator);let last;
+ /**
+  * @brief Render the current control value or interactive dial position.
+  * @return No value (undefined).
+  */
  function paint(){indicator.dataset.state=last===true?'on':last===false?'off':'unknown';caption.textContent=t(last===true?'ui_160':last===false?'ui_161':'ui_162')}
  binding.write=value=>{last=value;paint()};binding.read=()=>last;binding.translate=paint;binding.indicator=indicator;binding.caption=caption;paint();
 }/*@endif*/
@@ -159,7 +319,15 @@ async function readAppFields(){try{/*@if ARDPORTAL_ENABLE_DEPENDENCIES*/if(dynam
   const action=c.type.startsWith('action'),node=dynamicElement(c.type==='select'?'select':c.type==='action_json'?'textarea':'input',wrap);const inputTypes={edit:'text',/*@if ARDPORTAL_CONTROL_SUPPORT_SWITCH*/switch:'checkbox',/*@endif*//*@if ARDPORTAL_CONTROL_SUPPORT_SLIDER*/slider:'range',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_DATETIME*/datetime:'datetime-local',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_LIGHT*/color:'color',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_DATE*/date:'date',/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_TIME*/time:'time',/*@endif*/};node.type=inputTypes[c.type]||'text';
   let output=null;/*@if ARDPORTAL_CONTROL_SUPPORT_SLIDER*/if(c.type==='slider'){node.min=c.min;node.max=c.max;node.step=c.step??1;output=dynamicElement('output',wrap)}/*@endif*//*@if ARDPORTAL_CONTROL_SUPPORT_SWITCH*/if(c.type==='switch'){styleToggle(node,wrap)}/*@endif*//*@if ARDPORTAL_CONTROL_SUPPORT_SELECT*/if(c.type==='select')for(const value of c.options){const option=dynamicElement('option',node);option.value=value;option.textContent=value}/*@endif*/
   let modeButtons=null;/*@if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER || ARDPORTAL_ENABLE_CONTROL_WATER_HEATER*/if(['water_heater','humidifier'].includes(field.type)&&c.key==='mode'&&c.type==='select'){label.className='srOnly';node.hidden=true;modeButtons=[];const row=dynamicElement('div',wrap);row.className='climateModes';row.setAttribute('role','group');for(const value of c.options){const button=dynamicElement('button',row);button.type='button';button.className='climateMode';button.dataset.mode=value==='off'?'off':field.type==='water_heater'?'heat':'';button.textContent=operatingLabel(value);button.onclick=()=>{node.value=value;return send()};modeButtons.push({node:button,value})}}/*@endif*/
+  /**
+   * @brief Request or perform a read through the component API.
+   * @return Request or perform a read through the component API.
+   */
   function read(){/*@if ARDPORTAL_CONTROL_SUPPORT_SLIDER*/if(c.type==='slider')return Number(node.value);/*@endif*//*@if ARDPORTAL_CONTROL_SUPPORT_SWITCH*/if(c.type==='switch')return c.on?(node.checked?c.on:c.off):node.checked;/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_LIGHT*/if(c.type==='color')return {r:parseInt(node.value.slice(1,3),16),g:parseInt(node.value.slice(3,5),16),b:parseInt(node.value.slice(5,7),16)};/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_DATETIME*/if(c.type==='datetime')return node.value.length?node.value.slice(0,19).padEnd(19,':00')+'Z':'';/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_TIME*/if(c.type==='time')return node.value.length===5?node.value+':00':node.value;/*@endif*//*@if ARDPORTAL_ENABLE_CONTROL_INFRARED || ARDPORTAL_ENABLE_CONTROL_VACUUM*/if(c.type==='action_json'){try{return JSON.parse(node.value)}catch(error){throw Error(t('ui_186'))}}/*@endif*/return node.value}
+  /**
+   * @brief Queue the selected control action for transmission.
+   * @return No value (undefined).
+   */
   function send(){if(binding.timer)clearTimeout(binding.timer);try{return queueDynamic(binding,page,index,c.type==='action'?c.payload:read())}catch(error){showNotice(error.message,true)}}
   if(action){if(c.type==='action')node.hidden=true;const button=dynamicElement('button',wrap);button.type='button';button.dataset.i18n=c.type==='action'?(c.label||'ui_107'):'ui_050';button.onclick=send}else {node.onchange=send;node.oninput=()=>{if(output)output.textContent=node.value;binding.dirty=true;if(binding.timer)clearTimeout(binding.timer);binding.timer=setTimeout(send,200)}}
   editors.push({c,node,output,modeButtons});
@@ -175,10 +343,29 @@ async function readAppFields(){try{/*@if ARDPORTAL_ENABLE_DEPENDENCIES*/if(dynam
  binding.write=value=>{dialWrite(value);controlsWrite(value);binding.dial.dataset.mode=humidity?(value.state==='OFF'?'off':''):(field.type==='water_heater'?(value.mode==='off'?'off':'heat'):(value.mode||''))};binding.read=dialRead;binding.translate=()=>{dialTranslate();controlsWrite(dialRead())};
 }/*@endif*/
 let homeHeading=null;
+/**
+ * @brief Check whether a dynamic page is designated as the home page.
+ * @param page Application page definition or identifier.
+ * @return True if the fallback or English page name is home, ignoring case.
+ */
 function isHomePage(page){return (page.name||page.names?.en||'').toLowerCase()==='home'}
+/**
+ * @brief Check whether a page matches the current browser route.
+ * @param page Application page definition or identifier.
+ * @return True if the page matches the route or is the home page at /.
+ */
 function activeDynamicPage(page){return location.pathname==='/p/'+page.id||(location.pathname==='/'&&isHomePage(page))}
 let dynamicCatalogRead=null,dynamicCatalogCount=0;
+/**
+ * @brief Fetch and merge the current page catalog while sharing an in-flight request.
+ * @return Promise for the shared catalog refresh.
+ */
 function refreshDynamicCatalog(){if(dynamicCatalogRead)return dynamicCatalogRead;dynamicCatalogRead=(async()=>{const catalog=await(await request('/api/page-catalog')).json();if(!Array.isArray(catalog))throw Error(t('ui_155'));await loadDynamicPages(catalog);openConsole()})().finally(()=>{dynamicCatalogRead=null});return dynamicCatalogRead}
+/**
+ * @brief Merge the page catalog and load the active page definition without discarding unsaved controls.
+ * @param catalog Page metadata to merge; null fetches the current catalog.
+ * @return A promise resolving when the asynchronous operation completes; rejects on an unhandled failure.
+ */
 async function loadDynamicPages(catalog=null){
  if(catalog){for(const page of catalog)if(!dynamicDefinitions.some(existing=>existing.id===page.id))dynamicDefinitions.push(page)}else dynamicDefinitions=JSON.parse(document.getElementById('pageCatalog').textContent||'[]');if(!Array.isArray(dynamicDefinitions))throw Error(t('ui_155'));if(!dynamicDefinitions.length)return;
 
@@ -220,6 +407,10 @@ async function loadDynamicPages(catalog=null){
 }
 /*@endif*/
 let portalReady=false,languagesLoaded=false;
+/**
+ * @brief Load language data and dynamic pages, then start live updates; retry initialization on failure.
+ * @return A promise resolving when the asynchronous operation completes; rejects on an unhandled failure.
+ */
 async function startPortal(){try{if(!languagesLoaded){document.querySelector('#languageChoice').replaceChildren(document.querySelector('#languageLabel'));await loadLanguages();languagesLoaded=true}/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/await loadDynamicPages();/*@endif*/portalReady=true;if(notice.textContent===t('ui_149'))showNotice('');openConsole()}catch(e){showNotice(e.message,true);setTimeout(startPortal,2000)}}
 startPortal();setInterval(()=>{if(portalReady)refresh();if(consoleConnected&&Date.now()-socketLastSeen>35000)consoleSocket?.close()},1000);
 </script></html>)HTML";

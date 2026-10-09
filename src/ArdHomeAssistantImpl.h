@@ -7,6 +7,11 @@
 #include "Language.h"
 using V = ArdJSON::JSONVar;
 namespace {
+/**
+ * @brief Resolve the localized label used in Home Assistant discovery.
+ * @param definition JSON definition to register; flash sources must remain valid for the portal lifetime.
+ * @return The resulting text; an empty value indicates no available text or failure where applicable.
+ */
 String discoveryLabel(const V& definition) {
   String name=definition["name"].asString();
   if(name.length())return name;
@@ -18,11 +23,15 @@ String discoveryLabel(const V& definition) {
 }
 
 
+/**
+ * @brief Restart the Home Assistant discovery publication cursor.
+ * @return No value.
+ */
 void ArdHomeAssistant::resetDiscovery() {
-  _haDiscovery=0; _haOnline=false; _haSince=millis();_serviceStage=0;
+  _haDiscovery=0; _haOnline=false;_discoveryRetryPending=false; _haSince=millis();_serviceStage=0;
   _portal._appControls.resetMqtt();
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-  _walk.reset();_walkDepth=0;_dependencyMask=0;
+  _walk.reset();_walkDepth=0;_dependencyRetryPending=false;_dependencyMask=0;
   const auto& definitions=_portal._dynamic;
   for(size_t p=0;p<definitions.pages.length();++p)for(size_t f=0;f<definitions.pages.fields(p);++f)if(definitions.pages.dependent(p,f))_dependencyMask|=ArdAppConfigFieldMask::forField(definitions.pages.fieldIndex(p,f));
   for(const auto* entity=definitions.entities.get();entity;entity=entity->next.get())if(entity->dependent)_dependencyMask|=ArdAppConfigFieldMask::forField(entity->index);
@@ -30,6 +39,11 @@ void ArdHomeAssistant::resetDiscovery() {
 #endif
 }
 
+/**
+ * @brief Check whether the specified page or field has been registered.
+ * @param first Whether to initialize the incremental publication pass.
+ * @return No value.
+ */
 void ArdHomeAssistant::registered(size_t first) {
   ArdAppConfigFieldMask states,dependencies;
   for(size_t i=first;i<_portal._dynamic.count();++i){auto bit=ArdAppConfigFieldMask::forField(i);if(!_portal._dynamic.transientAt(i))states|=bit;
@@ -39,6 +53,13 @@ void ArdHomeAssistant::registered(size_t first) {
   }
   registered(first,states,dependencies);
 }
+/**
+ * @brief Check whether the specified page or field has been registered.
+ * @param first Whether to initialize the incremental publication pass.
+ * @param states Mask of application states to publish.
+ * @param dependencies Mask of dependency fields requiring work.
+ * @return No value.
+ */
 void ArdHomeAssistant::registered(size_t first,const ArdAppConfigFieldMask& states,const ArdAppConfigFieldMask& dependencies) {
   if(!first){_haSince=millis();_portal._appControls._stateSince=millis();}
   _portal._appControls._stateDirty|=states;
@@ -50,32 +71,76 @@ void ArdHomeAssistant::registered(size_t first,const ArdAppConfigFieldMask& stat
 }
 
 #if ARDPORTAL_ENABLE_DEPENDENCIES
+/**
+ * @brief Invalidate the reverse-index closure of one changed controller.
+ * @param key Changed application field identifier.
+ * @return No value; only a traversal whose root is affected is cancelled.
+ */
+void ArdHomeAssistant::dependencyChanged(const String& key){
+  size_t controller=_portal._dynamic.indexOf(key);
+  if(!_portal._dynamic.dependencyControllers.test(controller))return;
+  ArdAppConfigFieldMask pending=ArdAppConfigFieldMask::forField(controller),seen,affected;
+  while(pending){size_t index=pending.firstSet();auto bit=ArdAppConfigFieldMask::forField(index);pending&=~bit;seen|=bit;
+    auto next=_portal._dynamic.dependents(index);affected|=next;pending|=next&~seen;
+  }
+  _dependencyDirty|=affected;
+  if(_walkDepth&&affected.test(_walkIndex)){_walk.reset();_walkDepth=0;}
+}
+
+/**
+ * @brief Finish the current dependency visibility transition.
+ * @param visible Whether the field or page should be visible.
+ * @return No value.
+ */
 void ArdHomeAssistant::completeDependency(bool visible) {
   auto bit=ArdAppConfigFieldMask::forField(_walkIndex);
   if(!_dependencyKnown.test(_walkIndex)||visible!=_dependencyVisible.test(_walkIndex)){if(_dependencyKnown.test(_walkIndex)||_walkIndex<_haDiscovery)_dependencyDiscovery|=bit;if(visible)_portal._appControls._stateDirty|=bit;}
   _dependencyVisible=visible?(_dependencyVisible|bit):(_dependencyVisible&~bit);_dependencyKnown|=bit;_dependencyDirty&=~bit;_walkDepth=0;_walk.reset();
 }
+/**
+ * @brief Advance dependency-driven visibility and state changes.
+ * @return True on success; false if validation, resource allocation or the operation fails.
+ */
 bool ArdHomeAssistant::serviceDependencies() {
-  if(_dependencyRevision!=_portal._appRevision){_dependencyRevision=_portal._appRevision;_dependencyDirty|=_dependencyMask;_walk.reset();_walkDepth=0;}
+  const size_t workIndex=_walkDepth?_walk[_walkDepth-1].index:_dependencyDirty.firstSet();
+  if(!ArdHeap::permits(_portal._dynamic.fieldWork(workIndex),_portal._dynamic.fieldBlock(workIndex)))return false;
+  _dependencyRevision=_portal._appRevision; // UI revisions do not invalidate the HA dependency graph.
+  if(_dependencyRetryPending){if(int32_t(millis()-_dependencyRetryAt)<0)return false;_dependencyRetryPending=false;}
   if(!_walkDepth){_walkIndex=_dependencyDirty.firstSet();if(_walkIndex>=_portal._dynamic.count())return false;
-    _walk.reset(new(std::nothrow) DependencyFrame[_portal._dynamic.count()]);if(!_walk)return true;
-    _walkDepth=1;_walk[0]={uint16_t(_walkIndex),0};_walkActive=ArdAppConfigFieldMask::forField(_walkIndex);_walkComplete=0;return true;
+    if(!_walk.reserve(1,_portal._dynamic.count())){_dependencyRetryAt=millis()+1000;_dependencyRetryPending=true;return true;}
+    _walkDepth=1;_walk[0]={uint16_t(_walkIndex),0,0};_walkActive=ArdAppConfigFieldMask::forField(_walkIndex);_walkComplete=0;_walkVisible=0;return true;
   }
-  DependencyFrame& frame=_walk[_walkDepth-1];
-  if(frame.edge==2){auto bit=ArdAppConfigFieldMask::forField(frame.index);_walkActive&=~bit;_walkComplete|=bit;if(!--_walkDepth)completeDependency(true);return true;}
-  V field=_portal._dynamic.at(frame.index);if(!field.isValid()||field.isUndefined()){completeDependency(false);return true;}
-  const V& rule=field[frame.edge++?"visibleWhen":"_pageVisibleWhen"];if(rule.isUndefined())return true;
-  if(!_portal._appControls.dependencyValueMatches(rule)){completeDependency(false);return true;}
-  size_t next=_portal._dynamic.indexOf(rule["field"].asString());
-  if(next>=_portal._dynamic.count()||_walkActive.test(next)){completeDependency(false);return true;}
-  if(_walkComplete.test(next)||!_portal._dynamic.dependentAt(next))return true;
-  if(_walkDepth>=_portal._dynamic.count()){completeDependency(false);return true;}
-  _walkActive|=ArdAppConfigFieldMask::forField(next);_walk[_walkDepth++]={uint16_t(next),0};return true;
+  auto load=[&](size_t i){return _portal._dynamic.at(i);};
+  auto indexOf=[&](const String& id){return _portal._dynamic.indexOf(id);};
+  auto dependent=[&](size_t i){return _portal._dynamic.dependentAt(i);};
+  auto match=[&](const V& leaf){return _portal._appControls.dependencyValueMatches(leaf);};
+  auto result=ArdDependencies::step(_walk,_walkDepth,_walkActive,_walkComplete,_walkVisible,
+                                  _portal._dynamic.count(),load,indexOf,dependent,match);
+  if(result==ArdDependencies::Result::Invalid){
+    _walk.reset();_walkDepth=0;_dependencyRetryAt=millis()+1000;_dependencyRetryPending=true;
+  }else if(result!=ArdDependencies::Result::Running)completeDependency(result==ArdDependencies::Result::Visible);
+  return true;
 }
 #endif
 
+/**
+ * @brief Build the Home Assistant MQTT discovery document for an entity.
+ * @param definition JSON definition to register; flash sources must remain valid for the portal lifetime.
+ * @param error Output error text; populated when the operation fails.
+ * @return The resulting text; an empty value indicates no available text or failure where applicable.
+ */
 String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) const {
-  V resolved=definition;if(ArdHa::extended(resolved)&&!ArdHa::normalize(resolved)) {if(error)*error="descriptor normalization failed";return String();}const V& f=resolved;
+  V resolved;const V* source=&definition;
+  if(!definition.isValid()){if(error)*error="invalid discovery definition";return String();}
+  if(ArdHa::extended(definition)){
+    resolved=definition;
+    if(!resolved.isValid()||!ArdHa::normalize(resolved)||!resolved.isValid()){
+      if(error) *error="descriptor normalization failed";
+      return String();
+    }
+    source=&resolved;
+  }
+  const V& f=*source;
   String id=f["id"].asString(),type=f["type"].asString(),state=_portal._mqttClient.mqttTopic("stat",id.c_str()),command=_portal._mqttClient.mqttTopic("cmnd",id.c_str());
   V c=V::object(); c["unique_id"]="ardui_"+_portal.chipId()+"_"+id;
   c["name"]=discoveryLabel(f);
@@ -131,12 +196,24 @@ String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) cons
     c[key]=value;
   }
   String component=ArdHa::component(f);
+#if ARDPORTAL_ENABLE_CONTROL_SWITCH
+  if(type=="switch") {
+    // Keep HA mode defaults and explicit field options; choose a toggle icon.
+    if(!c["state_topic"].asString().length())c["state_topic"]=state;
+    if(!c.hasOwnProperty("icon"))c["icon"]="mdi:toggle-switch";
+  }
+#endif
   if(component=="device_automation"||component=="tag") {c.remove("unique_id");c.remove("name");c.remove("availability_topic");c.remove("icon");}
   for(const char* key:{"unit_of_measurement","device_class","state_class","entity_category"}) if(f.hasOwnProperty(key)) c[key]=f[key];
   return _portal._json.stringify(c,false,error);
 }
 
 // DOM parsing and core transport calls cannot be preempted mid-unit.
+/**
+ * @brief Publish the next pending Home Assistant discovery entry within the work budget.
+ * @param now Current time used to evaluate deadlines.
+ * @return No value.
+ */
 void ArdHomeAssistant::serviceDiscovery(uint32_t now) {
   if(!_portal._appControls.canServiceMqtt()){
 #if ARDPORTAL_ENABLE_DEPENDENCIES
@@ -149,7 +226,14 @@ void ArdHomeAssistant::serviceDiscovery(uint32_t now) {
     if(!serviceOne(now))break;
   }
 }
+/**
+ * @brief Perform one pending Home Assistant publication or dependency work unit.
+ * @param now Current time used to evaluate deadlines.
+ * @return True if a work unit was performed; false if there is no eligible work.
+ */
 bool ArdHomeAssistant::serviceOne(uint32_t now) {
+  auto defer=[&](){_discoveryRetryAt=now+1000;_discoveryRetryPending=true;};
+  if(_discoveryRetryPending&&int32_t(now-_discoveryRetryAt)>=0)_discoveryRetryPending=false;
   for(unsigned skipped=0;skipped<6;++skipped){switch(_serviceStage){
     case 0:_portal._appControls.prepareMqtt(now);_serviceStage=1;return true;
     case 1:
@@ -165,12 +249,12 @@ bool ArdHomeAssistant::serviceOne(uint32_t now) {
     case 3:
       if(_portal._mqttClient.sendBusy()){_serviceStage=0;return false;}_serviceStage=4;
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-      if(_dependencyRevision==_portal._appRevision){size_t index=_dependencyDiscovery.firstSet();if(index<_portal._dynamic.count()){
-        if(_dependencyDirty.test(index))break;
-        auto bit=ArdAppConfigFieldMask::forField(index);V field=_portal._dynamic.at(index);if(field.isUndefined()||!field.isValid())return true;
+      {size_t index=_dependencyDiscovery.firstSet();if(index<_portal._dynamic.count()){
+        if(_dependencyDirty.test(index)||_discoveryRetryPending||!ArdHeap::permits(_portal._dynamic.fieldWork(index),_portal._dynamic.fieldBlock(index)))break;
+        auto bit=ArdAppConfigFieldMask::forField(index);V field=_portal._dynamic.at(index);if(field.isUndefined()||!field.isValid()){defer();return true;}
         String topic=String(F("homeassistant/"))+ArdHa::component(field)+"/ardui_"+_portal.chipId()+"/"+field["id"].asString()+"/config";
-        String payload=_dependencyVisible.test(index)?discoveryConfig(field):String();if(_dependencyVisible.test(index)&&!payload.length())return true;
-        if(_portal._mqttClient.publishRaw(topic.c_str(),payload.c_str(),true)){_dependencyDiscovery&=~bit;if(_dependencyVisible.test(index)&&!ArdHa::transient(field))_portal._appControls._stateDirty|=bit;_portal._appControls._yieldPending=true;}return true;
+        String payload=_dependencyVisible.test(index)?discoveryConfig(field):String();if(_dependencyVisible.test(index)&&!payload.length()){defer();return true;}
+        if(_portal._mqttClient.publishRaw(topic.c_str(),payload.c_str(),true)){_dependencyDiscovery&=~bit;if(_dependencyVisible.test(index)&&!ArdHa::transient(field))_portal._appControls._stateDirty|=bit;_portal._appControls._yieldPending=true;}else defer();return true;
       }}
 #endif
       break;
@@ -180,18 +264,26 @@ bool ArdHomeAssistant::serviceOne(uint32_t now) {
     default:
       if(_portal._mqttClient.sendBusy()){_serviceStage=0;return false;}_serviceStage=0;
       if(_haDiscovery>=_portal._dynamic.count()){if(_portal._options.discoveryIntervalMs&&uint32_t(now-_haSince)>=_portal._options.discoveryIntervalMs){_haDiscovery=0;_haSince=now;}else return false;}
+      if(_discoveryRetryPending||!ArdHeap::permits(_portal._dynamic.fieldWork(_haDiscovery),_portal._dynamic.fieldBlock(_haDiscovery)))return false;
       {bool visible=true;
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-        if(_dependencyMask.test(_haDiscovery)){if(_dependencyRevision!=_portal._appRevision||!_dependencyKnown.test(_haDiscovery)||_dependencyDirty.test(_haDiscovery))return false;visible=_dependencyVisible.test(_haDiscovery);}
+        if(_dependencyMask.test(_haDiscovery)){if(!_dependencyKnown.test(_haDiscovery)||_dependencyDirty.test(_haDiscovery))return false;visible=_dependencyVisible.test(_haDiscovery);}
 #endif
-        V field=_portal._dynamic.at(_haDiscovery);if(field.isUndefined()||!field.isValid())return true;
+        V field=_portal._dynamic.at(_haDiscovery);if(field.isUndefined()||!field.isValid()){defer();return true;}
         String topic=String(F("homeassistant/"))+ArdHa::component(field)+"/ardui_"+_portal.chipId()+"/"+field["id"].asString()+"/config",payload=visible?discoveryConfig(field):String();
-        if(visible&&!payload.length())return true;
-        if(_portal._mqttClient.publishRaw(topic.c_str(),payload.c_str(),true)){if(visible&&!ArdHa::transient(field))_portal._appControls._stateDirty|=ArdAppConfigFieldMask::forField(_haDiscovery);++_haDiscovery;_portal._appControls._yieldPending=true;}return true;
+        if(visible&&!payload.length()){defer();return true;}
+        if(_portal._mqttClient.publishRaw(topic.c_str(),payload.c_str(),true)){if(visible&&!ArdHa::transient(field))_portal._appControls._stateDirty|=ArdAppConfigFieldMask::forField(_haDiscovery);++_haDiscovery;_portal._appControls._yieldPending=true;}else defer();return true;
       }
   }}return false;
 }
 
+/**
+ * @brief Handle the Home Assistant birth/status topic and schedule discovery when HA comes online.
+ * @param topic MQTT topic to publish, subscribe or match.
+ * @param data Data buffer or value used by the operation.
+ * @param size Number of bytes or elements.
+ * @return True if the message belongs to the Home Assistant status topic; false otherwise.
+ */
 bool ArdHomeAssistant::handleStatus(const String& topic, const uint8_t* data, size_t size) {
   if (topic != "homeassistant/status") return false;
   String value; for (size_t i=0; i<size; ++i) value += char(data[i]);

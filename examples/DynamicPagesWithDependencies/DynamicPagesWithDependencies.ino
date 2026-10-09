@@ -1,7 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 /*
- * Show and hide dynamic fields using visibleWhen dependencies on another field.
+ * Show and hide dynamic fields using visibleWhen single-field and grouped AND/OR dependencies.
  * With HA enabled, discovery is removed/recreated as field visibility changes.
  */
 
@@ -34,6 +34,27 @@ static const char CONTROL_PAGE[] PROGMEM = R"JSON({
       }
     },
     {
+      "id": "alternative",
+      "type": "switch",
+      "name": "Alternative",
+      "default": false
+    },
+    {
+      "id": "grouped_note",
+      "type": "edit",
+      "name": "Grouped note",
+      "default": "",
+      "visibleWhen": {
+        "and": [
+          {"field": "enabled", "equals": true},
+          {"or": [
+            {"field": "level", "equals": 50},
+            {"field": "alternative", "equals": true}
+          ]}
+        ]
+      }
+    },
+    {
       "id": "note",
       "type": "edit",
       "name": "Note",
@@ -49,6 +70,10 @@ static const char CONTROL_PAGE[] PROGMEM = R"JSON({
 bool pageRegistered = false;
 bool startupApplied = false;
 
+/**
+ * @brief Initialize the example hardware, callbacks and portal.
+ * @return No value.
+ */
 void setup() {
   Serial.begin(115200);
   portal.onAppConfigPageRegistrationFinished([](bool success) {
@@ -73,6 +98,10 @@ void setup() {
   if (!portal.begin()) Serial.println("Could not start the portal.");
 }
 
+/**
+ * @brief Advance the component work; call repeatedly from the Arduino main loop.
+ * @return No value.
+ */
 void loop() {
   portal.loop(); // Services registration, live controls, MQTT and storage.
   if (!startupApplied && pageRegistered && portal.portalAndAppConfigReady()) {

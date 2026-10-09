@@ -11,6 +11,9 @@ from control_assets import emit_chunks, condition_enabled
 from generate_portal_assets import gzip_array
 
 
+# @brief Build a JSON object while rejecting duplicate keys.
+# @param pairs Ordered JSON key/value pairs; duplicate keys are rejected.
+# @return A dictionary of the pairs; raises on duplicate keys.
 def unique_object(pairs):
     result = {}
     for key, value in pairs:
@@ -26,12 +29,29 @@ UI_VARIANTS = [(1, 1, 1), (1, 1, 0), (1, 0, 0), (0, 1, 1), (0, 1, 0), (0, 0, 0)]
 STORAGE_KEYS = {f's_{number}' for number in (194,195,196,198,199,200,204)}
 
 
+# @brief Collect the localized UI strings used by the portal source.
+# @param strings Localized UI string collection.
+# @param ota Whether OTA UI is included.
+# @param mqtt Whether MQTT UI is included.
+# @param console Whether Console UI is included.
+# @param controls Optional set of controls included in the asset.
+# @param dynamic Whether dynamic-page UI is included.
+# @param tls Whether MQTT TLS UI is included.
+# @return The collected UI string definitions.
 def ui_strings(strings, ota=1, mqtt=1, console=1, controls=None, dynamic=True, tls=True):
     enabled = {'OTA': ota, 'MQTT': mqtt, 'CONSOLE': console and mqtt, 'HA': True, 'DEPENDENCIES': dynamic, 'DYNAMIC_PAGES': dynamic, 'WEBSOCKET': dynamic or (console and mqtt), 'MQTT_TLS':tls and mqtt}
     excluded = {key for feature, keys in FEATURE_KEYS.items() if not enabled[feature] for key in keys}
     return {key: value for key, value in strings.items() if key.startswith('ui_') and key not in excluded and condition_enabled(condition_for(key), controls, enabled)}
 
 
+# @brief Build the language payload for the selected UI features.
+# @param lines Generated source lines to wrap in a feature guard.
+# @param name Fallback name or generated symbol name.
+# @param strings Localized UI string collection.
+# @param flags Enabled UI feature flags.
+# @param controls Optional set of controls included in the asset.
+# @param dynamic Whether dynamic-page UI is included.
+# @return Serialized UI language data for the selected features.
 def ui_payload(lines,name,strings,flags,controls=None,dynamic=True):
     lines.append('#if ARDPORTAL_ENABLE_MQTT_TLS')
     for tls in [True,False]:
@@ -41,10 +61,16 @@ def ui_payload(lines,name,strings,flags,controls=None,dynamic=True):
     lines.append('#endif')
 
 
+# @brief Resolve the feature controlling a localized string.
+# @param key Configuration key or JSON object member name.
+# @return The feature condition associated with the string.
 def feature_for(key):
     return next((feature for feature, keys in FEATURE_KEYS.items() if key in keys), None)
 
 
+# @brief Build the compile-time condition selecting a language asset.
+# @param key Configuration key or JSON object member name.
+# @return The C++ feature expression selecting the asset variant.
 def condition_for(key):
     feature = feature_for(key)
     if feature == 'WEBSOCKET':
@@ -59,6 +85,11 @@ def condition_for(key):
     return '1'
 
 
+# @brief Wrap generated lines in their feature condition.
+# @param lines Generated source lines to wrap in a feature guard.
+# @param key Configuration key or JSON object member name.
+# @param body HTTP or MQTT message body.
+# @return Generated lines wrapped in the requested feature condition.
 def guarded(lines, key, body):
     condition = condition_for(key)
     if condition != '1':
@@ -68,6 +99,9 @@ def guarded(lines, key, body):
         lines.append('#endif')
 
 
+# @brief Build the generated header text from its source definitions.
+# @param directory Directory containing language source files.
+# @return Complete generated C++ header text.
 def generate(directory):
     paths = sorted(directory.glob("*.json"), key=lambda path: (path.stem != "en", path.name))
     if not paths:
@@ -177,6 +211,8 @@ def generate(directory):
     return '\n'.join(lines)
 
 
+# @brief Parse command-line options and generate or verify the output file.
+# @return No value; exits with an error when generation or verification fails.
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     root = Path(__file__).resolve().parents[1]
