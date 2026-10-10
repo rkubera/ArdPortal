@@ -14,6 +14,14 @@ ArdPortal is an Arduino library for ESP8266 and ESP32 that provides a browser-ba
 
 **[Full documentation and API reference → GitHub Wiki](https://github.com/rkubera/ArdPortal/wiki)**
 
+## Portal preview
+
+Home page from the DHT example, with live temperature and humidity readings:
+
+![ArdPortal Home with temperature, humidity and device information](media/Demo1.png)
+
+[See more portal screenshots](https://github.com/rkubera/ArdPortal/wiki/Screenshots) · [Explore all 30 controls](https://github.com/rkubera/ArdPortal/wiki/Controls)
+
 ## Install and connect
 
 Install **ArdPortal** through Arduino Library Manager, or download a [release ZIP](https://github.com/rkubera/ArdPortal/releases) and use **Sketch → Include Library → Add .ZIP Library**. Install the ESP8266 or ESP32 Arduino board package and select a board/flash layout with room for ArdFS and, if needed, OTA.
