@@ -755,6 +755,9 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     if (!_configurationReady || portalAndAppConfigBusy() || mqttTrialActive() || _rebootPending) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
     if (_request.substring(_request.indexOf("\r\n\r\n") + 4) != "confirm=RESET") { replyMessage(400,ArdUILanguage::Key::s_124); return; }
     PortalConfig defaults; defaults.deviceName = defaultDeviceName(); defaults.apName = defaults.deviceName;
+    // Notify independently of configuration differences, before replacing any values.
+    auto beforeFactoryReset = _beforeFactoryReset;
+    if (beforeFactoryReset) beforeFactoryReset();
     closeMqtt();
     if (!scheduleConfig(defaults, ArdJSON::JSONVar::object(), ChangeSource::FactoryReset, true)) { replyMessage(500,ArdUILanguage::Key::s_107); return; }
     _resetAfterSave = true; _httpWaitingStorage = true; return;

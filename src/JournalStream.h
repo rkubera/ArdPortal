@@ -13,7 +13,8 @@ struct ArdJournalStream {
  static uint32_t update(uint32_t crc,uint8_t b){crc^=b;for(uint8_t i=0;i<8;++i)crc=(crc>>1)^(0xedb88320U&(0U-(crc&1)));return crc;}
  static bool literal(const char*& at,const char* text){size_t n=strlen(text);if(strncmp(at,text,n))return false;at+=n;return true;}
  static bool number(const char*& at,uint32_t& value){
-  if(*at<'0'||*at>'9')return false;bool zero=*at=='0';value=0;
+  if(*at<'0'||*at>'9')return false;
+  bool zero=*at=='0';value=0;
   do{uint8_t digit=*at-'0';if(value>(UINT32_MAX-digit)/10)return false;value=value*10+digit;++at;if(zero&&*at>='0'&&*at<='9')return false;}while(*at>='0'&&*at<='9');return true;
  }
  bool valid()const{return canonical&&!failed&&state==4&&!utfLeft&&!high&&~crc==expectedCrc;}
@@ -38,7 +39,8 @@ struct ArdJournalStream {
    uint32_t gen=0,checksum=0;const char* at=header;
    if(!literal(at,"{\"journal\":1,\"generation\":")||!number(at,gen)||!literal(at,",\"crc32\":")||!number(at,checksum)||!literal(at,",\"data\":\"")||*at){failed=true;return;}
    generation=gen;expectedCrc=checksum;canonical=true;state=1;
-   for(uint8_t i=0;i<4;++i)crc=update(crc,uint8_t(generation>>(8*i)));return;
+   for(uint8_t i=0;i<4;++i)crc=update(crc,uint8_t(generation>>(8*i)));
+   return;
   }
   if(state==3){if(b=='}')state=4;else if(b!=32&&b!=9&&b!=10&&b!=13)failed=true;return;}
   if(state==4){if(b!=32&&b!=9&&b!=10&&b!=13)failed=true;return;}
@@ -51,7 +53,8 @@ struct ArdJournalStream {
   }
   if(state==2){state=1;if(high&&b!='u'){failed=true;return;}if(b=='u'){unicode=0;hexLeft=4;return;}
    uint8_t decoded=b=='b'?8:b=='f'?12:b=='n'?10:b=='r'?13:b=='t'?9:b;
-   if(!(b=='b'||b=='f'||b=='n'||b=='r'||b=='t'||b=='"'||b=='\\'||b=='/')||!output(decoded,emit))failed=true;return;
+   if(!(b=='b'||b=='f'||b=='n'||b=='r'||b=='t'||b=='"'||b=='\\'||b=='/')||!output(decoded,emit))failed=true;
+   return;
   }
   if(high&&b!='\\'){failed=true;return;}
   if(b=='"'){if(high||utfLeft)failed=true;else state=3;return;}

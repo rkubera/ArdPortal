@@ -1125,11 +1125,13 @@ private:
   bool writeObjectPatch(const JSONVar& base,const JSONVar& patch){
     if(base._type!=JSONVar::Type::Object||patch._type!=JSONVar::Type::Object||!base.isValid()||!patch.isObjectPatchValid())return fail("invalid object patch");
     if(++_nodes>_limits.maxNodes)return fail("node limit");
-    if(!append("{"))return false;bool first=true;size_t members=0;
+    if(!append("{"))return false;
+    bool first=true;size_t members=0;
     auto emit=[&](const JSONVar::Member* item,const JSONVar& value){
       if(value.isUndefined())return true;
       if(++members>MaxContainerElements)return fail("element limit");
-      if(!first&&!append(","))return false;first=false;
+      if(!first&&!append(","))return false;
+      first=false;
       String key=item->key.text();if(key.length()!=item->key.length())return fail("out of memory");
       return string(key)&&append(":")&&write(value,1);
     };

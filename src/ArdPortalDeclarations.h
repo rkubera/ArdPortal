@@ -101,6 +101,7 @@ public:
   using ChangeSource = ArdPortalChangeSource;
   using RestartReason = ArdPortalRestartReason;
   using RestartCallback = std::function<void(RestartReason)>;
+  using BeforeFactoryResetCallback = std::function<void()>;
   using PortalConfigChangedCallback = std::function<void(const PortalConfig&, ChangeSource)>;
   using PortalAndAppConfigSavedCallback = std::function<void(bool, const String&)>;
   using PortalAndAppConfigReadyCallback = std::function<void(bool)>;
@@ -117,6 +118,12 @@ public:
    * @return No value.
    */
   void onBeforeRestart(RestartCallback callback) { _beforeRestart = callback; }
+  /**
+   * @brief Install the callback run before a confirmed factory reset, even if settings are already default.
+   * @param callback Synchronous handler called once before default settings are scheduled for storage. An empty handler disables it.
+   * @return No value. Ordinary restarts and storage formatting do not invoke this callback.
+   */
+  void onBeforeFactoryReset(BeforeFactoryResetCallback callback) { _beforeFactoryReset = callback; }
   /**
    * @brief Install the callback reporting completion of a persistent configuration save.
    * @param callback Completion or event handler supplied to this operation.
@@ -647,6 +654,7 @@ private:
   PortalConfigChangedCallback _changed;
   PortalAndAppConfigSavedCallback _saved;
   RestartCallback _beforeRestart;
+  BeforeFactoryResetCallback _beforeFactoryReset;
   PortalAndAppConfigReadyCallback _readyCallback;
   ChangeSource _saveSource = ChangeSource::Application;
   bool _configurationReady = false, _loadStarted = false, _savePending = false, _saveQueued = false;

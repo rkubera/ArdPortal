@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.8 — 2026-10-11
+
+### Added
+- Add `onBeforeFactoryReset(void())`, called once for a confirmed, eligible factory-reset request before scheduling default configuration. Invoke it even when current settings already match defaults. The handler completes synchronously; ordinary/OTA restarts and storage formatting skip it. Configuration-change callbacks remain change-only.
+- Publish comprehensive English GitHub Wiki documentation for Portal, ArdFS and ArdJSON APIs, feature defines, all 30 controls, dependencies, MQTT and Home Assistant, with screenshots and minimal/full JSON examples.
+- Add a complete two-page example showing sequential asynchronous registration, immediate and deferred errors, and configuration readiness before applying startup values.
+
+### Fixed
+- Hide the repeated label before the light color picker by default. Optional `colorLabel` and localized `colorLabels` supply a dedicated portal label without changing the HA entity name.
+- Remove misleading-indentation compiler warnings in JSON object-patch serialization and the streaming journal reader without changing behavior.
+
+### Documentation and validation
+- Shorten README to installation, a portal preview, a minimal sketch and links to the Wiki.
+- Add host-side factory-reset callback regression coverage for ordering, request guards, unchanged-default notification, missing handlers and save rejection.
+- Verify generated portal assets, run storage/topic/HTTP/runtime regression suites, and compile DynamicPages for ESP8266 and ESP32.
+
 ## 0.7.7 — 2026-10-09
 
 ### Added
