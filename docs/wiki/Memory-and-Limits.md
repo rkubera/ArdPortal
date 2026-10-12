@@ -53,11 +53,6 @@ Page conditions are stored as compact JSON text rather than persistent JSON tree
 flash page sources remain in flash, RAM sources are moved into the registry, and
 fields retain compact indexes instead of permanent parsed definitions.
 
-`examples/HeapPressure` exercises controlled memory pressure on ESP32/ESP8266.
-UART commands `0` release memory, `1`–`4` target 32/24/16/8 KiB free memory and `r`
-queues its sample page. Watch the actual reported pools, registration state and
-HTTP/MQTT behavior. Use a dedicated test board; press `0` after the experiment.
-
 ## Handling memory errors
 
 Check JSON values with `isValid()` and check Boolean returns from registration and update methods. A rejected operation must not be treated as a successful value change. Use the Console's Messages tab, registration error details and heap metrics to diagnose memory pressure; see [Troubleshooting](https://github.com/rkubera/ArdPortal/wiki/Troubleshooting).
