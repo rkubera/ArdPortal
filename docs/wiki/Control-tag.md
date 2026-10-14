@@ -49,6 +49,26 @@
 
 Creates MQTT tag discovery. Publish the scanned identifier as a string with `portal.emitAppConfigEvent("reader", "tag-123")`; the library does not read a physical tag.
 
+## Integration with Home Assistant
+
+**MQTT component:** `tag`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** Transient tag identifiers emitted through `emitAppConfigEvent()` on the discovered topic can drive HA tag automations.
+
+**Not provided by the built-in integration / limits:** No RFID/NFC reader driver, automatic tag scanning, persistent tag history or editable tag control. The application provides the tag identifier.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Status: not mapped by ArdPortal.** Tag identifiers are not transported through Zigbee. Enabling Zigbee does not create an endpoint for this field. The field remains usable in the portal and through MQTT/HA when those features are enabled.
+
+This describes the current ArdPortal implementation, not a claim that Zigbee cannot represent a similar device through a standard cluster or a gateway-specific converter.
+
+**Possible extension, not implemented:** Character/octet-string attribute or custom scan command. A tag identifier can be transmitted, but existing standard generic clusters do not describe arbitrary NFC/RFID scans as HA tags. Repeatable scans require event semantics; a converter must interpret the identifier and emit the host tag event. See the [mapping feasibility table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#possible-mappings-not-yet-implemented).
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

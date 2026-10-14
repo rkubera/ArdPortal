@@ -20,7 +20,7 @@ GROUPS={
 # @param features Feature selections used to evaluate the asset guard.
 # @return True if the feature expression is enabled for the chosen controls.
 def condition_enabled(condition, controls=None, features=None):
- values={'ARDPORTAL_ENABLE_DEPENDENCIES':1,'ARDPORTAL_ENABLE_DYNAMIC_PAGES':1}
+ values={'ARDPORTAL_ENABLE_ZIGBEE':0,'ARDPORTAL_ENABLE_DEPENDENCIES':1,'ARDPORTAL_ENABLE_DYNAMIC_PAGES':1}
  values.update({PREFIX+c.upper():int(controls is None or c in controls) for c in CONTROLS})
  values.update({'ARDPORTAL_CONTROL_SUPPORT_'+g:int(any(values[PREFIX+c.upper()] for c in cs)) for g,cs in GROUPS.items()})
  if features:values.update({'ARDPORTAL_ENABLE_'+k:int(v) for k,v in features.items()})
@@ -91,20 +91,36 @@ def emit_chunks(name,parts,gzip_array):
 # @param source Input source or origin of a configuration change, as indicated by its type.
 # @param gzip_array Encoder converting asset text to gzip C++ declarations.
 # @return Generated C++ lines for shared and conditional profile chunks.
+# @brief Preserve optional Zigbee code when selecting an existing control profile.
+# @param name Asset symbol name.
+# @param source Guarded source text.
+# @param controls Selected controls.
+# @param features Other feature selections.
+# @param gzip_array Asset encoder.
+# @return Conditional C++ asset declarations.
+def emit_selected(name,source,controls,features,gzip_array):
+    if 'ARDPORTAL_ENABLE_ZIGBEE' not in source:
+        return emit_chunks(name,[('1',selected(source,controls,features))],gzip_array)
+    lines=['#if ARDPORTAL_ENABLE_ZIGBEE']
+    for enabled in [1,0]:
+        if not enabled:lines.append('#else')
+        lines+=emit_chunks(name,[('1',selected(source,controls,{**features,'ZIGBEE':enabled}))],gzip_array)
+    return lines+['#endif']
+
 def emit_profile_chunks(name, source, gzip_array):
     lines=['#if !ARDPORTAL_ENABLE_DYNAMIC_PAGES']
-    lines += emit_chunks(name,[('1',selected(source,[],{'DYNAMIC_PAGES':0,'DEPENDENCIES':0}))],gzip_array)
+    lines += emit_selected(name,source,[],{'DYNAMIC_PAGES':0,'DEPENDENCIES':0},gzip_array)
     lines += ['#elif ARDPORTAL_CONTROL_PROFILE_FULL']
     lines += ['#if ARDPORTAL_ENABLE_DEPENDENCIES']
-    lines += emit_chunks(name,[('1',selected(source))],gzip_array)
+    lines += emit_selected(name,source,None,{},gzip_array)
     lines += ['#else']
-    lines += emit_chunks(name,[('1',selected(source,features={'DEPENDENCIES':0}))],gzip_array)
+    lines += emit_selected(name,source,None,{'DEPENDENCIES':0},gzip_array)
     lines += ['#endif']
     lines += ['#elif ARDPORTAL_CONTROL_PROFILE_BASIC']
     lines += ['#if ARDPORTAL_ENABLE_DEPENDENCIES']
-    lines += emit_chunks(name,[('1',selected(source,['slider','text','select','edit']))],gzip_array)
+    lines += emit_selected(name,source,['slider','text','select','edit'],{},gzip_array)
     lines += ['#else']
-    lines += emit_chunks(name,[('1',selected(source,['slider','text','select','edit'],{'DEPENDENCIES':0}))],gzip_array)
+    lines += emit_selected(name,source,['slider','text','select','edit'],{'DEPENDENCIES':0},gzip_array)
     lines += ['#endif']
     lines += ['#else']
     lines += emit_chunks(name,segments(source),gzip_array)

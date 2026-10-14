@@ -437,6 +437,9 @@ public:
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
     if(type=="climate") { V v=V::object(); v["temperature"]=f["min"]; v["current_temperature"]=nullptr; if(f.hasOwnProperty("modes")) v["mode"]=f["modes"][0]; if(f.hasOwnProperty("fan_modes")) v["fan_mode"]=f["fan_modes"][0]; return v; }
 #endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT
+    if(type=="text"&&ArdText::pattern(f).type!=ArdText::Type::Text)return V(nullptr);
+#endif
     return V("");
   }
   /**
@@ -471,7 +474,7 @@ public:
     }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-    if(type=="text") {double number;return v.toDouble(number)||(v.type()==T::String&&v.asString().length()<=512&&strlen(v.asString().c_str())==v.asString().length());}
+    if(type=="text") return ArdText::validValue(f,v);
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EDIT
     if(type=="edit") return v.type()==T::String&&v.asString().length()<=128&&strlen(v.asString().c_str())==v.asString().length();
@@ -494,6 +497,9 @@ public:
       if(!title(f))return fail("field",id,"invalid name/names (1..80 bytes)");
 
       if(!ardPortalBasicControl(type)&&(!ArdHa::extended(f)||ArdHa::descriptor(type,true).isUndefined())) return fail("field",id,"unsupported or disabled control type");
+#if ARDPORTAL_ENABLE_CONTROL_TEXT
+      if(type=="text"&&ArdText::pattern(f).type==ArdText::Type::Invalid)return fail("field",id,"unsupported textType");
+#endif
       if(f.hasOwnProperty("ha")&&f["ha"].type()!=T::Object) return fail("field",id,"ha must be an object");
       if(f.hasOwnProperty("icon")) { String icon=f["icon"].asString(); if(icon.indexOf("mdi:")!=0 || icon.length()>80 || icon.length()<5) return fail("field",id,"invalid icon: expected mdi: name, 5..80 bytes"); }
 #if (ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_CLIMATE)

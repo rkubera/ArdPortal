@@ -65,6 +65,28 @@ The Install button sends `INSTALL` on the base command topic and invokes
 portal's OTA upload flow. Implement the update process and report version/progress
 state from code. The separate built-in Update portal page handles uploaded images.
 
+## Integration with Home Assistant
+
+**MQTT component:** `update`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** Installed/latest version strings and `in_progress` in the JSON state, plus an INSTALL action. The application owns version metadata and the ordinary MQTT-triggered update process; a configured native Zigbee OTA client can intercept INSTALL to query its coordinator.
+
+**Not provided by the built-in integration / limits:** No automatic HTTP firmware download, GitHub release checking or automatic synchronization of version strings with Zigbee OTA image versions. The built-in HTTP upload page is a separate mechanism. The application must report version metadata; native Zigbee reception only updates `in_progress` automatically.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Native mapping:** OTA Upgrade client (`0x0019`). Requires ESP32-C5/C6, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
+
+**Supported by ArdPortal:** One field per device can own the native OTA client. It queries a coordinator for an image matching manufacturer/image-type/file-version, receives a standard container with one Upgrade Image subelement, validates firmware and requests the portal-managed restart. `in_progress` is mirrored to AppConfig in RAM.
+
+**Not provided / limits:** Requires the OTA/control feature flags and adequate OTA partitions. It does not transfer HTTP `.bin.gz` files, publish release descriptions/URLs or synchronize installed/latest version strings. Numeric Zigbee OTA identity/version comes from compile-time defines, independently of the application version strings. The coordinator must provide the matching image.
+
+`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway UI support may require a converter; physical coordinator interoperability remains to be validated.
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

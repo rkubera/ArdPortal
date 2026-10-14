@@ -1,6 +1,7 @@
 #pragma once
 #include "Arduino.h"
 #define WL_CONNECTED 3
+#define WIFI_OFF 0
 #define WIFI_STA 1
 #define WIFI_AP_STA 3
 #define WIFI_SCAN_RUNNING -1
@@ -56,6 +57,7 @@ struct WiFiStub {
   String SSID(int) const { return "test\"network"; }
   int encryptionType(int i) const { return i ? 8 : 7; }
   int RSSI(int) const { return -45; }
+  int channel(int i) const { return i ? 36 : 6; }
   bool hostByName(const char*, IPAddress&) { return true; }
 };
 extern WiFiStub WiFi;

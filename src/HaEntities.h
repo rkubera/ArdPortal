@@ -3,6 +3,7 @@
 #pragma once
 #include "ArdJSON.h"
 #include "HaEntityData.h"
+#include "TextTypes.h"
 
 namespace ArdHa {
 using V=ArdJSON::JSONVar;

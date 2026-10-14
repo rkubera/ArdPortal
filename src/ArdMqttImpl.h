@@ -100,7 +100,7 @@ bool ArdMqtt::subscribeRaw(const char* topic) {
   uint16_t id = ++_packetId; if (!id) id = ++_packetId;
   String body; body += char(id >> 8); body += char(id & 255); appendText(body, topic); body += char(0);
   if (!queuePacket(0x82, body)) return false;
-  _subscriptionId = id; _subscriptionPending = true; _subscriptionSince = millis(); return true;
+  _unsubscribePending=false;_subscriptionId = id; _subscriptionPending = true; _subscriptionSince = millis(); return true;
 }
 
 /**
@@ -112,7 +112,7 @@ void ArdMqtt::closeMqtt(const char* reason) {
   if (reason || _mqttState == MqttState::Connecting || _mqttState == MqttState::Connected) {
     String message=ArdUILanguage::text(ArdUILanguage::Key::s_147);
     _portal.consoleLine(true,message);
-#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
     if(reason){
       const uint32_t now=millis();
       message+=String(" [")+reason+"; state="+(_mqttState==MqttState::Connected?"connected":_mqttState==MqttState::Connecting?"connecting":"retry");
@@ -120,6 +120,9 @@ void ArdMqtt::closeMqtt(const char* reason) {
       message+="; maxLoopGapMs="+String(_maxServiceGapMs)+"; heap="+String(ArdHeap::sample().free8)+"]";
     }
     _portal.logMessage(message);
+#if ARDPORTAL_MQTT_DEBUG_SERIAL
+    ardMqttSerialDiagnostic(message);
+#endif
 #else
     (void)reason;
 #endif
@@ -149,14 +152,22 @@ void ArdMqtt::closeMqtt(const char* reason) {
 bool ArdMqtt::processPacket(uint8_t type, const uint8_t* body, size_t length) {
   if (_mqttState == MqttState::Connecting) {
     if (type != 0x20 || length != 2 || body[0] != 0 || body[1] != 0) {
-#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-      if(type==0x20 && length==2 && body[1]!=0) _portal.logMessage(String("MQTT CONNACK refused; code=")+String(body[1]));
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
+      if(type==0x20 && length==2 && body[1]!=0){
+        String message=String("MQTT CONNACK refused; code=")+String(body[1]);_portal.logMessage(message);
+#if ARDPORTAL_MQTT_DEBUG_SERIAL
+        ardMqttSerialDiagnostic(message);
+#endif
+      }
 #endif
       return false;
     }
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_148));
-#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-    _portal.logMessage(String("MQTT connected; clientId=")+_clientId+"; connectMs="+String(uint32_t(millis()-_mqttSince)));
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
+    String message=String("MQTT connected; clientId=")+_clientId+"; connectMs="+String(uint32_t(millis()-_mqttSince));_portal.logMessage(message);
+#if ARDPORTAL_MQTT_DEBUG_SERIAL
+    ardMqttSerialDiagnostic(message);
+#endif
 #endif
     _mqttState = MqttState::Connected; _lastTx = _lastServiceMs = millis(); _maxServiceGapMs=0;
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
@@ -172,9 +183,10 @@ _portal._appControls.resetMqtt();
     _pingPending = false; return true;
   }
   if (type == 0x90) {
-    if (length != 3 || !_subscriptionPending || uint16_t(body[0] << 8 | body[1]) != _subscriptionId || body[2] != 0) return false;
+    if (length != 3 || _unsubscribePending || !_subscriptionPending || uint16_t(body[0] << 8 | body[1]) != _subscriptionId || body[2] != 0) return false;
     _subscriptionPending = false; return true;
   }
+  if(type==0xb0){if(length!=2||!_subscriptionPending||!_unsubscribePending||uint16_t(body[0]<<8|body[1])!=_subscriptionId)return false;_subscriptionPending=false;_unsubscribePending=false;return true;}
   if ((type >> 4) == 3) {
     // This small client requests QoS 0 only. Reject unsupported/malformed packets.
     if ((type & 6) || length < 2) return false;
@@ -201,6 +213,7 @@ _portal._appControls.resetMqtt();
  * @return No value.
  */
 void ArdMqtt::serviceMqtt(uint32_t now) {
+  if(!_autoReconnect){if(connected())closeMqtt("disabled by API");_mqttState=MqttState::Disabled;return;}
   if(_mqttState==MqttState::Connected){const uint32_t gap=uint32_t(now-_lastServiceMs);if(gap>_maxServiceGapMs)_maxServiceGapMs=gap;}
   _lastServiceMs=now;
   if (_portal._httpConfigUpload) return;
@@ -219,9 +232,12 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
   if (_mqttState == MqttState::WaitingForWifi) _mqttState = MqttState::WaitingRetry;
   if (_mqttState == MqttState::WaitingRetry && uint32_t(now - _mqttSince) >= _portal._options.retryMs) {
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_145));
-#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-    _portal.logMessage(String("MQTT connecting: ")+_portal._config.host+":"+String(_portal._config.port)+
-      "; clientId="+_clientId+"; TLS="+String(_portal._config.mqttTls ? "yes" : "no"));
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
+    String message=String("MQTT connecting: ")+_portal._config.host+":"+String(_portal._config.port)+
+      "; clientId="+_clientId+"; TLS="+String(_portal._config.mqttTls ? "yes" : "no");_portal.logMessage(message);
+#if ARDPORTAL_MQTT_DEBUG_SERIAL
+    ardMqttSerialDiagnostic(message);
+#endif
 #endif
     if (!connectMqttTransport()) { _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_151)); closeMqtt("transport connect failed"); return; }
     _mqttState = MqttState::Connecting; _mqttSince = _lastTx = millis();
@@ -272,7 +288,7 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
   now=millis();
   if(_mqttState==MqttState::Connecting&&uint32_t(now-_mqttSince)>=_portal._options.mqttTimeoutMs){closeMqtt("CONNACK timeout");return;}
   if(_pingPending&&uint32_t(now-_pingSince)>=_portal._options.mqttTimeoutMs){closeMqtt("PINGRESP timeout");return;}
-  if(_subscriptionPending&&uint32_t(now-_subscriptionSince)>=_portal._options.mqttTimeoutMs){closeMqtt("SUBACK timeout");return;}
+  if(_subscriptionPending&&uint32_t(now-_subscriptionSince)>=_portal._options.mqttTimeoutMs){closeMqtt("subscription acknowledgement timeout");return;}
   if(_rxSize&&uint32_t(now-_packetSince)>=_portal._options.mqttTimeoutMs){closeMqtt("incomplete packet timeout");return;}
   if (connected() && !_pingPending && !_txSize && uint32_t(millis() - _lastTx) >= uint32_t(_portal._options.keepAliveSeconds) * 500) {
     if (queuePacket(0xc0, "")) { _pingPending = true; _pingSince = millis(); }
@@ -403,6 +419,7 @@ void ArdMqtt::configurationLoaded() {
  * @return No value.
  */
 void ArdMqtt::prepareTrial(PortalConfig&& candidate) {
+  _autoReconnect=true;
   _portal._pending = std::move(candidate);
   _mqttTrialStart = true; ++_mqttRevision; _mqttResult = 0; _mqttResultMessage = "";
 }
@@ -425,4 +442,37 @@ void ArdMqtt::completeTrialSave(bool saved, const String& error, bool stillConne
   if (saved && !stillConnected) _mqttResultMessage = ArdUILanguage::text(ArdUILanguage::Key::s_147);
 }
 
+
+/** @brief Resume saved MQTT connection. @return True when retry is enabled. */
+bool ArdMqtt::connect(){
+  if(!_portal._configurationReady||_portal.portalAndAppConfigBusy()||_portal.otaActive()||_portal._rebootPending||connectionTestBusy()||!_portal._config.host.length())return false;
+  _autoReconnect=true;if(!connected()){_mqttState=_portal.wifiConnected()?MqttState::WaitingRetry:MqttState::WaitingForWifi;_mqttSince=millis()-_portal._options.retryMs;}return true;
+}
+/** @brief Stop MQTT and future retries. @return True when accepted. */
+bool ArdMqtt::disconnect(){
+  if(connectionTestBusy()||_portal.otaActive()||_portal._rebootPending)return false;
+  _autoReconnect=false;closeMqtt("disconnected by API");_mqttState=MqttState::Disabled;return true;
+}
+/** @brief Queue an unsubscribe packet with acknowledgement tracking. @param topic Filter. @return True when queued. */
+bool ArdMqtt::unsubscribe(const char* topic){
+  if(!connected()||!topic||!validMqttTopic(topic,true)||_subscriptionPending||strlen(topic)+4>PacketCapacity-5)return false;
+  uint16_t id=++_packetId;if(!id)id=++_packetId;
+  String body;body+=char(id>>8);body+=char(id);appendText(body,topic);
+  if(!queuePacket(0xa2,body))return false;
+  _subscriptionId=id;_subscriptionPending=true;_unsubscribePending=true;_subscriptionSince=millis();return true;
+}
+/** @brief Start the WWW-compatible connection trial. @param config Candidate settings. @return True when staged. */
+bool ArdMqtt::testConnection(const PortalConfig& config){
+  if(!_portal._configurationReady||_portal.portalAndAppConfigBusy()||_portal.otaActive()||_portal._rebootPending||connectionTestBusy()||!_portal.wifiConnected()||!config.host.length()||!ArdPortal::validPortalConfig(config))return false;
+#if !ARDPORTAL_ENABLE_MQTT_TLS
+  if(config.mqttTls)return false;
+#endif
+  if(config.ssid!=_portal._config.ssid||config.password!=_portal._config.password)return false;
+  PortalConfig candidate=config;_autoReconnect=true;prepareTrial(std::move(candidate));return true;
+}
+/** @brief Deliver shared state changes and completed trial notifications. @return No value. */
+void ArdMqtt::serviceApiCallbacks(){
+  if(_apiState!=_mqttState){_apiState=_mqttState;auto callback=_stateCallback;if(callback)callback(_mqttState);}
+  if(_mqttResult&&!connectionTestBusy()&&_apiTrialRevision!=_mqttRevision){_apiTrialRevision=_mqttRevision;auto callback=_trialCallback;if(callback)callback(_mqttResult==1,_mqttResultMessage);}
+}
 #endif

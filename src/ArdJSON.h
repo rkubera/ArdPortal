@@ -172,6 +172,11 @@ public:
    */
   String asString() const { return _type == Type::String ? _text : String(); }
   /**
+   * @brief Borrow the stored JSON string without allocating or copying it.
+   * @return Pointer to the internal string, or nullptr for non-string values; valid until this value is changed or destroyed.
+   */
+  const String* stringValue() const { return _type == Type::String ? &_text : nullptr; }
+  /**
    * @brief Read a JSON boolean, returning false for other types.
    * @return The stored boolean, or false when the value has a different type.
    */

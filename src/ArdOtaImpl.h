@@ -1,7 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #include "ArdPortalFeatures.h"
-#if ARDPORTAL_ENABLE_OTA
+#if ARDPORTAL_HTTP_OTA_SUPPORT
 #include "ArdOta.h"
 #include "ArdPortalDeclarations.h"
 #include "Language.h"

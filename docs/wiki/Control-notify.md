@@ -54,6 +54,26 @@
 
 **Value:** String notification text, up to 512 bytes; the application delivers or processes it.
 
+## Integration with Home Assistant
+
+**MQTT component:** `notify`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** A text message is delivered to the action callback on the base command topic; the preset uses the MQTT notify component.
+
+**Not provided by the built-in integration / limits:** No built-in email, SMS, push service, message queue or delivery receipts. The text action is bounded to 512 bytes and requires the application command callback.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Status: not mapped by ArdPortal.** Text notifications are not sent through Zigbee. Enabling Zigbee does not create an endpoint for this field. The field remains usable in the portal and through MQTT/HA when those features are enabled.
+
+This describes the current ArdPortal implementation, not a claim that Zigbee cannot represent a similar device through a standard cluster or a gateway-specific converter.
+
+**Possible extension, not implemented:** Character-string payload in a custom ZCL command. A notification message can be transported over Zigbee, but standard measurement/control clusters do not define the ArdPortal notify service. Delivery semantics, size limits, repeat handling and gateway presentation require a custom protocol/converter. See the [mapping feasibility table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#possible-mappings-not-yet-implemented).
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

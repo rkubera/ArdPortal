@@ -10,6 +10,7 @@ ArdPortal is an Arduino library for ESP8266 and ESP32 that provides a browser-ba
 - Persistent settings through **ArdFS**, the included flash filesystem and journaled storage API.
 - JSON parsing and serialization through the standalone **ArdJSON** module.
 - OTA firmware upload, diagnostics console, device information and restart controls.
+- Optional ESP32-C5/C6 Zigbee End Device/Router, native control mapping, OTA and dedicated diagnostics.
 - Compile-time defines to include only the required features.
 
 **[Full documentation and API reference → GitHub Wiki](https://github.com/rkubera/ArdPortal/wiki)**
@@ -56,6 +57,7 @@ Call `loop()` frequently: initialization, networking and storage advance coopera
 | Configuration methods and callbacks | [Portal API](https://github.com/rkubera/ArdPortal/wiki/Portal-API) |
 | Controls, screenshots, minimal/full JSON | [Control catalogue](https://github.com/rkubera/ArdPortal/wiki/Controls) |
 | Page definitions and conditional visibility | [Dynamic pages](https://github.com/rkubera/ArdPortal/wiki/Dynamic-Pages) · [Dependencies](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields) |
+| Zigbee pairing, rejoin and diagnostics | [Zigbee](https://github.com/rkubera/ArdPortal/wiki/Zigbee) |
 | Home Assistant and MQTT commands/state | [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) · [MQTT messages](https://github.com/rkubera/ArdPortal/wiki/MQTT-Messages) |
 | Standalone flash storage and JSON | [ArdFS API](https://github.com/rkubera/ArdPortal/wiki/FS-API) · [ArdJSON API](https://github.com/rkubera/ArdPortal/wiki/JSON-API) |
 | Diagnostics, updates, memory and languages | [Console/OTA](https://github.com/rkubera/ArdPortal/wiki/Console-and-OTA) · [Memory limits](https://github.com/rkubera/ArdPortal/wiki/Memory-and-Limits) · [Languages](https://github.com/rkubera/ArdPortal/wiki/Languages) |
@@ -65,3 +67,5 @@ See [portal screenshots](https://github.com/rkubera/ArdPortal/wiki/Screenshots),
 ## License
 
 [MIT](LICENSE). Copyright Radoslaw Kubera (rkubera on GitHub).
+
+Zigbee support includes native controls and composite functions exposed as separate standard endpoints. See the [control catalogue](https://github.com/rkubera/ArdPortal/wiki/Controls) for HA/Zigbee coverage and [Zigbee](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for gateway and page-order limitations.

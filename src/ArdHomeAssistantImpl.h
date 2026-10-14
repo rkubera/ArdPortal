@@ -189,6 +189,9 @@ String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) cons
 #endif
     }
   }
+#if ARDPORTAL_ENABLE_CONTROL_TEXT
+  if(type=="text")ArdText::haPattern(f,c);
+#endif
   const V& extra=f["ha"]; V keys=extra.keys();
   for(size_t i=0;i<keys.length();++i) {
     String key=keys[i].asString(); if(key=="unique_id"||key=="device"||key=="name"||key=="availability_topic") continue;

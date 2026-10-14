@@ -10,6 +10,7 @@ using V = ArdJSON::JSONVar;
  * @param definition JSON definition to register; flash sources must remain valid for the portal lifetime.
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
+#if ARDPORTAL_ENABLE_HA
 bool ArdPortal::addAppConfigEntity(const __FlashStringHelper* definition) {
 #if ARDPORTAL_ENABLE_HA
   if(!definition||!addAppConfigEntity(String(definition)))return false;
@@ -39,6 +40,7 @@ bool ArdPortal::addAppConfigEntity(const String& definition) {
 #endif
 }
 
+#endif
 #include "AppConfigPageRegistrationImpl.h"
 
 /**
@@ -47,6 +49,7 @@ bool ArdPortal::addAppConfigEntity(const String& definition) {
  * @param path Journal file path.
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
+#if ARDPORTAL_ENABLE_WWW
 bool ArdPortal::dynamicHttp(const String& method,const String& path) {
   if(method=="GET"&&(path.indexOf("/api/pages")==0||path.indexOf("/api/app")==0||path=="/api/page-conditions"||path=="/api/page-catalog")&&!reserveDynamicHttpMemory(2048,1024)){
     reply(503,"text/plain","Network memory reserve; retry later");return true;
@@ -128,7 +131,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     const V& field=_dynamic.field(request["field"].asString());bool belongs=false;
     for(size_t p=0;p<_dynamic.pages.length();++p) if(_dynamic.pages.id(p)==request["page"].asString()) if(_dynamic.pages.belongs(p,request["field"].asString())) belongs=true;
     _appControls.clearControlStage();uint64_t index;if(!belongs||!request["control"].toUnsignedInteger(index)||!_appControls.appControl(field,size_t(index),request["value"],ChangeSource::Portal)) {
-      const bool unavailable=belongs&&field["persist"].asBool()&&!_storage.mounted();String error=ArdUILanguage::text(unavailable?ArdUILanguage::Key::s_170:_appControls.controlStage()==6?ArdUILanguage::Key::s_207:ArdUILanguage::Key::s_177)+" ["+request["field"].asString()+" #"+String(_appControls.controlStage())+"]";log(error);reply(unavailable?503:portalAndAppConfigBusy()?409:400,"text/plain",error);return true;
+      const bool unavailable=belongs&&field["persist"].asBool()&&!_storage.mounted();String error=ArdUILanguage::text(unavailable?ArdUILanguage::Key::s_170:_appControls.controlStage()==6?ArdUILanguage::Key::s_207:_appControls.controlStage()==7?ArdUILanguage::Key::s_241:_appControls.controlStage()==8?ArdUILanguage::Key::s_240:ArdUILanguage::Key::s_177)+" ["+request["field"].asString()+" #"+String(_appControls.controlStage())+"]";log(error);reply(unavailable?503:portalAndAppConfigBusy()?409:400,"text/plain",error);return true;
     }
     replyMessage(202,ArdUILanguage::Key::s_175);return true;
   }
@@ -180,7 +183,9 @@ bool ArdPortal::reserveDynamicHttpMemory(size_t bytes,size_t block) {
       history[oldest]=ConsoleLine();if(ArdHeap::permits(bytes,block))return true;
     }
   };
+#if ARDPORTAL_ENABLE_MQTT
   if(reclaim(_console,1))return true;
+#endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   if(reclaim(_consoleMessages,3))return true;
 #endif
@@ -259,6 +264,7 @@ bool ArdPortal::buildDynamicHttpPart() {
   _httpDynamicPages=false;return true;
 }
 
+#endif // ARDPORTAL_ENABLE_WWW
 
 /**
  * @brief Update a runtime application value and optionally queue its MQTT state.
@@ -273,6 +279,7 @@ bool ArdPortal::setAppConfigStateValue(const char* key,const V& value,bool publi
  * @param key Configuration key or JSON object member name.
  * @return True when the field is found and queued; false for an unknown or unsupported field.
  */
+#if ARDPORTAL_ENABLE_MQTT
 bool ArdPortal::queueAppConfigStatePublish(const char* key) {
 #if ARDPORTAL_ENABLE_MQTT
   if(!key) return false;
@@ -283,11 +290,15 @@ bool ArdPortal::queueAppConfigStatePublish(const char* key) {
   (void)key;return false;
 #endif
 }
+#endif
+
 /**
  * @brief Emit a transient application event through the field MQTT topic.
  * @param key Configuration key or JSON object member name.
  * @param value Input value, or output destination when passed by mutable reference.
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
+#if ARDPORTAL_CONTROL_SUPPORT_EVENTS
 bool ArdPortal::emitAppConfigEvent(const char* key,const V& value) { return _appControls.emitAppConfigEvent(key, value); }
+#endif
 

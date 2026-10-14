@@ -78,6 +78,7 @@ CRC and memory allocation are synchronous CPU operations.
 | `length()` | Number of container members/elements; not the byte length of a string. |
 | `push(value)` / `tryPush(value)` | Append to an array; bool reports success. `tryPush` preserves the array on allocation failure. |
 | `remove(key)` / `remove(size_t index)` | Remove object member / array element; returns success. |
+| `stringValue()` | Borrow a `const String*` without copying; nullptr for non-string values. Valid until the JSON value is changed or destroyed. |
 | `asString()` / `asBool()` / `asDouble()` | Convenience accessors: wrong types produce empty/false/zero; not validation. |
 | `isInteger()` / `toInteger(int64_t&)` | Integer-lexeme test / checked signed conversion with range validation. |
 | `toUnsignedInteger(uint64_t&)` / `toDouble(double&)` | Checked numeric conversion; return false for incompatible/invalid/out-of-range input. |
