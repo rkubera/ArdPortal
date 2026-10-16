@@ -43,7 +43,7 @@ inline Spec describe(const V& f,const V& value){
   else if(t=="light")s.kind=Kind::Light;
   else if(t=="climate"){
     s.kind=Kind::Climate;s.min=f["min"].asDouble();s.max=f["max"].asDouble();s.step=f.hasOwnProperty("step")?f["step"].asDouble():0.5;s.fan=f["fan_modes"].length();
-    bool heat=false,cool=false;for(size_t i=0;i<f["modes"].length();++i){String m=f["modes"][i].asString();heat|=m=="heat";cool|=m=="cool";}
+    bool heat=false,cool=false;for(size_t i=0;i<f["modes"].length();++i){String m=f["modes"][i].asString();heat|=m=="heat"||m=="heat_cool";cool|=m=="cool"||m=="heat_cool";}
     s.sequence=heat&&cool?4:heat?2:0;
   }
   else if(t=="cover")s.kind=Kind::Cover;
@@ -79,13 +79,15 @@ inline void integer(Values& v,uint16_t c,uint16_t id,uint8_t type,uint32_t n){if
 /** @brief Append a floating ZCL attribute. @param v Output list. @param c Cluster. @param n Value. @return No value. */
 inline void number(Values& v,uint16_t c,float n){integer(v,c,0x55,0x39,0);v.attributes[v.count-1].data.f=n;}
 /** @brief Encode temperature as signed hundredths of Celsius. @param v Source temperature. @return ZCL invalid value when unavailable or outside range. */
-inline uint16_t temperature(const V& v){double n;if(!v.toDouble(n)||!std::isfinite(n)||n<-273.15||n>327.67)return 0x8000;return uint16_t(int16_t(std::lround(n*100)));}
+inline uint16_t temperature(double n){if(!std::isfinite(n)||n<-273.15||n>327.67)return 0x8000;return uint16_t(int16_t(std::lround(n*100)));}
+/** @brief Encode a JSON temperature without copying its numeric value. @param v Source reading. @return Signed hundredths or the ZCL unavailable sentinel. */
+inline uint16_t temperature(const V& v){double n;return v.toDouble(n)?temperature(n):0x8000;}
 /** @brief Encode a bounded unsigned measurement. @param v Reading. @param scale Wire multiplier. @return Unknown sentinel when outside the wire range. */
 inline uint16_t unsignedMeasurement(const V& v,double scale){double n;if(!v.toDouble(n)||!std::isfinite(n)||n<0||n*scale>65534)return 0xffff;return uint16_t(std::lround(n*scale));}
 /** @brief Append a floating measurement attribute. @param out Attribute list. @param cluster Standard measurement cluster. @param value Reading. @param scale Wire multiplier. @return No value. */
 inline void measurement(Values& out,uint16_t cluster,const V& value,double scale=1){double n;float wire=value.toDouble(n)&&std::isfinite(n)&&n>=0&&std::isfinite(float(n*scale))?float(n*scale):NAN;integer(out,cluster,0,0x39,0);out.attributes[out.count-1].data.f=wire;}
 /** @brief Translate standard mode names. @param mode Application name. @param fan Select fan-mode mapping. @return ZCL mode or 255 for unsupported name. */
-inline uint8_t mode(const String& mode,bool fan=false){const char* names[]={"off",fan?"low":"auto",fan?"medium":"",fan?"high":"cool",fan?"on":"heat",fan?"auto":"",fan?"smart":"",fan?"":"fan_only",fan?"":"dry"};for(uint8_t i=0;i<9;++i)if(mode.length()&&mode==names[i])return i;return 255;}
+inline uint8_t mode(const String& mode,bool fan=false){if(!fan&&mode=="heat_cool")return 1;const char* names[]={"off",fan?"low":"auto",fan?"medium":"",fan?"high":"cool",fan?"on":"heat",fan?"auto":"",fan?"smart":"",fan?"":"fan_only",fan?"":"dry"};for(uint8_t i=0;i<9;++i)if(mode.length()&&mode==names[i])return i;return 255;}
 /** @brief Convert an RGB color to standard hue/saturation. @param color RGB object. @param h Output hue. @param s Output saturation. @return No value. */
 inline void rgbToHs(const V& color,uint8_t& h,uint8_t& s){double r=color["r"].asDouble()/255,g=color["g"].asDouble()/255,b=color["b"].asDouble()/255;double hi=std::fmax(r,std::fmax(g,b)),lo=std::fmin(r,std::fmin(g,b)),d=hi-lo,x=0;if(d>0){x=hi==r?(g-b)/d:hi==g?2+(b-r)/d:4+(r-g)/d;x/=6;if(x<0)x+=1;}h=std::lround(x*254);s=std::lround((hi?d/hi:0)*254);}
 /** @brief Convert hue/saturation back to full-scale RGB. @param hue ZCL hue. @param saturation ZCL saturation. @return RGB object. */
@@ -142,7 +144,7 @@ inline Values encode(const Spec& s,const V& f,const V& value){
     case Kind::Select:for(size_t i=0;i<f["options"].length();++i)if(f["options"][i]["value"].asString()==value.asString()){integer(out,0x13,0x55,0x21,i+1);break;}break;
     case Kind::Binary:integer(out,0xf,0x55,0x10,value.asBool());break;
     case Kind::Light:{uint8_t h,sat;rgbToHs(value["color"],h,sat);integer(out,6,0,0x10,value["state"].asString()=="ON");integer(out,8,0,0x20,std::lround(value["brightness"].asDouble()*254/255*std::fmax(value["color"]["r"].asDouble(),std::fmax(value["color"]["g"].asDouble(),value["color"]["b"].asDouble()))/255));integer(out,0x300,0,0x20,h);integer(out,0x300,1,0x20,sat);integer(out,0x300,8,0x30,0);integer(out,0x300,0x4000,0x21,std::lround(h*65535.0/254));integer(out,0x300,0x4001,0x30,0);uint16_t x,y;rgbToXy(value["color"],x,y);integer(out,0x300,3,0x21,x);integer(out,0x300,4,0x21,y);break;}
-    case Kind::Climate:{integer(out,0x201,0,0x29,temperature(value["current_temperature"]));integer(out,0x201,0x11,0x29,temperature(value["temperature"]));integer(out,0x201,0x12,0x29,temperature(value["temperature"]));uint8_t m=mode(value["mode"].asString());integer(out,0x201,0x1c,0x30,m==255?0:m);String action=value["action"].asString();integer(out,0x201,0x29,0x19,action=="heating"?1:action=="cooling"?2:0);if(s.fan){m=mode(value["fan_mode"].asString(),true);integer(out,0x202,0,0x30,m==255?0:m);}break;}
+    case Kind::Climate:{integer(out,0x201,0,0x29,temperature(value["current_temperature"]));double target=value["temperature"].asDouble();bool cooling=value["mode"].asString()=="cool";double band=s.sequence==4?2.5:0;integer(out,0x201,0x11,0x29,temperature(value["mode"].asString()=="heat_cool"&&value.hasOwnProperty("temperature_high")?value["temperature_high"].asDouble():(cooling?target:(band?s.max+band:target))));integer(out,0x201,0x12,0x29,temperature(value["mode"].asString()=="heat_cool"&&value.hasOwnProperty("temperature_low")?value["temperature_low"].asDouble():(cooling?(band?s.min-band:target):target)));uint8_t m=mode(value["mode"].asString());integer(out,0x201,0x1c,0x30,m==255?0:m);String action=value["action"].asString();integer(out,0x201,0x29,0x19,action=="heating"?1:action=="cooling"?2:0);if(s.fan){m=mode(value["fan_mode"].asString(),true);integer(out,0x202,0,0x30,m==255?0:m);}break;}
     case Kind::Cover:integer(out,0x102,8,0x20,100-value["position"].asDouble());integer(out,0x102,9,0x20,100-value["tilt"].asDouble());break;
     case Kind::Lock:{String state=value.asString();integer(out,0x101,0,0x30,state=="LOCKED"?1:state=="UNLOCKED"||state=="OPEN"?2:0);break;}
     default:break;
@@ -168,8 +170,8 @@ inline bool decode(const Spec& s,const V& f,const V& current,const Command& c,V&
   if(s.kind==Kind::Slider&&c.cluster==0xd&&c.id==0x55){float n;std::memcpy(&n,&c.value,4);double min=f["min"].asDouble(),max=f["max"].asDouble(),step=f.hasOwnProperty("step")?f["step"].asDouble():1;if(!std::isfinite(n)||n<min-1e-5||n>max+1e-5)return false;double snapped=min+std::round((n-min)/step)*step;if(std::fabs(n-snapped)>std::fmax(1e-5,std::fabs(n)*1e-7))return false;next=snapped;return true;}
   if(s.kind==Kind::Select&&c.cluster==0x13&&c.id==0x55&&c.value&&c.value<=s.states){next=f["options"][size_t(c.value-1)]["value"];return true;}
   if(s.kind==Kind::Climate){next=current;
-    if(c.cluster==0x201&&(c.id==0x11||c.id==0x12)){double n=int16_t(c.value)/100.0,min=f["min"].asDouble(),max=f["max"].asDouble(),step=f.hasOwnProperty("step")?f["step"].asDouble():0.5;next["temperature"]=min+std::round((n-min)/step)*step;return n>=min&&n<=max;}
-    if((c.cluster==0x201&&c.id==0x1c)||(c.cluster==0x202&&c.id==0&&s.fan)){bool fan=c.cluster==0x202;const V& options=f[fan?"fan_modes":"modes"];for(size_t i=0;i<options.length();++i)if(mode(options[i].asString(),fan)==c.value){next[fan?"fan_mode":"mode"]=options[i];return true;}}return false;
+    if(c.cluster==0x201&&(c.id==0x11||c.id==0x12)){double n=int16_t(c.value)/100.0;bool range=false;for(size_t i=0;i<f["modes"].length();++i)range|=f["modes"][i].asString()=="heat_cool";if(range&&current["mode"].asString()=="heat_cool"){next[c.id==0x11?"temperature_high":"temperature_low"]=n;double step=s.step;return n>=s.min&&n<=s.max&&std::fabs((n-s.min)/step-std::round((n-s.min)/step))<0.000001&&next["temperature_high"].asDouble()-next["temperature_low"].asDouble()>=2.5;}bool cooling=current["mode"].asString()=="cool";if(s.sequence==4){if(c.id==0x11&&!cooling)n-=2.5;else if(c.id==0x12&&cooling)n+=2.5;}double min=f["min"].asDouble(),max=f["max"].asDouble(),step=f.hasOwnProperty("step")?f["step"].asDouble():0.5;next["temperature"]=min+std::round((n-min)/step)*step;return n>=min&&n<=max;}
+    if((c.cluster==0x201&&c.id==0x1c)||(c.cluster==0x202&&c.id==0&&s.fan)){bool fan=c.cluster==0x202;const V& options=f[fan?"fan_modes":"modes"];if(!fan&&c.value==1)for(size_t i=0;i<options.length();++i)if(options[i].asString()=="heat_cool"){next["mode"]="heat_cool";return true;}for(size_t i=0;i<options.length();++i)if(mode(options[i].asString(),fan)==c.value){next[fan?"fan_mode":"mode"]=options[i];return true;}}return false;
   }
   if(s.kind==Kind::Light){
     if(c.cluster==6&&c.id==0&&c.value<=1){property="state";next=c.value?"ON":"OFF";return true;}

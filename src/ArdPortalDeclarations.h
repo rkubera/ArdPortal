@@ -495,6 +495,13 @@ public:
    * @return True when startup is accepted; initial storage completion is reported separately by the ready callback.
    */
   bool begin();
+  /** @brief Set application firmware version before begin(); default is "1.0".
+   * @param version Nonempty version string, at most 16 UTF-8 bytes (Zigbee SWBuildID limit).
+   * @return False for invalid input or when initialization has already started. */
+  bool setFirmwareVersion(const char* version);
+  /** @brief Read application firmware version. @return Borrowed string owned by the portal. */
+  const char* getFirmwareVersion() const { return _firmwareVersion+1; }
+
   /**
    * @brief Initialize networking, storage and portal services using default or supplied options.
    * @param options Initialization options and cooperative work limits.
@@ -822,6 +829,7 @@ private:
     return String();
 #endif
   }
+  char _firmwareVersion[18]="\x03" "1.0"; // ZCL length prefix plus bounded text and terminator.
   Options _options;
 #if ARDPORTAL_ENABLE_ZIGBEE
   ArdZigbee _zigbee;

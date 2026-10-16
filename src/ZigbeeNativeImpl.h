@@ -42,7 +42,7 @@ bool ArdZigbee::createControls(esp_zb_ep_list_t* endpoints){
     auto add=[&](esp_zb_attribute_list_t* list,auto function){return list&&function(clusters,list,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE)==ESP_OK;};
     auto* basic=esp_zb_basic_cluster_create(nullptr);static char manufacturer[]="\x09" "ArdPortal";auto* model=ArdZigbeeIdentity::Model;
     stage("Basic/Identify");
-    if(!basic||esp_zb_basic_cluster_add_attr(basic,4,manufacturer)!=ESP_OK||esp_zb_basic_cluster_add_attr(basic,5,model)!=ESP_OK||!add(basic,esp_zb_cluster_list_add_basic_cluster)||!add(esp_zb_identify_cluster_create(nullptr),esp_zb_cluster_list_add_identify_cluster))return false;
+    if(!basic||esp_zb_basic_cluster_add_attr(basic,4,manufacturer)!=ESP_OK||esp_zb_basic_cluster_add_attr(basic,5,model)!=ESP_OK||esp_zb_basic_cluster_add_attr(basic,0x4000,const_cast<char*>(_firmwareVersion))!=ESP_OK||!add(basic,esp_zb_cluster_list_add_basic_cluster)||!add(esp_zb_identify_cluster_create(nullptr),esp_zb_cluster_list_add_identify_cluster))return false;
     // Register the standard optional ProductLabel with its explicit type:
     // the SDK's typed Basic helper does not accept it in every version.
     char text[65];text[0]=entry->label?entry->label.get()[0]:0;
@@ -89,8 +89,8 @@ bool ArdZigbee::createControls(esp_zb_ep_list_t* endpoints){
 #endif
 #if !defined(ARDPORTAL_ENABLE_CONTROL_CLIMATE) || ARDPORTAL_ENABLE_CONTROL_CLIMATE
       case Kind::Climate:{device=ESP_ZB_HA_THERMOSTAT_DEVICE_ID;esp_zb_thermostat_cluster_cfg_t cfg={};cfg.local_temperature=0x8000;cfg.occupied_cooling_setpoint=cfg.occupied_heating_setpoint=2000;cfg.control_sequence_of_operation=s.sequence;
-        auto* list=esp_zb_thermostat_cluster_create(&cfg);int16_t min=std::lround(s.min*100),max=std::lround(s.max*100);uint16_t running=0;
-        if(!list||esp_zb_thermostat_cluster_add_attr(list,0x15,&min)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x16,&max)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x17,&min)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x18,&max)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x29,&running)!=ESP_OK||!add(list,esp_zb_cluster_list_add_thermostat_cluster))return false;
+        auto* list=esp_zb_thermostat_cluster_create(&cfg);int16_t min=std::lround(s.min*100),max=std::lround(s.max*100);uint16_t running=0;int16_t heatMin=min-(s.sequence==4?250:0),coolMax=max+(s.sequence==4?250:0);
+        if(!list||esp_zb_thermostat_cluster_add_attr(list,0x03,&heatMin)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x04,&max)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x05,&min)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x06,&coolMax)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x15,&heatMin)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x16,&max)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x17,&min)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x18,&coolMax)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x29,&running)!=ESP_OK||!add(list,esp_zb_cluster_list_add_thermostat_cluster))return false;
         if(s.fan&&!add(esp_zb_fan_control_cluster_create(nullptr),esp_zb_cluster_list_add_fan_control_cluster))return false;break;}
 #endif
 #if !defined(ARDPORTAL_ENABLE_CONTROL_COVER) || ARDPORTAL_ENABLE_CONTROL_COVER
@@ -179,19 +179,35 @@ bool ArdZigbee::publish(uint8_t endpoint,const ArdZigbeeFields::Values& values,b
   // A retry retains only attributes not yet queued successfully.
   if(force&&!previous)entry->pendingReports=uint16_t((1u<<values.count)-1u);
   bool ok=true;bool submitted=false;bool achromatic=false;for(uint8_t i=0;i<values.count;++i)if(values.attributes[i].cluster==0x300&&values.attributes[i].id==1&&values.attributes[i].data.u==0)achromatic=true;
-  for(uint8_t i=0;i<values.count;++i){const auto& a=values.attributes[i];const uint16_t bit=uint16_t(1u<<i);auto* current=esp_zb_zcl_get_attribute(endpoint,a.cluster,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,a.id);size_t size=a.type==0x39||a.type==0x23||a.type==0x1b?4:a.type==0x21||a.type==0x29||a.type==0x19?2:1;
+  bool heatFirst=false;
+  if(entry->spec.kind==ArdZigbeeFields::Kind::Climate&&values.count>=3){
+    auto* heating=esp_zb_zcl_get_attribute(endpoint,0x201,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,0x12);int16_t stored=0;
+    if(heating&&heating->data_p){memcpy(&stored,heating->data_p,sizeof(stored));heatFirst=int16_t(values.attributes[2].data.u)<stored;}
+  }
+  for(uint8_t order=0;order<values.count;++order){uint8_t i=heatFirst&&(order==1||order==2)?3-order:order;const auto& a=values.attributes[i];const uint16_t bit=uint16_t(1u<<i);auto* current=esp_zb_zcl_get_attribute(endpoint,a.cluster,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,a.id);size_t size=a.type==0x39||a.type==0x23||a.type==0x1b?4:a.type==0x21||a.type==0x29||a.type==0x19?2:1;
     if(achromatic&&a.cluster==0x300&&(a.id==0||a.id==0x4000)){entry->pendingReports&=~bit;continue;}
-    if(!current||!current->data_p){entry->pendingReports|=bit;ok=false;continue;}
-    if(memcmp(current->data_p,&a.data,size))entry->pendingReports|=bit;
+    if(!current||!current->data_p){entry->pendingReports|=bit;ok=false;char message[112];snprintf(message,sizeof(message),"TX attribute missing ep=%u cluster=%04x attr=%04x",endpoint,a.cluster,a.id);traffic(message);continue;}
+    const bool changed=memcmp(current->data_p,&a.data,size)!=0;
+    if(changed)entry->pendingReports|=bit;
     if(!(entry->pendingReports&bit))continue;
-    if(esp_zb_zcl_set_attribute_val(endpoint,a.cluster,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,a.id,const_cast<void*>(static_cast<const void*>(&a.data)),false)!=ESP_ZB_ZCL_STATUS_SUCCESS){ok=false;continue;}
-    // Read-only metadata remains readable without requesting unsupported reports.
-    if(!(current->access&ESP_ZB_ZCL_ATTR_ACCESS_REPORTING)){entry->pendingReports&=~bit;continue;}
+    const auto stored=changed?esp_zb_zcl_set_attribute_val(endpoint,a.cluster,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,a.id,const_cast<void*>(static_cast<const void*>(&a.data)),false):ESP_ZB_ZCL_STATUS_SUCCESS;
+    if(stored!=ESP_ZB_ZCL_STATUS_SUCCESS){ok=false;char message[112];snprintf(message,sizeof(message),"TX attribute rejected ep=%u cluster=%04x attr=%04x status=0x%x",endpoint,a.cluster,a.id,unsigned(stored));traffic(message);continue;}
+    // Enhanced color metadata is readable; ordinary color mode is reported.
+    if(a.cluster==0x300&&a.id>=0x4000){entry->pendingReports&=~bit;continue;}
     if(submitted)continue; // Release the stack lock between outgoing attributes.
     submitted=true;
-    esp_zb_zcl_report_attr_cmd_t report={};report.address_mode=ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;report.zcl_basic_cmd.src_endpoint=endpoint;report.zcl_basic_cmd.dst_endpoint=1;report.zcl_basic_cmd.dst_addr_u.addr_short=0;report.clusterID=a.cluster;report.attributeID=a.id;report.direction=ESP_ZB_ZCL_CMD_DIRECTION_TO_CLI;report.manuf_code=ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC;
-    const auto result=esp_zb_zcl_report_attr_cmd_req(&report);
-    if(result!=ESP_OK){ok=false;if(!(previous&bit)){char message[128];snprintf(message,sizeof(message),"TX report deferred ep=%u cluster=%04x attr=%04x status=0x%lx",endpoint,a.cluster,a.id,(unsigned long)result);traffic(message);}}
+    // A standard global Report Attributes frame does not require the SDK's
+    // per-attribute reporting table (writable thermostat values lack entries).
+    // APS copies the bounded frame and supplies delivery acknowledgement/retries.
+    uint8_t frame[10]={0x18,_reportSequence++,0x0a,uint8_t(a.id),uint8_t(a.id>>8),a.type};
+    uint32_t wire=0;memcpy(&wire,&a.data,size);
+    for(size_t byte=0;byte<size;++byte)frame[6+byte]=uint8_t(wire>>(8*byte));
+    esp_zb_apsde_data_req_t report={};report.dst_addr_mode=ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+    report.dst_addr.addr_short=0;report.dst_endpoint=1;report.src_endpoint=endpoint;
+    report.profile_id=ESP_ZB_AF_HA_PROFILE_ID;report.cluster_id=a.cluster;
+    report.asdu=frame;report.asdu_length=6+size;report.radius=30;report.tx_options=ESP_ZB_APSDE_TX_OPT_ACK_TX;
+    const auto result=esp_zb_aps_data_request(&report);
+    if(result!=ESP_OK){ok=false;{char message[128];snprintf(message,sizeof(message),"TX report deferred ep=%u cluster=%04x attr=%04x status=0x%lx",endpoint,a.cluster,a.id,(unsigned long)result);traffic(message);}}
     else {
       entry->pendingReports&=~bit;
       // Float32 formatted with %.7g and all supported integer/boolean values fit in 16 bytes.

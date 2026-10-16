@@ -19,7 +19,7 @@ int main(){
  assert(strcmp(ArdZigbeeIdentity::Model+1,"ArdPortal-C6")==0);
 #endif
 
- ArdZigbee z;
+ ArdZigbee z;z.setFirmwareVersion("\x05" "2.3.4");
 #if ARDPORTAL_ZIGBEE_DEBUG_SERIAL
  z.log("Serial diagnostic");assert(Serial.output.find("Serial diagnostic")!=std::string::npos);
  auto serialBefore=Serial.output;Serial.capacity=0;z.log("Console only");assert(Serial.output==serialBefore);assert(z.nextLine(1));Serial.capacity=256;
@@ -29,11 +29,11 @@ int main(){
  V field=ArdJSON::JSON.parse(R"({"options":[{"value":"a"},{"value":"b"}]})");
  V state=ArdJSON::JSON.parse(R"({"state":"ON","brightness":255,"color":{"r":255,"g":0,"b":0},"temperature":22,"current_temperature":20,"mode":"heat","fan_mode":"auto","position":20,"tilt":70})");
  for(auto kind:{Kind::Action,Kind::State,Kind::Slider,Kind::Select,Kind::Number,Kind::Temperature,Kind::Humidity,Kind::Pressure,Kind::Illuminance,Kind::Flow,Kind::WindSpeed,Kind::CarbonDioxide,Kind::PM25,Kind::Voltage,Kind::Current,Kind::Power,Kind::Binary,Kind::Light,Kind::Climate,Kind::Cover,Kind::Lock,Kind::Siren}){
-   Spec mapping;mapping.kind=kind;mapping.min=10;mapping.max=30;mapping.step=0.5;mapping.states=2;mapping.fan=true;
+   Spec mapping;mapping.kind=kind;mapping.min=10;mapping.max=30;mapping.step=0.5;mapping.states=2;mapping.fan=true;if(kind==Kind::Climate)mapping.sequence=4;
    V value=kind==Kind::Select?V("a"):kind==Kind::Lock?V("LOCKED"):kind==Kind::Binary?V(true):kind==Kind::Light||kind==Kind::Climate||kind==Kind::Cover||kind==Kind::Siren?state:V(22);
    auto attributes=encode(mapping,field,value);assert(z.addControl(mapping,attributes,kind==Kind::Number?String():String("Native")));
  }
- assert(z.controlCount()==23);nativeFailure=true;assert(!z.createControls(&nativeEndpoints));nativeFailure=false;assert(z.createControls(&nativeEndpoints));assert(!z.controls()->initial&&!z.controls()->label);
+ assert(z.controlCount()==23);nativeFailure=true;assert(!z.createControls(&nativeEndpoints));nativeFailure=false;assert(z.createControls(&nativeEndpoints));assert(!z.controls()->initial&&!z.controls()->label);for(const auto& endpoint:nativeEndpoints.endpoints){auto* basic=endpoint.second->clusters[0];if(basic){const auto& version=basic->attributes[0x4000].bytes;assert(version[0]==5&&memcmp(version.data()+1,"2.3.4",5)==0);}}
  float maximum=0,minimum=0;auto* slider=nativeEndpoints.endpoints[5]->clusters[13];memcpy(&maximum,slider->attributes[0x41].bytes.data(),4);memcpy(&minimum,slider->attributes[0x45].bytes.data(),4);assert(maximum==30&&minimum==10);assert(!z._startupError[0]);
  assert(z.begin(ArdZigbee::Options()));assert(!z.addControl(spec,initial,"Late"));z._ready=true;z._state=ArdZigbee::State::Connected;
  auto values=encode(spec,f,true);assert(z.publish(2,values));assert(reports==1);assert(z.publish(2,values)&&reports==1);assert(z.publish(2,values,true)&&reports==2);
@@ -47,9 +47,9 @@ int main(){
  assert(!z.publish(light->spec.endpoint,lightValues,true)&&reports==before+4&&!light->reportIncomplete);
  assert(!z.publish(light->spec.endpoint,lightValues,true)&&reports==before+5);
  failedReportCluster=failedReportAttribute=-1;
- for(unsigned i=6;i<8;++i)assert(!z.publish(light->spec.endpoint,lightValues,true)&&reports==before+i&&light->reportIncomplete);
- assert(z.publish(light->spec.endpoint,lightValues,true)&&reports==before+8);
- assert(z.publish(light->spec.endpoint,lightValues)&&reports==before+8);
+ for(unsigned i=6;i<9;++i)assert(!z.publish(light->spec.endpoint,lightValues,true)&&reports==before+i&&light->reportIncomplete);
+ assert(z.publish(light->spec.endpoint,lightValues,true)&&reports==before+9);
+ assert(z.publish(light->spec.endpoint,lightValues)&&reports==before+9);
  assert(!light->pendingReports);
  lockAvailable=false;assert(!z.publish(2,values,true));lockAvailable=true;
 
@@ -75,5 +75,32 @@ int main(){
  msg.attribute.data.type=0x20;assert(ArdZigbee::action(ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID,&msg)==ESP_ERR_INVALID_ARG);msg.attribute.data.type=0x10;
  for(unsigned i=0;i<16;++i)assert(ArdZigbee::action(ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID,&msg)==ESP_OK);
  assert(ArdZigbee::action(ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID,&msg)==ESP_ERR_NO_MEM);unsigned count=0;while(z.nextCommand(c))++count;assert(count==16);
- puts("PASS: native SDK staging, startup-buffer release, late registration, state reports, retry/defer, typed commands and queue saturation");
+ // SDK thermostat attributes can be writable yet lack reporting descriptors.
+ // Manual global reports must still carry exact types/values and remain paced.
+ const ArdZigbee::Control* climate=z.controls();while(climate&&climate->spec.kind!=Kind::Climate)climate=climate->next.get();assert(climate);
+ for(uint16_t id:{uint16_t(0),uint16_t(0x11),uint16_t(0x12),uint16_t(0x1c),uint16_t(0x29)})esp_zb_zcl_get_attribute(climate->spec.endpoint,0x201,1,id)->access=3;
+ auto thermal=encode(climate->spec,field,state);size_t first=apsReports.size();bool completed=false;
+ for(unsigned i=0;i<10&&!completed;++i)completed=z.publish(climate->spec.endpoint,thermal,true);
+ assert(completed&&apsReports.size()-first==thermal.count);
+ bool sawSetpoint=false,sawMode=false;
+ for(size_t i=first;i<apsReports.size();++i){const auto& packet=apsReports[i];assert(packet[0]==0x18&&packet[2]==0x0a);uint16_t id=packet[3]|packet[4]<<8;
+   if(id==0x12){sawSetpoint=true;assert(packet[5]==0x29&&packet[6]==0x98&&packet[7]==8);}
+   if(id==0x1c){sawMode=true;assert(packet[5]==0x30&&packet[6]==4);}
+ }
+ assert(sawSetpoint&&sawMode);
+ for(double target:{26.0,12.0,30.0,10.0}){
+   state["temperature"]=target;auto changed=encode(climate->spec,field,state);bool sent=false;
+   for(unsigned retry=0;retry<10&&!sent;++retry)sent=z.publish(climate->spec.endpoint,changed);
+   assert(sent);int16_t heat=0,cool=0;memcpy(&heat,esp_zb_zcl_get_attribute(climate->spec.endpoint,0x201,1,0x12)->data_p,2);memcpy(&cool,esp_zb_zcl_get_attribute(climate->spec.endpoint,0x201,1,0x11)->data_p,2);
+   assert(heat==int(target*100)&&cool==3250);
+   int16_t remote=2200;
+   assert(esp_zb_zcl_set_attribute_val(climate->spec.endpoint,0x201,1,0x12,&remote,true)==ESP_ZB_ZCL_STATUS_SUCCESS);
+ }
+ // Reporting timers must scale with staged attributes before the stack starts.
+ ArdZigbee scaled;Spec scaledSpec;scaledSpec.kind=Kind::Switch;
+ for(unsigned i=0;i<48;++i)assert(scaled.addControl(scaledSpec,encode(scaledSpec,f,false),"Scale"));
+ ArdZigbee::_instance=nullptr;
+ ESP.freeHeap=128000;
+ assert(scaled.begin(ArdZigbee::Options()));ArdZigbee::task(&scaled);assert(schedulerSlots==80+48*2);assert(nativeEndpoints.endpoints[1]->clusters[0]->attributes[0x4000].bytes[0]==3);
+ puts("PASS: native SDK staging, startup-buffer release, late registration, state reports, retry/defer, typed commands, command queue saturation and reporting scheduler capacity");
 }

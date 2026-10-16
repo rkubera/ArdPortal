@@ -23,3 +23,5 @@ ASAN_OPTIONS=detect_leaks=0 "$work/native-serial"
 
 c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -I"$root/tests/host" -I"$root/src" "$root/tests/zigbee-export-api-test.cpp" -o "$work/export-api"
 ASAN_OPTIONS=detect_leaks=0 "$work/export-api"
+
+python3 "$root/tests/zigbee-queue-order-test.py"

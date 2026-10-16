@@ -181,6 +181,12 @@ bool ArdPortal::validPortalConfig(const PortalConfig& c) {
  * @return True when startup is accepted; initial storage completion is reported separately by the ready callback.
  */
 bool ArdPortal::begin() { return begin(Options{}); }
+/** @brief Set shared HA/Zigbee application firmware metadata before startup. @param version Nonempty text up to 16 bytes. @return True when copied. */
+bool ArdPortal::setFirmwareVersion(const char* version){
+  if(_started||!version)return false;
+  size_t bytes=strlen(version);if(!bytes||bytes>16)return false;
+  _firmwareVersion[0]=char(bytes);memcpy(_firmwareVersion+1,version,bytes+1);return true;
+}
 /**
  * @brief Initialize networking, storage and portal services using default or supplied options.
  * @param options Initialization options and cooperative work limits.
@@ -188,6 +194,9 @@ bool ArdPortal::begin() { return begin(Options{}); }
  */
 bool ArdPortal::begin(const Options& options) {
   if (_started) return true;
+#if ARDPORTAL_ENABLE_ZIGBEE
+  _zigbee.setFirmwareVersion(_firmwareVersion);
+#endif
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   _zigbee.onLifecycleDiagnostic(this,[](void* context,const String& message){static_cast<ArdPortal*>(context)->log("Zigbee: "+message);});
 #endif
@@ -1505,6 +1514,10 @@ bool ArdPortal::scheduleAppPatch(ArdJSON::JSONVar patch,ChangeSource source,bool
 #endif
      )||
      (_savePending&&_saveSource!=source&&!coalesceSource))return false;
+#if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
+  ArdAppConfigFieldMask superseded;
+  if(source!=ChangeSource::Zigbee)patch.forEachObjectMember([&](const String& key,const V&){superseded|=ArdAppConfigFieldMask::forField(_dynamic.indexOf(key));return true;});
+#endif
   auto limits=snapshotLimits();limits.maxOutputBytes=MaxAppConfigBytes;
   if(_savePending&&!_pendingAppPatch){
     if(!ArdJSON::JSON.measureObjectPatch(_pendingApp,patch,nullptr,limits)||!_pendingApp.applyObjectPatch(std::move(patch)))return false;
@@ -1514,6 +1527,10 @@ bool ArdPortal::scheduleAppPatch(ArdJSON::JSONVar patch,ChangeSource source,bool
     _pendingApp=std::move(candidate);_pendingAppPatch=true;
   }
   if(!_savePending){_pending=_config;_pending.apName=ArdDeviceName::ap(_pending.deviceName);}
+#if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
+  // A newer accepted intent supersedes Zigbee values still waiting for storage.
+  while(superseded){size_t field=superseded.firstSet();superseded&=~ArdAppConfigFieldMask::forField(field);_zigbeeAppQueue.remove(_dynamic.idAt(field));}
+#endif
   _saveSource=source;_savePending=true;_dirtySince=millis();return true;
 }
 String ArdPortal::saveDocumentSlice(size_t offset,size_t maximum)const {

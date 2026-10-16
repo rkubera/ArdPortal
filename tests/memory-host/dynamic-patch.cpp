@@ -36,6 +36,21 @@ bool failFileWrite = false, failRename = false;
 
 void drain(ArdPortal& p){if(p._savePending&&!p._saveQueued)p.flushPortalAndAppConfig();for(int i=0;i<10000&&(p._savePending||p._storage.busy()||!p.portalAndAppConfigReady());++i){fakeMillis+=10;p.serviceStorage(fakeMillis);}assert(!p._storage.busy()&&!p._savePending);}
 int main(){
+  {ArdPortal p;assert(String(p.getFirmwareVersion())=="1.0");
+   auto f=ArdJSON::JSON.parse(R"({"id":"version_test","type":"switch","name":"Relay"})");
+   auto d=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(d["device"]["sw_version"].asString()=="1.0");
+   assert(!p.setFirmwareVersion(nullptr)&&!p.setFirmwareVersion("")&&!p.setFirmwareVersion("12345678901234567"));
+   assert(p.setFirmwareVersion("2.3.4-beta"));d=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(d["device"]["sw_version"].asString()=="2.3.4-beta");
+   p._started=true;assert(!p.setFirmwareVersion("3.0"));assert(String(p.getFirmwareVersion())=="2.3.4-beta");
+  }
+
+  {ArdPortal p;auto f=ArdJSON::JSON.parse(R"({"id":"room","type":"climate","name":"Room","min":10,"max":35,"step":0.5,"modes":["off","heat","cool","heat_cool"]})");
+   auto value=ArdDynamicPages::initial(f);assert(value["temperature_low"].asDouble()==10&&value["temperature_high"].asDouble()==35);
+   value["mode"]="heat_cool";value["temperature_low"]=20;value["temperature_high"]=25;assert(ArdDynamicPages::validValue(f,value));
+   auto discovery=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(discovery["temperature_low_command_topic"].asString().indexOf("room_temperature_low")>=0);assert(discovery["temperature_high_state_template"].asString()=="{{ value_json.temperature_high }}");
+   value["temperature_low"]=26;assert(!ArdDynamicPages::validValue(f,value));value["temperature_low"]=20.25;assert(!ArdDynamicPages::validValue(f,value));value.remove("temperature_low");assert(!ArdDynamicPages::validValue(f,value));value["mode"]="cool";assert(ArdDynamicPages::validValue(f,value));
+  }
+
   {ArdPortal::PortalConfig bandConfig;bandConfig.deviceName="Band test";bandConfig.apBand=5;
    String encoded=ArdPortalJson::encode(bandConfig);ArdPortal::PortalConfig restored;
    assert(encoded.length()&&ArdPortalJson::decode(encoded,restored)&&restored.apBand==5);

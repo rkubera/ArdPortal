@@ -38,6 +38,8 @@ struct esp_zb_platform_config_t {struct {int radio_mode;} radio_config;struct {i
 struct esp_zb_cfg_t {int esp_zb_role;bool install_code_policy;struct {struct {int max_children;} zczr_cfg;struct {int ed_timeout,keep_alive;} zed_cfg;} nwk_cfg;};
 inline int esp_zb_platform_config(esp_zb_platform_config_t*){return ESP_OK;}
 inline void esp_zb_init(esp_zb_cfg_t*){}
+inline uint16_t schedulerSlots=0;
+inline int esp_zb_scheduler_queue_size_set(uint16_t slots){schedulerSlots=slots;return ESP_OK;}
 inline int esp_zb_device_register(void*){return ESP_OK;}
 inline void esp_zb_set_primary_network_channel_set(unsigned){}
 inline bool coexistEnabled=false;

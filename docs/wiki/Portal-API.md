@@ -594,3 +594,22 @@ disconnected. Existing `startZigbeePairing()`, `stopZigbeePairing()`,
 `rejoinZigbee()`, `resetZigbeePairing()`, `setZigbeeOptions()`,
 `onZigbeeStateChanged()` and `onZigbeeOperationFinished()` remain the convenient
 portal API. Status changes are also visible in WWW.
+
+
+## Application firmware version
+
+Set the application version before `begin()`. The default is `1.0`.
+
+```cpp
+ArdPortal portal;
+
+void setup() {
+  portal.setFirmwareVersion("2.3.4");
+  portal.begin();
+}
+```
+
+- `bool setFirmwareVersion(const char* version)` copies a nonempty version of up to 16 UTF-8 bytes. It returns `false` for null/empty/oversized input or after startup, preserving the previous version.
+- `const char* getFirmwareVersion() const` returns the current version; the returned text belongs to the portal.
+
+Home Assistant MQTT Discovery includes this value as device `sw_version`. Zigbee exposes it through the standard Basic cluster `SWBuildID` (`0x4000`) on the management and application endpoints. Existing Zigbee devices may need a new interview/read to refresh cached software metadata. The version is firmware metadata, not a saved user setting; assign it in each firmware build. Changing it does not change the control-layout model ID. This display string is independent of the integer `ARDPORTAL_ZIGBEE_OTA_FILE_VERSION` used to order Zigbee OTA images; set that macro separately for OTA releases.

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Application firmware version
+
+- Add `setFirmwareVersion()` and `getFirmwareVersion()` with a default application version of `1.0`; configure before `begin()` using up to 16 UTF-8 bytes.
+- Include application version in Home Assistant device `sw_version` and standard Zigbee Basic `SWBuildID` on management/application endpoints, independently of the OTA image version and layout fingerprint.
+
+## Unreleased — Zigbee hardware validation
+
+- Prevent a false Zigbee OTA timeout when the SDK task updates its activity timestamp after the caller sampled the loop time; test concurrent tick ordering and millis rollover.
+
+- Size the native Zigbee scheduler before stack initialization according to staged attributes, retaining commissioning capacity when many reporting endpoints are registered.
+- Keep inactive single-target thermostat setpoints outside the active target range so SDK deadband validation does not reject large remote target changes. Independent `heat_cool` thresholds retain their deadband validation.
+- Cover reporting scheduler capacity and remote thermostat writes with native adapter regression tests.
+
 ## Unreleased — Conditional UI and typed text
 
 - Exclude Zigbee refresh/navigation logic and disabled Console channels from generated WWW JavaScript using existing feature switches.

@@ -48,6 +48,9 @@ public:
   static bool validOptions(const Options& options){return options.timeoutMs&&options.timeoutMs<=600000&&options.retryMs&&options.retryMs<=600000&&options.attemptTimeoutMs&&options.attemptTimeoutMs<=600000&&options.maxAttempts&&options.maxAttempts<=20;}
   /** @brief Schedule stack initialization in a separate task. @return True if accepted. */
   bool begin(const Options& options);
+  /** @brief Borrow stable application version metadata before startup. @param version ZCL length-prefixed SWBuildID owned by the portal. @return No value. */
+  void setFirmwareVersion(const char* version){if(!_begun&&version)_firmwareVersion=version;}
+
   /** @brief Advance queued signals, retries and callbacks. @param now Milliseconds. @return No value. */
   void loop(uint32_t now);
   /** @brief Request a network operation. @param op Pair, rejoin or reset. @param options Timeout/retry limits. @return True if accepted. */
@@ -146,6 +149,7 @@ public:
   bool queryOta();
 #endif
 private:
+  const char* _firmwareVersion="\x03" "1.0";
   std::atomic<uint32_t> _timeReceived{0};
   std::atomic<uint16_t> _timeSequence{256};
   uint32_t _timeProbeAt=0;
@@ -165,7 +169,7 @@ private:
 #endif
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   std::unique_ptr<Control> _controls;
-  uint8_t _controlCount=0;
+  uint8_t _controlCount=0,_reportSequence=0;
   QueueHandle_t _commands=nullptr;
   /** @brief Build staged endpoints before stack start. @param endpoints Native list. @return True if all clusters were added. */
   bool createControls(esp_zb_ep_list_t* endpoints);

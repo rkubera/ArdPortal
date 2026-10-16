@@ -57,11 +57,11 @@ for(const f of fields){
   else if(f.kind==='cover')extend.push(m.windowCovering({endpointNames,controls:['lift','tilt']}));
   else if(f.kind==='climate'){
     const values={};
-    if(f.modes.includes('heat'))values.occupiedHeatingSetpoint={min:f.min,max:f.max,step:f.step};
-    if(f.modes.includes('cool'))values.occupiedCoolingSetpoint={min:f.min,max:f.max,step:f.step};
+    if(f.modes.includes('heat')||f.modes.includes('heat_cool'))values.occupiedHeatingSetpoint={min:f.min,max:f.max,step:f.step};
+    if(f.modes.includes('cool')||f.modes.includes('heat_cool'))values.occupiedCoolingSetpoint={min:f.min,max:f.max,step:f.step};
     if(!Object.keys(values).length)values.occupiedHeatingSetpoint={min:f.min,max:f.max,step:f.step};
     extend.push(m.thermostat({endpoint:endpointName,localTemperature:{},setpoints:{values},
-      systemMode:{values:f.modes},runningState:{values:['idle',...(f.modes.includes('heat')?['heat']:[]),...(f.modes.includes('cool')?['cool']:[])]},
+      systemMode:{values:[...new Set(f.modes.map(mode=>mode==='heat_cool'?'auto':mode))]},runningState:{values:['idle',...((f.modes.includes('heat')||f.modes.includes('heat_cool'))?['heat']:[]),...((f.modes.includes('cool')||f.modes.includes('heat_cool'))?['cool']:[])]},
       ...(f.fanModes?.length?{fanMode:f.fanModes}:{})}));
   }else if(f.kind==='lock'){
     const lock=m.lock({endpointNames,pinCodeCount:0});
@@ -125,4 +125,5 @@ for(const extension of extend)for(const expose of extension.exposes??[])hideEndp
 export default {
   fingerprint:[{modelID:identity.model,manufacturerName:'ArdPortal'}],
   model:identity.model,vendor:'ArdPortal',description:'ArdPortal registered controls',extend,
+  ota:fields.some(field=>field.kind==='update'),
 };

@@ -59,6 +59,13 @@ void ArdZigbee::task(void* arg){
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   if(!ArdHeap::permits(8192+size_t(self._controlCount)*512,4096)){self.traffic("Insufficient heap8/DMA reserve for native Zigbee endpoints");self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
 #endif
+#if ARDPORTAL_ENABLE_DYNAMIC_PAGES
+  // Each reportable attribute can retain both an interval timer and pending
+  // reporting work. Keep the SDK's default capacity for network commissioning.
+  uint16_t schedulerSlots=80;
+  for(auto* entry=self._controls.get();entry;entry=entry->next.get())schedulerSlots+=uint16_t(entry->initialCount)*2;
+  if(esp_zb_scheduler_queue_size_set(schedulerSlots)!=ESP_OK){snprintf(self._startupError,sizeof(self._startupError),"Cannot size Zigbee reporting scheduler");self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
+#endif
   esp_zb_init(&config);
 #if !ARDPORTAL_ZIGBEE_ROUTER
   // A portal device is continuously powered: receive commands directly instead
@@ -77,7 +84,8 @@ void ArdZigbee::task(void* arg){
   static char manufacturer[]="\x09" "ArdPortal";
   auto* model=ArdZigbeeIdentity::Model;
   if(!basic||esp_zb_basic_cluster_add_attr(basic,ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID,manufacturer)!=ESP_OK||
-     esp_zb_basic_cluster_add_attr(basic,ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID,model)!=ESP_OK){self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
+     esp_zb_basic_cluster_add_attr(basic,ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID,model)!=ESP_OK||
+     esp_zb_basic_cluster_add_attr(basic,0x4000,const_cast<char*>(self._firmwareVersion))!=ESP_OK){self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
   auto* timeClient=esp_zb_zcl_attr_list_create(0x000a);
   if(!timeClient||esp_zb_cluster_list_add_time_cluster(clusters,timeClient,ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE)!=ESP_OK){self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
   auto* endpoints=esp_zb_ep_list_create();
@@ -178,7 +186,9 @@ bool ArdZigbee::request(Operation op,const Options& options){
 void ArdZigbee::loop(uint32_t now){
   if(!_begun)return;
 #if ARDPORTAL_ZIGBEE_OTA_SUPPORT
-  if(_otaActive&&uint32_t(now-_otaLastActivity.load())>=60000&&esp_zb_lock_acquire(0)){
+  // The SDK task can refresh activity after `now` was sampled by the caller.
+  // A slightly newer activity tick is not an elapsed timeout, including wrap.
+  if(_otaActive&&int32_t(now-_otaLastActivity.load())>=60000&&esp_zb_lock_acquire(0)){
     if(_otaHandle){esp_ota_abort(_otaHandle);_otaHandle=0;}_otaActive=false;esp_zb_lock_release();log("Zigbee OTA timed out; current firmware retained");
   }
 #endif

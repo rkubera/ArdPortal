@@ -435,7 +435,7 @@ public:
     if(type=="select") return f["options"][0]["value"];
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
-    if(type=="climate") { V v=V::object(); v["temperature"]=f["min"]; v["current_temperature"]=nullptr; if(f.hasOwnProperty("modes")) v["mode"]=f["modes"][0]; if(f.hasOwnProperty("fan_modes")) v["fan_mode"]=f["fan_modes"][0]; return v; }
+    if(type=="climate") { V v=V::object(); v["temperature"]=f["min"]; v["current_temperature"]=nullptr; if(contains(f["modes"],"heat_cool")){v["temperature_low"]=f["min"];v["temperature_high"]=f["max"];} if(f.hasOwnProperty("modes")) v["mode"]=f["modes"][0]; if(f.hasOwnProperty("fan_modes")) v["fan_mode"]=f["fan_modes"][0]; return v; }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
     if(type=="text"&&ArdText::pattern(f).type!=ArdText::Type::Text)return V(nullptr);
@@ -465,11 +465,20 @@ public:
       if(v.type()!=T::Object) return false;
       double n; if(!v["temperature"].toDouble(n) || n<f["min"].asDouble() || n>f["max"].asDouble()) return false;
       double step=f["step"].isUndefined()?0.5:f["step"].asDouble(); if(fabs((n-f["min"].asDouble())/step-round((n-f["min"].asDouble())/step))>0.000001) return false;
+      const bool range=contains(f["modes"],"heat_cool");
+      for(const char* key:{"temperature_low","temperature_high"}) {
+        if(v[key].isUndefined()&&v["mode"].asString()!="heat_cool") continue;
+        if(!range||!v[key].toDouble(n)||n<f["min"].asDouble()||n>f["max"].asDouble()||fabs((n-f["min"].asDouble())/step-round((n-f["min"].asDouble())/step))>0.000001) return false;
+      }
+      if(!v["temperature_low"].isUndefined()&&!v["temperature_high"].isUndefined()&&v["temperature_low"].asDouble()>v["temperature_high"].asDouble()) return false;
+#if ARDPORTAL_ENABLE_ZIGBEE
+      if(v["mode"].asString()=="heat_cool"&&v["temperature_high"].asDouble()-v["temperature_low"].asDouble()<2.5) return false;
+#endif
       if(!v["current_temperature"].isUndefined() && !v["current_temperature"].isNull() && !v["current_temperature"].toDouble(n)) return false;
       if(f.hasOwnProperty("modes") ? !contains(f["modes"],v["mode"].asString()) : !v["mode"].isUndefined()) return false;
       if(f.hasOwnProperty("fan_modes") ? !contains(f["fan_modes"],v["fan_mode"].asString()) : !v["fan_mode"].isUndefined()) return false;
       if(!v["action"].isUndefined()&&(v["action"].type()!=T::String||v["action"].asString().length()>32)) return false;
-      V keys=v.keys(); for(size_t i=0;i<keys.length();++i) { String k=keys[i].asString(); if(k!="temperature"&&k!="current_temperature"&&k!="mode"&&k!="fan_mode"&&k!="action") return false; }
+      V keys=v.keys(); for(size_t i=0;i<keys.length();++i) { String k=keys[i].asString(); if(k!="temperature"&&k!="temperature_low"&&k!="temperature_high"&&k!="current_temperature"&&k!="mode"&&k!="fan_mode"&&k!="action") return false; }
       return true;
     }
 #endif
@@ -509,7 +518,7 @@ public:
     if(type=="select") { const V& o=f["options"]; if(o.type()!=T::Array||!o.length()||o.length()>16) return fail("field",id,"options must contain 1..16 entries"); for(size_t j=0;j<o.length();++j) { if(o[j]["value"].type()!=T::String || o[j]["value"].asString().length()>128 || strlen(o[j]["value"].asString().c_str())!=o[j]["value"].asString().length() || !title(o[j])) return fail("field",id,"invalid option value/title"); for(size_t k=0;k<j;++k) if(o[j]["value"].asString()==o[k]["value"].asString()) return fail("field",id,"duplicate option value"); } }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
-    if(type=="climate") for(const char* key:{"modes","fan_modes"}) if(f.hasOwnProperty(key)) { const V& modes=f[key]; if(modes.type()!=T::Array||!modes.length()||modes.length()>10) return fail("field",id,"modes/fan_modes must contain 1..10 entries"); for(size_t j=0;j<modes.length();++j) { String m=modes[j].asString(); if(!identifier(m)) return fail("field",id,"invalid mode identifier"); if(String(key)=="modes"&&m!="off"&&m!="heat"&&m!="cool"&&m!="auto"&&m!="dry"&&m!="fan_only") return fail("field",id,"unsupported climate mode"); for(size_t k=0;k<j;++k) if(m==modes[k].asString()) return fail("field",id,"duplicate mode"); } }
+    if(type=="climate") for(const char* key:{"modes","fan_modes"}) if(f.hasOwnProperty(key)) { const V& modes=f[key]; if(modes.type()!=T::Array||!modes.length()||modes.length()>10) return fail("field",id,"modes/fan_modes must contain 1..10 entries"); for(size_t j=0;j<modes.length();++j) { String m=modes[j].asString(); if(!identifier(m)) return fail("field",id,"invalid mode identifier"); if(String(key)=="modes"&&m!="off"&&m!="heat"&&m!="cool"&&m!="auto"&&m!="heat_cool"&&m!="dry"&&m!="fan_only") return fail("field",id,"unsupported climate mode"); for(size_t k=0;k<j;++k) if(m==modes[k].asString()) return fail("field",id,"duplicate mode"); } }
 #endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
       if(checkDependencies&&f.hasOwnProperty("visibleWhen")&&!validCondition(f["visibleWhen"],fields))return fail("field",id,"invalid visibleWhen condition or referenced field");
@@ -574,7 +583,7 @@ public:
     // Every generated command and acknowledgement name must be unambiguous.
     for(size_t i=0;i<count();++i) {V f=at(i);V suffixes=V::array();
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
-      if(f["type"].asString()=="climate")for(const char* suffix:{"temperature","mode","fan"})suffixes.push(suffix);
+      if(f["type"].asString()=="climate")for(const char* suffix:{"temperature","temperature_low","temperature_high","mode","fan"})suffixes.push(suffix);
 #endif
       if(ArdHa::extended(f)){V resolved=f;if(!ArdHa::normalize(resolved,true))return fail("commands",f["id"].asString(),"descriptor normalization failed");for(size_t c=0;c<resolved["controls"].length();++c)if(resolved["controls"][c]["command"].asString().length())suffixes.push(resolved["controls"][c]["command"]);suffixes.push("ack");}
       for(size_t k=0;k<suffixes.length();++k)if(indexOf(f["id"].asString()+"_"+suffixes[k].asString())<count())return fail("commands",f["id"].asString(),"generated command/ack id collides with field: "+f["id"].asString()+"_"+suffixes[k].asString());yield();

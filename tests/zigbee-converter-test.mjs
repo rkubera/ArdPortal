@@ -22,6 +22,7 @@ const fields=[
   {kind:'action',ep:9,endpoint:'button_ep9',label:'Button'},
   {kind:'lock',ep:10,endpoint:'lock_ep10',label:'Lock'},
   {kind:'siren',ep:11,endpoint:'siren_ep11',label:'Siren'},
+  {kind:'update',ep:49,endpoint:'firmware_ep49',label:'Firmware'},
   ...['number','temperature','humidity','pressure','illuminance','flow','carbon_dioxide','pm25','wind_speed','voltage','current','power','binary'].map((kind,index)=>({kind,ep:index+12,endpoint:kind+'_ep'+(index+12),label:kind})),
   {kind:'action',ep:40,endpoint:'vacuum_ep40',label:'Vacuum / start'},
   {kind:'action',ep:41,endpoint:'vacuum_ep41',label:'Vacuum / stop'},
@@ -31,8 +32,9 @@ const fields=[
 fs.writeFileSync(destination,"import * as m from 'zigbee-herdsman-converters/lib/modernExtend';\nimport {presets as e, access as a} from 'zigbee-herdsman-converters/lib/exposes';\nconst identity={model:'ArdPortal-0123456789abcdef'};\nconst fields="+JSON.stringify(fields).slice(0,-1)+tail);
 try{
   const {default:definition}=await import(pathToFileURL(destination));
+  assert.equal(definition.ota,true);
   assert.deepEqual(definition.fingerprint,[{modelID:'ArdPortal-0123456789abcdef',manufacturerName:'ArdPortal'}]);
-  assert.equal(definition.extend.length,fields.length-1);
+  assert.equal(definition.extend.length,fields.length-2);
   const exposes=definition.extend.flatMap(x=>x.exposes??[]);
   const at=(x,endpoint)=>x.property?.endsWith('_'+endpoint)||x.features?.some(f=>at(f,endpoint));
   assert.ok(exposes.some(x=>x.type==='climate'&&at(x,'climate_ep6')));

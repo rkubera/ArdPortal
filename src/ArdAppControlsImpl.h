@@ -128,6 +128,8 @@ void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t 
     else if(type=="climate") {
       value=_mqttAppQueue.hasOwnProperty(id)?_mqttAppQueue[id]:((_portal._savePending||_portal._saveQueued||_portal._pendingReady)&&_portal._pendingApp.hasOwnProperty(id)?_portal._pendingApp[id]:_portal.getAppConfigValue(id.c_str()));
       if(command==id+"_temperature") value["temperature"]=_portal._json.parse(payload);
+      else if(command==id+"_temperature_low") value["temperature_low"]=_portal._json.parse(payload);
+      else if(command==id+"_temperature_high") value["temperature_high"]=_portal._json.parse(payload);
       else if(command==id+"_mode"&&f.hasOwnProperty("modes")) value["mode"]=payload;
       else if(command==id+"_fan"&&f.hasOwnProperty("fan_modes")) value["fan_mode"]=payload;
       else continue;
@@ -205,8 +207,16 @@ bool ArdAppControls::applyAppState(const String& key,const V& value,ChangeSource
   // Do not materialize a second runtime member just to repeat that value.
   // Failed serialization must never be interpreted as equality.
   if(!after.length()||(!previous.isUndefined()&&!before.length()))return false;
-  if(!previous.isUndefined()&&before==after)return true;
+  if(!previous.isUndefined()&&before==after){
+#if ARDPORTAL_ENABLE_ZIGBEE
+    if(source!=ChangeSource::Zigbee)_portal._zigbeeAppQueue.remove(key);
+#endif
+    return true;
+  }
   _appState[key]=value;if(!_appState.isValid()) return false;
+#if ARDPORTAL_ENABLE_ZIGBEE
+  if(source!=ChangeSource::Zigbee)_portal._zigbeeAppQueue.remove(key);
+#endif
   {++_portal._appRevision;
 #if ARDPORTAL_ENABLE_HA && ARDPORTAL_ENABLE_DEPENDENCIES
     _portal._homeAssistant.dependencyChanged(key);
