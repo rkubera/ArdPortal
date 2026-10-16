@@ -36,6 +36,27 @@ bool failFileWrite = false, failRename = false;
 
 void drain(ArdPortal& p){if(p._savePending&&!p._saveQueued)p.flushPortalAndAppConfig();for(int i=0;i<10000&&(p._savePending||p._storage.busy()||!p.portalAndAppConfigReady());++i){fakeMillis+=10;p.serviceStorage(fakeMillis);}assert(!p._storage.busy()&&!p._savePending);}
 int main(){
+  {ArdPortal p;assert(String(p.getFirmwareVersion())=="1.0");
+   auto f=ArdJSON::JSON.parse(R"({"id":"version_test","type":"switch","name":"Relay"})");
+   auto d=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(d["device"]["sw_version"].asString()=="1.0");
+   assert(!p.setFirmwareVersion(nullptr)&&!p.setFirmwareVersion("")&&!p.setFirmwareVersion("12345678901234567"));
+   assert(p.setFirmwareVersion("2.3.4-beta"));d=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(d["device"]["sw_version"].asString()=="2.3.4-beta");
+   p._started=true;assert(!p.setFirmwareVersion("3.0"));assert(String(p.getFirmwareVersion())=="2.3.4-beta");
+  }
+
+  {ArdPortal p;auto f=ArdJSON::JSON.parse(R"({"id":"room","type":"climate","name":"Room","min":10,"max":35,"step":0.5,"modes":["off","heat","cool","heat_cool"]})");
+   auto value=ArdDynamicPages::initial(f);assert(value["temperature_low"].asDouble()==10&&value["temperature_high"].asDouble()==35);
+   value["mode"]="heat_cool";value["temperature_low"]=20;value["temperature_high"]=25;assert(ArdDynamicPages::validValue(f,value));
+   auto discovery=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(discovery["temperature_low_command_topic"].asString().indexOf("room_temperature_low")>=0);assert(discovery["temperature_high_state_template"].asString()=="{{ value_json.temperature_high }}");
+   value["temperature_low"]=26;assert(!ArdDynamicPages::validValue(f,value));value["temperature_low"]=20.25;assert(!ArdDynamicPages::validValue(f,value));value.remove("temperature_low");assert(!ArdDynamicPages::validValue(f,value));value["mode"]="cool";assert(ArdDynamicPages::validValue(f,value));
+  }
+
+  {ArdPortal::PortalConfig bandConfig;bandConfig.deviceName="Band test";bandConfig.apBand=5;
+   String encoded=ArdPortalJson::encode(bandConfig);ArdPortal::PortalConfig restored;
+   assert(encoded.length()&&ArdPortalJson::decode(encoded,restored)&&restored.apBand==5);
+   auto legacy=ArdPortalJson::value(bandConfig);legacy.remove("apBand");assert(ArdPortalJson::decodeValue(legacy,restored)&&restored.apBand==24);
+   auto invalid=ArdPortalJson::value(bandConfig);invalid["apBand"]=6;assert(!ArdPortalJson::decodeValue(invalid,restored));}
+
   {
     ArdPortal discovery;
     auto field=ArdJSON::JSON.parse(R"({"id":"toggle","name":"Toggle","type":"switch","default":false})");
@@ -50,6 +71,29 @@ int main(){
     config=ArdJSON::JSON.parse(discovery._homeAssistant.discoveryConfig(field));
     assert(config["icon"].asString()=="mdi:fan");
   }
+{
+  ArdPortal p;
+  auto plain=ArdJSON::JSON.parse(R"({"id":"reading","name":"Reading","type":"text"})");
+  assert(ArdDynamicPages::initial(plain).asString()=="");
+  auto config=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(plain));
+  assert(!config.hasOwnProperty("device_class")&&!config.hasOwnProperty("state_class"));
+  for(auto type:{"number","temperature","humidity","pressure","illuminance","flow","carbon_dioxide","pm25","wind_speed","voltage","current","power"}){
+    auto field=plain;field["textType"]=type;
+    assert(ArdDynamicPages::initial(field).isNull());
+    assert(ArdDynamicPages::validValue(field,nullptr)&&ArdDynamicPages::validValue(field,22.5)&&!ArdDynamicPages::validValue(field,"22.5"));
+    config=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(field));
+    auto pattern=ArdText::pattern(field);
+    assert(config["state_class"].asString()=="measurement");
+    assert(config["device_class"].asString()==pattern.device&&config["unit_of_measurement"].asString()==pattern.unit);
+    field["ha"]["value_template"]="{{ value | float * 2 }}";
+    config=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(field));
+    assert(config["value_template"].asString()=="{{ value | float * 2 }}");
+  }
+  plain["textType"]="bogus";
+  assert(!p._dynamic.validateField(plain,ArdJSON::JSONVar::array(),false));
+  assert(String(p._dynamic.error.stage)=="field"&&p._dynamic.error.fieldId=="reading"&&p._dynamic.error.reason=="unsupported textType");
+
+}
 using V=ArdJSON::JSONVar;ArdPortal p;assert(p.begin());drain(p);
 for(int i=0;i<300;++i)p._appConfig[String("setting")+String(i)]=i;
 allocationBudget=12;size_t before=allocations;assert(p.setAppConfigValue("setting1",17));assert(allocations-before<12);allocationBudget=-1;assert(p._pendingAppPatch&&p._pendingApp.length()==1);assert(p.getAppConfigValue("setting1").asDouble()==1);

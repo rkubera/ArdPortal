@@ -104,6 +104,30 @@ controls and application behavior.
 
 Available since ArdPortal 0.7.8.
 
+## Integration with Home Assistant
+
+**MQTT component:** `light`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** JSON light state and partial commands for `state` (`ON`/`OFF`), `brightness` (0–255) and `color` (RGB channels 0–255). The preset advertises RGB color mode; accepted partial commands merge into the current state.
+
+**Not provided by the built-in integration / limits:** No built-in color temperature, XY/HS command schema, RGBW/RGBWW channels, effects, transitions, flashing or hardware/PWM driver. Extra discovery capabilities need matching application control definitions and behavior; advertising them alone does not implement them.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+ArdPortal supports standard XY, Hue/Saturation and Enhanced Hue/Saturation Zigbee commands. RGB is converted automatically; no JSON color-space option is needed. Zigbee2MQTT may select Enhanced Hue for its color picker.
+
+**Native mapping:** On/Off, Level Control and Color Control. Requires ESP32-C5/C6/H2, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
+
+**Supported by ArdPortal:** On/off, brightness and RGB color through standard hue/saturation. Incoming color/level commands are normalized back into the application’s RGB/brightness state.
+
+**Not provided / limits:** Brightness/hue/saturation use the ZCL 0–254 range, so conversion is lossy. RGB intensity is folded into brightness; the original RGB/brightness decomposition is not preserved. Color temperature, effects, transitions and flashing are not implemented/advertised.
+
+`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway presentation depends on its support for the mapped clusters. ArdPortal can export a [Zigbee2MQTT converter or ZHA quirk](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download); see the [validation scope](https://github.com/rkubera/ArdPortal/wiki/Zigbee#validation-and-troubleshooting).
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

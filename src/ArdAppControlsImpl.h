@@ -128,6 +128,8 @@ void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t 
     else if(type=="climate") {
       value=_mqttAppQueue.hasOwnProperty(id)?_mqttAppQueue[id]:((_portal._savePending||_portal._saveQueued||_portal._pendingReady)&&_portal._pendingApp.hasOwnProperty(id)?_portal._pendingApp[id]:_portal.getAppConfigValue(id.c_str()));
       if(command==id+"_temperature") value["temperature"]=_portal._json.parse(payload);
+      else if(command==id+"_temperature_low") value["temperature_low"]=_portal._json.parse(payload);
+      else if(command==id+"_temperature_high") value["temperature_high"]=_portal._json.parse(payload);
       else if(command==id+"_mode"&&f.hasOwnProperty("modes")) value["mode"]=payload;
       else if(command==id+"_fan"&&f.hasOwnProperty("fan_modes")) value["fan_mode"]=payload;
       else continue;
@@ -205,11 +207,22 @@ bool ArdAppControls::applyAppState(const String& key,const V& value,ChangeSource
   // Do not materialize a second runtime member just to repeat that value.
   // Failed serialization must never be interpreted as equality.
   if(!after.length()||(!previous.isUndefined()&&!before.length()))return false;
-  if(!previous.isUndefined()&&before==after)return true;
+  if(!previous.isUndefined()&&before==after){
+#if ARDPORTAL_ENABLE_ZIGBEE
+    if(source!=ChangeSource::Zigbee)_portal._zigbeeAppQueue.remove(key);
+#endif
+    return true;
+  }
   _appState[key]=value;if(!_appState.isValid()) return false;
+#if ARDPORTAL_ENABLE_ZIGBEE
+  if(source!=ChangeSource::Zigbee)_portal._zigbeeAppQueue.remove(key);
+#endif
   {++_portal._appRevision;
 #if ARDPORTAL_ENABLE_HA && ARDPORTAL_ENABLE_DEPENDENCIES
     _portal._homeAssistant.dependencyChanged(key);
+#endif
+#if ARDPORTAL_ENABLE_ZIGBEE
+    _portal.markZigbeeStateDirty(key);
 #endif
     if(publishMqtt)markDirty(key);if(_portal._appChanged) _portal._appChanged(key,value,source);}
   return true;
@@ -258,16 +271,19 @@ bool ArdAppControls::emitAppConfigEvent(const char* key,const V& value) {
  */
 bool ArdAppControls::appControl(const V& definition,size_t index,const V& value,ChangeSource source) {
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
-  _appControlStage=1;if(!appFieldVisible(definition)) {_appControlStage=6;return false;}V resolved=definition;if(!ArdHa::normalize(resolved,true)) return false;const V& f=resolved;
+  _appControlStage=1;if(source!=ChangeSource::Zigbee&&!appFieldVisible(definition)) {_appControlStage=6;return false;}V resolved=definition;if(!ArdHa::normalize(resolved,true)) return false;const V& f=resolved;
   _appControlStage=2;if(!ArdHa::extended(f)||index>=f["controls"].length()) return false;
   const V& c=f["controls"][index];String kind=c["type"].asString(),key=f["id"].asString(),suffix=c["command"].asString();
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
   if(kind.indexOf("action")==0) {
-    if(!_portal._appCommand) return false;
+#if ARDPORTAL_ZIGBEE_OTA_SUPPORT
+    if(f["type"].asString()=="update"&&value.asString()=="INSTALL"&&c["payload"].asString()=="INSTALL"&&_portal._zigbee.queryOta())return true;
+#endif
+    if(!_portal._appCommand){_appControlStage=7;return false;}
     if(kind=="action" && _portal._json.stringify(value,false,nullptr,snapshotLimits())!=_portal._json.stringify(c["payload"])) return false;
     if(kind=="action_text"&&!ArdHa::string(value)) return false;
     if(kind=="action_json"&&(!value.isValid()||value.isUndefined()||_portal._json.stringify(value,false,nullptr,[](){ArdJSON::Limits limits;limits.maxNodes=512;return limits;}()).length()>1500)) return false;
-    if(!_portal._appCommand(key,suffix,value,source)) return false;
+    if(!_portal._appCommand(key,suffix,value,source)){_appControlStage=8;return false;}
 #if ARDPORTAL_ENABLE_MQTT
     if(_portal.mqttConnected()) {
       V ack=V::object();ack["command"]=suffix;ack["value"]=value;ack["accepted"]=true;
@@ -288,10 +304,14 @@ bool ArdAppControls::appControl(const V& definition,size_t index,const V& value,
   String property=c["key"].asString();if(property.length()) next[property]=value;else next=value;
   _appControlStage=4;if(!ArdHa::validValue(f,next)) return false;
   if(!f["persist"].asBool()) {if(!applyAppState(key,next,source)) return false;markDirty(key);return true;}
-  _appControlStage=5;V patch=V::object();patch[key]=next;
+  _appControlStage=5;
 #if ARDPORTAL_ENABLE_MQTT
   if(source==ChangeSource::Mqtt) return acceptMqttState(key,next);
 #endif
+#if ARDPORTAL_ENABLE_ZIGBEE
+  if(source==ChangeSource::Zigbee)return _portal.acceptZigbeeState(key,next);
+#endif
+  V patch=V::object();patch[key]=next;
   if(_portal._saveQueued||_portal._pendingReady||_portal._storage.busy()||_portal.mqttTrialActive()) return false;
   if(!_portal.scheduleAppPatch(std::move(patch),source))return false;
   return applyAppState(key,next,source);
@@ -340,9 +360,12 @@ void ArdAppControls::applyAppConfig(V app) {
 #if ARDPORTAL_ENABLE_HA && ARDPORTAL_ENABLE_DEPENDENCIES
     _portal._homeAssistant.dependencyChanged(key);
 #endif
+#if ARDPORTAL_ENABLE_ZIGBEE
+    _portal.markZigbeeStateDirty(key);
+#endif
     markDirty(key);
     // MQTT intent was already dispatched on receipt. A flash commit is not a new command.
-    if(source!=ChangeSource::Mqtt && _portal._appChanged) { V copy=value; _portal._appChanged(key,copy,source); }
+    if(source!=ChangeSource::Mqtt && source!=ChangeSource::Zigbee && _portal._appChanged) { V copy=value; _portal._appChanged(key,copy,source); }
   }
 }
 
@@ -366,8 +389,11 @@ void ArdAppControls::applyAppPatch(V patch){
 #if ARDPORTAL_ENABLE_HA && ARDPORTAL_ENABLE_DEPENDENCIES
     _portal._homeAssistant.dependencyChanged(key);
 #endif
+#if ARDPORTAL_ENABLE_ZIGBEE
+    _portal.markZigbeeStateDirty(key);
+#endif
     markDirty(key);
-    if(_portal._saveSource!=ChangeSource::Mqtt&&_portal._appChanged)_portal._appChanged(key,value,_portal._saveSource);
+    if(_portal._saveSource!=ChangeSource::Mqtt&&_portal._saveSource!=ChangeSource::Zigbee&&_portal._appChanged)_portal._appChanged(key,value,_portal._saveSource);
   }
 }
 #if ARDPORTAL_ENABLE_MQTT

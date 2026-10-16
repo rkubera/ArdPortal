@@ -51,6 +51,28 @@
 
 Required `min`/`max`; `step` defaults to 1. The value must lie on the step grid starting at `min`.
 
+## Integration with Home Assistant
+
+**MQTT component:** `number`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** Numeric state and commands on the field’s base topic; configured `min`, `max` and `step` are advertised. The built-in HA display mode is a slider.
+
+**Not provided by the built-in integration / limits:** No automatic unit conversion, physical actuator driver, or separate read-only measurement endpoint. Values must satisfy the configured range and step.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Native mapping:** Analog Output (`0x000D`). Requires ESP32-C5/C6/H2, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
+
+**Supported by ArdPortal:** Numeric present value, min/max/resolution attributes and incoming value writes. Range/step checks reuse the field definition.
+
+**Not provided / limits:** float32 cannot preserve arbitrary double precision. Generic Analog Output may need a gateway converter; creating an endpoint does not guarantee a slider in the gateway UI.
+
+`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway presentation depends on its support for the mapped clusters. ArdPortal can export a [Zigbee2MQTT converter or ZHA quirk](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download); see the [validation scope](https://github.com/rkubera/ArdPortal/wiki/Zigbee#validation-and-troubleshooting).
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

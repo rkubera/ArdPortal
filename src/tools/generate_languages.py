@@ -25,7 +25,7 @@ def unique_object(pairs):
 
 FEATURE_KEYS = json.loads(Path(__file__).with_name('language_features.json').read_text(encoding='utf-8'))
 CONTROL_KEYS = json.loads(Path(__file__).with_name('control_language_features.json').read_text())
-UI_VARIANTS = [(1, 1, 1), (1, 1, 0), (1, 0, 0), (0, 1, 1), (0, 1, 0), (0, 0, 0)]
+UI_VARIANTS = [(1, 1, 1), (1, 1, 0), (1, 0, 1), (1, 0, 0), (0, 1, 1), (0, 1, 0), (0, 0, 1), (0, 0, 0)]
 STORAGE_KEYS = {f's_{number}' for number in (194,195,196,198,199,200,204)}
 
 
@@ -39,7 +39,7 @@ STORAGE_KEYS = {f's_{number}' for number in (194,195,196,198,199,200,204)}
 # @param tls Whether MQTT TLS UI is included.
 # @return The collected UI string definitions.
 def ui_strings(strings, ota=1, mqtt=1, console=1, controls=None, dynamic=True, tls=True):
-    enabled = {'OTA': ota, 'MQTT': mqtt, 'CONSOLE': console and mqtt, 'HA': True, 'DEPENDENCIES': dynamic, 'DYNAMIC_PAGES': dynamic, 'WEBSOCKET': dynamic or (console and mqtt), 'MQTT_TLS':tls and mqtt}
+    enabled = {'OTA': ota, 'MQTT': mqtt, 'CONSOLE': console, 'HA': True, 'DEPENDENCIES': dynamic, 'DYNAMIC_PAGES': dynamic, 'WEBSOCKET': dynamic or console, 'MQTT_TLS':tls and mqtt}
     excluded = {key for feature, keys in FEATURE_KEYS.items() if not enabled[feature] for key in keys}
     return {key: value for key, value in strings.items() if key.startswith('ui_') and key not in excluded and condition_enabled(condition_for(key), controls, enabled)}
 

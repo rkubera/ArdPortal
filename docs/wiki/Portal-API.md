@@ -119,6 +119,7 @@ are bytes, not Unicode characters. All strings reject embedded NUL bytes.
 | `deviceManufacturer` | `String`, `"DYI"` | Up to 128 bytes; set from code; optional Info row and HA `device.manufacturer`. |
 | `apName` | `String`, normalized to device name | Must be nonempty and at most 32 bytes in a validated Config; accepted saves derive it from `deviceName` with spaces replaced by hyphens. It is not an independent SSID setting. |
 | `apPassword` | `String`, `"1234567890"` | Empty for an open AP, otherwise 8–63 bytes. |
+| `apBand` | `uint8_t`, `24` | Preferred AP band: `24` = 2.4 GHz, `5` = 5 GHz on dual-band chips; connected STA determines the active channel. |
 
 Copy `getPortalConfig()`, edit the copy, then call `setPortalConfig()`. A change
 made through this API is validated and scheduled for storage; it does not run the
@@ -204,7 +205,7 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | `homeAssistant()` | Owned `ArdHomeAssistant&` (also const overload); accessor exists only when HA is enabled. `discoveryConfig(field)` builds discovery JSON; it does not publish it. |
 | `ota()` | Owned `ArdOta&` (also const overload); accessor exists only when OTA is enabled. `active()`, `received()`, `expected()` report upload status; there is no public code-level URL updater. |
 
-`ChangeSource` values are `Application`, `Portal`, `Mqtt` and `FactoryReset`.
+`ChangeSource` values are `Application`, `Portal`, `Mqtt`, `Zigbee` and `FactoryReset`.
 `WifiState` values are `NoCredentials`, `Connecting`, `Connected` and `FallbackAP`.
 `MqttState` values are `Disabled`, `WaitingForWifi`, `WaitingRetry`, `Connecting`,
 `Connected` and `WaitingForTime`. These enum values are runtime states, not error
@@ -463,6 +464,10 @@ change-only behavior. Ordinary/OTA restarts and storage formatting do not invoke
 this handler, and factory reset still skips `onBeforeRestart`.
 Use `portal.onBeforeFactoryReset(nullptr)` to remove the handler.
 
+## Zigbee API
+
+When `ARDPORTAL_ENABLE_ZIGBEE=1`, see [Zigbee network operations and callbacks](https://github.com/rkubera/ArdPortal/wiki/Zigbee#api). Factory reset also clears Zigbee pairing before restart; ordinary restarts and storage formatting preserve it.
+
 ## Callback distinction
 
 - `onPortalConfigChanged`: changed network/device settings have been applied.
@@ -488,3 +493,123 @@ invocation. Do not retain a pointer to incoming MQTT bytes.
 ---
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
+
+Native Zigbee control commands use `ChangeSource::Zigbee` in the same AppConfig
+value/action callbacks. Register initial pages before Zigbee starts; see
+[automatic native controls](https://github.com/rkubera/ArdPortal/wiki/Zigbee#automatic-native-controls).
+
+### Access point band
+
+`PortalConfig::apBand` is **24** (2.4 GHz, default) or **5** (5 GHz).
+Dual-band chips expose this preference in AP Setup and save it with PortalConfig.
+A disconnected AP starts on channel 1 or 36 respectively. When STA is connected,
+AP and STA share its channel, so the router determines the active band.
+The portal explains this beside the selector. Single-band boards hide and disable
+the selector and reject a 5 GHz request through the HTTP settings API.
+The config API returns `apBand` and the read-only capability `apDualBand`.
+
+## Network control without using WWW
+
+WWW is enabled by default; `ARDPORTAL_ENABLE_WWW=0` disables its server without
+disabling the C++ API. `ARDPORTAL_ENABLE_WIFI=0` disables Wi-Fi/AP and forces
+WWW/MQTT off; Wi-Fi/AP and MQTT public methods/types are then omitted. See
+[Defines](https://github.com/rkubera/ArdPortal/wiki/Defines#www-and-wi-fi-combinations).
+All methods operate on the same state used by its status
+view. Persisted settings changed through `setPortalConfig()` reload configuration
+forms on the next status refresh. Normal network operations require `begin()`,
+configuration readiness and continued calls to `loop()`. Call these APIs from
+application/loop context, not interrupt or native stack callbacks.
+
+| Wi-Fi/AP method | Behavior |
+|---|---|
+| `connectWifiStation()` | Start association with saved credentials and enable retries; returns false if not ready/busy or credentials are missing. |
+| `disconnectWifiStation()` | Disconnect STA and suspend retries without erasing credentials; MQTT transport closes too. |
+| `setWifiAutoReconnect(bool)`, `wifiAutoReconnect()` | Set/read runtime retry policy. Disabling retries does not immediately disconnect an existing association. |
+| `onWifiStateChanged(callback)` | Deferred `WifiState` notifications from `loop()`. |
+| `scanWifiNetworks()`, `wifiScanBusy()` | Queue/check an asynchronous scan; an active association attempt delays scanning. |
+| `wifiNetworksJson()` | Borrowed last scan array with `ssid`, `rssi`, `channel`, `secured`. |
+| `onWifiScanFinished(callback)` | Receives `(bool success, const String& results)` once per completed scan, including scans requested in WWW. |
+| `setApPolicy(policy)`, `apPolicy()` | `Automatic` uses fallback behavior; `AlwaysOn` keeps AP active; `Disabled` stops AP and prevents fallback. |
+| `startAccessPoint()`, `stopAccessPoint()` | Shortcuts for `AlwaysOn` and `Disabled`. |
+| `onApStateChanged(callback)` | Deferred `(bool active)` notification, including automatic AP changes. |
+
+SSID/password, AP password and preferred AP band remain persistent settings in
+`PortalConfig`. AP SSID is derived from `deviceName`; changing `apName` alone does
+not override this rule. On dual-band chips AP and STA share the radio channel;
+an STA band conflict can still close AP. Runtime connection/AP policies are not
+persisted across reboot. Policy/operation setters do not erase saved settings.
+A `true` return means accepted (or AP active), not successful association.
+
+```cpp
+portal.onPortalAndAppConfigReady([](bool ok) {
+  if (!ok) return;
+  auto config = portal.getPortalConfig();
+  config.ssid = "MyNetwork";
+  config.password = "MyPassword";
+  config.deviceName = "My device"; // Also determines AP SSID.
+  config.apPassword = "setup-password";
+  config.apBand = 24; // 5 only on supported dual-band chips.
+  portal.setPortalConfig(config); // Save, then apply and connect automatically.
+});
+portal.onWifiStateChanged([](ArdPortal::WifiState state) {
+  // Update application connection status; do not block.
+});
+portal.onWifiScanFinished([](bool success, const String& networks) {
+  // Copy networks if needed after this callback returns.
+});
+```
+
+### MQTT connection API
+
+Available when `ARDPORTAL_ENABLE_MQTT=1`, through `portal.mqtt()`:
+
+| Method | Behavior |
+|---|---|
+| `connect()`, `disconnect()` | Resume connection/retries or close transport and suspend retries. |
+| `setAutoReconnect(bool)`, `autoReconnect()` | Runtime retry permission; disabling is applied on the next MQTT loop. |
+| `onStateChanged(callback)` | Deferred `MqttState` notifications from portal `loop()`. |
+| `unsubscribe(topic)` | Queue MQTT UNSUBSCRIBE and track matching UNSUBACK; returns false when disconnected, busy or invalid. Uses the same filter validation as `subscribe()`. |
+| `testConnection(config)` | Test candidate MQTT settings using the WWW trial mechanism: persist on success, restore old settings on failure. Wi-Fi credentials must match the current configuration. |
+| `connectionTestBusy()` | Trial or its persistent save is pending. |
+| `connectionTestResult()`, `connectionTestMessage()` | Last result: 0 pending, 1 success, 2 failure, and explanation. |
+| `onConnectionTestFinished(callback)` | Deferred `(bool success, const String& message)` after trial/save completion. |
+
+`publish()`, `subscribe()` and `onMessage()` remain available. Connect/test calls
+return acceptance, not broker acknowledgement. Connection testing requires active
+Wi-Fi and completed storage initialization. It enables MQTT retries. TLS requires
+TLS support compiled in and a valid candidate certificate. Always copy
+`getPortalConfig()` before replacing host/port/user/password/TLS settings so other
+settings are preserved. Continue `loop()` to complete trials and saves.
+
+### Zigbee status and policy API
+
+When Zigbee is enabled, `portal.zigbee()` exposes the owned Zigbee component:
+`state()`, `busy()`, `pairing()`, `hasNetwork()`, `nativeReady()`, `channel()`,
+`pan()`, `attempts()` and `error()`. No second stack instance is created.
+
+`setAutoConnect(bool)` and `autoConnect()` control automatic pairing/rejoin
+retries at runtime. Disabling retries does not cancel an active operation:
+call `stopZigbeePairing()` to stop it too. Re-enabling schedules connection when
+disconnected. Existing `startZigbeePairing()`, `stopZigbeePairing()`,
+`rejoinZigbee()`, `resetZigbeePairing()`, `setZigbeeOptions()`,
+`onZigbeeStateChanged()` and `onZigbeeOperationFinished()` remain the convenient
+portal API. Status changes are also visible in WWW.
+
+
+## Application firmware version
+
+Set the application version before `begin()`. The default is `1.0`.
+
+```cpp
+ArdPortal portal;
+
+void setup() {
+  portal.setFirmwareVersion("2.3.4");
+  portal.begin();
+}
+```
+
+- `bool setFirmwareVersion(const char* version)` copies a nonempty version of up to 16 UTF-8 bytes. It returns `false` for null/empty/oversized input or after startup, preserving the previous version.
+- `const char* getFirmwareVersion() const` returns the current version; the returned text belongs to the portal.
+
+Home Assistant MQTT Discovery includes this value as device `sw_version`. Zigbee exposes it through the standard Basic cluster `SWBuildID` (`0x4000`) on the management and application endpoints. Existing Zigbee devices may need a new interview/read to refresh cached software metadata. The version is firmware metadata, not a saved user setting; assign it in each firmware build. Changing it does not change the control-layout model ID. This display string is independent of the integer `ARDPORTAL_ZIGBEE_OTA_FILE_VERSION` used to order Zigbee OTA images; set that macro separately for OTA releases.

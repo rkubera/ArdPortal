@@ -8,10 +8,9 @@
 - [Components](#components)
 - [Responsibilities](#responsibilities)
 
-A Wi-Fi and MQTT configuration portal for Wi-Fi equipped ESP8266 and ESP32 boards,
-with storage and JSON implementations written in this project. The library
-requires only the board’s Arduino core; no ESPAsyncTCP, AsyncTCP,
-ESPAsyncWebServer or external MQTT library is required.
+ArdPortal combines optional Wi-Fi/AP/WWW, MQTT/Home Assistant and native Zigbee networking with a shared JSON control model, persistent settings and diagnostics. Wi-Fi features run on supported ESP8266/ESP32 boards; native Zigbee requires ESP32-C5/C6/H2. Disable unused transports at compile time, including Wi-Fi and WWW for a Zigbee-only device.
+
+It uses the ESP Arduino core and its bundled Zigbee SDK, with no external web server, MQTT, JSON or filesystem library required by ArdPortal itself.
 
 ## Main features
 
@@ -19,10 +18,11 @@ ESPAsyncWebServer or external MQTT library is required.
 - **Captive portal:** configure the device from a browser, with captive DNS for supported operating systems.
 - **MQTT:** configure the broker, optionally use verified TLS, publish application data and handle commands.
 - **Home Assistant:** automatically publish discovery definitions and synchronize supported controls through MQTT.
+- **Zigbee:** End Device/Router roles, automatic join/rejoin, Zigbee-only reset, standard and composite control endpoints, layout-specific Zigbee2MQTT/ZHA exports, time synchronization, OTA and a dedicated Console channel. See [setup and coverage](https://github.com/rkubera/ArdPortal/wiki/Zigbee).
 - **Dynamic pages:** define forms in JSON, including a Home block, live controls and cascading visibility conditions for fields and pages.
 - **Persistent configuration:** store portal and application settings as JSON using ArdFS, with a journal and delayed, coalesced writes to reduce flash wear.
 - **Live updates:** synchronize portal controls through WebSockets and inspect or send MQTT messages in the console.
-- **Firmware updates:** install firmware from a local file or URL through the OTA page.
+- **Firmware updates:** HTTP file/URL uploads, or standard Zigbee OTA through a compatible coordinator. Image validation and deferred restart include the application restart callback and storage flush.
 - **Device management:** configure the device name and description, set manufacturer metadata from code, view system information, restart or restore factory settings.
 - **Time and languages:** synchronize time through NTP and support developer-provided translations with automatic browser language selection.
 - **Configurable builds:** disable optional modules and control types with compile-time flags to reduce firmware size.
@@ -60,7 +60,7 @@ or moved. Each component has one owner.
 ## Responsibilities
 
 ArdPortal validates inputs, presents controls, maintains network connectivity,
-stores settings and exchanges MQTT messages. The application reads sensors,
+stores settings and exchanges MQTT messages and Zigbee commands/reports. The application reads sensors,
 operates actuators and reports hardware results. Accepting a command, confirming
 a flash write and confirming physical hardware are separate events.
 
@@ -68,7 +68,7 @@ a flash write and confirming physical hardware are separate events.
 application values. Field/page definitions are schemas, not stored value copies.
 RAM-only telemetry is separate from persistent application configuration.
 
-All portal work and callbacks run in the Arduino task through `loop()`. The
+Application callbacks and cooperative portal work run through `loop()`. The native Zigbee stack runs in a separate SDK task and queues application work for that loop. The
 library is cooperative: it splits registration, HTTP, Discovery and storage into
 steps, but a core DNS/TCP/TLS/flash operation or application callback can still
 block. Keep application callbacks and UART work bounded.

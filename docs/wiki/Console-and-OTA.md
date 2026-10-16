@@ -2,6 +2,12 @@
 
 [Documentation home](https://github.com/rkubera/ArdPortal/wiki/Home) · [All topics](https://github.com/rkubera/ArdPortal/wiki/Home#start-here) · [Source](https://github.com/rkubera/ArdPortal)
 
+## Zigbee diagnostics and updates
+
+With Zigbee and WWW enabled, Console includes a **Zigbee** tab using its own `/api/zigbee/console` WebSocket. MQTT/Messages use `/api/console`, and dynamic values use `/api/events`; reconnecting one does not reconnect the others. Zigbee works without device-side MQTT. Enable `ARDPORTAL_ZIGBEE_DEBUG_SERIAL=1` for USB/Serial diagnostics, including on builds without WWW. Lifecycle messages can also appear in Messages when that channel is enabled.
+
+HTTP OTA accepts its documented upload formats; Zigbee OTA instead receives a standard Zigbee OTA image containing the target firmware `.bin`. The two transports share restart/storage handling, but use different delivery protocols. Application control processing is paused during Zigbee OTA; resume control tests after update completion. See [Zigbee OTA](https://github.com/rkubera/ArdPortal/wiki/Zigbee#firmware-updates-over-zigbee) and [diagnostic limits](https://github.com/rkubera/ArdPortal/wiki/Zigbee#dedicated-console).
+
 ## Console and OTA
 
 The console uses `/api/console` WebSocket, supports one browser console client
@@ -18,7 +24,7 @@ application diagnostics, enable the optional feature before including ArdPortal:
 ```
 
 Use the same feature settings in every sketch source file that includes ArdPortal.
-The feature defaults to `0` and is disabled when Console is disabled. The initial Console connection
+The feature defaults to `0`; web viewing requires Console and WWW. The initial Console connection
 starts with the error banner hidden; changing the language during the handshake
 does not mark an in-progress connection as failed. Dynamic forms use `/api/events` for live value updates without console log
 traffic. Each endpoint has its own browser WebSocket connection, receive/transmit

@@ -146,11 +146,15 @@ String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) cons
   c["name"]=discoveryLabel(f);
   if(f.hasOwnProperty("icon")) c["icon"]=f["icon"];
   c["availability_topic"]=_portal._mqttClient.mqttTopic("stat","availability");
-  V device=V::object(),ids=V::array(); ids.push("ardui_"+_portal.chipId()); device["identifiers"]=ids; device["name"]=_portal._config.deviceName; device["manufacturer"]=_portal._config.deviceManufacturer; device["model"]=_portal._config.deviceDescription; c["device"]=device;
+  V device=V::object(),ids=V::array(); ids.push("ardui_"+_portal.chipId()); device["identifiers"]=ids; device["name"]=_portal._config.deviceName; device["manufacturer"]=_portal._config.deviceManufacturer; device["model"]=_portal._config.deviceDescription; device["sw_version"]=_portal.getFirmwareVersion(); c["device"]=device;
   if(!ArdHa::extended(f)) {
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
     if(type=="climate") {
     c["temperature_command_topic"]=command+"_temperature"; c["temperature_state_topic"]=state; c["temperature_state_template"]="{{ value_json.temperature }}";
+    if(ArdDynamicPages::contains(f["modes"],"heat_cool")) for(const char* suffix:{"low","high"}) {
+      String key=String("temperature_")+suffix;
+      c[key+"_command_topic"]=command+"_"+key;c[key+"_state_topic"]=state;c[key+"_state_template"]=String("{{ value_json.")+key+" }}";
+    }
     c["current_temperature_topic"]=state; c["current_temperature_template"]="{{ value_json.current_temperature | default('', true) }}";
     c["min_temp"]=f["min"]; c["max_temp"]=f["max"]; c["temp_step"]=f["step"].isUndefined()?V(0.5):f["step"]; c["temperature_unit"]="C";
     if(f.hasOwnProperty("modes")) { c["modes"]=f["modes"]; c["mode_command_topic"]=command+"_mode"; c["mode_state_topic"]=state; c["mode_state_template"]="{{ value_json.mode }}"; }
@@ -189,6 +193,9 @@ String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) cons
 #endif
     }
   }
+#if ARDPORTAL_ENABLE_CONTROL_TEXT
+  if(type=="text")ArdText::haPattern(f,c);
+#endif
   const V& extra=f["ha"]; V keys=extra.keys();
   for(size_t i=0;i<keys.length();++i) {
     String key=keys[i].asString(); if(key=="unique_id"||key=="device"||key=="name"||key=="availability_topic") continue;

@@ -103,6 +103,28 @@ in steps of 0.1. Commands use JSON on the base topic, for example
 commands preserve omitted properties. The library does not start a timer or
 stop a physical siren after `duration`; implement that behavior in the application.
 
+## Integration with Home Assistant
+
+**MQTT component:** `siren`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** JSON partial commands for on/off, tone (`alarm`/`bell`), duration (1–300 seconds) and volume (0–1, step 0.1). The preset advertises those capabilities and publishes the application state object.
+
+**Not provided by the built-in integration / limits:** No waveform generation, amplifier driver, automatic timeout or hardware confirmation. The application must honor the requested duration and report the final OFF state; the library does not run a siren timer.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Native mapping:** IAS Warning Device (`0x0502`). Requires ESP32-C5/C6/H2, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
+
+**Supported by ArdPortal:** Incoming Start Warning commands become on/off, duration and a four-level volume request. All nonzero warning modes map to the application preset’s `alarm` tone.
+
+**Not provided / limits:** The `bell` tone and distinct Zigbee warning modes are not preserved. Volume is quantized and duration bounded to 1–300 seconds. Strobe/squawk controls are not mapped. There is no Zigbee report of the application siren state/tone/duration/volume; the current mapping is command-oriented. The application runs the duration timer.
+
+`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway presentation depends on its support for the mapped clusters. ArdPortal can export a [Zigbee2MQTT converter or ZHA quirk](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download); see the [validation scope](https://github.com/rkubera/ArdPortal/wiki/Zigbee#validation-and-troubleshooting).
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

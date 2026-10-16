@@ -38,6 +38,10 @@
 | [update](https://github.com/rkubera/ArdPortal/wiki/Control-update) | Firmware installation action |
 
 
+The [complete current Zigbee coverage table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#complete-current-control-coverage)
+marks which fields are native, composite (several separate endpoints), generic
+single-endpoint controls, or unmapped. All 30 types remain documented individually.
+
 ## Control catalogue
 
 Control types can be **enabled or disabled at compile time with defines**. `ARDPORTAL_ENABLE_CONTROLS` selects the default for optional types; an individual flag such as `ARDPORTAL_ENABLE_CONTROL_LIGHT` overrides that type. See [Defines → Optional field types](https://github.com/rkubera/ArdPortal/wiki/Defines#optional-field-types) for every flag and its default. Set the flags before `#include <ArdPortal.h>` in the main sketch, then rebuild/upload the firmware. Dynamic portal pages also require `ARDPORTAL_ENABLE_DYNAMIC_PAGES`.
@@ -47,6 +51,11 @@ The examples below describe the built-in presets shipped with this library,
 not every capability that Home Assistant may support. Register a field with its
 `id`, `type` and `name`; add only the options you need. Field IDs are stable
 application keys, not C++ variable declarations.
+
+Each control page also describes **Integration with Home Assistant** and
+**Integration with Zigbee**, including the behavior ArdPortal implements and the
+remaining gaps. Possible future cluster combinations are clearly marked as
+unimplemented; see the [Zigbee feasibility table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#possible-mappings-not-yet-implemented).
 
 Every linked control page includes **minimal JSON** and **full JSON**, both ready to copy into a page's `fields` array. Minimal JSON contains only the properties needed to register the field. Full JSON makes the example configuration explicit, including defaults and the built-in `controls` and `ha` settings where applicable; it is not a requirement to supply every optional property. The property table on each control page identifies what can be omitted. `$state`, `$command` and `$command:<suffix>` are topic placeholders expanded by the library. Internal normalization properties are not needed in your JSON.
 

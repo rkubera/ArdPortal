@@ -89,7 +89,7 @@
     "ui_095": "OTA error {status}",
     "ui_096": "{days} days {hours} h {minutes} min {seconds} s",
     "ui_097": "cmnd/{device}/command",
-    "ui_098": "Wi-Fi: {wifi} · MQTT: {mqtt}{tls}{clock} · IP: {ip}{ap}",
+    "ui_098": "Wi-Fi: {wifi} · MQTT: {mqtt}{tls}{clock} · IP: {ip}{zigbee}{ap}",
     "ui_099": "Language",
     "s_101": "AP: ",
     "s_102": "Wi-Fi IP: ",
@@ -248,6 +248,13 @@
     "ui_192": "Update from URL",
     "ui_193": "Invalid firmware URL or empty file.",
     "ui_194": "Downloading firmware…",
-    "ui_195": "Download failed. Check the URL, browser network access and server CORS settings."
+    "ui_195": "Download failed. Check the URL, browser network access and server CORS settings.",
+    "ui_196": "Connecting may disconnect this access point. If the portal stops responding, connect your phone or computer to the selected Wi-Fi network, then reopen the portal at the device's new IP address.",
+    "ui_197": "Wi-Fi connected. Open the portal:",
+    "ui_198": "Wi-Fi: {wifi} · IP: {ip}{zigbee}{ap}",
+    "ui_199": "AP band",
+    "ui_200": "When connected to a Wi-Fi router, the AP shares its band and channel. This selection applies when the AP starts without a Wi-Fi connection.",
+    "s_240": "Action rejected by application callback.",
+    "s_241": "No application command callback registered."
   }
 }

@@ -22,6 +22,8 @@ which defaults to `0`. All enable flags accept only `0` or `1`:
 
 | Define | Disabled behavior |
 | --- | --- |
+| `ARDPORTAL_ENABLE_WWW` | Defaults to `1`. Set `0` to stop HTTP/WWW and WebSockets, including HTTP API, web Console, uploads and HTTP converter downloads. Omits HTTP transport/buffers and captive DNS. Disables HTTP OTA; Zigbee OTA remains controlled by `ARDPORTAL_ENABLE_OTA`. Converter export through the C++ API remains available. Wi-Fi, AP, MQTT, Zigbee, storage and programmatic APIs remain available. |
+| `ARDPORTAL_ENABLE_WIFI` | Defaults to `1`. Set `0` to disable station Wi-Fi and AP; forces WWW and MQTT off, including MQTT TLS/HA. Zigbee, storage and local AppConfig APIs remain available. Wi-Fi/AP and MQTT public APIs are unavailable. |
 | `ARDPORTAL_ENABLE_OTA` | Removes OTA implementation and Update page. |
 | `ARDPORTAL_ENABLE_MQTT` | Removes MQTT, MQTT Configuration, Console and HA. |
 | `ARDPORTAL_ENABLE_MQTT_TLS` | Removes secure MQTT transport and TLS/CA settings. Defaults to `1`; MQTT disabled forces it off. Stored TLS configurations require explicit reconfiguration, with no automatic plaintext fallback. |
@@ -155,3 +157,159 @@ are configured through `Limits` and `Options` respectively.
 ---
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
+
+## Zigbee (ESP32-C5/C6/H2)
+
+`ARDPORTAL_ENABLE_ZIGBEE` defaults to **0**. Set it to **1** to include the
+native Zigbee network operations, supported control mappings, and optional WWW management/Console with a dedicated WebSocket. ESP32-H2 forces Wi-Fi/AP/WWW/MQTT off.
+`ARDPORTAL_ZIGBEE_ROUTER` defaults to **0** (End Device); **1** selects Router.
+Choose the matching ED/ZCZR board mode. Both flags accept only 0 or 1. Zigbee
+is independent of MQTT and HA. Its log tab requires `ARDPORTAL_ENABLE_CONSOLE`; Messages additionally requires `ARDPORTAL_ENABLE_CONSOLE_MESSAGES`.
+See [Zigbee](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for partitions,
+automatic boot pairing/rejoin, retries, callbacks and reset behavior.
+
+### Zigbee OTA image identity
+
+| Define | Default | Purpose |
+| --- | --- | --- |
+| `ARDPORTAL_ZIGBEE_OTA_MANUFACTURER` | `0xffff` | Manufacturer identifier matched against Zigbee OTA images. |
+| `ARDPORTAL_ZIGBEE_OTA_IMAGE_TYPE` | `1` | Product/image type matched against OTA images. |
+| `ARDPORTAL_ZIGBEE_OTA_FILE_VERSION` | `1UL` | Application firmware's current numeric OTA version; increment for new images. |
+
+These apply to the native `update` mapping when Zigbee, dynamic pages, the update
+control and OTA are enabled. See [Zigbee firmware updates](https://github.com/rkubera/ArdPortal/wiki/Zigbee#firmware-updates-over-zigbee).
+
+### Zigbee Serial diagnostics
+
+`ARDPORTAL_ZIGBEE_DEBUG_SERIAL` defaults to **0**. Define it as **1** before
+including `ArdPortal.h` to mirror Zigbee lifecycle, received APS frames, queued
+reports and command results to `Serial`. The sketch must call `Serial.begin()`.
+It works without the Console WebSocket. Writes run from the Arduino loop, not
+SDK callbacks. If the complete line does not fit the available Serial transmit
+buffer, that Serial copy is skipped rather than waiting; Console history remains.
+
+```cpp
+#define ARDPORTAL_ENABLE_ZIGBEE 1
+#define ARDPORTAL_ZIGBEE_DEBUG_SERIAL 1
+#include <ArdPortal.h>
+// In setup(): Serial.begin(115200);
+```
+
+A queued TX report is not a coordinator acknowledgement.
+
+### MQTT Serial diagnostics
+
+`ARDPORTAL_MQTT_DEBUG_SERIAL` defaults to **0**. Define it as **1** before
+including `ArdPortal.h` to send MQTT connection attempts, connection results,
+disconnect reasons and MQTT RX/TX traffic to `Serial`. Call `Serial.begin()`
+in the sketch. This is independent of `ARDPORTAL_ENABLE_CONSOLE` and
+`ARDPORTAL_ENABLE_CONSOLE_MESSAGES`; MQTT must be enabled. No credentials are
+logged by the connection diagnostics. Topic payloads are included in traffic
+diagnostics. Lines that cannot fit the available transmit buffer are skipped
+rather than blocking the portal loop. A queued publication is not a broker
+acknowledgement.
+
+```cpp
+#define ARDPORTAL_MQTT_DEBUG_SERIAL 1
+#include <ArdPortal.h>
+// In setup(): Serial.begin(115200);
+```
+
+### Zigbee2MQTT converter download
+
+`ARDPORTAL_ENABLE_ZIGBEE_CONVERTER` defaults to **1**. Converter generation
+and the download button on the Zigbee page are enabled automatically. Set it to
+**0** before including `ArdPortal.h` to disable them. It requires Zigbee and dynamic pages to be enabled. Disabled
+firmware does not include the generator or its download state.
+
+```cpp
+#define ARDPORTAL_ENABLE_ZIGBEE 1
+#define ARDPORTAL_ENABLE_ZIGBEE_CONVERTER 1
+#include <ArdPortal.h>
+```
+
+See [Zigbee converter download](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download).
+
+### ZHA quirk download
+
+`ARDPORTAL_ENABLE_ZHA_QUIRK` defaults to **1**, independently of the Zigbee2MQTT
+converter define. It requires Zigbee and dynamic pages. Set it to **0** before
+including `ArdPortal.h` to remove the Python exporter. A ZHA-only build can use:
+
+```cpp
+#define ARDPORTAL_ENABLE_ZIGBEE 1
+#define ARDPORTAL_ENABLE_ZIGBEE_CONVERTER 0
+#define ARDPORTAL_ENABLE_ZHA_QUIRK 1
+#include <ArdPortal.h>
+```
+
+Both exporters share endpoint metadata and the same layout model identifier.
+See [ZHA quirk download](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zha-quirk-download).
+
+
+## WWW and Wi-Fi combinations
+
+```cpp
+// No web server, with Wi-Fi/AP and MQTT controlled through the C++ API.
+#define ARDPORTAL_ENABLE_WWW 0
+#include <ArdPortal.h>
+```
+
+```cpp
+// Zigbee-only networking: no Wi-Fi, AP, WWW or MQTT.
+#define ARDPORTAL_ENABLE_WIFI 0
+#define ARDPORTAL_ENABLE_ZIGBEE 1
+#include <ArdPortal.h>
+```
+
+Wi-Fi disabled overrides even explicit `ARDPORTAL_ENABLE_WWW=1` and
+`ARDPORTAL_ENABLE_MQTT=1`. It disables Wi-Fi radio use by ArdPortal, NTP over
+Wi-Fi and Wi-Fi/Zigbee coexistence setup. Existing saved network settings are
+preserved; re-enabling Wi-Fi in a later firmware can use them again. Both flags
+are compile-time options, not runtime switches. Continue `begin()`/`loop()` for
+storage, AppConfig and Zigbee. Disabling WWW removes HTTP OTA. Zigbee OTA remains available when
+`ARDPORTAL_ENABLE_OTA=1` and the Zigbee update control is enabled. An AP with WWW disabled can still run,
+but it cannot serve the configuration interface.
+
+
+## Public API follows enabled features
+
+Calls to disabled features are compile errors, rather than silent no-ops or
+methods returning false. The corresponding public callback types are omitted.
+
+| API | Required feature |
+|---|---|
+| Wi-Fi/AP control, scans, callbacks, status/IP and policy types | Wi-Fi |
+| MQTT component, message callback, wrappers and status | MQTT |
+| `tlsClockReady()` | MQTT TLS |
+| Page registration, progress/error/callbacks and `setAppConfigStateValue()` | Dynamic pages |
+| `addAppConfigEntity()` | Dynamic pages and HA |
+| `queueAppConfigStatePublish()` | Dynamic pages and MQTT |
+| `onAppConfigCommand()` and its callback type | Dynamic pages and at least one action-capable control |
+| `emitAppConfigEvent()` | Dynamic pages and at least one event/device-trigger/tag control |
+| `log()` / `logMessage()` | Console Messages |
+| Zigbee methods/component/types | Zigbee |
+| OTA component | OTA |
+
+Generic stored AppConfig get/set/remove methods and storage callbacks remain
+available without dynamic pages or networking. `PortalConfig` retains its saved
+settings independently of which transports are enabled. WWW disabled does not
+remove APIs needed to control enabled Wi-Fi/AP/MQTT/Zigbee from the sketch. Some
+status/logging methods remain private helpers for internal operation; they are
+not callable from application code when their feature is disabled.
+
+Converter/quirk defines gate both their API and format-specific implementation.
+WWW additionally gates only HTTP download support; disabling both exporter defines
+removes the public export API. See [Zigbee export API](https://github.com/rkubera/ArdPortal/wiki/Zigbee#export-converters-through-the-c-api-without-www).
+
+ESP32-H2 automatically forces Wi-Fi, AP, WWW and MQTT off. Native Zigbee
+support is available in End Device and Router roles.
+
+## Typed text measurements
+
+`ARDPORTAL_ENABLE_TEXT_TYPES` defaults to `1`. Set it to `0` to omit numeric
+`textType` variants and their automatic HA sensor patterns while retaining plain
+`text` controls. Definitions with a numeric subtype are then rejected explicitly.
+This also removes native Zigbee measurement mappings provided by text subtypes;
+other controls are unaffected. Disabling `ARDPORTAL_ENABLE_CONTROL_TEXT` forces
+this option off.
