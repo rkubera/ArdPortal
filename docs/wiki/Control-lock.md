@@ -87,13 +87,13 @@ Explicit `ha` properties can override Discovery metadata. They do not create add
 
 ## Integration with Zigbee
 
-**Native mapping:** Door Lock (`0x0101`). Requires ESP32-C5/C6, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
+**Native mapping:** Door Lock (`0x0101`). Requires ESP32-C5/C6/H2, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
 
 **Supported by ArdPortal:** Lock/unlock commands and basic lock-state reports; LOCKED maps to locked, UNLOCKED and OPEN map to unlocked.
 
 **Not provided / limits:** No distinct OPEN/unlatch command, PIN/user-code management, door-state reporting or automatic relock. OPEN cannot be distinguished from UNLOCKED in the reported Zigbee lock state.
 
-`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway UI support may require a converter; physical coordinator interoperability remains to be validated.
+`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway presentation depends on its support for the mapped clusters. ArdPortal can export a [Zigbee2MQTT converter or ZHA quirk](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download); see the [validation scope](https://github.com/rkubera/ArdPortal/wiki/Zigbee#validation-and-troubleshooting).
 
 See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
 

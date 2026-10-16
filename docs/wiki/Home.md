@@ -8,15 +8,11 @@
 - [First connection](#first-connection)
 - [Project links](#project-links)
 
-A Wi-Fi and MQTT configuration portal for Wi-Fi equipped ESP8266 and ESP32 boards,
-with storage and JSON implementations written in this project. The library
-requires only the board’s Arduino core; no ESPAsyncTCP, AsyncTCP,
-ESPAsyncWebServer or external MQTT library is required.
+ArdPortal is a modular Arduino library for ESP8266 and ESP32, combining a device configuration portal, MQTT/Home Assistant integration and an optional native Zigbee extension. JSON-defined controls share AppConfig values, callbacks and ArdFS persistence across the enabled transports.
 
-This wiki is the developer and user reference for ArdPortal, ArdFS and ArdJSON.
-It covers Wi-Fi equipped ESP8266 and ESP32 boards and the current 0.7.7 API.
-Documentation reviewed on **10 October 2026**. Features awaiting the next source
-release are marked explicitly.
+Zigbee supports ESP32-C5/C6/H2 as End Device or Router, automatic native/composite control mapping, generated Zigbee2MQTT converters and ZHA quirks, OTA, time synchronization and diagnostics. It can operate without Wi-Fi or WWW. ArdFS and ArdJSON are included standalone storage and JSON modules; no external web server, MQTT or JSON library is required. Zigbee uses the SDK bundled with the ESP32 Arduino core.
+
+This Wiki documents the current development branch, including Zigbee. Check the selected release's changelog before using it with an older installed package. Updated **16 October 2026**; hardware validation scope and limitations are documented in the Zigbee guide.
 
 ## Start here
 
@@ -32,6 +28,7 @@ release are marked explicitly.
 | [Dynamic pages](https://github.com/rkubera/ArdPortal/wiki/Dynamic-Pages) | JSON schemas, registration, limits, flash sources and HTTP loading |
 | [Dependent fields](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields) | Single conditions, AND/OR, page conditions and cascades |
 | [Home Assistant](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) | Discovery, mapping, availability, state and HA-only entities |
+| [Zigbee](https://github.com/rkubera/ArdPortal/wiki/Zigbee) | Setup, roles, shared controls, pairing/rejoin, gateway exports, API, diagnostics and OTA |
 | [MQTT messages](https://github.com/rkubera/ArdPortal/wiki/MQTT-Messages) | Topic construction, payload examples, retain and custom commands |
 | [Wi-Fi and device identity](https://github.com/rkubera/ArdPortal/wiki/Wi-Fi-and-Device-Identity) | Station/AP operation and normalized names |
 | [Console and OTA](https://github.com/rkubera/ArdPortal/wiki/Console-and-OTA) | Messages, WebSockets, firmware uploads and restart handling |
@@ -62,5 +59,3 @@ external sensors require their sensor libraries.
 ---
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
-
-- [Zigbee](https://github.com/rkubera/ArdPortal/wiki/Zigbee)

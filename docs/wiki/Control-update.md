@@ -77,13 +77,13 @@ Explicit `ha` properties can override Discovery metadata. They do not create add
 
 ## Integration with Zigbee
 
-**Native mapping:** OTA Upgrade client (`0x0019`). Requires ESP32-C5/C6, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
+**Native mapping:** OTA Upgrade client (`0x0019`). Requires ESP32-C5/C6/H2, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
 
 **Supported by ArdPortal:** One field per device can own the native OTA client. It queries a coordinator for an image matching manufacturer/image-type/file-version, receives a standard container with one Upgrade Image subelement, validates firmware and requests the portal-managed restart. `in_progress` is mirrored to AppConfig in RAM.
 
 **Not provided / limits:** Requires the OTA/control feature flags and adequate OTA partitions. It does not transfer HTTP `.bin.gz` files, publish release descriptions/URLs or synchronize installed/latest version strings. Numeric Zigbee OTA identity/version comes from compile-time defines, independently of the application version strings. The coordinator must provide the matching image.
 
-`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway UI support may require a converter; physical coordinator interoperability remains to be validated.
+`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway presentation depends on its support for the mapped clusters. ArdPortal can export a [Zigbee2MQTT converter or ZHA quirk](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download); see the [validation scope](https://github.com/rkubera/ArdPortal/wiki/Zigbee#validation-and-troubleshooting).
 
 See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
 

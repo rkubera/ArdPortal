@@ -2,11 +2,23 @@
 
 [Documentation home](https://github.com/rkubera/ArdPortal/wiki/Home) · [Defines](https://github.com/rkubera/ArdPortal/wiki/Defines)
 
-## Enable on ESP32-C5/C6/H2
+ArdPortal's Zigbee extension connects the same AppConfig controls to a Zigbee network through the chip's native radio. It includes joining/rejoining, standard and composite endpoints, bidirectional values, persistent settings, gateway definition export, diagnostics and firmware reception. The application still reads sensors and operates hardware.
 
-This module is in the working tree and is not included in the 0.7.8 release.
-Validated by compilation with Arduino-ESP32 **3.3.12** and host tests; physical
-coordinator interoperability and Wi-Fi/Zigbee coexistence still require device testing.
+This guide describes the current development branch. It does not imply these features are present in older release ZIPs. Native compilation and host tests use Arduino-ESP32 **3.3.12**; device tests on ESP32-C5 with Zigbee2MQTT include control exchanges and complete OTA both with and without Wi-Fi. See [validation and troubleshooting](#validation-and-troubleshooting) for the exact scope.
+
+## Choose a build
+
+| Build | Configuration | Management and integration |
+| --- | --- | --- |
+| Wi-Fi portal + Zigbee | `ARDPORTAL_ENABLE_ZIGBEE=1`; Wi-Fi/WWW remain enabled | Web configuration, Console, gateway downloads and shared control values |
+| Zigbee without device MQTT | Above plus `ARDPORTAL_ENABLE_MQTT=0` and `ARDPORTAL_ENABLE_HA=0` | Zigbee2MQTT can still publish through its own broker; the ESP does not connect to MQTT |
+| Zigbee + MQTT/HA | Enable Zigbee and keep MQTT/HA | Both transports use AppConfig; configure their gateways and namespaces separately |
+| Zigbee without WWW | `ARDPORTAL_ENABLE_WWW=0` | C++ configuration/export API; no HTTP, web Console or HTTP OTA; Wi-Fi/AP can remain available |
+| Zigbee only | `ARDPORTAL_ENABLE_ZIGBEE=1`, `ARDPORTAL_ENABLE_WIFI=0` | Wi-Fi/AP/WWW/MQTT off; AppConfig, ArdFS, Zigbee OTA and C++ exports remain available |
+
+Zigbee is opt-in. Converter and quirk export default on when Zigbee and dynamic pages are enabled. Their download buttons additionally require WWW. [All flags and dependencies](https://github.com/rkubera/ArdPortal/wiki/Defines#zigbee-esp32-c5c6h2).
+
+## Enable on ESP32-C5/C6/H2
 
 This optional module uses the ESP32-C5/C6/H2 native radio and the Zigbee SDK bundled
 with Arduino-ESP32. It is disabled by default. The implementation provides network management, diagnostics and automatic
@@ -71,6 +83,47 @@ serving a Wi-Fi portal. The 3-second keep-alive remains a parent-link maintenanc
 setting; it is not an intentional application command delay.
 See Espressif coexistence documentation for [C6](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/api-guides/coexist.html) and [C5](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c5/api-guides/coexist.html).
 
+## Minimal shared-control sketch
+
+Select **Zigbee ED** board mode and keep the partition table from `ZigbeeClimate` beside the sketch. Enable coordinator joining before the first boot. This example needs no sensor, actuator callback or device MQTT connection to accept and store setting values:
+
+```cpp
+#define ARDPORTAL_ENABLE_ZIGBEE 1
+#define ARDPORTAL_ZIGBEE_ROUTER 0
+#define ARDPORTAL_ENABLE_MQTT 0
+#define ARDPORTAL_ENABLE_HA 0
+#include <ArdPortal.h>
+
+ArdPortal portal;
+
+void setup() {
+  Serial.begin(115200);
+  portal.setFirmwareVersion("1.0");
+  portal.onAppConfigPageRegistrationFinished([](bool ok) {
+    Serial.println(ok ? "Controls registered" : "Control registration failed");
+  });
+  portal.onZigbeeOperationFinished([](ArdPortal::ZigbeeOperation,
+                                     bool ok, const String& error) {
+    if (!ok) Serial.println(error);
+  });
+  if (!portal.startAppConfigPageRegistration(F(R"JSON({
+    "id":"settings","name":"Settings","fields":[
+      {"id":"relay","type":"switch","name":"Relay","default":false},
+      {"id":"target","type":"slider","name":"Target","min":0,"max":100,"step":1,"default":50}
+    ]
+  })JSON"))) Serial.println("Registration not accepted");
+  if (!portal.begin()) Serial.println("Portal startup failed");
+}
+
+void loop() {
+  portal.loop();
+}
+```
+
+A successful registration callback means the page is registered, not that the radio has joined. Register all initial pages before endpoint startup; chain the callback when registering multiple pages. See [two-page registration](https://github.com/rkubera/ArdPortal/wiki/Dynamic-Pages) and the `ZigbeeClimate`/`ZigbeePortal` examples.
+
+After configuration is ready, `portal.setAppConfigValue("target", 65)` changes the shared setting and schedules ArdFS persistence according to `persist`. `portal.setAppConfigStateValue("target", 65)` changes it only in RAM and reports the current value. Zigbee writes follow the same validation and `persist` policy; `onAppConfigValueChanged` reports `ChangeSource::Zigbee`. A switch setting needs no command callback to change its value. Actions such as cover movement or lock/unlock require the application command handler and actual state reporting. See each [control's C++ examples](https://github.com/rkubera/ArdPortal/wiki/Controls).
+
 ## Zigbee page
 
 Open **Zigbee** in the portal navigation, or `/zigbee` directly. It shows the
@@ -104,6 +157,8 @@ separate task; callbacks are delivered from `portal.loop()`. Keep calling it.
 | `setZigbeeOptions(options)` | Validate and set limits before startup or the next request; returns `false` for invalid limits. Timings: 1–600000 ms; attempts: 1–20. |
 | `zigbeeState()` | Read cached `Starting`, `Idle`, `Pairing`, `Rejoining`, `Resetting`, `Connected` or `Failed` state. |
 | `onZigbeeStateChanged(callback)` | `void(ZigbeeState)` for state transitions from the Arduino loop. |
+| `portal.zigbee().setAutoConnect(bool)` | Set automatic connection policy; use `stopZigbeePairing()` as well to cancel an operation already in progress. |
+| `portal.zigbee()` status accessors | Read channel, PAN, saved network, busy/error and retry information; see [status API](https://github.com/rkubera/ArdPortal/wiki/Portal-API#zigbee-status-and-policy-api). |
 | `onZigbeeOperationFinished(callback)` | `void(ZigbeeOperation, bool success, const String& error)` once per accepted operation, including automatic boot operations. |
 
 ```cpp
@@ -199,8 +254,8 @@ needed. The implementation works with MQTT and HA disabled.
 | `text`, `textType: "humidity"` | Relative Humidity Measurement | Percent in hundredths |
 | Other measurement `text` subtypes | Standard measurement clusters | Pressure, illuminance, flow, CO₂, PM2.5, wind speed, AC voltage/current/power; see [text subtypes](https://github.com/rkubera/ArdPortal/wiki/Control-text#text-subtypes-and-automatic-patterns) |
 | `binary_sensor` | Binary Input | Read-only boolean measurement |
-| `light` | On/Off, Level Control, Color Control | Power, brightness and RGB via standard hue/saturation |
-| `climate` | Thermostat, optional Fan Control | Current/target Celsius temperature, standard system/fan modes, heating/cooling state |
+| `light` | On/Off, Level Control, Color Control | Power, brightness and RGB via standard XY or hue/saturation |
+| `climate` | Thermostat, optional Fan Control | Current/target Celsius temperature, independent low/high targets in heat_cool, standard system/fan modes, heating/cooling state |
 | `cover` | Window Covering | Open/close/stop, lift percentage and tilt percentage |
 | `lock` | Door Lock | Lock/unlock commands and actual lock state |
 | `siren` | IAS Warning Device | Start/stop warning, duration and four standard volume levels |
@@ -221,7 +276,7 @@ mapping limit is 239 application endpoints. A limit/allocation failure stops Zig
 startup and records a diagnostic; it does not delete AppConfig fields.
 
 For a focused slider + thermostat example, use **File → Examples → ArdPortal →
-ZigbeeClimate** ([sketch](https://github.com/rkubera/ArdPortal/blob/main/examples/ZigbeeClimate/ZigbeeClimate.ino)).
+ZigbeeClimate** ([sketch](https://github.com/rkubera/ArdPortal/blob/codex/zigbee/examples/ZigbeeClimate/ZigbeeClimate.ino)).
 It disables MQTT/HA, registers one page asynchronously, simulates room temperature
 with a RAM-only slider, persists thermostat target/mode edits, and reports Celsius
 current temperature/heating activity without saving telemetry. Keep its partition
@@ -300,14 +355,14 @@ the library’s transport, but gateway UI support for generic clusters is not gu
 | [vacuum](https://github.com/rkubera/ArdPortal/wiki/Control-vacuum#integration-with-zigbee) | Composite — 8 endpoints | Six action endpoints, fan selection and activity; custom JSON command is not mapped. |
 | [lawn_mower](https://github.com/rkubera/ArdPortal/wiki/Control-lawn_mower#integration-with-zigbee) | Composite — 4 endpoints | START/PAUSE/DOCK and activity; no navigation or battery telemetry. |
 | [water_heater](https://github.com/rkubera/ArdPortal/wiki/Control-water_heater#integration-with-zigbee) | Composite — 3 endpoints | Target temperature, operation mode, current temperature; no unified heater profile. |
-| [update](https://github.com/rkubera/ArdPortal/wiki/Control-update#integration-with-zigbee) | Native OTA client | One owner; matching image reception/validation and deferred restart. Version strings are not synchronized. |
+| [update](https://github.com/rkubera/ArdPortal/wiki/Control-update#integration-with-zigbee) | Native OTA client | One owner; matching image reception/validation and deferred restart. Display firmware version is Basic SWBuildID; OTA ordering uses a separate integer image version. |
 
-### Composite controls without supplied converters
+### Composite controls and gateway presentation
 
 ArdPortal now decomposes `fan`, `valve`, `humidifier`, `water_heater`,
 `alarm_control_panel`, `vacuum`, `lawn_mower`, `button` and `scene` into separate
 standard endpoints. `device_tracker` reports its two preset presence states through
-Multistate Input. No manufacturer-specific cluster or gateway converter is supplied.
+Multistate Input. The native mappings use standard clusters; optional generated gateway files add interpretation, labels and option names.
 
 | Control | Current separate endpoints / scope |
 | --- | --- |
@@ -329,9 +384,7 @@ text/JSON actions (for example vacuum’s custom command) are left unmapped.
 
 Each endpoint carries its function in standard Basic ProductLabel, and generic
 Analog/Multistate endpoints also have Description. Gateways may ignore those labels
-or fail to expose those clusters. The lack of a supplied converter is intentional;
-it does not guarantee that ZHA, Zigbee2MQTT or a commercial bridge automatically
-shows every function. They remain parts of one physical Zigbee device.
+or fail to expose those clusters. Use the generated converter/quirk on supported gateways. Generic ZHA, Zigbee2MQTT or a commercial bridge is not guaranteed to expose every function without that definition. They remain parts of one physical Zigbee device.
 
 Registration and publication advance one endpoint per loop, including composite
 fields; retry/OOM behavior and selective invalidation are retained. Multiple
@@ -426,7 +479,7 @@ Only one `update` field can own the device's OTA client. This mapping also requi
 `ARDPORTAL_ENABLE_OTA=1` and
 `ARDPORTAL_ENABLE_CONTROL_UPDATE=1`. The coordinator must
 serve a standard Zigbee OTA container containing a single **Upgrade Image** subelement
-(tag 0) with the `.bin` compiled for the actual ESP32-C5 or ESP32-C6 target. A plain HTTP `.bin`/`.bin.gz` upload is a different flow.
+(tag 0) with the `.bin` compiled for the actual ESP32-C5, C6 or H2 target. A plain HTTP `.bin`/`.bin.gz` upload is a different flow.
 
 Set these defines before including `ArdPortal.h` to match the coordinator's images:
 
@@ -453,8 +506,18 @@ field's version strings are application metadata; they do not override these OTA
 image identifiers. Native reception updates `in_progress` automatically in RAM,
 without writing progress markers to ArdFS.
 
-Physical pairing, command interoperability and OTA transfer still need validation
-with a real coordinator; host tests and compilation do not establish gateway certification.
+Complete OTA reception, validation, the before-restart callback, version-2 boot and Zigbee rejoin were confirmed on ESP32-C5 with Zigbee2MQTT, both without Wi-Fi and with Wi-Fi/WWW enabled. These are hardware tests, not certification of all roles, chips or coordinators.
+
+### Prepare an OTA release
+
+1. Build the application for the same target, role and partition layout as the installed firmware. Preserve the Zigbee network partitions and two sufficiently large app slots.
+2. Increment `ARDPORTAL_ZIGBEE_OTA_FILE_VERSION` and optionally set the human-readable version with `setFirmwareVersion("1.1")` before `begin()`. Neither value is the ArdPortal library version.
+3. Package the application `.bin` in a standard Zigbee OTA container with matching manufacturer/image type and the new file version. Do not send a merged flash image, `.bin.gz` or raw `.bin` to this client.
+4. Make the image available through the coordinator's OTA provider. Installing the ArdPortal converter does not host an image or configure a provider. Follow your gateway's OTA documentation.
+5. Start the update through the gateway, or the mapped INSTALL action when an image is available. Keep stable USB/power and radio placement for the full transfer. Zigbee transfer is substantially slower than HTTP; the tested images took over two hours.
+6. Confirm the gateway's successful completion, new image version and device rejoin. `TX queued` or 100% transfer alone does not prove the new firmware booted. Verify application operation after restart.
+
+While native OTA is active, application control processing is suspended. Commands issued then are not a valid control-latency test; wait for completion. The existing firmware remains selected when reception or image validation fails. Never change the partition layout through this OTA path.
 
 ## Zigbee2MQTT converter download
 
@@ -471,7 +534,7 @@ Memory pressure postpones generation; normal HTTP timeout still applies.
 The export includes control IDs, endpoint numbers, labels, numeric ranges,
 select options, discrete states, climate modes and fan modes.
 
-With this feature enabled, the Zigbee model identifier is `ArdPortal-` followed
+With Zigbee and dynamic pages enabled, the Zigbee model identifier is `ArdPortal-` followed
 by a deterministic 64-bit layout signature. The signature covers the exported
 metadata and schema version, excluding live values and the device IEEE address.
 All devices with identical exported layouts use the same model and converter,
@@ -484,6 +547,8 @@ Install the downloaded module in Zigbee2MQTT's **Settings → Dev console →
 External converters**, or in its `external_converters` directory. Current
 Zigbee2MQTT installations may require `enable_external_js` to be enabled; see
 [the official external converter instructions](https://www.zigbee2mqtt.io/advanced/more/external_converters.html).
+This is the gateway-level Dev console, not the Dev console of an individual device. Save the downloaded layout-specific file, check gateway logs for loading errors and refresh the device interview when its model/endpoints changed. Existing devices with the same layout reuse the installed converter; firmware updates do not replace the gateway file automatically.
+
 ArdPortal does not install or change anything on the gateway. The generator
 is tested with Zigbee2MQTT 2.14.2 / zigbee-herdsman-converters 26.115.1.
 
@@ -499,9 +564,7 @@ not control this frontend layout. A standalone action remains a single-option
 command (a button in HA Discovery). Composite
 controls are still represented by separate standard features; this export
 does not reconstruct dependent forms or promise a combined fan, vacuum, valve,
-humidifier or water-heater entity. Plain text, unmapped controls and OTA image
-management are not added by the converter. Climate still has one shared target
-temperature for heating and cooling, matching ArdPortal's native mapping.
+humidifier or water-heater entity. Plain text and unmapped controls are not added. The converter advertises OTA capability for the mapped update client but does not supply an image provider. Climate exports independent heating/cooling targets when `heat_cool` is configured; other modes use the active single target.
 
 The download is refused while endpoint registration is incomplete or failed.
 Adding fields after the Zigbee registry is frozen requires a firmware restart
@@ -561,7 +624,7 @@ so ZHA sees the new model and endpoints.
 - Standard switches, lights, covers, locks, sirens and thermostats use ZHA's native
   entities with the registered labels. Thermostat temperature limits are supplied
   locally by the quirk; ZHA chooses its temperature step and available modes from
-  its native thermostat implementation. ArdPortal still has one shared heating/cooling target.
+  its native thermostat implementation. The native mapping supplies independent heating/cooling setpoints for `heat_cool`; the ZHA entity chooses how to present the supported modes and setpoints.
 - Composite fan, valve, humidifier, alarm, vacuum, mower and water-heater controls
   remain separate entities. The quirk does not reconstruct pages or visibleWhen rules.
 - Zigbee OTA image providers and unsupported controls are not added by this file.
@@ -666,3 +729,26 @@ filesystem or publish automatically through MQTT. `ARDPORTAL_ENABLE_WIFI=0` and
 
 On ESP32-H2, ArdPortal automatically disables Wi-Fi/AP, WWW and MQTT.
 Both End Device and Router roles are supported. HTTP OTA requires WWW; Zigbee OTA can operate without WWW or Wi-Fi.
+
+## Application firmware identity
+
+Call `portal.setFirmwareVersion("1.2.3")` before `begin()` to set the shared application display version (default `1.0`, at most 16 UTF-8 bytes). Home Assistant MQTT Discovery uses device `sw_version`; Zigbee Basic `SWBuildID` exposes the same text. Gateways cache device metadata, so an existing device may need a new attribute read/interview. The layout model excludes this version, live values and IEEE identity: another device with the same layout can reuse the installed converter or quirk. The integer OTA file version remains separate. [Version API](https://github.com/rkubera/ArdPortal/wiki/Portal-API#application-firmware-version).
+
+## Validation and troubleshooting
+
+Host tests cover mappings, SDK command validation, queue ordering, reporting retries, scheduler capacity, OTA parsing/errors and restart sequencing. Hardware testing used ESP32-C5, Arduino-ESP32 3.3.12 and Zigbee2MQTT 2.14.2. Settings, telemetry and action routing were exercised with simulated application actuators. Actions confirm callback acceptance, not operation of real hardware. Native gaps and unsupported commands remain documented per control. ZHA exports have API-level tests; the C5/Zigbee2MQTT hardware results do not certify ZHA or commercial bridges, C6/H2, Router operation or every feature-flag combination.
+
+Full OTA without Wi-Fi passed on 15 October 2026 (approximately 2 h 16 min); full OTA with Wi-Fi/WWW passed on 16 October (approximately 2 h 27 min). Earlier runs had an actual reception timeout and an SDK MAC assertion; a later run passed without reproducing them, so their triggering cause remains unproven. Moving USB/power contacts or changing antenna placement can affect a test, but was not established as the cause in those logs. The [hardware validation report](https://github.com/rkubera/ArdPortal/wiki/Zigbee-Validation) distinguishes passing runs, interrupted attempts and failures.
+
+| Symptom | Check |
+| --- | --- |
+| Compile error selecting ED/ZCZR | Match `ARDPORTAL_ZIGBEE_ROUTER` to the board's Zigbee mode; use a native supported chip. |
+| Firmware too large | Keep the example's partition table and correct upload size check; disable unused modules with documented flags. |
+| Registration/endpoint error | Inspect Messages or Serial for field/stage/reason, free heap8 and largest block. Composite controls consume multiple endpoints; do not remove fields as a memory-error workaround. |
+| Pair/rejoin fails | Open coordinator joining for a new identity, check stable power and range; rejoin preserves the network, reset pairing erases it. Automatic retries continue after the pause. |
+| Wrong labels or missing properties | Verify the actual model/layout, install the matching export, restart/reload the gateway as needed and refresh the interview after endpoint changes. Do not routinely erase pairing for label-only changes. |
+| Command accepted but hardware unchanged | Check the value/action callback and report the resulting hardware state. Test after OTA, not while commands are suspended. |
+| A hidden portal field still appears remotely | Expected: `visibleWhen` affects portal/HA presentation, not Zigbee endpoint existence or command acceptance. |
+| OTA stops or device restarts | Preserve serial and gateway logs, last block/progress, power/reset evidence, Wi-Fi status and heap. Check image identity/layout, then distinguish reception timeout, image validation and SDK assertion. Do not treat a cached Connected label as proof of a working link. |
+
+Use the dedicated Console Zigbee tab when WWW is enabled, or `ARDPORTAL_ZIGBEE_DEBUG_SERIAL=1` otherwise. Diagnostics are bounded application/stack logs, not an RF capture or proof of broker delivery. No gateway installation or modification is performed automatically by ArdPortal.

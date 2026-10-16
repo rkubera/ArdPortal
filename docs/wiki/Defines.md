@@ -158,10 +158,10 @@ are configured through `Limits` and `Options` respectively.
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
 
-## Zigbee (ESP32-C5/C6)
+## Zigbee (ESP32-C5/C6/H2)
 
 `ARDPORTAL_ENABLE_ZIGBEE` defaults to **0**. Set it to **1** to include the
-Zigbee network page, operation API and a Zigbee tab in Console with a dedicated WebSocket.
+native Zigbee network operations, supported control mappings, and optional WWW management/Console with a dedicated WebSocket. ESP32-H2 forces Wi-Fi/AP/WWW/MQTT off.
 `ARDPORTAL_ZIGBEE_ROUTER` defaults to **0** (End Device); **1** selects Router.
 Choose the matching ED/ZCZR board mode. Both flags accept only 0 or 1. Zigbee
 is independent of MQTT and HA. Its log tab requires `ARDPORTAL_ENABLE_CONSOLE`; Messages additionally requires `ARDPORTAL_ENABLE_CONSOLE_MESSAGES`.

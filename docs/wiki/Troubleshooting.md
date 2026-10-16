@@ -108,3 +108,7 @@ and the relevant JSON definition, without credentials.
 ---
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
+
+## Zigbee pairing, controls and OTA
+
+See the [Zigbee troubleshooting table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#validation-and-troubleshooting) for board mode, partitions, endpoint registration, pairing/rejoin, converter labels and OTA failures. The [validation page](https://github.com/rkubera/ArdPortal/wiki/Zigbee-Validation) separates passing hardware tests from interrupted attempts and unresolved intermittent faults. Keep serial/gateway logs and distinguish an accepted setting, accepted action callback, persisted value and actual hardware result.

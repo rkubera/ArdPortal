@@ -86,7 +86,7 @@ Explicit `ha` properties can override Discovery metadata. They do not create add
 
 ## Integration with Zigbee
 
-**Implemented without a converter supplied by ArdPortal.** The functions below are separate standard Zigbee endpoints on the same physical device; ArdPortal does not create a gateway-specific combined control. Requires ESP32-C5/C6, Zigbee and dynamic pages enabled, and the field’s control flag enabled. MQTT/HA is not required.
+**Implemented as a composite mapping.** The functions below are separate standard endpoints on the same physical Zigbee device. The optional generated Zigbee2MQTT converter and ZHA quirk add names and option/state semantics; a composite mapping does not guarantee one combined gateway entity. Requires ESP32-C5/C6/H2, Zigbee and dynamic pages enabled, and the field’s control flag enabled. MQTT/HA is not required.
 
 **Standard mapping:** Three momentary On/Off actions + Multistate Input.
 

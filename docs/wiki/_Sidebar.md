@@ -41,6 +41,8 @@
   - [water_heater](https://github.com/rkubera/ArdPortal/wiki/Control-water_heater)
   - [update](https://github.com/rkubera/ArdPortal/wiki/Control-update)
 
+- [Zigbee setup and integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee)
+- [Zigbee hardware validation](https://github.com/rkubera/ArdPortal/wiki/Zigbee-Validation)
 - [Home Assistant integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant)
 - [MQTT message construction](https://github.com/rkubera/ArdPortal/wiki/MQTT-Messages)
 - [Wi-Fi, AP and device identity](https://github.com/rkubera/ArdPortal/wiki/Wi-Fi-and-Device-Identity)
@@ -49,5 +51,3 @@
 - [Languages and translations](https://github.com/rkubera/ArdPortal/wiki/Languages)
 - [Troubleshooting](https://github.com/rkubera/ArdPortal/wiki/Troubleshooting)
 - [Portal screenshots](https://github.com/rkubera/ArdPortal/wiki/Screenshots)
-
-- [Zigbee](https://github.com/rkubera/ArdPortal/wiki/Zigbee)

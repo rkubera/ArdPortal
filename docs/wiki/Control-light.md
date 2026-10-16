@@ -118,13 +118,13 @@ Explicit `ha` properties can override Discovery metadata. They do not create add
 
 ArdPortal supports standard XY, Hue/Saturation and Enhanced Hue/Saturation Zigbee commands. RGB is converted automatically; no JSON color-space option is needed. Zigbee2MQTT may select Enhanced Hue for its color picker.
 
-**Native mapping:** On/Off, Level Control and Color Control. Requires ESP32-C5/C6, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
+**Native mapping:** On/Off, Level Control and Color Control. Requires ESP32-C5/C6/H2, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
 
 **Supported by ArdPortal:** On/off, brightness and RGB color through standard hue/saturation. Incoming color/level commands are normalized back into the application’s RGB/brightness state.
 
 **Not provided / limits:** Brightness/hue/saturation use the ZCL 0–254 range, so conversion is lossy. RGB intensity is folded into brightness; the original RGB/brightness decomposition is not preserved. Color temperature, effects, transitions and flashing are not implemented/advertised.
 
-`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway UI support may require a converter; physical coordinator interoperability remains to be validated.
+`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway presentation depends on its support for the mapped clusters. ArdPortal can export a [Zigbee2MQTT converter or ZHA quirk](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download); see the [validation scope](https://github.com/rkubera/ArdPortal/wiki/Zigbee#validation-and-troubleshooting).
 
 See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
 

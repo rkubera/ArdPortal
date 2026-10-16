@@ -115,13 +115,13 @@ Explicit `ha` properties can override Discovery metadata. They do not create add
 
 ## Integration with Zigbee
 
-**Native mapping:** IAS Warning Device (`0x0502`). Requires ESP32-C5/C6, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
+**Native mapping:** IAS Warning Device (`0x0502`). Requires ESP32-C5/C6/H2, `ARDPORTAL_ENABLE_ZIGBEE=1`, enabled dynamic pages and the control’s feature flag, with the matching End Device/Router board mode. MQTT/HA is not required. Register the initial pages before endpoint startup; later endpoint changes require restart. `persist` retains its AppConfig meaning.
 
 **Supported by ArdPortal:** Incoming Start Warning commands become on/off, duration and a four-level volume request. All nonzero warning modes map to the application preset’s `alarm` tone.
 
 **Not provided / limits:** The `bell` tone and distinct Zigbee warning modes are not preserved. Volume is quantized and duration bounded to 1–300 seconds. Strobe/squawk controls are not mapped. There is no Zigbee report of the application siren state/tone/duration/volume; the current mapping is command-oriented. The application runs the duration timer.
 
-`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway UI support may require a converter; physical coordinator interoperability remains to be validated.
+`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway presentation depends on its support for the mapped clusters. ArdPortal can export a [Zigbee2MQTT converter or ZHA quirk](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download); see the [validation scope](https://github.com/rkubera/ArdPortal/wiki/Zigbee#validation-and-troubleshooting).
 
 See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
 
