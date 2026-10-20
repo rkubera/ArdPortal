@@ -4,7 +4,8 @@ The `PR checks` workflow runs on pull requests (including forks), pushes to `mai
 and manual dispatch. Its three stable check names are `Host tests`,
 `Arduino builds` and `Lint and assets`. Jobs have read-only repository access and
 no repository secrets. Actions are pinned to commit hashes; tool/core/API-test
-versions are explicit in the workflow.
+versions are explicit in the workflow. Only GitHub-owned actions are used;
+Arduino CLI/Lint are downloaded from official releases with pinned SHA-256 hashes.
 
 ## Host tests
 
