@@ -1,0 +1,98 @@
+name: PR checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-tests:
+    name: Host tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ASAN_OPTIONS: detect_leaks=0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Host regressions with ASan and UBSan
+        run: bash tests/run-host.sh
+      - name: Install isolated exporter test dependencies
+        run: |
+          python -m pip install -r tests/requirements-host.txt
+          npm install --prefix "$RUNNER_TEMP/converter-tests" --ignore-scripts --no-audit --no-fund zigbee-herdsman-converters@26.115.1
+          curl --fail --show-error --location --retry 3 https://raw.githubusercontent.com/Koenkk/zigbee2mqtt/2.14.2/lib/extension/homeassistant.ts --output "$RUNNER_TEMP/z2m-homeassistant.ts"
+      - name: ZHA and Zigbee2MQTT exporter compatibility
+        run: |
+          python tests/zha-quirk-test.py
+          ZHC_NODE_MODULES="$RUNNER_TEMP/converter-tests/node_modules" Z2M_HA_SOURCE="$RUNNER_TEMP/z2m-homeassistant.ts" node tests/zigbee-converter-test.mjs
+
+  arduino-builds:
+    name: Arduino builds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install verified Arduino CLI
+        run: |
+          python tests/install-arduino-tool.py arduino-cli "$RUNNER_TEMP/arduino-tools"
+          echo "$RUNNER_TEMP/arduino-tools" >> "$GITHUB_PATH"
+      - name: Install pinned board cores
+        run: |
+          arduino-cli core update-index --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json,https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp8266:esp8266@3.1.2 --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - name: Examples and public API feature matrix
+        run: bash tests/compile-arduino.sh
+
+  lint-assets:
+    name: Lint and assets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Arduino Lint
+        run: |
+          python tests/install-arduino-tool.py arduino-lint "$RUNNER_TEMP/arduino-tools"
+          "$RUNNER_TEMP/arduino-tools/arduino-lint" --compliance specification --library-manager false "$GITHUB_WORKSPACE"
+      - name: Preserve registered library name
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          properties = dict(line.split("=", 1) for line in Path("library.properties").read_text().splitlines() if "=" in line and not line.startswith("#"))
+          assert properties["name"] == "ArdPortal", "Changing the registered library name requires an Arduino Registry maintenance request"
+          PY
+      - name: Check generated resources without modifying files
+        run: |
+          python src/tools/generate_languages.py --check
+          python src/tools/generate_portal_assets.py --check
+          python src/tools/generate_state_schemas.py --check
+          python src/tools/generate_zigbee_converter.py --check
+          python src/tools/generate_zha_quirk.py --check
+          git diff --exit-code
+          git diff --check

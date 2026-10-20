@@ -33,7 +33,8 @@ class ArdJsonFieldSlices {
   size_t valueEnd(size_t i) const {
     if(at(i)=='"')return stringEnd(i);
     if(at(i)=='{'||at(i)=='['){size_t depth=0;while(i<length){char c=at(i);if(c=='"'){i=stringEnd(i);continue;}++i;if(c=='{'||c=='[')++depth;else if(c=='}'||c==']'){if(!--depth)return i;}}return length;}
-    while(i<length&&at(i)!=','&&at(i)!=']'&&at(i)!='}')++i;return i;
+    while(i<length&&at(i)!=','&&at(i)!=']'&&at(i)!='}')++i;
+    return i;
   }
 public:
   /**

@@ -48,9 +48,11 @@ inline String resolveJson(const String& source,const String& device) {
       cursor=value+bytes;changed=true;return true;
     });
   });
-  if(!ok)return String();if(!changed)return source;
+  if(!ok)return String();
+  if(!changed)return source;
   String tail=slices.slice(cursor,source.length()-cursor);
-  if(tail.length()!=source.length()-cursor||!output.concat(tail.c_str(),tail.length()))return String();return output;
+  if(tail.length()!=source.length()-cursor||!output.concat(tail.c_str(),tail.length()))return String();
+  return output;
 }
 
 /** @brief Reproduce registration's extended/persist flags without a definition DOM. */
@@ -62,12 +64,14 @@ inline String fieldHttpJson(const String& source,const String& device,bool exten
     if(key=="extended"||key=="persist"||key=="_pageVisibleWhen")return true;
     String encoded=ArdJSON::JSON.stringify(ArdJSON::JSONVar(key)),value=slices.slice(start,bytes);
     if(!encoded.length()||value.length()!=bytes)return false;
-    if(!first&&!normalized.concat(",",1))return false;first=false;
+    if(!first&&!normalized.concat(",",1))return false;
+    first=false;
     return normalized.concat(encoded.c_str(),encoded.length())&&normalized.concat(":",1)&&normalized.concat(value.c_str(),value.length());
   }))return String();
   if(!first&&!normalized.concat(",",1))return String();
   const char* flags=persist?"\"extended\":true,\"persist\":true}":"\"extended\":true,\"persist\":false}";
-  if(!normalized.concat(flags,strlen(flags)))return String();return resolveJson(normalized,device);
+  if(!normalized.concat(flags,strlen(flags)))return String();
+  return resolveJson(normalized,device);
 }
 
 }

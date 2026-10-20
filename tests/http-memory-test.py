@@ -48,7 +48,8 @@ int main(){
  pressure=0;credit=600;blockPenalty=0;portal._httpDynamicText=String();
  for(unsigned i=0;i<8;++i){portal._console[i].id=i+1;portal._console[i].text=std::string(200,'m').c_str();}
  assert(portal.reserveDynamicHttpMemory(portal._dynamic.pages.work,2000));assert(historyBytes()<=600);assert(portal._console[7].text.length()==200);
- for(auto& x:portal._console)x=ArdPortal::ConsoleLine();credit=600;
+ for(auto& x:portal._console)x=ArdPortal::ConsoleLine();
+ credit=600;
  for(unsigned i=0;i<8;++i){portal._consoleMessages[i].id=i+1;portal._consoleMessages[i].text=std::string(200,'d').c_str();}
  assert(portal.reserveDynamicHttpMemory(portal._dynamic.pages.work,2000));assert(historyBytes()==600);assert(portal._consoleMessages[5].text.length()&&portal._consoleMessages[6].text.length()&&portal._consoleMessages[7].text.length());
  pressure=1;assert(!portal.reserveDynamicHttpMemory(portal._dynamic.pages.work,2000));assert(historyBytes()==600);
