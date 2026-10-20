@@ -41,7 +41,10 @@ bash tests/compile-arduino.sh
 The script builds DynamicPages for ESP8266 and ESP32, and ZigbeeClimate for
 ESP32-C5/C6/H2. It also compiles the public API feature-switch matrix on ESP8266.
 Temporary build directories are cleaned on exit. `ARDUINO_CLI` can select a local
-CLI executable. These builds do not upload firmware or contact devices.
+CLI executable. For ESP8266 builds only, a narrow Python warning filter hides
+core 3.1.2's known `elf2bin.py` non-raw `\s` regex warning under Python 3.12.
+Other Python and compiler warnings remain enabled; caller `PYTHONWARNINGS`
+filters take precedence. These builds do not upload firmware or contact devices.
 
 ## Lint and generated assets
 
