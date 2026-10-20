@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add three PR checks: host regressions and gateway exporters, Arduino compilation across ESP8266/ESP32/C5/C6/H2 plus feature-switch API probes, and Arduino Lint/generated-asset verification. Pin action revisions and tool/core versions; run fork contributions with read-only permissions.
+
 ## 0.8.0 — 2026-10-20
 
 ### Added

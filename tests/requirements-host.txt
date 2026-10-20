@@ -1,0 +1,4 @@
+# Versions covered by the Zigbee exporter API tests.
+zha==2.3.1
+zigpy==2.3.0
+zha-quirks==2.3.0
