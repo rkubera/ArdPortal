@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — Firmware version in device information
+
+- Show the application firmware version in the Device information view and the `firmwareVersion` field of `/api/info`, using `setFirmwareVersion()` or the default `1.0`.
+
 ## Unreleased — Startup copy repair
 
 - Validate both configuration copies at startup and repair a missing or invalid alternate from the surviving verified document before accepting persistent edits.

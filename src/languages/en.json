@@ -254,6 +254,7 @@
     "ui_198": "Wi-Fi: {wifi} · IP: {ip}{zigbee}{ap}",
     "ui_199": "AP band",
     "ui_200": "When connected to a Wi-Fi router, the AP shares its band and channel. This selection applies when the AP starts without a Wi-Fi connection.",
+    "ui_201": "Firmware version",
     "s_240": "Action rejected by application callback.",
     "s_241": "No application command callback registered."
   }

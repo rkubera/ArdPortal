@@ -37,10 +37,12 @@ bool failFileWrite = false, failRename = false;
 void drain(ArdPortal& p){if(p._savePending&&!p._saveQueued)p.flushPortalAndAppConfig();for(int i=0;i<10000&&(p.portalAndAppConfigBusy()||!p.portalAndAppConfigReady());++i){fakeMillis+=10;p.serviceStorage(fakeMillis);}assert(!p._storage.busy()&&!p._savePending);}
 int main(){
   {ArdPortal p;assert(String(p.getFirmwareVersion())=="1.0");
+   assert(ArdJSON::JSON.parse(p.infoJson())["firmwareVersion"].asString()=="1.0");
    auto f=ArdJSON::JSON.parse(R"({"id":"version_test","type":"switch","name":"Relay"})");
    auto d=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(d["device"]["sw_version"].asString()=="1.0");
    assert(!p.setFirmwareVersion(nullptr)&&!p.setFirmwareVersion("")&&!p.setFirmwareVersion("12345678901234567"));
    assert(p.setFirmwareVersion("2.3.4-beta"));d=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(d["device"]["sw_version"].asString()=="2.3.4-beta");
+   assert(ArdJSON::JSON.parse(p.infoJson())["firmwareVersion"].asString()=="2.3.4-beta");
    p._started=true;assert(!p.setFirmwareVersion("3.0"));assert(String(p.getFirmwareVersion())=="2.3.4-beta");
   }
 
