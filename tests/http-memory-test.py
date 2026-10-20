@@ -11,6 +11,7 @@ struct HeapStub{uint32_t getFreeHeap(){++heapReads;return fakeFree();}uint32_t g
 #include "ArdJSON.h"
 #include "HeapMemory.h"
 #define ARDPORTAL_ENABLE_CONSOLE 1
+#define ARDPORTAL_ENABLE_MQTT 1
 #define ARDPORTAL_ENABLE_CONSOLE_MESSAGES 1
 struct Pages{size_t work=4000;size_t length(){return 9;}size_t fields(size_t){return 1;}size_t fieldIndex(size_t,size_t){return 0;}size_t fieldWork(size_t){return work;}size_t fieldHttpWork(size_t){return work;}size_t fieldBlock(size_t){return 2000;}};
 struct ArdPortal{

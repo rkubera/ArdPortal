@@ -1,224 +1,56 @@
 # Changelog
 
-## Unreleased — Firmware version in device information
-
-- Show the application firmware version in the Device information view and the `firmwareVersion` field of `/api/info`, using `setFirmwareVersion()` or the default `1.0`.
-
-## Unreleased — Startup copy repair
-
-- Validate both configuration copies at startup and repair a missing or invalid alternate from the surviving verified document before accepting persistent edits.
-- Stream and verify the replacement without rewriting the good copy; leave two already valid copies untouched, including copies with different generations.
-- Limit repair to three attempts with one-second failure backoff. If repair exhausts its attempts, restore the surviving configuration for operation but block ordinary persistent edits until a successful startup repair or explicit recovery.
-- Cover either damaged/missing slot, healthy-copy preservation, repair failures and interrupted repair with torn raw flash operations.
-
-## Unreleased — Bounded save retries
-
-- Retain failed configuration batches for up to three total attempts, with at least one second between failed attempts, including during explicit flush/restart draining.
-- Keep later application edits in their own queue and retain MQTT acknowledgement state until the batch succeeds or exhausts its attempts.
-- Expose `portalAndAppConfigSaveAttempts()` and `onAppConfigValueSaveFailed()` with key, attempted value, attempt count and error after terminal failure. Existing save callbacks continue reporting each attempt.
-
-## Unreleased — Application edit queue
-
-- Accept valid application edits during an active configuration save using a separate coalescing patch, preserving the immutable streaming snapshot.
-- Include waiting edits in storage busy status, explicit flush and restart draining; retain the latest accepted value per key, including deletions.
-- Keep `true` as acceptance in RAM, with persistent completion reported by the existing save callback.
-
-## Unreleased — Configuration recovery
-
-- Maintain an erased end marker when appending to reused flash banks so older committed records cannot override newer configuration after restart.
-- Report allocation failures while validating configuration journals instead of silently selecting an older valid copy.
-- Keep the newest committed flash bank authoritative when scanning fails; do not automatically format on allocation, flash I/O, index capacity or layout errors.
-- Cover either journal slot, generation rollover, corrupted-copy recovery, failed mount preservation and rapid multi-key edits across restart.
-
-## Unreleased — Zigbee2MQTT Home Assistant discovery
-
-- Preserve expose endpoint identity and explicit registered names so repeated controls have unique Home Assistant Discovery IDs instead of colliding or falling back to the device name.
-- Read initial thermostat values without configuring reporting for SDK-unreportable setpoints, preventing a thermostat configuration failure from skipping subsequent controls after interview/re-pairing.
-- Exercise multiple same-type controls against the actual Zigbee2MQTT Discovery mapper and verify thermostat initial reads against a reporting-rejection fixture.
-
-## Unreleased — Application firmware version
-
-- Add `setFirmwareVersion()` and `getFirmwareVersion()` with a default application version of `1.0`; configure before `begin()` using up to 16 UTF-8 bytes.
-- Include application version in Home Assistant device `sw_version` and standard Zigbee Basic `SWBuildID` on management/application endpoints, independently of the OTA image version and layout fingerprint.
-
-## Unreleased — Zigbee hardware validation
-
-- Prevent a false Zigbee OTA timeout when the SDK task updates its activity timestamp after the caller sampled the loop time; test concurrent tick ordering and millis rollover.
-
-- Size the native Zigbee scheduler before stack initialization according to staged attributes, retaining commissioning capacity when many reporting endpoints are registered.
-- Keep inactive single-target thermostat setpoints outside the active target range so SDK deadband validation does not reject large remote target changes. Independent `heat_cool` thresholds retain their deadband validation.
-- Cover reporting scheduler capacity and remote thermostat writes with native adapter regression tests.
-
-## Unreleased — Conditional UI and typed text
-
-- Exclude Zigbee refresh/navigation logic and disabled Console channels from generated WWW JavaScript using existing feature switches.
-- Add optional `ARDPORTAL_ENABLE_TEXT_TYPES` (default enabled) to omit numeric text subtypes and automatic HA patterns while retaining plain text. Disabled numeric subtype definitions are rejected explicitly.
-- Add borrowed `JSONVar::stringValue()` access and avoid copying subtype names and text readings during validation.
-- Validate typed text on/off, HA defaults, native Zigbee mappings and generated frontend syntax.
-
-
-## Unreleased — Compile-time memory trimming
-
-- Omit HTTP server/client, response/asset state and dynamic HTTP buffers when WWW is disabled.
-- Omit captive DNS without WWW while retaining AP and programmatic Wi-Fi support.
-- Remove MQTT Console history when MQTT is disabled; retain independent Messages history.
-- Use AP credentials directly from PortalConfig instead of retaining duplicate strings, and omit NTP server copies without Wi-Fi.
-- Exercise persistent storage with WWW/Wi-Fi disabled and Messages enabled without MQTT.
-
-
-## Unreleased — Headless OTA and ESP32-H2
-
-- Remove HTTP OTA whenever WWW is disabled while retaining independently enabled Zigbee OTA.
-- Support native Zigbee on ESP32-H2 and automatically disable Wi-Fi/AP, WWW and MQTT on this target.
-
-
-## Unreleased — Converter export without WWW
-
-- Add asynchronous callback-based Zigbee2MQTT/ZHA exports, readiness/busy status and cancellation, with bounded 256-byte output and retry/backpressure handling.
-- Gate HTTP download routes/state/methods on WWW while retaining layout identity and format-specific API exports.
-- Test streamed file syntax, repeat-safe backpressure, memory retry, cancellation, layout changes and stalled output.
-
-
-## Unreleased — Conditional public API
-
-- Omit disabled Wi-Fi/AP, MQTT, dynamic registration, HA entity, action/event and diagnostic APIs from the public interface.
-- Remove disabled registration stubs and unused network callback/registration metadata storage.
-- Retain shared storage/configuration APIs and necessary private status/log helpers.
-- Add compile-time API availability probes for enabled and disabled feature combinations.
-
-
-## Unreleased — WWW and Wi-Fi feature switches
-
-- Add enabled-by-default `ARDPORTAL_ENABLE_WWW` and `ARDPORTAL_ENABLE_WIFI`.
-- WWW disabled stops HTTP and WebSockets while retaining programmatic network control.
-- Wi-Fi disabled stops STA/AP and forces WWW/MQTT/TLS/HA off; local storage and Zigbee continue.
-
-
-## Unreleased — Programmatic network control
-
-- Add Wi-Fi connect/disconnect, retry policies, asynchronous scans and state/scan callbacks.
-- Add AP lifetime policies and start/stop notifications without changing persistent AP configuration.
-- Add MQTT connection control, unsubscribe acknowledgements, connection tests and callbacks.
-- Expose Zigbee status and automatic retry policy through the owned component.
-- Refresh WWW configuration forms after API configuration changes; WWW stays enabled.
-
-
-## Unreleased — Zigbee clock synchronization
-
-- Add a background Time client that probes the coordinator for valid UTC/time status, updates the system clock and periodically retries.
-- Keep time synchronization separate from AppConfig controls and converter exports.
-
-
-## Unreleased — Zigbee dependency handling
-
-- Accept Zigbee commands for fields hidden by field/page dependencies, including compound controls and actions.
-- Keep value validation and read-only restrictions; Portal and MQTT visibility checks remain unchanged.
-- Document that dependencies do not affect Zigbee control visibility.
-
-## Unreleased — Zigbee2MQTT action choices
-
-- Group action endpoints of the same AppConfig control into one immediate-action choice.
-- Route each choice to its original endpoint and clear the transient selection after sending, allowing repeated actions without an Execute button.
-- Preserve standalone actions and the existing device layout signature.
-
-## Unreleased — Zigbee2MQTT control labels
-
-- Hide endpoint annotations in exported features while retaining unique MQTT properties and endpoint command routing.
-- Clear action selection using the unsuffixed converter key, avoiding a duplicate endpoint suffix in Z2M optimistic state.
-
-- Apply AppConfig names to standard-device child features and all measurement labels.
-- Keep climate as one expose and document frontend property rendering and converter replacement.
-
-## Unreleased — ZHA quirk export
-
-- Add enabled-by-default `ARDPORTAL_ENABLE_ZHA_QUIRK` and a separate Zigbee-page Python download button.
-- Share metadata, streamed export and layout identity with the independent Zigbee2MQTT exporter.
-- Generate named Multistate entities, number ranges, measurements, action buttons and native entity labels/thermostat limits.
-- Document installation, supported ZHA API versions and composite/native mapping limits.
-
-## Unreleased — Zigbee memory optimization
-
-- Replace persistent endpoint label Strings with startup-only ZCL buffers and compact report flags.
-- Normalize Zigbee composite definitions once instead of deep-copying them during registration and command handling.
-- Reuse diagnostic history buffers and avoid temporary traffic/timestamp Strings.
-- Compact the shared converter asset without changing the supported control set.
-- Derive converter labels from definitions after SDK startup, preserving the layout identity across downloads.
-
-## Unreleased — Zigbee2MQTT converter export
-
-- Add enabled-by-default `ARDPORTAL_ENABLE_ZIGBEE_CONVERTER` and a Zigbee-page `.mjs` download.
-- Generate converters cooperatively from registered endpoints without buffering the complete file.
-- Identify devices by exported control layout rather than IEEE address; identical layouts share one converter.
-- Export named Multistate choices/status, configured climate ranges/modes, measurements and scoped endpoint commands.
-- Document external converter setup and limits; enable the option in Zigbee examples.
-
-## Unreleased
+## 0.8.0 — 2026-10-20
 
 ### Added
 
-- Simplify the Zigbee network page to saved-network Rejoin and Reset pairing actions; pairing starts automatically and retries until connected. Scope network details/messages to the Zigbee section.
+- Optional native Zigbee End Device and Router support on ESP32-C5, ESP32-C6 and ESP32-H2. Zigbee remains disabled by default and requires a supported chip and matching Arduino board mode.
+- Automatic joining, saved-network rejoining, retry policies, network-only reset, state/result callbacks and background UTC synchronization from the coordinator.
+- Map supported AppConfig controls to Zigbee: switches, numbers, selections, typed measurements, binary sensors, RGB lights, thermostats, covers, locks and sirens. Composite mappings expose supported portions of fans, valves, humidifiers, water heaters, alarm panels, vacuums, mowers, actions and presence states through separate endpoints.
+- Generate layout-specific Zigbee2MQTT converters and ZHA quirks, with registered control names and endpoint routing. Download through WWW or export through bounded asynchronous C++ callbacks with backpressure and cancellation.
+- Receive and validate Zigbee OTA images, report progress and failures, and restart through the existing firmware-update lifecycle. Image version/manufacturer/type are separate from the application display version.
+- Add Zigbee network management, connection status and an independent Console channel/WebSocket with decoded traffic and lifecycle diagnostics. Lock PINs are redacted from diagnostics.
+- Add ZigbeePortal and ZigbeeClimate examples with OTA/ArdFS/Zigbee partition layouts, setup instructions and a control support matrix.
+- Add `setFirmwareVersion()` / `getFirmwareVersion()`, defaulting to `1.0`. Show this application version in Home Assistant device metadata, Zigbee Basic SWBuildID, Device information and `/api/info` as `firmwareVersion`.
+- Add programmatic Wi-Fi, AP, scan and MQTT connection management, retry policies and callbacks, including MQTT unsubscribe acknowledgements and connection tests.
+- Add enabled-by-default `ARDPORTAL_ENABLE_WIFI`, `ARDPORTAL_ENABLE_WWW` and `ARDPORTAL_ENABLE_TEXT_TYPES` switches. Support headless Zigbee builds while retaining local configuration/storage and Zigbee OTA.
+- Add optional numeric/measurement `textType` mappings with HA defaults, units, scaling and unknown-value handling; plain text remains the default.
+- Add an AP band preference on supported dual-band chips and optional sketch-owned Serial diagnostics for MQTT and Zigbee.
+- Add configuration save attempt reporting and `onAppConfigValueSaveFailed()` with the affected key, attempted value, attempt count and terminal error.
 
-- Show the current Zigbee connection status beside Wi-Fi in the shared header on every portal page, including builds with MQTT disabled; remove its duplicate state row and connection banner from the Zigbee page.
+### Changed
 
-- Zigbee Console displays JSON payloads for incoming APS metadata, decoded ZCL responses/attributes/control commands, applied commands and queued TX reports. Remove raw hexadecimal previews, preserve transaction sequences, redact lock PINs and explicitly identify unsupported/truncated formats without allocating a JSON tree.
-
-- AP Setup offers a persistent 2.4/5 GHz band preference on dual-band Wi-Fi chips; single-band boards keep the existing setup. AP follows the station channel while connected.
-
-- Native Zigbee light supports standard XY color attributes and commands, with sRGB conversion alongside Hue/Saturation and Enhanced Hue.
-
-- Optional `ARDPORTAL_MQTT_DEBUG_SERIAL` mirrors MQTT lifecycle and RX/TX diagnostics to Serial, independently of Console and Messages.
-
-- Optional `ARDPORTAL_ZIGBEE_DEBUG_SERIAL` mirrors Zigbee diagnostics to sketch-owned Serial without waiting for transmit buffer space.
+- Compile out disabled networking, captive DNS, HTTP OTA, Console channels, registration state and public APIs. Applications referencing disabled-feature APIs must guard those calls with the matching feature flags.
+- Wi-Fi disabled also disables AP/WWW/MQTT/TLS/HA; ESP32-H2 selects this headless behavior automatically. WWW disabled still permits programmatic Wi-Fi/AP use.
+- Freeze native Zigbee endpoint layouts after initial asynchronous page registration. Supported Zigbee commands share application state, callbacks and persistence; portal visibility dependencies do not hide Zigbee endpoints.
+- Full factory reset also clears Zigbee pairing. Ordinary restart, OTA and storage formatting preserve pairing.
+- Accept and coalesce application configuration edits during an active save in a separate queue, retaining the newest accepted value per key and including queued work in flush/restart draining. A setter returning `true` acknowledges RAM acceptance; save callbacks report durability.
+- Retry a failed configuration batch up to three total attempts, at least one second apart. Preserve newer queued edits and MQTT acknowledgements through retries; after exhaustion, stop the failed batch and notify affected application values. MQTT connection-trial rollback remains deliberate.
+- Validate both configuration copies at startup and repair a missing or invalid alternate from the verified survivor before accepting ordinary persistent edits. Repair preserves the good copy and uses up to three attempts; after exhaustion, restore the surviving data for operation but block ordinary persistent edits until recovery. Two valid copies, including different generations, are left untouched.
+- Remove the internal HeapPressure and ESP32AllocationFailure diagnostic examples from the distributed example set.
 
 ### Fixed
 
-- Report missing or rejecting application action callbacks explicitly in Portal command errors instead of misclassifying them as invalid field values/definitions.
+- Prevent old records in a reused flash bank from overriding newer configuration after restart. Keep an erased successor marker before append and preserve committed data through interrupted operations.
+- Distinguish allocation, flash I/O, layout and index-capacity failures from corrupt storage; do not silently select stale data or format on operational failures.
+- Preserve unique Zigbee2MQTT Home Assistant Discovery identities and registered names after interview/re-pairing. Read initial thermostat state without unsupported reporting setup that previously skipped later controls.
+- Correct Zigbee thermostat inactive-target/deadband handling and retain independent heat/cool thresholds. Extend the climate UI for dual targets.
+- Size the native Zigbee scheduler before initialization and pace/fairly retry attribute reports, preserving unrelated commands and endpoints under load or allocation pressure.
+- Prevent false Zigbee OTA timeouts from concurrent timestamp ordering and millis rollover; handle incomplete images, flash failures, aborts and deferred restart.
+- Correct native Analog Output attributes, optional labels, light attribute updates and standard XY/Hue/Saturation/Enhanced Hue conversions. Enable RX-on-when-idle for the current awake End Device implementation.
+- Enable Wi-Fi/IEEE 802.15.4 coexistence before Zigbee startup and report setup failures. Retire a conflicting fallback AP after a 5 GHz station connection on ESP32-C5.
+- Paint Wi-Fi/AP disconnection guidance before submitting credentials, retain it across connection loss, and provide a link to the station address.
+- Keep Console available without MQTT, isolate channel histories and omit disabled Zigbee/UI logic from generated assets. Reject missing/rejecting application action callbacks with explicit errors.
+- Reduce endpoint, converter, JSON and disabled-module memory overhead, including borrowed `JSONVar::stringValue()` access.
 
-- Forward Zigbee pairing/rejoin attempts, successful connection, link loss, retries and operation failures to Console Messages when enabled; keep frame payload traffic in the dedicated Zigbee history without replacing application callbacks.
+### Validation and limitations
 
-- Place Zigbee connection status after IP. Zigbee logs use the same UTC timestamps and browser-local date/time formatting as Messages, falling back to uptime until the device clock is valid.
-
-- Automatically retry Zigbee pairing or saved-network rejoin after each unsuccessful series, with a 30-second pause and no overall retry limit; Stop pairing also cancels scheduled retries. Preserve network identity during recovery and keep HTTP processing cooperative.
-
-- Pace native Zigbee reports at one attribute per step, at least 50 ms apart; retain unsent attributes without treating normal progress as an error. Enhanced Hue metadata remains readable without extra unsolicited reports.
-
-- Support standard Zigbee Enhanced Hue/Saturation commands used by Zigbee2MQTT, including 16-bit hue attributes and RGB conversion.
-
-- Normalize composite control definitions before decoding incoming Zigbee commands; retain queued commands while field parsing or normalization lacks memory.
-
-- Schedule Zigbee state reports fairly per endpoint; failures and retry delays no longer block unrelated controls or replay completed composite endpoints.
-
-- Explicitly enable RX-on-when-idle for Zigbee end devices so commands can arrive without waiting for a periodic parent poll.
-
-- Zigbee retries only failed attributes, respects SDK reporting permissions, and updates existing light attributes before adding missing optional attributes, preventing repeated light report bursts.
-- Zigbee startup and timeout checks tolerate work started later in the same portal loop.
-- Explicitly enable Wi-Fi/IEEE 802.15.4 radio coexistence before starting the native Zigbee stack; report setup failure through lifecycle diagnostics.
-- Show Wi-Fi/AP disconnection guidance before submitting credentials, retain it across connection loss, display scan bands and link to the station address when received.
-- Keep Console available without MQTT; show Zigbee logs in an independent Console tab and place Zigbee navigation after AP Setup. Enable Messages and disable MQTT/HA in Zigbee examples.
-- Correct Analog Output minimum/maximum attribute IDs, register optional Zigbee ProductLabel through the generic typed attribute API, and report endpoint/attribute initialization failures precisely. Keep the Zigbee network page inside the shared portal navigation.
-- Add the required page order to ZigbeePortal so its demonstration controls register successfully.
-- Retire the fallback AP on ESP32-C5 after a 5 GHz station connection even when stale AP clients or HTTP requests remain; use the station channel when starting an AP while connected.
-
-### Added
-- Native Zigbee support for ESP32-C5 alongside ESP32-C6, with chip-specific model identity and shared examples/partition layout.
-- Decompose fan, valve, humidifier, water heater, alarm panel, vacuum, mower, button and scene into separate standard Zigbee endpoints without supplied converters; add read-only home/not-home tracker status. Route projected commands to the original controls, label endpoint functions, and stage/report only one endpoint per loop.
-- Document HA/Zigbee support and actual limitations on all 30 control pages, including unimplemented richer mappings and portal page/order limitations.
-- Optional `textType` on text controls: plain text by default (no Zigbee endpoint), generic number and eleven standard measurement subtypes. Automatically apply HA sensor patterns and native Zigbee unit/scaling/unknown-value mappings.
-- Optional ESP32-C6 Zigbee network management (`ARDPORTAL_ENABLE_ZIGBEE`, default off), with End Device/Router role selected by `ARDPORTAL_ZIGBEE_ROUTER` and a matching Arduino board mode.
-- Automatic boot pairing or saved-identity rejoin, bounded operation timeouts/retries, start/stop pairing, Zigbee-only reset-and-pair, and loop-delivered state/result callbacks.
-- Zigbee page and dedicated `/api/zigbee/console` WebSocket/history, independent of MQTT, HA, Messages and AppConfig sockets. Report stack signals and incoming APS metadata/payload prefixes without replacing the stack's TX confirmation handler.
-- ZigbeePortal example with a 4 MiB partition layout containing two 1792 KiB OTA slots, 320 KiB ArdFS and separate Zigbee partitions.
-
-- Automatically map native AppConfig controls to standard Zigbee endpoints: switch, slider, select, numeric/binary sensors, RGB light, thermostat, cover, lock and IAS siren. Share callbacks, effective state and `persist` behavior with existing portal/application paths.
-- Add a standard Zigbee OTA client for one `update` field, configurable image identity/version, split-header parsing, validation, failure/timeout handling and portal-managed restart.
-
-### Changed
-- Full portal factory reset also clears Zigbee network state before restart; ordinary restart, OTA and storage formatting preserve pairing.
-
-- Freeze native endpoints after initial asynchronous page registration; preserve network reserves, bound loop work and free copied startup buffers. Report endpoint/command/attribute diagnostics in the dedicated Zigbee console.
-
-### Validation
-- Host tests cover lifecycle/allocation failures, native cluster construction, typed commands/queue saturation, units/RGB/position conversions, persistence and OOM recovery, attribute-report retries, and OTA length/flash/abort/timeout/deferred-restart handling. Dedicated frontend socket/switch and factory-reset tests also pass. Physical coordinator interoperability still needs hardware validation.
+- Host regression suites cover native Zigbee lifecycle/clusters/commands/reporting/OTA, configuration queues and bounded retries, startup repair, allocation refusal, power-loss recovery, exports, feature switches, networking and generated UI behavior.
+- Release checks compile DynamicPages for ESP8266 (core 3.1.2) and ZigbeeClimate for ESP32-C5 (Arduino-ESP32 3.3.12), verify generated assets, and exercise the exporters against ZHA 2.3.1 / zha-quirks 2.3.0 / zigpy 2.3.0 and Zigbee2MQTT 2.14.2 / zigbee-herdsman-converters 26.115.1. Update the HTTP memory test fixture to explicitly enable the MQTT history it exercises.
+- Physical ESP32-C5/Zigbee2MQTT tests confirmed bidirectional controls and complete OTA activation, restart callbacks and rejoining, both with Wi-Fi disabled and enabled. Earlier failed runs remain documented; these results are not a guarantee for every board, role, gateway or workload.
+- Zigbee remains an optional extension: it does not transport every Portal/HA control or property. Composite endpoints may appear as separate gateway entities; consult the documented mapping and gateway support limits.
+- The current End Device implementation remains awake; it is not a battery-sleep implementation. Wi-Fi/Zigbee coexistence is role/workload dependent, and concurrent AP/Router operation is not supported.
+- Expand README, Wiki, API references and hardware/storage validation reports while retaining the existing Wi-Fi, MQTT, Home Assistant, ArdFS and ArdJSON functionality.
 
 ## 0.7.8 — 2026-10-11
 
