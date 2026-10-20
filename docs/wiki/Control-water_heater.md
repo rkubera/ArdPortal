@@ -109,6 +109,34 @@ Dials can be dragged or operated with plus/minus and keyboard input. Current
 measurements are shown as gray dots; missing measurements hide the dot. These
 widgets display reported values and settings, not a thermostat algorithm.
 
+## Integration with Home Assistant
+
+**MQTT component:** `water_heater`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** Target/current temperature and mode selection. Defaults: target 30–80 °C, step 1, modes `off`, `eco`, `electric`, `performance`, `heat_pump`, `high_demand`; preset topics and templates route temperature/mode commands.
+
+**Not provided by the built-in integration / limits:** No thermostat algorithm, heater driver, away-mode control or extra operation states in the preset. Changing advertised limits/modes requires matching `controls` validation; automatic temperature-unit conversion is not implemented.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Implemented as a composite mapping.** The functions below are separate standard endpoints on the same physical Zigbee device. The optional generated Zigbee2MQTT converter and ZHA quirk add names and option/state semantics; a composite mapping does not guarantee one combined gateway entity. Requires ESP32-C5/C6/H2, Zigbee and dynamic pages enabled, and the field’s control flag enabled. MQTT/HA is not required.
+
+**Standard mapping:** Analog Output + Multistate Output + Temperature Measurement.
+
+**Supported by ArdPortal:** Target temperature, selected operation mode and measured current temperature are separate endpoints. Preset mode indices: 1=off, 2=eco, 3=electric, 4=performance, 5=heat_pump, 6=high_demand. Temperatures are Celsius.
+
+**Not provided / limits:** No native unified water-heater profile, heater driver or Thermostat control algorithm. The target uses float32 Analog Output; the measured temperature uses standard signed hundredths of Celsius. Generic target/mode controls are gateway-dependent.
+
+Endpoint IDs follow registration order, then the preset’s `controls` order; read-only measurement/status endpoints follow the editable/action endpoints. Composite fields consume multiple slots in the shared 239-endpoint budget. Startup stages one endpoint per loop and reports one endpoint per loop. Values and action callbacks use the existing AppConfig routes and `persist`; accepting an action is not hardware completion.
+
+Standard Basic ProductLabel contains `field name / property or action`, truncated to 63 UTF-8 bytes; Analog/Multistate endpoints also carry their Description. A gateway is not required to use these labels or expose all these clusters. Option/state names are documented here but are not currently sent as StateText. Unknown discrete readings set the standard status fault flag and leave the last representable ordinal unchanged.
+
+`visibleWhen` does not remove endpoints or create a dynamic Zigbee form. Dependency rules do not affect Zigbee control visibility or command acceptance. Native endpoint definitions freeze at startup; changes need restart. Physical coordinator interoperability is still unverified.
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) and [page/order limitations](https://github.com/rkubera/ArdPortal/wiki/Zigbee#portal-pages-and-control-order).
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

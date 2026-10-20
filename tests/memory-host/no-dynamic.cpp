@@ -2,6 +2,8 @@
 #include "ESP8266WiFi.h"
 #include "ArdFSHostVolume.h"
 #include <cassert>
+#include <type_traits>
+#include <utility>
 #define ARDPORTAL_ENABLE_DYNAMIC_PAGES 0
 #define ARDPORTAL_ENABLE_OTA 0
 #define ARDPORTAL_ENABLE_MQTT 0
@@ -19,17 +21,19 @@ bool failMount=false,failFormat=false,failFileWrite=false;
 std::map<std::string,std::vector<uint8_t>> fakeFiles;
 std::deque<WiFiClient> WiFiServer::incoming;
 bool WiFiClient::connectResult=true;
+template<class T,class=void>struct hasRegistration:std::false_type{};
+template<class T>struct hasRegistration<T,std::void_t<decltype(std::declval<T&>().startAppConfigPageRegistration(String()))>>:std::true_type{};
+static_assert(!hasRegistration<ArdPortal>::value,"Disabled registration API must be absent");
 int main() {
   ArdPortal portal;
+#if ARDPORTAL_ENABLE_WWW
   portal._request="GET / HTTP/1.1\r\nHost: device\r\n\r\n";
   portal.handleHttp();
   assert(portal._response.indexOf("Content-Encoding: gzip")>=0);
   assert(portal._assetChunks&&portal._pageLength>2);
   assert(static_cast<unsigned char>(portal._page[0])==0x1f&&static_cast<unsigned char>(portal._page[1])==0x8b);
   portal.closeHttp();
-  assert(!portal.startAppConfigPageRegistration(String("{}")));
-  assert(!portal.setAppConfigStateValue("a",1));
-  assert(!portal.emitAppConfigEvent("a",1));
+#endif
   int changes=0;
   portal.onAppConfigValueChanged([&](const String& key,const ArdJSON::JSONVar& value,ArdPortal::ChangeSource) {
     assert(key=="a"&&value.asDouble()==42);++changes;

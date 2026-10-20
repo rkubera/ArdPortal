@@ -34,8 +34,29 @@ std::map<std::string, std::vector<uint8_t>> fakeFiles;
 bool failFileWrite = false, failRename = false;
 
 
-void drain(ArdPortal& p){if(p._savePending&&!p._saveQueued)p.flushPortalAndAppConfig();for(int i=0;i<10000&&(p._savePending||p._storage.busy()||!p.portalAndAppConfigReady());++i){fakeMillis+=10;p.serviceStorage(fakeMillis);}assert(!p._storage.busy()&&!p._savePending);}
+void drain(ArdPortal& p){if(p._savePending&&!p._saveQueued)p.flushPortalAndAppConfig();for(int i=0;i<10000&&(p.portalAndAppConfigBusy()||!p.portalAndAppConfigReady());++i){fakeMillis+=10;p.serviceStorage(fakeMillis);}assert(!p._storage.busy()&&!p._savePending);}
 int main(){
+  {ArdPortal p;assert(String(p.getFirmwareVersion())=="1.0");
+   auto f=ArdJSON::JSON.parse(R"({"id":"version_test","type":"switch","name":"Relay"})");
+   auto d=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(d["device"]["sw_version"].asString()=="1.0");
+   assert(!p.setFirmwareVersion(nullptr)&&!p.setFirmwareVersion("")&&!p.setFirmwareVersion("12345678901234567"));
+   assert(p.setFirmwareVersion("2.3.4-beta"));d=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(d["device"]["sw_version"].asString()=="2.3.4-beta");
+   p._started=true;assert(!p.setFirmwareVersion("3.0"));assert(String(p.getFirmwareVersion())=="2.3.4-beta");
+  }
+
+  {ArdPortal p;auto f=ArdJSON::JSON.parse(R"({"id":"room","type":"climate","name":"Room","min":10,"max":35,"step":0.5,"modes":["off","heat","cool","heat_cool"]})");
+   auto value=ArdDynamicPages::initial(f);assert(value["temperature_low"].asDouble()==10&&value["temperature_high"].asDouble()==35);
+   value["mode"]="heat_cool";value["temperature_low"]=20;value["temperature_high"]=25;assert(ArdDynamicPages::validValue(f,value));
+   auto discovery=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(discovery["temperature_low_command_topic"].asString().indexOf("room_temperature_low")>=0);assert(discovery["temperature_high_state_template"].asString()=="{{ value_json.temperature_high }}");
+   value["temperature_low"]=26;assert(!ArdDynamicPages::validValue(f,value));value["temperature_low"]=20.25;assert(!ArdDynamicPages::validValue(f,value));value.remove("temperature_low");assert(!ArdDynamicPages::validValue(f,value));value["mode"]="cool";assert(ArdDynamicPages::validValue(f,value));
+  }
+
+  {ArdPortal::PortalConfig bandConfig;bandConfig.deviceName="Band test";bandConfig.apBand=5;
+   String encoded=ArdPortalJson::encode(bandConfig);ArdPortal::PortalConfig restored;
+   assert(encoded.length()&&ArdPortalJson::decode(encoded,restored)&&restored.apBand==5);
+   auto legacy=ArdPortalJson::value(bandConfig);legacy.remove("apBand");assert(ArdPortalJson::decodeValue(legacy,restored)&&restored.apBand==24);
+   auto invalid=ArdPortalJson::value(bandConfig);invalid["apBand"]=6;assert(!ArdPortalJson::decodeValue(invalid,restored));}
+
   {
     ArdPortal discovery;
     auto field=ArdJSON::JSON.parse(R"({"id":"toggle","name":"Toggle","type":"switch","default":false})");
@@ -50,6 +71,144 @@ int main(){
     config=ArdJSON::JSON.parse(discovery._homeAssistant.discoveryConfig(field));
     assert(config["icon"].asString()=="mdi:fan");
   }
+{
+  ArdPortal p;
+  auto plain=ArdJSON::JSON.parse(R"({"id":"reading","name":"Reading","type":"text"})");
+  assert(ArdDynamicPages::initial(plain).asString()=="");
+  auto config=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(plain));
+  assert(!config.hasOwnProperty("device_class")&&!config.hasOwnProperty("state_class"));
+  for(auto type:{"number","temperature","humidity","pressure","illuminance","flow","carbon_dioxide","pm25","wind_speed","voltage","current","power"}){
+    auto field=plain;field["textType"]=type;
+    assert(ArdDynamicPages::initial(field).isNull());
+    assert(ArdDynamicPages::validValue(field,nullptr)&&ArdDynamicPages::validValue(field,22.5)&&!ArdDynamicPages::validValue(field,"22.5"));
+    config=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(field));
+    auto pattern=ArdText::pattern(field);
+    assert(config["state_class"].asString()=="measurement");
+    assert(config["device_class"].asString()==pattern.device&&config["unit_of_measurement"].asString()==pattern.unit);
+    field["ha"]["value_template"]="{{ value | float * 2 }}";
+    config=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(field));
+    assert(config["value_template"].asString()=="{{ value | float * 2 }}");
+  }
+  plain["textType"]="bogus";
+  assert(!p._dynamic.validateField(plain,ArdJSON::JSONVar::array(),false));
+  assert(String(p._dynamic.error.stage)=="field"&&p._dynamic.error.fieldId=="reading"&&p._dynamic.error.reason=="unsupported textType");
+
+}
+// Rapid edits across multiple keys must preserve the last accepted intent, including across reboot.
+{
+  ArdPortal rapid; assert(rapid.begin()); drain(rapid);
+  int saves=0;rapid.onPortalAndAppConfigSaved([&](bool ok,const String&){assert(ok);++saves;});
+  ArdJSON::JSONVar expected=ArdJSON::JSONVar::object();
+  for(int i=0;i<120;++i){
+    const char* key=i%3==0?"stressRelay":i%3==1?"stressSetpoint":"stressProfile";
+    ArdJSON::JSONVar value=i%3==0?ArdJSON::JSONVar(bool(i%2)):i%3==1?ArdJSON::JSONVar(i):ArdJSON::JSONVar(i%2?"eco":"normal");
+    assert(rapid.setAppConfigValue(key,value));expected[key]=value;
+    if(i%12==11)rapid.flushPortalAndAppConfig();
+    fakeMillis+=20; rapid.serviceStorage(fakeMillis);
+  }
+  assert(expected.length()==3);
+  drain(rapid);assert(saves>=2);
+  // Deletions and repeated edits during the active snapshot belong to the next save.
+  assert(rapid.setAppConfigValue("removeTarget",1));assert(rapid.flushPortalAndAppConfig());
+  fakeMillis+=10;rapid.serviceStorage(fakeMillis);assert(rapid._saveQueued);
+  assert(rapid.removeAppConfigValue("removeTarget"));
+  assert(rapid.setAppConfigValue("queuedValue",41));
+  assert(rapid.setAppConfigValue("queuedValue",42));
+  assert(rapid.portalAndAppConfigBusy());assert(rapid.flushPortalAndAppConfig());
+  // A rejected allocation cannot destroy a previously accepted queued value.
+  allocationBudget=0;assert(!rapid.setAppConfigValue("queuedValue",43));allocationBudget=-1;
+  ArdJSON::JSONVar rejected=ArdJSON::JSONVar::object();rejected["queuedValue"]=43;
+  allocationBudget=0;assert(!rapid.scheduleAppPatch(std::move(rejected),ArdPortal::ChangeSource::Application));allocationBudget=-1;
+  drain(rapid);
+  assert(!rapid._appConfig.hasOwnProperty("removeTarget"));
+  assert(rapid.getAppConfigValue("queuedValue").asDouble()==42);
+  // Application edits also queue behind a pending save from a different source.
+  ArdJSON::JSONVar incoming=ArdJSON::JSONVar::object();incoming["crossSource"]=7;
+  assert(rapid.scheduleAppPatch(std::move(incoming),ArdPortal::ChangeSource::Mqtt));
+  assert(rapid.setAppConfigValue("crossSource",8));drain(rapid);
+  assert(rapid.getAppConfigValue("crossSource").asDouble()==8);
+  ArdPortal rebooted; assert(rebooted.begin()); drain(rebooted);
+  assert(!rebooted._appConfig.hasOwnProperty("removeTarget")&&rebooted.getAppConfigValue("queuedValue").asDouble()==42);
+  expected.forEachObjectMember([&](const String& key,const ArdJSON::JSONVar& value){
+    assert(ArdJSON::JSON.stringify(rebooted.getAppConfigValue(key.c_str()))==ArdJSON::JSON.stringify(value));return true;
+  });
+}
+fakeFiles.clear();
+// Failed snapshots survive two retries, while later edits wait in their own batch.
+{
+  ArdPortal retry;assert(retry.begin());drain(retry);
+  assert(retry.setAppConfigValue("keep",11));assert(retry.setAppConfigValue("remove",7));drain(retry);
+  std::vector<bool> outcomes;std::vector<uint8_t> attempts;std::vector<uint32_t> failures;
+  int terminal=0;retry.onAppConfigValueSaveFailed([&](const String&,const ArdJSON::JSONVar&,uint8_t,const String&){++terminal;});
+  retry.onPortalAndAppConfigSaved([&](bool ok,const String& error){
+    outcomes.push_back(ok);attempts.push_back(retry.portalAndAppConfigSaveAttempts());
+    if(!ok){assert(error.length()&&retry._appControls._mqttAckInFlight);failures.push_back(fakeMillis);}
+  });
+  ArdJSON::JSONVar mqttPatch=ArdJSON::JSONVar::object();mqttPatch["keep"]=22;mqttPatch["remove"]=ArdJSON::JSONVar();
+  assert(retry.scheduleAppPatch(std::move(mqttPatch),ArdPortal::ChangeSource::Mqtt));
+  retry._appControls._mqttAckInFlight=ArdAppConfigFieldMask::forField(0);
+  assert(retry.flushPortalAndAppConfig());failFileWrite=true;
+  fakeMillis+=10;retry.serviceStorage(fakeMillis);assert(retry._saveQueued);
+  assert(retry.setAppConfigValue("keep",33));assert(retry.setAppConfigValue("extra",99));
+  for(int i=0;i<10000&&failures.size()<2;++i){fakeMillis+=10;retry.flushPortalAndAppConfig();retry.serviceStorage(fakeMillis-5);}
+  assert(failures.size()==2&&failures[1]-failures[0]>=1000&&retry.portalAndAppConfigBusy());
+  failFileWrite=false;drain(retry);
+  assert(outcomes.size()==4&&!outcomes[0]&&!outcomes[1]&&outcomes[2]&&outcomes[3]);
+  assert(attempts[0]==1&&attempts[1]==2&&attempts[2]==3&&attempts[3]==1&&terminal==0);
+  assert(!retry._appControls._mqttAckInFlight);
+  ArdPortal reboot;assert(reboot.begin());drain(reboot);
+  assert(reboot.getAppConfigValue("keep").asDouble()==33&&reboot.getAppConfigValue("extra").asDouble()==99);
+  assert(!reboot._appConfig.hasOwnProperty("remove"));
+}
+fakeFiles.clear();
+// Three failures exhaust a full snapshot, report deletions, and leave later batches independent.
+{
+  ArdPortal retry;assert(retry.begin());drain(retry);
+  assert(retry.setAppConfigValue("remove",7));drain(retry);
+  int failures=0,terminal=0;bool failedA=false,failedDeletion=false;
+  retry.onPortalAndAppConfigSaved([&](bool ok,const String&){if(!ok){++failures;assert(retry.portalAndAppConfigSaveAttempts()==failures);}});
+  retry.onAppConfigValueSaveFailed([&](const String& key,const ArdJSON::JSONVar& value,uint8_t attempts,const String& error){
+    assert(attempts==3&&error.length());++terminal;
+    if(key=="failed"){assert(value.asDouble()==42);failedA=true;}
+    if(key=="remove"){assert(value.isUndefined());failedDeletion=true;}
+  });
+  ArdJSON::JSONVar full=ArdJSON::JSONVar::object();full["failed"]=42;
+  assert(retry.scheduleConfig(retry.getPortalConfig(),full,ArdPortal::ChangeSource::Application,true));
+  failFileWrite=true;drain(retry);assert(failures==3&&terminal==2&&failedA&&failedDeletion);
+  assert(!retry.portalAndAppConfigBusy()&&retry.portalAndAppConfigSaveAttempts()==3);
+  const auto writes=fakeOpenWrites;failFileWrite=false;
+  for(int i=0;i<2000;++i){fakeMillis+=10;retry.serviceStorage(fakeMillis);}
+  assert(fakeOpenWrites==writes&&failures==3&&terminal==2);
+  assert(retry.setAppConfigValue("recovery",1));drain(retry);assert(retry.portalAndAppConfigSaveAttempts()==1);
+  ArdPortal reboot;assert(reboot.begin());drain(reboot);
+  assert(!reboot._appConfig.hasOwnProperty("failed")&&reboot.getAppConfigValue("remove").asDouble()==7);
+  assert(reboot.getAppConfigValue("recovery").asDouble()==1);
+  // Exhausting the older batch does not discard a newer value already accepted for the same key.
+  failures=0;int exhaustedAgain=0;
+  retry.onAppConfigValueSaveFailed([&](const String& key,const ArdJSON::JSONVar& value,uint8_t count,const String&){
+    assert(key=="latest"&&value.asDouble()==1&&count==3);++exhaustedAgain;failFileWrite=false;
+    assert(retry.setAppConfigValue("fromCallback",true));
+  });
+  assert(retry.setAppConfigValue("latest",1));assert(retry.flushPortalAndAppConfig());failFileWrite=true;
+  fakeMillis+=10;retry.serviceStorage(fakeMillis);assert(retry._saveQueued);
+  assert(retry.setAppConfigValue("latest",2));drain(retry);
+  assert(failures==3&&exhaustedAgain==1&&retry.getAppConfigValue("latest").asDouble()==2);
+  assert(retry.getAppConfigValue("fromCallback").asBool());
+}
+fakeFiles.clear();
+// Startup repairs a missing alternate before readiness; failed repair restores data but blocks edits.
+{
+  {ArdPortal first;assert(first.begin());drain(first);assert(first.setAppConfigValue("bootRepair",42));drain(first);}
+  const auto source=fakeFiles["/ardportal.json"];
+  failFileWrite=true;
+  {ArdPortal blocked;bool ready=false;blocked.onPortalAndAppConfigReady([&](bool restored){assert(restored);ready=true;});
+    assert(blocked.begin());drain(blocked);assert(ready&&!blocked.portalAndAppConfigStorageOK());
+    assert(blocked.getAppConfigValue("bootRepair").asDouble()==42&&!blocked.setAppConfigValue("bootRepair",43));}
+  failFileWrite=false;assert(fakeFiles["/ardportal.json"]==source);
+  {ArdPortal fixed;assert(fixed.begin());drain(fixed);assert(fixed.portalAndAppConfigStorageOK());
+    assert(fixed.getAppConfigValue("bootRepair").asDouble()==42&&fixed.setAppConfigValue("bootRepair",43));drain(fixed);}
+}
+fakeFiles.clear();
 using V=ArdJSON::JSONVar;ArdPortal p;assert(p.begin());drain(p);
 for(int i=0;i<300;++i)p._appConfig[String("setting")+String(i)]=i;
 allocationBudget=12;size_t before=allocations;assert(p.setAppConfigValue("setting1",17));assert(allocations-before<12);allocationBudget=-1;assert(p._pendingAppPatch&&p._pendingApp.length()==1);assert(p.getAppConfigValue("setting1").asDouble()==1);

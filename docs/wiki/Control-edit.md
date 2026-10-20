@@ -43,6 +43,26 @@
 
 Changes are sent automatically; MQTT accepts the text directly. Embedded NUL bytes are rejected.
 
+## Integration with Home Assistant
+
+**MQTT component:** `text`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** Editable string state and commands; Discovery advertises a 0–128 length range and ArdPortal validates up to 128 UTF-8 bytes without embedded NULs.
+
+**Not provided by the built-in integration / limits:** No built-in password mode, regular-expression pattern, multiline HA editor, or typed numeric measurement behavior. Additional `ha` metadata does not change the 128-byte application validation limit.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Status: not mapped by ArdPortal.** Editable text/string writes are not mapped to a Zigbee cluster. Enabling Zigbee does not create an endpoint for this field. The field remains usable in the portal and through MQTT/HA when those features are enabled.
+
+This describes the current ArdPortal implementation, not a claim that Zigbee cannot represent a similar device through a standard cluster or a gateway-specific converter.
+
+**Possible extension, not implemented:** Writable ZCL character-string attribute. ZCL can carry a string, but there is no portable generic editable-text control from combining the existing On/Off/Analog/Multistate clusters. A manufacturer-specific attribute/model and gateway converter could preserve this value; bounds and read/write behavior must be defined. See the [mapping feasibility table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#possible-mappings-not-yet-implemented).
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

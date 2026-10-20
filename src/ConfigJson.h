@@ -11,7 +11,7 @@ namespace ArdPortalJson {
  * @return Configured JSON byte, node, string and depth limits.
  */
 inline ArdJSON::Limits limits() {
-  ArdJSON::Limits value;value.maxDepth=1;value.maxNodes=15;value.maxStringBytes=4096;return value;
+  ArdJSON::Limits value;value.maxDepth=1;value.maxNodes=16;value.maxStringBytes=4096;return value;
 }
 struct TextField { const char* key; String ArdPortal::PortalConfig::*member; uint16_t limit; bool required; };
 static const TextField TextFields[] PROGMEM = {
@@ -38,7 +38,7 @@ inline TextField field(size_t index) {
  * @return True if every portal setting matches; false otherwise.
  */
 inline bool equal(const ArdPortal::PortalConfig& a, const ArdPortal::PortalConfig& b) {
-  if(a.port!=b.port || a.mqttTls!=b.mqttTls)return false;
+  if(a.port!=b.port || a.mqttTls!=b.mqttTls || a.apBand!=b.apBand)return false;
   for(size_t i=0;i<sizeof(TextFields)/sizeof(TextFields[0]);++i)if(a.*field(i).member!=b.*field(i).member)return false;
   return true;
 }
@@ -49,7 +49,7 @@ inline bool equal(const ArdPortal::PortalConfig& a, const ArdPortal::PortalConfi
  */
 inline ArdJSON::JSONVar value(const ArdPortal::PortalConfig& config) {
   auto root=ArdJSON::JSONVar::object();
-  root["version"]=1;root["port"]=config.port;root["mqttTls"]=config.mqttTls;
+  root["version"]=1;root["apBand"]=config.apBand;root["port"]=config.port;root["mqttTls"]=config.mqttTls;
   for(size_t i=0;i<sizeof(TextFields)/sizeof(TextFields[0]);++i) {
     auto entry=field(i);root[entry.key]=config.*entry.member;
   }
@@ -91,6 +91,8 @@ inline bool decodeValue(const ArdJSON::JSONVar& root,ArdPortal::PortalConfig& re
   if(root["mqttTls"].type()!=ArdJSON::JSONVar::Type::Boolean)return false;
   ArdPortal::PortalConfig config;config.port=static_cast<uint16_t>(port);config.mqttTls=root["mqttTls"].asBool();
   size_t count=3;
+  if(root.hasOwnProperty("apBand")){int64_t band;if(!root["apBand"].toInteger(band)||(band!=24&&band!=5))return false;config.apBand=uint8_t(band);++count;}
+
   for(size_t i=0;i<sizeof(TextFields)/sizeof(TextFields[0]);++i) {
     auto entry=field(i);
     if(root.hasOwnProperty(entry.key)) {

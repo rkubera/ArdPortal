@@ -13,6 +13,13 @@
 #if ARDPORTAL_ENABLE_HA
 #include "ArdHomeAssistantImpl.h"
 #endif
-#if ARDPORTAL_ENABLE_OTA
+#if ARDPORTAL_HTTP_OTA_SUPPORT
 #include "ArdOtaImpl.h"
 #endif
+
+#if ARDPORTAL_ENABLE_ZIGBEE
+#include "ArdZigbeeImpl.h"
+#include "ZigbeePortalImpl.h"
+#endif
+
+#include "NetworkApiImpl.h"

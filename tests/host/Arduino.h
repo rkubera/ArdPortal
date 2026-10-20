@@ -59,12 +59,15 @@ public:
   bool reserve(size_t size) { if(size > reserveLimitForTest()) return false; value.reserve(size); return true; }
 };
 struct SerialStub {
+  std::string output;
+  int capacity=256;
+  int availableForWrite()const{return capacity;}
   void begin(int) {}
   template<class T> void print(const T&) {}
   template<class T> void println(const T&) {}
   void println() {}
   template<class... T> void printf(const char*, T...) {}
-  void write(const uint8_t*, size_t) {}
+  void write(const uint8_t* bytes, size_t size) {output.append(reinterpret_cast<const char*>(bytes),size);}
 };
 extern SerialStub Serial;
 

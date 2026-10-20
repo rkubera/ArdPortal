@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "ArdPortalFeatures.h"
-#if ARDPORTAL_ENABLE_OTA
+#if ARDPORTAL_HTTP_OTA_SUPPORT
 #include <Arduino.h>
 #include "PortalTypes.h"
 class ArdPortal;

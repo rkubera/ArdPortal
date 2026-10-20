@@ -65,6 +65,26 @@ event["button"] = 1;
 portal.emitAppConfigEvent("wall_button", event);
 ```
 
+## Integration with Home Assistant
+
+**MQTT component:** `event`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** Transient event objects are published using `emitAppConfigEvent()`. The preset allows `press`, `double_press` and `long_press` in `event_type`; `ha.event_types` can supply a matching custom list.
+
+**Not provided by the built-in integration / limits:** Events are not retained configuration or editable HA state. ArdPortal does not detect hardware gestures or keep a durable event history; the application emits each occurrence.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Status: not mapped by ArdPortal.** Transient application events are not translated into Zigbee button/gesture events. Enabling Zigbee does not create an endpoint for this field. The field remains usable in the portal and through MQTT/HA when those features are enabled.
+
+This describes the current ArdPortal implementation, not a claim that Zigbee cannot represent a similar device through a standard cluster or a gateway-specific converter.
+
+**Possible extension, not implemented:** On/Off or Scenes client commands; optionally Multistate Input + event counter. Known actions can be sent as commands to bound peers/coordinator. Arbitrary press/double-press/long-press event names need a device converter and a repeat/event-sequence mechanism. A state attribute alone loses consecutive identical events; it is not equivalent to an event stream. See the [mapping feasibility table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#possible-mappings-not-yet-implemented).
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

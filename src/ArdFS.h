@@ -21,6 +21,8 @@ class ArdFS {
 public:
   struct Result {
     bool ok = false, found = false, changed = false, recovered = false;
+    bool redundant = false, repaired = false;
+    uint8_t repairAttempts = 0;
     String data, error;
   };
   using Callback = std::function<void(const Result&)>;
@@ -37,10 +39,11 @@ public:
   /**
    * @brief Request or perform a read through the component API.
    * @param path Journal file path.
-   * @param callback Completion or event handler supplied to this operation.
+   * @param callback Completion handler; failed repair still returns the verified source in data.
+   * @param repair Restore a missing or invalid alternate from the verified source before completion.
    * @return True if the operation was accepted; loop() later reports its result through callback. False if busy or input cannot be accepted.
    */
-  bool read(const String& path, Callback callback);
+  bool read(const String& path, Callback callback, bool repair = false);
   /**
    * @brief Request or perform a write through the component API.
    * @param path Journal file path.
@@ -93,7 +96,7 @@ public:
   static constexpr size_t MaxBytes = ArdFSMaxDocumentBytes;
 private:
   enum class Phase { Mount, End, Format, Remount, Idle, OpenRead, Read, Validate,
-                     Prepare, SourceCrc, OpenWrite, Write, Flush, CloseWrite, OpenVerify, Verify, CloseVerify };
+                     Prepare, RepairWait, SourceCrc, OpenWrite, Write, Flush, CloseWrite, OpenVerify, Verify, CloseVerify };
   Phase _phase = Phase::Idle;
   bool _mountDone = false, _mounted = false, _writing = false, _formatRequested = false;
   bool _valid[2] = {false, false}, _present[2] = {false, false}, _match[2] = {false, false};
@@ -107,6 +110,9 @@ private:
   Callback _callback;
   JsonSource _source;
   ArdJournalStream _journal;
+  bool _repairRequested=false,_repairing=false;
+  uint8_t _repairAttempts=0;
+  uint32_t _repairRetrySince=0;
   bool _sourceLegacy=false,_sourceMatch=false,_sourceFailed=false;
   size_t _sourceLength=0,_sourceAt=0,_sourceCompareAt=0,_escapedLength=0,_journalHeaderAt=0,_rawAt=0,_escapeAt=0,_escapeLength=0;
   uint8_t _journalStage=0;

@@ -1,0 +1,26 @@
+// Exercise the actual Climate renderer and range submissions without a browser.
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../src/PortalPage.h'),'utf8');
+const start=source.indexOf('function climateControl('),end=source.indexOf('/*@endif*/\n/*@if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR*/',start);
+const elements=[],submissions=[];
+const element=()=>({children:[],getBoundingClientRect(){return{left:0,top:0,width:250,height:250}},setPointerCapture(){},style:{setProperty(){}},dataset:{},setAttribute(){},insertBefore(node,before){this.children=this.children.filter(x=>x!==node);this.children.splice(this.children.indexOf(before),0,node);},hidden:false});
+const context=vm.createContext({dynamicElement:(tag,parent)=>{const node=element();node.tag=tag;parent.children.push(node);elements.push(node);return node;},t:key=>key,operatingLabel:x=>x,queueDynamic:(binding,page,index,value)=>{submissions.push(value);},setTimeout,clearTimeout,Math,Number,String,Promise});
+vm.runInContext(source.slice(start,end),context);
+const field={type:'climate',min:10,max:35,step:.5,modes:['heat','cool','heat_cool']},binding={},parent=element();
+context.climateControl(field,parent,binding,{});
+binding.write({temperature:22,temperature_low:20,temperature_high:25,mode:'heat_cool'});
+assert.equal(binding.dial.hidden,false);
+const range=elements.filter(node=>node.tag==='input'&&node!==binding.target);
+assert.equal(range.length,2);assert.equal(range[0].value,20);assert.equal(range[1].value,25);
+range[0].value='21';range[0].onchange();assert.equal(submissions.at(-1).temperature_low,21);assert.equal(submissions.at(-1).temperature_high,25);
+const handles=elements.filter(node=>node.className==='climateKnob');assert.equal(handles.length,2);assert.ok(handles.every(node=>!node.hidden));
+range[0].value='29';range[0].onchange();assert.equal(submissions.at(-1).temperature_low,22.5);assert.equal(submissions.at(-1).temperature_high,25);
+handles[1].onfocus();handles[1].onkeydown({target:handles[1],key:'ArrowUp',preventDefault(){},stopPropagation(){}});assert.equal(submissions.at(-1).temperature_high,25.5);
+assert.equal(submissions.at(-1).temperature_low,22.5);
+binding.dial.onpointerdown({target:handles[1],clientX:45,clientY:205,pointerId:1,preventDefault(){}});binding.dial.onpointerup();assert.equal(submissions.at(-1).temperature_high,25);assert.equal(submissions.at(-1).temperature_low,22.5);
+binding.write({temperature:23,temperature_low:21,temperature_high:25,mode:'cool'});assert.equal(binding.dial.hidden,false);
+assert.equal(elements.find(node=>node.className==='climateRange').hidden,true);
+binding.write({temperature:22,temperature_low:20,temperature_high:25,mode:'heat_cool'});
+range[0].value='28';range[1].onfocus();assert.equal(range[0].value,'28');range[0].onfocus();range[0].oninput();assert.equal(binding.dirty,true);range[0].onchange();assert.equal(submissions.at(-1).temperature_low,22.5);
+const countBefore=elements.length;vm.runInContext(source.slice(start,end).replace('/*@if ARDPORTAL_ENABLE_ZIGBEE*/+2.5/*@endif*/',''),context);const withoutZigbee={};context.climateControl(field,element(),withoutZigbee,{});withoutZigbee.write({temperature:22,temperature_low:20,temperature_high:25,mode:'heat_cool'});const plainRange=elements.slice(countBefore).filter(node=>node.tag==='input'&&node!==withoutZigbee.target);plainRange[0].value='29';plainRange[0].onchange();assert.equal(submissions.at(-1).temperature_low,25);plainRange[1].value='15';plainRange[1].onchange();assert.equal(submissions.at(-1).temperature_high,25);
+console.log('PASS: Climate dual ring, independent handles, keyboard changes, deadband and single-target cooling');

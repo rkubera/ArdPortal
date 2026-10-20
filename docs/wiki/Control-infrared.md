@@ -55,6 +55,26 @@
 
 **Value:** Valid JSON command; the application interprets and transmits it with its own IR hardware/driver. There is no built-in IR protocol implementation.
 
+## Integration with Home Assistant
+
+**MQTT component:** `infrared`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** The MQTT infrared emitter descriptor and JSON action payload are provided; valid JSON reaches `onAppConfigCommand` on the base command topic.
+
+**Not provided by the built-in integration / limits:** No IR carrier/pulse generation, hardware transmitter driver, protocol/code database, learning receiver, or reception stream. Action JSON is limited to 1500 serialized bytes and the command parser’s node budget.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Status: not mapped by ArdPortal.** IR-emitter JSON actions are not transported through Zigbee; no gateway-specific IR protocol is implemented. Enabling Zigbee does not create an endpoint for this field. The field remains usable in the portal and through MQTT/HA when those features are enabled.
+
+This describes the current ArdPortal implementation, not a claim that Zigbee cannot represent a similar device through a standard cluster or a gateway-specific converter.
+
+**Possible extension, not implemented:** Custom commands/attributes; optional tunneling in a compatible stack/gateway. Generic standard clusters cannot preserve the arbitrary IR-emitter JSON API or automatically make an IR controller. Predefined IR actions could be exposed as scenes/buttons, which is only a fixed subset. Full code transfer requires a documented device protocol, fragmentation limits and a gateway converter. See the [mapping feasibility table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#possible-mappings-not-yet-implemented).
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

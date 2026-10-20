@@ -62,9 +62,11 @@ Examples are in `examples`:
 | `HomeAssistantEntities` | HA sensor/switch registration without dynamic panel pages, cooperative HA work settings |
 | `ApplicationConfig` | Application JSON values and configuration callbacks |
 | `AsyncStorage` | Standalone cooperative journal storage without a portal |
+| `ZigbeeClimate` | Zigbee slider and thermostat, simulated temperature and shared AppConfig values; MQTT/HA disabled |
+| `ZigbeePortal` | Native and composite Zigbee controls, callbacks and gateway converter export |
 | `JsonBasics` | Standalone JSON objects, arrays, serialization and parsing |
 
-The main the external `ArdUI.ino` demo additionally demonstrates MQTT subscriptions to device
+The external `ArdUI.ino` demo additionally demonstrates MQTT subscriptions to device
 commands/queries, publishing status and reacting to portal changes.
 
 Progress and successful actions appear in green notification boxes. Failed
@@ -102,3 +104,9 @@ smaller than the displayed resolution do not necessarily send another packet.
 ---
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
+
+## First Zigbee connection
+
+Use **File → Examples → ArdPortal → ZigbeeClimate** on ESP32-C5/C6/H2. Select Zigbee ED for the default End Device role, or set `ARDPORTAL_ZIGBEE_ROUTER=1` with ZCZR board mode. Preserve the example partition table and upload through USB for the initial flash layout. Enable joining on the coordinator; a new device attempts pairing automatically and retries after unsuccessful series.
+
+On C5/C6, configure Wi-Fi through the normal portal if needed, then open **Zigbee** for network information and converter/quirk downloads. On H2, or with `ARDPORTAL_ENABLE_WIFI=0`, use the programming API and optional USB diagnostics; no web portal is available. Zigbee does not require the device's MQTT or HA module. Follow the [Zigbee guide](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for gateway installation, OTA and control coverage.

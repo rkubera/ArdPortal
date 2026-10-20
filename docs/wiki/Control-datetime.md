@@ -55,6 +55,26 @@
 
 Date/time input with an ISO-style string containing a timezone: for example `2026-10-02T12:30:00Z` or `2026-10-02T14:30:00+02:00`. Fractional seconds are accepted. The browser control sends a UTC `Z` value.
 
+## Integration with Home Assistant
+
+**MQTT component:** `datetime`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
+
+**Supported by ArdPortal:** Read/write timestamp state and commands with a calendar date, time and explicit `Z` or UTC offset. The validator accepts optional fractional seconds (up to six digits).
+
+**Not provided by the built-in integration / limits:** No timezone database, recurring schedule, automatic clock-setting or conversion of the stored timestamp. The application owns interpretation and execution.
+
+Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
+
+## Integration with Zigbee
+
+**Status: not mapped by ArdPortal.** Timestamp values and commands are not mapped; there is no automatic Zigbee Time endpoint. Enabling Zigbee does not create an endpoint for this field. The field remains usable in the portal and through MQTT/HA when those features are enabled.
+
+This describes the current ArdPortal implementation, not a claim that Zigbee cannot represent a similar device through a standard cluster or a gateway-specific converter.
+
+**Possible extension, not implemented:** Time cluster for the device clock; custom UTC-time attribute for an application timestamp. The Time cluster can exchange actual device/network clock information. Independent AppConfig timestamps need their own attributes and a converter. ZCL UTC time has a fixed epoch/range and does not preserve the original offset or fractional-second representation. It cannot reproduce every accepted ArdPortal timestamp unchanged. See the [mapping feasibility table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#possible-mappings-not-yet-implemented).
+
+See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

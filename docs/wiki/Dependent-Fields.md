@@ -200,3 +200,12 @@ of a level slider and a note input. A minimal standalone version is available in
 ---
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
+
+
+## Zigbee
+
+Field and page dependency rules do not affect control visibility in Zigbee.
+All registered supported endpoints remain available in the gateway, even when
+their fields are hidden in ArdPortal. Zigbee commands remain accepted for these
+fields, including compound controls and actions, with normal value validation
+and read-only restrictions. Portal and MQTT/HA dependency behavior is unchanged.

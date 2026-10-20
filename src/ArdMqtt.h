@@ -96,7 +96,38 @@ public:
    * @return True if queued; false if disconnected or the topic/filter or packet is invalid.
    */
   bool subscribe(const char* topic);
+  using StateCallback=std::function<void(MqttState)>;
+  using TrialCallback=std::function<void(bool,const String&)>;
+  /** @brief Resume automatic MQTT connection using saved settings. @return False when not ready, busy or missing broker. */
+  bool connect();
+  /** @brief Close MQTT and suspend automatic reconnect. @return False during a configuration trial or OTA. */
+  bool disconnect();
+  /** @brief Set automatic retry permission. @param enabled Retry policy. @return No value. */
+  void setAutoReconnect(bool enabled){_autoReconnect=enabled;}
+  /** @brief Read retry permission. @return True when enabled. */
+  bool autoReconnect()const{return _autoReconnect;}
+  /** @brief Queue an MQTT UNSUBSCRIBE. @param topic Valid subscription filter. @return True when queued; false when busy, disconnected or invalid. */
+  bool unsubscribe(const char* topic);
+  /** @brief Test and persist candidate settings on success, restoring old settings on failure. @param config Candidate configuration. @return True when queued. */
+  bool testConnection(const PortalConfig& config);
+  /** @brief Read whether a connection trial is pending. @return True until trial/save finishes. */
+  bool connectionTestBusy()const{return trialActive()||trialSavePending();}
+  /** @brief Read connection-test outcome. @return 0 pending, 1 success or 2 failure. */
+  uint8_t connectionTestResult()const{return trialResult();}
+  /** @brief Read connection-test explanation. @return Borrowed message. */
+  const String& connectionTestMessage()const{return trialMessage();}
+  /** @brief Install deferred MQTT state notifications. @param callback State handler. @return No value. */
+  void onStateChanged(StateCallback callback){_stateCallback=std::move(callback);}
+  /** @brief Install deferred connection-test completion notification. @param callback Success/error handler. @return No value. */
+  void onConnectionTestFinished(TrialCallback callback){_trialCallback=std::move(callback);}
 private:
+  bool _autoReconnect=true,_unsubscribePending=false;
+  StateCallback _stateCallback;
+  TrialCallback _trialCallback;
+  MqttState _apiState=MqttState::Disabled;
+  uint32_t _apiTrialRevision=0;
+  /** @brief Deliver deferred state/trial results from portal loop. @return No value. */
+  void serviceApiCallbacks();
   friend class ArdPortal;
   friend class ArdHomeAssistant;
   friend class ArdAppControls;

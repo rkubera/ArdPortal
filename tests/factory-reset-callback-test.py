@@ -16,7 +16,12 @@ namespace ArdJSON { struct JSONVar { static JSONVar object() { return {}; } }; }
 namespace ArdUILanguage { enum class Key { s_132, s_124, s_107 }; }
 enum class ChangeSource { FactoryReset };
 struct PortalConfig { String deviceName, apName; };
+enum class ZigbeeOperation { FactoryReset };
+struct ZigbeeMock { unsigned resets=0; bool request(ZigbeeOperation,int){++resets;return true;} };
 struct Portal {
+ ZigbeeMock _zigbee;int _zigbeeOptions=0;
+ void log(const String&){}
+
  bool _configurationReady=true, _rebootPending=false, busy=false, trial=false;
  bool _resetAfterSave=false, _httpWaitingStorage=false, accept=true;
  String _request="POST /api/factory-reset HTTP/1.1\r\n\r\nconfirm=RESET";
@@ -41,6 +46,9 @@ int main(){
  Portal p;int calls=0;
  p._beforeFactoryReset=[&]{assert(p.phase==0 && p.scheduled==0); ++calls;p.phase=1;};
  p.request();assert(calls==1 && p.scheduled==1 && p._resetAfterSave && p._httpWaitingStorage);
+#if ARDPORTAL_ENABLE_ZIGBEE
+ assert(p._zigbee.resets==1);
+#endif
  for(int guard=0;guard<5;++guard){
    Portal q;q._beforeFactoryReset=[&]{++calls;};
    if(guard==0)q._configurationReady=false;
@@ -48,11 +56,11 @@ int main(){
    if(guard==2)q.trial=true;
    if(guard==3)q._rebootPending=true;
    if(guard==4)q._request="POST / HTTP/1.1\r\n\r\nconfirm=WRONG";
-   q.request();assert(q.scheduled==0 && calls==1);
+   q.request();assert(q.scheduled==0 && calls==1 && q._zigbee.resets==0);
  }
  Portal noHandler;noHandler.request();assert(noHandler.scheduled==1);
  Portal failure;failure.accept=false;failure._beforeFactoryReset=[&]{++calls;};
- failure.request();assert(calls==2 && failure.status==500 && !failure._resetAfterSave);
+ failure.request();assert(calls==2 && failure.status==500 && !failure._resetAfterSave && failure._zigbee.resets==0);
  Portal other;other._beforeFactoryReset=[&]{++calls;};
  other.request("POST","/api/storage/format");other.request("POST","/api/restart");
  assert(calls==2 && other.scheduled==0);
@@ -62,7 +70,9 @@ int main(){
 with tempfile.TemporaryDirectory(prefix="ardportal-reset-test-") as tmp:
     tmp = Path(tmp)
     (tmp / "test.cpp").write_text(fixture + branch + main)
-    subprocess.run(["c++", "-std=c++17", "-Wall", "-Wextra", "-Werror",
-                    "-fsanitize=address,undefined", "-I" + str(root / "tests/host"),
-                    str(tmp / "test.cpp"), "-o", str(tmp / "test")], check=True)
-    subprocess.run([str(tmp / "test")], check=True)
+    for zigbee in (0, 1):
+        subprocess.run(["c++", "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                        "-DARDPORTAL_ENABLE_ZIGBEE=" + str(zigbee),
+                        "-fsanitize=address,undefined", "-I" + str(root / "tests/host"),
+                        str(tmp / "test.cpp"), "-o", str(tmp / "test")], check=True)
+        subprocess.run([str(tmp / "test")], check=True)
