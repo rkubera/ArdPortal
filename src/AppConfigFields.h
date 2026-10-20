@@ -86,7 +86,8 @@ public:
    * @return Reference to this mask after merging.
    */
   ArdAppConfigFieldMask& operator|=(const ArdAppConfigFieldMask& v) {
-    for(size_t i=0;i<16;++i) words[i]|=v.words[i];return *this;
+    for(size_t i=0;i<16;++i) words[i]|=v.words[i];
+    return *this;
   }
   /**
    * @brief Intersect this field mask with another mask in place.
@@ -94,6 +95,7 @@ public:
    * @return Reference to this mask after intersection.
    */
   ArdAppConfigFieldMask& operator&=(const ArdAppConfigFieldMask& v) {
-    for(size_t i=0;i<16;++i) words[i]&=v.words[i];return *this;
+    for(size_t i=0;i<16;++i) words[i]&=v.words[i];
+    return *this;
   }
 };

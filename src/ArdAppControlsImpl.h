@@ -224,7 +224,8 @@ bool ArdAppControls::applyAppState(const String& key,const V& value,ChangeSource
 #if ARDPORTAL_ENABLE_ZIGBEE
     _portal.markZigbeeStateDirty(key);
 #endif
-    if(publishMqtt)markDirty(key);if(_portal._appChanged) _portal._appChanged(key,value,source);}
+    if(publishMqtt)markDirty(key);
+    if(_portal._appChanged) _portal._appChanged(key,value,source);}
   return true;
 }
 

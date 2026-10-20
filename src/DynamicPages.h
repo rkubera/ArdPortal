@@ -141,7 +141,8 @@ public:
       for(size_t p=0;p<size;++p)for(size_t f=0;f<entries[p]->count;++f)if(!strcmp(fieldId(p,f),id)){
         const auto& e=*entries[p];const auto& meta=e.fields[f];if(meta.extended)return false;
         String source=e.flash?ArdJsonFieldSlices(e.flash,e.sourceLength).slice(meta.offset,meta.length):e.source.substring(meta.offset,meta.offset+meta.length);
-        if(source.length()!=meta.length)return false;ArdJsonFieldSlices slices(source);bool found=false;
+        if(source.length()!=meta.length)return false;
+        ArdJsonFieldSlices slices(source);bool found=false;
         bool ok=slices.members(0,source.length(),[&](const String& key,size_t start,size_t bytes){if(key=="default"){result=codec.parse(slices.slice(start,bytes));found=result.isValid()&&!result.isUndefined();}return true;});
         return ok&&found;
       }
@@ -151,7 +152,8 @@ public:
     V fieldConditions(size_t p,size_t f) const {
       const auto& e=*entries[p];const auto& meta=e.fields[f];V result=V::object();
       String source=e.flash?ArdJsonFieldSlices(e.flash,e.sourceLength).slice(meta.offset,meta.length):e.source.substring(meta.offset,meta.offset+meta.length);
-      if(source.length()!=meta.length)return V();ArdJsonFieldSlices slices(source);
+      if(source.length()!=meta.length)return V();
+      ArdJsonFieldSlices slices(source);
       if(!slices.members(0,source.length(),[&](const String& key,size_t start,size_t bytes){if(key=="visibleWhen")result[key]=codec.parse(slices.slice(start,bytes));return result.isValid();}))return V();
       if(e.condition.length())result["_pageVisibleWhen"]=codec.parse(e.condition);
       return result.isValid()?result:V();
@@ -160,7 +162,8 @@ public:
     String fieldHttpText(size_t p,size_t f) const {
       const Entry& entry=*entries[p];const Field& meta=entry.fields[f];
       String source=entry.flash?ArdJsonFieldSlices(entry.flash,entry.sourceLength).slice(meta.offset,meta.length):entry.source.substring(meta.offset,meta.offset+meta.length);
-      if(source.length()!=meta.length)return String();return ArdTopicTemplates::fieldHttpJson(source,topicDevice,meta.extended,meta.persist);
+      if(source.length()!=meta.length)return String();
+      return ArdTopicTemplates::fieldHttpJson(source,topicDevice,meta.extended,meta.persist);
     }
     /** @brief Aggregate source/output buffers for definition streaming, without DOM nodes. */
     size_t fieldHttpWork(size_t index) const {for(size_t p=0;p<size;++p){const auto& e=*entries[p];if(e.count&&index>=e.fields[0].index&&index-e.fields[0].index<e.count){const auto& field=e.fields[index-e.fields[0].index];return ArdHeap::fieldWork(field.length,1,0)+512+(field.extended?field.length+256:0);}}return 2048;}
