@@ -5,8 +5,54 @@
 import argparse
 import gzip
 import re
+from html.parser import HTMLParser
 from control_assets import segments, selected, emit_profile_chunks, emit_chunks, segments
 from pathlib import Path
+
+
+class PortalSections(HTMLParser):
+    """Locate inline asset spans while preserving the original source bytes.
+
+    This extracts trusted build input; it is not an HTML sanitizer.
+    """
+
+    def __init__(self, source):
+        super().__init__(convert_charrefs=False)
+        self.source = source
+        self.line_offsets = [0]
+        for match in re.finditer("\n", source):
+            self.line_offsets.append(match.end())
+        self.sections = {}
+        self.active = None
+        self.feed(source)
+        self.close()
+        if self.active or set(self.sections) != {"style", "script"}:
+            raise ValueError("Portal HTML must contain one complete style and script element")
+
+    def source_offset(self):
+        line, column = self.getpos()
+        return self.line_offsets[line - 1] + column
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in {"style", "script"} or self.active:
+            return
+        if tag in self.sections or any(name == "src" for name, _ in attrs):
+            raise ValueError("Portal assets must be unique inline elements")
+        start = self.source_offset()
+        self.active = (tag, start, start + len(self.get_starttag_text()))
+
+    def handle_endtag(self, tag):
+        if not self.active or self.active[0] != tag:
+            return
+        _, start, content_start = self.active
+        content_end = self.source_offset()
+        end = self.source.index(">", content_end) + 1
+        self.sections[tag] = (start, content_start, content_end, end)
+        self.active = None
+
+    def content(self, tag):
+        _, start, end, _ = self.sections[tag]
+        return self.source[start:end]
 
 
 # @brief Select portal HTML, CSS and JavaScript for the requested feature combination.
@@ -31,8 +77,9 @@ def portal_parts(root, ota=True, mqtt=True, console=True, controls=None, guarded
     if not messages:
         body = re.sub(r'<button[^>]*id="messagesTab".*?</button>', '', body, flags=re.S)
         body = re.sub(r'<div id="messagesPanel".*?</div>', '', body, flags=re.S)
-    css = re.search(r'<style>(.*?)</style>', body, re.S).group(1)
-    script = re.search(r'<script>(.*?)</script>', body, re.S).group(1)
+    sections = PortalSections(body)
+    css = sections.content('style')
+    script = sections.content('script')
     # Keep source documentation out of firmware while retaining feature guards.
     script = re.sub(r'(?m)^[ \t]*/\*\*(?:(?!\*/).)*\*/\n?', '', script, flags=re.S)
     for enabled, entry in [(ota, 'upgrade'), (mqtt, 'mqtt'), (console, 'console')]:
@@ -77,9 +124,11 @@ def portal_parts(root, ota=True, mqtt=True, console=True, controls=None, guarded
                            and not line.startswith('mqttForm.elements.mqttTls.onchange'))
         script = script.replace('setCaVisibility()', '')
     script = re.sub(r'/\*@if ARDPORTAL_ENABLE_CONSOLE_MESSAGES\*/(.*?)/\*@endif\*/', lambda m: m[1] if messages and console else '', script, flags=re.S)
-    script_block = re.search(r'<script>(.*?)</script>', body, re.S)
-    selected_body = body[:script_block.start()] + '<script>' + script + '</script>' + body[script_block.end():]
-    shell = selected_body.replace('<style>' + css + '</style>', '<link rel="stylesheet" href="/portal.css">')
+    sections = PortalSections(body)
+    script_start, _, _, script_end = sections.sections['script']
+    selected_body = body[:script_start] + '<script>' + script + '</script>' + body[script_end:]
+    style_start, _, _, style_end = sections.sections['style']
+    shell = selected_body.replace(body[style_start:style_end], '<link rel="stylesheet" href="/portal.css">', 1)
     shell = shell.replace('<script>' + script + '</script>', '<script src="/portal.js"></script>')
     return (css, script, shell) if guarded else (selected(css, controls), selected(script, controls), shell)
 
