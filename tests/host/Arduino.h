@@ -71,7 +71,7 @@ struct SerialStub {
 };
 extern SerialStub Serial;
 
-#include <time.h>
+#include <ctime>
 extern time_t fakeUnixTime;
 inline time_t fakeTime(time_t*) { return fakeUnixTime; }
 extern int ntpStarts;
