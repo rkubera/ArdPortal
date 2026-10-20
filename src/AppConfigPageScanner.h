@@ -63,7 +63,7 @@ public:
     while(budget){
       if(state==KeyToken||state==ValueToken||state==FieldToken){bool finished;if(!token(source,budget,finished))return Failed;if(!finished)return Waiting;
         start=tokenStart;bytes=offset-start;
-        if(state==KeyToken){String error;String text=source.slice(start,bytes);if(text.length()!=bytes){reason="out of memory copying key";return Failed;}auto value=ArdJSON::JSON.parse(text,&error);if(value.type()!=ArdJSON::JSONVar::Type::String){reason=error.length()?error:String("expected key string");return Failed;}key=value.asString();state=Colon;continue;}
+        if(state==KeyToken){String error;String text=source.slice(start,bytes);if(text.length()!=bytes){reason="out of memory copying key";return Failed;}auto value=ArdJSON::JSON.parse(text,&error);if(value.type()!=ArdJSON::JSONVar::Type::String){reason=error.length()?error:String(F("expected key string"));return Failed;}key=value.asString();state=Colon;continue;}
         if(state==FieldToken){++fieldCount;state=FieldEnd;return Field;}
         state=MemberEnd;return Member;
       }

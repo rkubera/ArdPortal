@@ -75,5 +75,5 @@ inline size_t fieldBlock(size_t bytes){return bytes>SIZE_MAX-512?SIZE_MAX:bytes+
 /** @brief Format a diagnostic sample without counting overlapping pools twice.
  * @param heap Snapshot to report.
  * @return Separate free/largest-block values for heap8 and DMA. */
-inline String describe(const Snapshot& heap){return String("heap8=")+String(heap.free8)+" block8="+String(heap.block8)+" DMA="+String(heap.freeDma)+" blockDMA="+String(heap.blockDma);}
+inline String describe(const Snapshot& heap){return String(F("heap8="))+String(heap.free8)+" block8="+String(heap.block8)+" DMA="+String(heap.freeDma)+" blockDMA="+String(heap.blockDma);}
 }

@@ -745,7 +745,7 @@ private:
   bool appConfigRegistrationFailed(const char* stage,const String& field,const String& reason) {
     _appConfigRegistrationError={stage,field,reason};
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-    log(String("AppConfig registration: stage=")+stage+" field="+field+" reason="+reason);
+    log(String(F("AppConfig registration: stage="))+stage+" field="+field+" reason="+reason);
 #endif
     return false;
   }

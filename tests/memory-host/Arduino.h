@@ -40,6 +40,7 @@ public:
   char operator[](size_t i) const { return value[i]; }
   String& operator+=(char c) { value += c; return *this; }
   String& operator+=(const String& s) { value += s.value; return *this; }
+  String& operator+=(const __FlashStringHelper* s) { value += reinterpret_cast<const char*>(s);return *this; }
   friend String operator+(String a, const String& b) { return a += b; }
   friend String operator+(String a, char b) { return a += b; }
   bool operator==(const String& b) const { return value == b.value; }

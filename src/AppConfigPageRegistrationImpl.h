@@ -39,13 +39,13 @@ bool ArdPortal::beginAppConfigPageRegistration(const String* source,const __Flas
   if(!work)return appConfigRegistrationFailed("registry","",F("out of memory allocating registration"));
   work->heapBefore=heapBefore;
   work->length=source?source->length():strlen_P(reinterpret_cast<const char*>(flash));
-  if(!work->length||work->length>ArdAppConfigMaxDefinitionBytes)return appConfigRegistrationFailed("input","",String("definition is empty or exceeds the definition budget: ")+String(ArdAppConfigMaxDefinitionBytes)+" bytes");
+  if(!work->length||work->length>ArdAppConfigMaxDefinitionBytes)return appConfigRegistrationFailed("input","",String(F("definition is empty or exceeds the definition budget: "))+String(ArdAppConfigMaxDefinitionBytes)+" bytes");
   if(source&&!owned&&!ArdHeap::permits(work->length))return appConfigRegistrationFailed("memory","",F("network heap reserve prevents definition copy"));
   if(source){if(owned)work->source=std::move(*owned);else work->source=*source;if(work->source.length()!=work->length)return appConfigRegistrationFailed("input","",F("out of memory copying definition"));}
   work->flash=flash;work->first=_dynamic.count();work->topicDevice=_dynamic.pages.topicDevice;
   work->wholePass=work->length<=2048;
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-  log(String("AppConfig registration accepted: ")+ArdHeap::describe(work->heapBefore));
+  log(String(F("AppConfig registration accepted: "))+ArdHeap::describe(work->heapBefore));
 #endif
   _appConfigPageRegistration=std::move(work);_appConfigPageRegistrationState=AppConfigPageRegistrationState::Pending;
   ++_appConfigPageRegistrationGeneration;
@@ -63,7 +63,7 @@ void ArdPortal::finishAppConfigPageRegistration(bool success) {
   _appConfigPageRegistration.reset();
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   auto after=ArdHeap::sample();
-  log(String("AppConfig registration ")+(success?"completed":"FAILED")+"; before "+ArdHeap::describe(before)+"; after "+ArdHeap::describe(after)+"; used8="+String(int32_t(before.free8)-int32_t(after.free8))+" usedDMA="+String(int32_t(before.freeDma)-int32_t(after.freeDma)));
+  log(String(F("AppConfig registration "))+(success?"completed":"FAILED")+"; before "+ArdHeap::describe(before)+"; after "+ArdHeap::describe(after)+"; used8="+String(int32_t(before.free8)-int32_t(after.free8))+" usedDMA="+String(int32_t(before.freeDma)-int32_t(after.freeDma)));
 #endif
   _appConfigPageRegistrationState=success?AppConfigPageRegistrationState::Succeeded:AppConfigPageRegistrationState::Failed;
   if(success)_appConfigRegistrationError={};
@@ -100,7 +100,7 @@ void ArdPortal::serviceAppConfigPageRegistration() {
     if(!ArdHeap::permits(_appConfigPageRegistration->maximumFieldWork,_appConfigPageRegistration->maximumFieldBlock)){
       if(!_appConfigPageRegistration->memoryDeferred){_appConfigPageRegistration->memoryDeferred=true;
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-        log(String("AppConfig registration deferred: ")+ArdHeap::describe(ArdHeap::sample()));
+        log(String(F("AppConfig registration deferred: "))+ArdHeap::describe(ArdHeap::sample()));
 #endif
       }
       break;
@@ -186,7 +186,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     for(size_t i=0;i<index;++i)if(id==work.idAt(i)){failAppConfigPageRegistration("field",id,F("duplicate field id in page"));return;}
 #if ARDPORTAL_ENABLE_HA
     String discoveryError;String payload=_homeAssistant.discoveryConfig(value,&discoveryError);
-    if(!payload.length()||payload.length()+400>ArdMqtt::PacketCapacity-5){failed("discovery",id,!payload.length()?discoveryError:String("Discovery payload exceeds MQTT packet capacity: payload=")+String(payload.length())+" reserve=400 capacity="+String(ArdMqtt::PacketCapacity-5));return;}
+    if(!payload.length()||payload.length()+400>ArdMqtt::PacketCapacity-5){failed("discovery",id,!payload.length()?discoveryError:String(F("Discovery payload exceeds MQTT packet capacity: payload="))+String(payload.length())+" reserve=400 capacity="+String(ArdMqtt::PacketCapacity-5));return;}
 #endif
     // Only existing owners whose generated names might match this new ID need
     // parsing. Unrelated earlier pages/entities are never reparsed here.
@@ -317,7 +317,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
   if(work.entry->headerPrefix.length()!=headerBytes-2){failAppConfigPageRegistration("serialize","",F("out of memory storing page header"));return;}
   limits.maxOutputBytes=ArdAppConfigMaxDefinitionBytes;
   size_t existingBytes=_dynamic.pages.measure(limits);
-  if(!existingBytes||existingBytes+work.entry->jsonLength+(_dynamic.pages.length()?1:0)+_dynamic.entityBytes>ArdAppConfigMaxDefinitionBytes){failed("limits","",String("total definition limit: ")+String(ArdAppConfigMaxDefinitionBytes)+" bytes");return;}
+  if(!existingBytes||existingBytes+work.entry->jsonLength+(_dynamic.pages.length()?1:0)+_dynamic.entityBytes>ArdAppConfigMaxDefinitionBytes){failed("limits","",String(F("total definition limit: "))+String(ArdAppConfigMaxDefinitionBytes)+" bytes");return;}
   work.entry->flash=work.flash;work.entry->source=std::move(work.source);
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   work.entry->edges.controllers(_dynamic.dependencyControllers);

@@ -49,8 +49,8 @@ bool ArdMqtt::validMqttTopic(const String& topic, bool subscription) const {
   int first = topic.indexOf('/'), second = topic.indexOf('/', first + 1);
   if (first < 0 || second < 0 || topic.indexOf('/', second + 1) >= 0) return false;
   String kind = topic.substring(0, first), command = topic.substring(second + 1);
-  if ((kind != "cmnd" && kind != "get" && kind != "stat") || topic.substring(first + 1, second) != ArdDeviceName::mqtt(_portal._config.deviceName) || !command.length()) return false;
-  if (subscription && (command == "+" || command == "#")) return true;
+  if ((!ardFlashEqual(kind,F("cmnd")) && !ardFlashEqual(kind,F("get")) && !ardFlashEqual(kind,F("stat"))) || topic.substring(first + 1, second) != ArdDeviceName::mqtt(_portal._config.deviceName) || !command.length()) return false;
+  if (subscription && (ardFlashEqual(command,F("+")) || ardFlashEqual(command,F("#")))) return true;
   for (size_t i = 0; i < command.length(); ++i) if (uint8_t(command[i]) < 32 || command[i] == '#' || command[i] == '+') return false;
   return true;
 }
@@ -120,7 +120,7 @@ void ArdMqtt::closeMqtt(const char* reason) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
     if(reason){
       const uint32_t now=millis();
-      message+=String(" [")+reason+"; state="+(_mqttState==MqttState::Connected?"connected":_mqttState==MqttState::Connecting?"connecting":"retry");
+      message+=String(F(" ["))+reason+"; state="+(_mqttState==MqttState::Connected?"connected":_mqttState==MqttState::Connecting?"connecting":"retry");
       message+="; sessionMs="+String(uint32_t(now-_mqttSince))+"; txIdleMs="+String(uint32_t(now-_lastTx));
       message+="; maxLoopGapMs="+String(_maxServiceGapMs)+"; heap="+String(ArdHeap::sample().free8)+"]";
     }
@@ -162,7 +162,7 @@ bool ArdMqtt::processPacket(uint8_t type, const uint8_t* body, size_t length) {
     if (type != 0x20 || length != 2 || body[0] != 0 || body[1] != 0) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
       if(type==0x20 && length==2 && body[1]!=0){
-        String message=String("MQTT CONNACK refused; code=")+String(body[1]);_portal.logMessage(message);
+        String message=String(F("MQTT CONNACK refused; code="))+String(body[1]);_portal.logMessage(message);
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
         ardMqttSerialDiagnostic(message);
 #endif
@@ -174,7 +174,7 @@ bool ArdMqtt::processPacket(uint8_t type, const uint8_t* body, size_t length) {
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_148));
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
-    String message=String("MQTT connected; clientId=")+_clientId+"; connectMs="+String(uint32_t(millis()-_mqttSince));_portal.logMessage(message);
+    String message=String(F("MQTT connected; clientId="))+_clientId+"; connectMs="+String(uint32_t(millis()-_mqttSince));_portal.logMessage(message);
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
     ardMqttSerialDiagnostic(message);
 #endif
@@ -250,7 +250,7 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_145));
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
-    String message=String("MQTT connecting: ")+_portal._config.host+":"+String(_portal._config.port)+
+    String message=String(F("MQTT connecting: "))+_portal._config.host+":"+String(_portal._config.port)+
       "; clientId="+_clientId+"; TLS="+String(_portal._config.mqttTls ? "yes" : "no");_portal.logMessage(message);
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
     ardMqttSerialDiagnostic(message);

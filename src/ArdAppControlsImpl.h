@@ -306,7 +306,7 @@ bool ArdAppControls::appControl(const V& definition,size_t index,const V& value,
       V ack=V::object();ack["command"]=suffix;ack["value"]=value;ack["accepted"]=true;
       // The callback accepts an action; it must report actual hardware state separately.
       if(!ArdHa::transient(f)) {V state=_portal.getAppConfigValue(key.c_str());String payload=state.type()==V::Type::String?state.asString():_portal._json.stringify(state);queueAppEmission(_portal._mqttClient.mqttTopic("stat",key.c_str()),payload);}
-      queueAppEmission(_portal._mqttClient.mqttTopic("stat",(key+(ArdHa::transient(f)?String():String("_ack"))).c_str()),_portal._json.stringify(ack));
+      queueAppEmission(_portal._mqttClient.mqttTopic("stat",(key+(ArdHa::transient(f)?String():String(F("_ack")))).c_str()),_portal._json.stringify(ack));
     }
 #endif
     // Acceptance depends on the local callback, even if MQTT delivery is unavailable.

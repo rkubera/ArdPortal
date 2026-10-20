@@ -65,7 +65,7 @@ bool ArdPortal::handleZigbeeHttp(const String& method,const String& path){
     if(method!="POST"){reply(405,"text/plain","Use POST");return true;}
     if(path=="/api/zigbee/reset"&&_request.substring(_request.indexOf("\r\n\r\n")+4)!="confirm=RESET-ZIGBEE"){reply(400,"text/plain","Reset confirmation required");return true;}
     bool accepted=path=="/api/zigbee/stop"?stopZigbeePairing():path=="/api/zigbee/pair"?startZigbeePairing():path=="/api/zigbee/rejoin"?rejoinZigbee():resetZigbeePairing();
-    reply(accepted?202:409,"text/plain",accepted?String("Zigbee operation accepted"):(_zigbee.error().length()?_zigbee.error():String("Zigbee is not ready or busy")));return true;
+    reply(accepted?202:409,"text/plain",accepted?String(F("Zigbee operation accepted")):(_zigbee.error().length()?_zigbee.error():String(F("Zigbee is not ready or busy"))));return true;
   }
   return false;
 }
