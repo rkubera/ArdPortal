@@ -42,7 +42,8 @@ void ArdFS::begin() {
 bool ArdFS::start(const String& path, Callback callback) {
   if (!_mountDone || !_mounted || busy() || !callback || path.length() < 2 ||
       path.length() > 64 || path[0] != '/' || path.indexOf("..") >= 0) return false;
-  _path = path; _callback = callback; _slot = 0; _best = -1;
+  _path = path; if(_path!=path)return false; _callback = callback; _slot = 0; _best = -1;
+  _repairRequested=_repairing=false;_repairAttempts=0;
   _buffer = String(); _bestData = String(); _input = String();
   for (int i = 0; i < 2; ++i) { _valid[i] = _present[i] = _match[i] = false; _generation[i] = 0; }
   _phase = Phase::OpenRead; return true;
@@ -53,9 +54,9 @@ bool ArdFS::start(const String& path, Callback callback) {
  * @param callback Completion or event handler supplied to this operation.
  * @return True if the operation was accepted; loop() later reports its result through callback. False if busy or input cannot be accepted.
  */
-bool ArdFS::read(const String& path, Callback callback) {
+bool ArdFS::read(const String& path, Callback callback, bool repair) {
   if (!start(path, callback)) return false;
-  _writing = false; return true;
+  _writing = false; _repairRequested=repair; return true;
 }
 /**
  * @brief Request or perform a write through the component API.
@@ -130,13 +131,18 @@ uint32_t ArdFS::checksum(uint32_t generation, const String& data) {
  * @return No value.
  */
 void ArdFS::finish(bool ok, const String& error, bool changed) {
+  if(_repairing&&!ok&&_repairAttempts<3){
+    _file.close();++_repairAttempts;_repairRetrySince=millis();_phase=Phase::RepairWait;return;
+  }
   Result result; result.ok = ok; result.error = error; result.changed = changed;
   result.found = _best >= 0;
-  result.recovered = result.found && ((_present[0] && !_valid[0]) || (_present[1] && !_valid[1]));
-  if (ok && !_writing && !_formatRequested) result.data = std::move(_bestData);
+  result.redundant=(_valid[0]&&_valid[1])||(_repairing&&ok);
+  result.repaired=_repairing&&ok;result.repairAttempts=_repairAttempts;
+  result.recovered = _repairing || (result.found && ((_present[0] && !_valid[0]) || (_present[1] && !_valid[1])));
+  if ((ok || _repairing) && !_writing && !_formatRequested) result.data = std::move(_bestData);
   _source=nullptr;_sourceCompare=String();_raw=String();_journalHeader=String();
   _error = error; _buffer = String(); _input = String(); _bestData = String(); _phase = Phase::Idle;
-  _formatRequested = false;
+  _formatRequested = false; _repairRequested=_repairing=false;
   Callback callback = std::move(_callback); _callback = nullptr;
   if (callback) callback(result);
 }
@@ -158,7 +164,11 @@ void ArdFS::loop() {
       _mounted = _volume.begin();
 #endif
       if (_mounted) { _mountDone = true; _phase = Phase::Idle; }
-      else _phase = Phase::End;
+      else if (_volume.lastError() && _volume.lastError() != -84) {
+        // Operational failures must never erase storage or restore an older snapshot.
+        _mountDone = true;
+        finish(false, ArdUILanguage::storageText(_volume.lastError() == -12 ? ArdUILanguage::Key::s_198 : ArdUILanguage::Key::s_199));
+      } else _phase = Phase::End;
       return;
     case Phase::End: _volume.end(); _mounted = false; _phase = Phase::Format; return;
     case Phase::Format:
@@ -175,17 +185,20 @@ void ArdFS::loop() {
       else { _phase = Phase::Idle; if (!_mounted) _error = ArdUILanguage::storageText(ArdUILanguage::Key::s_196); }
       return;
     case Phase::Idle: return;
-    case Phase::OpenRead:
+    case Phase::OpenRead: {
+      const String path=slotPath(_slot);
+      if(path.length()!=_path.length()+(_slot?8:0)){finish(false,ArdUILanguage::storageText(ArdUILanguage::Key::s_198));return;}
       if(_source){_journal=ArdJournalStream();_sourceLegacy=false;_sourceMatch=true;_sourceFailed=false;_sourceCompare=String();_sourceCompareAt=0;}
-      _present[_slot] = _volume.exists(slotPath(_slot).c_str());
+      _present[_slot] = _volume.exists(path.c_str());
       if (_volume.lastError() && _volume.lastError() != -2) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_199)); return; }
       if (!_present[_slot]) { _phase = Phase::Validate; return; }
-      _file = _volume.open(slotPath(_slot).c_str(), "r");
+      _file = _volume.open(path.c_str(), "r");
       if (!_file) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_199)); return; }
       _expected = _file.size(); _offset = 0;
       if (!_expected || _expected > ArdFSMaxJournalBytes) { _file.close(); _phase = Phase::Validate; return; }
       if ((!_source||_sourceLegacy) && !_buffer.reserve(_expected)) { _file.close(); finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return; }
       _phase = Phase::Read; return;
+    }
     case Phase::Read: {
       size_t count = _expected - _offset; if (count > sizeof(chunk)) count = sizeof(chunk);
       if (!count) { _file.close(); _phase = Phase::Validate; return; }
@@ -221,37 +234,69 @@ void ArdFS::loop() {
         _sourceCompare=String();
       }
       if (_buffer.length()) {
-        const JSONVar root = _json.parse(_buffer, nullptr, journalLimits());
+        const auto limits = journalLimits();
+        ArdJSON::Parser parser(_buffer, limits);
+        const JSONVar root = parser.parse();
+        if (parser.error() && !strcmp(parser.error(), "out of memory")) {
+          finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return;
+        }
         int64_t version = 0, generation = 0, crc = 0;
         if (root.isValid() && root.type() == JSONVar::Type::Object && root.length() == 4 &&
             root["journal"].toInteger(version) && version == 1 &&
             root["generation"].toInteger(generation) && generation >= 0 && uint64_t(generation) <= UINT32_MAX &&
             root["crc32"].toInteger(crc) && crc >= 0 && uint64_t(crc) <= UINT32_MAX &&
             root["data"].type() == JSONVar::Type::String) {
-          String data = root["data"].asString();
+          const String& data = *root["data"].stringValue();
           if (data.length() <= MaxBytes && checksum(uint32_t(generation), data) == uint32_t(crc)) {
             _valid[_slot] = true; _generation[_slot] = uint32_t(generation); _match[_slot] = data == _input;
             if (_best < 0 || int32_t(_generation[_slot] - _generation[_best]) > 0) {
-              _best = _slot; if (!_writing) _bestData = data;
+              _best = _slot; if (!_writing) {
+                if (!_bestData.reserve(data.length())) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return; }
+                _bestData = data;
+                if (_bestData.length() != data.length()) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return; }
+              }
             }
           }
         }
         // Import the existing text JSON configuration once; never binary files.
         else if (_slot == 0 && _buffer.length() <= MaxBytes) {
-          const JSONVar legacy = _json.parse(_buffer);
+          const ArdJSON::Limits legacyLimits;
+          ArdJSON::Parser legacyParser(_buffer, legacyLimits);
+          const JSONVar legacy = legacyParser.parse();
+          if (legacyParser.error() && !strcmp(legacyParser.error(), "out of memory")) {
+            finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return;
+          }
           if (legacy.isValid() && legacy.type() == JSONVar::Type::Object && !legacy.hasOwnProperty("journal")) {
             _valid[0] = true; _generation[0] = 0; _match[0] = _buffer == _input;
-            if (_best < 0) { _best = 0; if (!_writing) _bestData = _buffer; }
+            if (_best < 0) { _best = 0; if (!_writing) {
+              if (!_bestData.reserve(_buffer.length())) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return; }
+              _bestData = _buffer;
+              if (_bestData.length() != _buffer.length()) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return; }
+            } }
           }
         }
       }
       _buffer = "";
       if (++_slot < 2) _phase = Phase::OpenRead;
       else if (_writing) _phase = Phase::Prepare;
+      else if(_repairRequested&&_best>=0&&(!_valid[0]||!_valid[1])){
+        // Repair only the other slot. The verified source remains untouched throughout.
+        _repairing=true;_repairAttempts=1;
+        _sourceLength=_bestData.length();_sourceGeneration=_generation[_best];
+        _source=[this](size_t at,size_t maximum){return _bestData.substring(at,at+maximum);};
+        _sourceCrc=UINT32_MAX;
+        for(uint8_t i=0;i<4;++i)_sourceCrc=ArdJournalStream::update(_sourceCrc,uint8_t(_sourceGeneration>>(8*i)));
+        _sourceAt=0;_escapedLength=0;_sourceFailed=false;_phase=Phase::SourceCrc;
+      }
       else if (_best >= 0 || (!_present[0] && !_present[1])) finish(true);
       else finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_200));
       return;
     }
+    case Phase::RepairWait:
+      if(int32_t(millis()-_repairRetrySince)<1000)return;
+      _sourceCrc=UINT32_MAX;
+      for(uint8_t i=0;i<4;++i)_sourceCrc=ArdJournalStream::update(_sourceCrc,uint8_t(_sourceGeneration>>(8*i)));
+      _sourceAt=0;_escapedLength=0;_sourceFailed=false;_phase=Phase::SourceCrc;return;
     case Phase::Prepare: {
       if (_best >= 0 && _match[_best]) { ++_skipped; finish(true); return; }
       if(_source){
@@ -282,10 +327,13 @@ void ArdFS::loop() {
       if(_expected>ArdFSMaxJournalBytes){finish(false,ArdUILanguage::storageText(ArdUILanguage::Key::s_198));return;}
       _slot=_best==0?1:0;_offset=0;resetJournalOutput();_phase=Phase::OpenWrite;return;
     }
-    case Phase::OpenWrite:
-      _file = _volume.open(slotPath(_slot).c_str(), "w");
+    case Phase::OpenWrite: {
+      const String path=slotPath(_slot);
+      if(path.length()!=_path.length()+(_slot?8:0)){finish(false,ArdUILanguage::storageText(ArdUILanguage::Key::s_198));return;}
+      _file = _volume.open(path.c_str(), "w");
       if (!_file) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_204)); return; }
       _phase = Phase::Write; return;
+    }
     case Phase::Write: {
       if(_source){
         String part=journalOutput();if(_sourceFailed){_file.close();finish(false,ArdUILanguage::storageText(ArdUILanguage::Key::s_198));return;}
@@ -306,10 +354,13 @@ void ArdFS::loop() {
     case Phase::CloseWrite:
       if (!_file.close()) { finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_204)); return; }
       _phase = Phase::OpenVerify; return;
-    case Phase::OpenVerify:
-      _file = _volume.open(slotPath(_slot).c_str(), "r");
+    case Phase::OpenVerify: {
+      const String path=slotPath(_slot);
+      if(path.length()!=_path.length()+(_slot?8:0)){finish(false,ArdUILanguage::storageText(ArdUILanguage::Key::s_198));return;}
+      _file = _volume.open(path.c_str(), "r");
       if (!_file || _file.size() != (_source?_expected:_buffer.length())) { _file.close(); finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_204)); return; }
       _offset = 0;if(_source)resetJournalOutput(); _phase = Phase::Verify; return;
+    }
     case Phase::Verify: {
       if(_source){
         String part=journalOutput();if(_sourceFailed){_file.close();finish(false,ArdUILanguage::storageText(ArdUILanguage::Key::s_198));return;}

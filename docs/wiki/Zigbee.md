@@ -639,8 +639,7 @@ name, because frontends may render these children without a parent heading.
 A switch's state therefore uses its AppConfig name; climate properties use
 `control name / property label`. Measurements and other simple features also
 retain their AppConfig labels. Unique MQTT property suffixes and converter scopes retain the endpoint route.
-The exported feature descriptions omit endpoint annotations, so the frontend
-shows the control labels without `(Endpoint: ...)` suffixes.
+Endpoint identity is retained in exported exposes so Home Assistant Discovery creates distinct entities for repeated switches, numbers and measurements. Explicit HA names use the registered labels. A gateway frontend may display endpoint annotations; removing identity to hide them would merge unrelated entities.
 
 A climate control is exported as one `climate` expose containing its properties.
 WindFront renders these properties separately, even though HA Discovery can
@@ -649,7 +648,7 @@ card layout. After updating an exporter, download and replace the `.mjs` file
 in Z2M; updating firmware alone does not update the installed converter.
 If the saved converter contains the new labels but the device still displays the
 previous names, restart Zigbee2MQTT from **Settings → Tools → Restart Zigbee2MQTT**,
-then reload its web interface. This was required when replacing the converter
+then reload its web interface. Run device reconfiguration to perform initial reads after replacing a converter; a firmware update alone does not execute the gateway configuration. ArdPortal reports thermostat values directly, so the converter reads initial thermostat attributes without requesting unsupported setpoint reporting configuration. This was required when replacing the converter
 with the same filename in Zigbee2MQTT 2.14.2. Removing or pairing the device again
 is not required for a label-only converter update.
 

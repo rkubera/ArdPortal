@@ -23,6 +23,9 @@ const fields=[
   {kind:'lock',ep:10,endpoint:'lock_ep10',label:'Lock'},
   {kind:'siren',ep:11,endpoint:'siren_ep11',label:'Siren'},
   {kind:'update',ep:49,endpoint:'firmware_ep49',label:'Firmware'},
+  {kind:'switch',ep:50,endpoint:'relay_two_ep50',label:'Second relay'},
+  {kind:'slider',ep:51,endpoint:'target_two_ep51',label:'Second target',min:0,max:100,step:1},
+  {kind:'temperature',ep:52,endpoint:'temperature_two_ep52',label:'Second temperature'},
   ...['number','temperature','humidity','pressure','illuminance','flow','carbon_dioxide','pm25','wind_speed','voltage','current','power','binary'].map((kind,index)=>({kind,ep:index+12,endpoint:kind+'_ep'+(index+12),label:kind})),
   {kind:'action',ep:40,endpoint:'vacuum_ep40',label:'Vacuum / start'},
   {kind:'action',ep:41,endpoint:'vacuum_ep41',label:'Vacuum / stop'},
@@ -35,7 +38,7 @@ try{
   assert.equal(definition.ota,true);
   assert.deepEqual(definition.fingerprint,[{modelID:'ArdPortal-0123456789abcdef',manufacturerName:'ArdPortal'}]);
   assert.equal(definition.extend.length,fields.length-2);
-  const exposes=definition.extend.flatMap(x=>x.exposes??[]);
+  const exposes=definition.extend.flatMap(x=>x.exposes??[]).filter(x=>typeof x!=='function');
   const at=(x,endpoint)=>x.property?.endsWith('_'+endpoint)||x.features?.some(f=>at(f,endpoint));
   assert.ok(exposes.some(x=>x.type==='climate'&&at(x,'climate_ep6')));
   assert.ok(exposes.some(x=>x.type==='enum'&&at(x,'mode_ep3')&&x.values.includes('comfort')));
@@ -71,9 +74,27 @@ try{
   await assert.rejects(groupConverter.convertSet(entity,'activate','invalid',groupMeta));
   assert.equal(calls.length,3);
   assert.deepEqual(exposes.find(x=>at(x,'mower_ep42')).values,['start','dock']);
-  const hidden=x=>!x.endpoint&&(x.features??[]).every(hidden);
-  assert.ok(exposes.every(hidden));
+  assert.ok(exposes.every(x=>typeof x.endpoint==='string'&&x.endpoint.length),exposes.filter(x=>!x.endpoint).map(x=>String(x)).join('\n'));
+  assert.ok(exposes.every(x=>x.homeassistant?.name===x.label));
+  assert.notEqual(relay.endpoint,exposes.find(x=>x.label==='Second relay').endpoint);
+  assert.equal(relay.homeassistant.name,'Relay');
+  // A thermostat configReport rejection must not prevent later initial reads.
+  const reads=[];
+  const mockEndpoint={ID:6,inputClusters:[],supportsInputCluster:()=>true,
+    bind:async()=>{},configureReporting:async()=>{throw new Error('UNREPORTABLE_ATTRIBUTE');},
+    read:async(cluster,attributes)=>reads.push({cluster,attributes})};
+  const mockDevice={endpoints:[mockEndpoint],getEndpoint:ep=>{assert.equal(ep,6);return mockEndpoint;}};
+  const climateExtension=definition.extend.find(x=>x.exposes?.includes(climate));
+  for(const configure of climateExtension.configure)await configure(mockDevice,{},definition);
+  assert.ok(reads.some(x=>x.cluster==='hvacThermostat'&&x.attributes.includes('occupiedHeatingSetpoint')));
+  assert.ok(reads.some(x=>x.cluster==='hvacThermostat'&&x.attributes.includes('occupiedCoolingSetpoint')));
+  assert.ok(reads.some(x=>x.cluster==='hvacFanCtrl'&&x.attributes.includes('fanMode')));
+  assert.ok(reads.every(x=>x.attributes.length<=4));
+  if(process.env.Z2M_HA_SOURCE){
+    const {checkHomeAssistantDiscovery}=await import('./zigbee-ha-discovery-test.mjs');
+    checkHomeAssistantDiscovery(exposes);
+  }
   assert.equal(relay.features[0].property,'state_relay_ep2');
   assert.ok(definition.extend[1].toZigbee.every(c=>c.endpoints.includes('relay_ep2')));
-  console.log('PASS: actual ZHC API, named options, both directions, layout fingerprint, climate ranges and isolated endpoints');
+  console.log('PASS: actual ZHC API, named options, both directions, HA identities/names, initial thermostat reads and isolated endpoints');
 }finally{fs.unlinkSync(destination);}

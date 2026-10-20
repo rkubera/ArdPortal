@@ -207,6 +207,7 @@ public:
   using BeforeFactoryResetCallback = std::function<void()>;
   using PortalConfigChangedCallback = std::function<void(const PortalConfig&, ChangeSource)>;
   using PortalAndAppConfigSavedCallback = std::function<void(bool, const String&)>;
+  using AppConfigValueSaveFailedCallback = std::function<void(const String&, const ArdJSON::JSONVar&, uint8_t, const String&)>;
   using PortalAndAppConfigReadyCallback = std::function<void(bool)>;
 #if ARDPORTAL_ENABLE_MQTT
   using MessageCallback = std::function<void(const String&, const uint8_t*, size_t)>;
@@ -236,6 +237,14 @@ public:
    */
   void onPortalAndAppConfigSaved(PortalAndAppConfigSavedCallback callback) { _saved = callback; }
   /**
+   * @brief Report each application value whose batch exhausted its three save attempts.
+   * @param callback Receives key, attempted value (Undefined for deletion), attempt count and error. References are valid only during the call.
+   * @return No value.
+   */
+  void onAppConfigValueSaveFailed(AppConfigValueSaveFailedCallback callback) { _valueSaveFailed = callback; }
+  /** @brief Read attempts made for the current or most recently completed save batch. @return Zero before any attempt, otherwise 1 to 3. */
+  uint8_t portalAndAppConfigSaveAttempts() const { return _saveAttempts; }
+  /**
    * @brief Install the callback reporting completion of initial configuration loading.
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
@@ -250,7 +259,7 @@ public:
    * @brief Check for active storage work, a pending save or a pending ready notification.
    * @return True if storage work, a scheduled save or a ready notification is pending.
    */
-  bool portalAndAppConfigBusy() const { return _storage.busy() || _savePending || _pendingReady; }
+  bool portalAndAppConfigBusy() const { return _storage.busy() || _savePending || _pendingReady || _deferredApp.length(); }
   // true = accepted in RAM; onPortalAndAppConfigSaved signals durable completion.
   /**
    * @brief Validate and apply portal settings in RAM, then schedule persistent storage.
@@ -277,7 +286,7 @@ public:
    */
   ArdJSON::JSONVar getAppConfigValue(const char* key) const;
   /**
-   * @brief Update a custom application configuration value and schedule its persistence.
+   * @brief Queue a custom application value, coalescing edits received during an active save.
    * @param key Configuration key or JSON object member name.
    * @param value Input value, or output destination when passed by mutable reference.
    * @return True if accepted in RAM; persistent completion is reported through onPortalAndAppConfigSaved().
@@ -920,6 +929,9 @@ private:
   DNSServer _dns;
 #endif
   ArdJSON::JSONVar _appConfig = ArdJSON::JSONVar::object(), _pendingApp = ArdJSON::JSONVar::object();
+  // Latest application intent per key, isolated from the immutable active save.
+  ArdJSON::JSONVar _deferredApp = ArdJSON::JSONVar::object();
+  bool _deferredAppForce=false;
   bool _pendingAppPatch=false;
   String _saveDocumentPrefix;
   size_t _saveDocumentAppBytes=0;
@@ -929,6 +941,7 @@ private:
 
   PortalConfigChangedCallback _changed;
   PortalAndAppConfigSavedCallback _saved;
+  AppConfigValueSaveFailedCallback _valueSaveFailed;
   RestartCallback _beforeRestart;
   BeforeFactoryResetCallback _beforeFactoryReset;
   PortalAndAppConfigReadyCallback _readyCallback;
@@ -937,6 +950,10 @@ private:
   bool _forceSave = false, _httpWaitingStorage = false, _resetAfterSave = false;
   bool _hasCommitted = false, _notifyPending = false, _saveHasChanges = false;
   uint32_t _dirtySince = 0, _lastCommit = 0;
+  uint32_t _saveRetrySince=0;
+  uint8_t _saveAttempts=0;
+  bool _saveRetryPending=false;
+  bool _configurationWritable=false;
   /**
    * @brief Advance pending storage operations and the restart save sequence.
    * @param now Current time used to evaluate deadlines.

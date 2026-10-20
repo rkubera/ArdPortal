@@ -1424,7 +1424,7 @@ bool validApp(const ArdJSON::JSONVar& value) {
 void ArdPortal::finishLoad(const ArdFS::Result& result) {
   bool restored = false;
   _storageMounted = _storage.mounted(); _storageError = result.error;
-  if (result.ok && result.found) {
+  if (result.found && result.data.length()) {
     ArdJSON::JSONVar root = _json.parse(result.data, nullptr, snapshotLimits());
     const ArdJSON::JSONVar& view=root;
     PortalConfig loaded;
@@ -1435,6 +1435,7 @@ void ArdPortal::finishLoad(const ArdFS::Result& result) {
     } else if (ArdPortalJson::decode(result.data, loaded, _json) && validPortalConfig(loaded)) { _config = std::move(loaded); restored = true; }
     else _storageError = ArdUILanguage::text(ArdUILanguage::Key::s_166);
   }
+  _configurationWritable=result.ok&&(!result.found||result.redundant);
   _storageOK = _storageMounted && result.ok && !_storageError.length();
   if (!_config.deviceName.length()) _config.deviceName = defaultDeviceName();
   _config.apName = ArdDeviceName::ap(_config.deviceName);
@@ -1457,13 +1458,27 @@ void ArdPortal::serviceStorage(uint32_t now) {
   _storage.loop(); _storageMounted = _storage.mounted();
   if (!_loadStarted && _storage.ready()) {
     _loadStarted = true;
-    if (!_storage.read("/ardportal.json", [this](const ArdFS::Result& result) { finishLoad(result); })) {
+    if (!_storage.read("/ardportal.json", [this](const ArdFS::Result& result) { finishLoad(result); }, true)) {
       ArdFS::Result result; result.error = _storage.error(); finishLoad(result);
     }
   }
+  if (_configurationReady && !_savePending && !_saveQueued && !_pendingReady && _deferredApp.length()) {
+    _pending = _config; _pending.apName = ArdDeviceName::ap(_pending.deviceName);
+    _pendingApp = std::move(_deferredApp); _deferredApp = ArdJSON::JSONVar::object();
+    _pendingAppPatch = true; _saveSource = ChangeSource::Application;
+    _savePending = true; _forceSave = _deferredAppForce; _deferredAppForce = false;
+    _dirtySince = now;
+  }
   if (!_savePending || _saveQueued || _storage.busy() || !_configurationReady) return;
-  if (!_forceSave && (uint32_t(now - _dirtySince) < _options.appConfigSaveDelayMs ||
-      (_hasCommitted && uint32_t(now - _lastCommit) < _options.appConfigMinWriteIntervalMs))) return;
+  if (_saveRetryPending) {
+    // Explicit flush/restart draining cannot bypass failure backoff.
+    if (int32_t(now-_saveRetrySince)<1000) return;
+  } else {
+    if (!_forceSave && (uint32_t(now - _dirtySince) < _options.appConfigSaveDelayMs ||
+        (_hasCommitted && uint32_t(now - _lastCommit) < _options.appConfigMinWriteIntervalMs))) return;
+    _saveAttempts=0;
+  }
+  _saveRetryPending=false; ++_saveAttempts;
   auto appLimits=snapshotLimits();appLimits.maxOutputBytes=MaxAppConfigBytes;
   _saveDocumentAppBytes=_pendingAppPatch?ArdJSON::JSON.measureObjectPatch(_appConfig,_pendingApp,nullptr,appLimits):ArdJSON::JSON.measure(_pendingApp,nullptr,appLimits);
   String configJson=ArdPortalJson::encode(_pending,_json);
@@ -1491,7 +1506,7 @@ void ArdPortal::serviceStorage(uint32_t now) {
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdPortal::scheduleConfig(const PortalConfig& config, const ArdJSON::JSONVar& app, ChangeSource source, bool immediate) {
-  if (!_configurationReady || _saveQueued || _pendingReady || !_storage.mounted() || otaActive() ||
+  if (!_configurationReady || (!_configurationWritable&&source!=ChangeSource::FactoryReset) || _saveQueued || _saveRetryPending || _pendingReady || !_storage.mounted() || otaActive() ||
       (_rebootPending && !(_beforeRestartRunning && source == ChangeSource::Application && ArdPortalJson::equal(config,_config))) ||
       !validPortalConfig(config) || !validApp(app)) return false;
   if (_savePending && (source != ChangeSource::Application || _saveSource != source)) return false;
@@ -1507,31 +1522,44 @@ bool ArdPortal::scheduleConfig(const PortalConfig& config, const ArdJSON::JSONVa
 // Only changed members are staged. The saved tree is untouched until verified commit.
 bool ArdPortal::scheduleAppPatch(ArdJSON::JSONVar patch,ChangeSource source,bool coalesceSource){
   using V=ArdJSON::JSONVar;
-  if(!_configurationReady||_saveQueued||_pendingReady||!_storage.mounted()||otaActive()||mqttTrialActive()||_httpWaitingStorage||!patch.isObjectPatchValid()||
+  const bool defer=source==ChangeSource::Application&&(_saveQueued||_saveRetryPending||_pendingReady||_deferredApp.length()||(_savePending&&_saveSource!=source));
+  if(!_configurationReady||!_configurationWritable||((_saveQueued||_saveRetryPending)&&!defer)||(_pendingReady&&!defer)||!_storage.mounted()||otaActive()||mqttTrialActive()||(_httpWaitingStorage&&!defer)||!patch.isObjectPatchValid()||_resetAfterSave||
      (_rebootPending&&!(_beforeRestartRunning&&source==ChangeSource::Application)
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
       &&!(_zigbeeDrainingRestart&&source==ChangeSource::Zigbee)
 #endif
      )||
-     (_savePending&&_saveSource!=source&&!coalesceSource))return false;
+     (_savePending&&_saveSource!=source&&!coalesceSource&&!defer))return false;
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
   ArdAppConfigFieldMask superseded;
   if(source!=ChangeSource::Zigbee)patch.forEachObjectMember([&](const String& key,const V&){superseded|=ArdAppConfigFieldMask::forField(_dynamic.indexOf(key));return true;});
 #endif
   auto limits=snapshotLimits();limits.maxOutputBytes=MaxAppConfigBytes;
-  if(_savePending&&!_pendingAppPatch){
+  if(defer){
+    // Never mutate the tree consumed by the streaming writer. Retain only changed keys.
+    V candidate=_deferredApp;
+    if(!candidate.applyObjectPatch(std::move(patch),false)||!ArdJSON::JSON.measureObjectPatch(_appConfig,candidate,nullptr,limits))return false;
+    if(_savePending||_pendingReady){
+      if(_pendingAppPatch){
+        V projected=_pendingApp;
+        if(!projected.applyObjectPatch(V(candidate),false)||!ArdJSON::JSON.measureObjectPatch(_appConfig,projected,nullptr,limits))return false;
+      }else if(!ArdJSON::JSON.measureObjectPatch(_pendingApp,candidate,nullptr,limits))return false;
+    }
+    _deferredApp=std::move(candidate);
+  }else if(_savePending&&!_pendingAppPatch){
     if(!ArdJSON::JSON.measureObjectPatch(_pendingApp,patch,nullptr,limits)||!_pendingApp.applyObjectPatch(std::move(patch)))return false;
   }else{
     V candidate=_savePending?_pendingApp:V::object();
     if(!candidate.applyObjectPatch(std::move(patch),false)||!ArdJSON::JSON.measureObjectPatch(_appConfig,candidate,nullptr,limits))return false;
     _pendingApp=std::move(candidate);_pendingAppPatch=true;
   }
-  if(!_savePending){_pending=_config;_pending.apName=ArdDeviceName::ap(_pending.deviceName);}
+  if(!defer&&!_savePending){_pending=_config;_pending.apName=ArdDeviceName::ap(_pending.deviceName);}
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
   // A newer accepted intent supersedes Zigbee values still waiting for storage.
   while(superseded){size_t field=superseded.firstSet();superseded&=~ArdAppConfigFieldMask::forField(field);_zigbeeAppQueue.remove(_dynamic.idAt(field));}
 #endif
-  _saveSource=source;_savePending=true;_dirtySince=millis();return true;
+  if(!defer){_saveSource=source;_savePending=true;_dirtySince=millis();}
+  return true;
 }
 String ArdPortal::saveDocumentSlice(size_t offset,size_t maximum)const {
   String out;if(!out.reserve(maximum))return out;
@@ -1623,7 +1651,7 @@ ArdJSON::JSONVar ArdPortal::getAppConfigValue(const char* key) const {
  */
 bool ArdPortal::setAppConfigValue(const char* key, const ArdJSON::JSONVar& value) {
   if (!key || !*key || strlen(key) > 64 || !value.isValid() || value.isUndefined() ||
-      (_rebootPending && !_beforeRestartRunning) || mqttTrialActive() || _httpWaitingStorage) return false;
+      (_rebootPending && !_beforeRestartRunning) || mqttTrialActive()) return false;
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   const ArdJSON::JSONVar& field=_dynamic.field(key);
   if(field.hasOwnProperty("persist")&&!field["persist"].asBool())return setAppConfigStateValue(key,value);
@@ -1638,7 +1666,7 @@ bool ArdPortal::setAppConfigValue(const char* key, const ArdJSON::JSONVar& value
  * @return True if accepted in RAM; persistent completion is reported through onPortalAndAppConfigSaved().
  */
 bool ArdPortal::removeAppConfigValue(const char* key) {
-  if (!key || (_rebootPending && !_beforeRestartRunning) || mqttTrialActive() || _httpWaitingStorage) return false;
+  if (!key || (_rebootPending && !_beforeRestartRunning) || mqttTrialActive()) return false;
   ArdJSON::JSONVar patch=ArdJSON::JSONVar::object();patch[key]=ArdJSON::JSONVar();
   return scheduleAppPatch(std::move(patch),ChangeSource::Application);
 }
@@ -1647,7 +1675,9 @@ bool ArdPortal::removeAppConfigValue(const char* key) {
  * @return True if accepted in RAM; persistent completion is reported through onPortalAndAppConfigSaved().
  */
 bool ArdPortal::flushPortalAndAppConfig() {
-  if (!_configurationReady || !_savePending || _saveQueued) return false;
+  if (!_configurationReady) return false;
+  if (_deferredApp.length()) { _deferredAppForce = true; return true; }
+  if (!_savePending || _saveQueued) return false;
   _forceSave = true; return true;
 }
 /**
@@ -1670,7 +1700,16 @@ void ArdPortal::finishSave(const ArdFS::Result& result) {
 #if ARDPORTAL_ENABLE_MQTT
   const bool acknowledgeMqtt = _saveSource == ChangeSource::Mqtt;
 #endif
-  _savePending = _saveQueued = _forceSave = false;
+#if ARDPORTAL_ENABLE_MQTT
+  // A failed connection trial deliberately rolls back; never retry its rejected settings.
+  const bool trialSave=_mqttClient.trialSavePending();
+#else
+  const bool trialSave=false;
+#endif
+  const bool retry=!result.ok&&!trialSave&&_saveAttempts<3;
+  _savePending = _saveRetryPending = retry;
+  _saveQueued = _forceSave = false;
+  if(retry)_saveRetrySince=millis();
   _storageOK = result.ok; _storageError = result.error;
   if (result.ok && result.changed) { _hasCommitted = true; _lastCommit = millis(); }
   #if ARDPORTAL_ENABLE_WWW
@@ -1703,13 +1742,26 @@ void ArdPortal::finishSave(const ArdFS::Result& result) {
   }
 #if ARDPORTAL_ENABLE_MQTT
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  if (acknowledgeMqtt) { _appControls.acknowledgeSave(result.ok); }
+  if (acknowledgeMqtt && !retry) { _appControls.acknowledgeSave(result.ok); }
 #else
   (void)acknowledgeMqtt;
 #endif
 #endif
-  _resetAfterSave = false; _wifiConnectAfterSave = false;
+  if(!retry){_resetAfterSave = false; _wifiConnectAfterSave = false;}
+  const bool exhausted=!result.ok&&!trialSave&&!retry;
+  const bool failedPatch=_pendingAppPatch;
+  ArdJSON::JSONVar failedValues;
+  // Move rather than copy: reporting must not require another snapshot allocation.
+  if(exhausted)failedValues=std::move(_pendingApp);
   if(!_savePending&&!_saveQueued&&!_pendingReady) {_pendingApp=ArdJSON::JSONVar::object();_pendingAppPatch=false;_pending.caCert=String();}
+  if(exhausted&&_valueSaveFailed){
+    failedValues.forEachObjectMember([&](const String& key,const ArdJSON::JSONVar& value){
+      _valueSaveFailed(key,value,_saveAttempts,result.error);return true;
+    });
+    if(!failedPatch)_appConfig.forEachObjectMember([&](const String& key,const ArdJSON::JSONVar&){
+      if(!failedValues.hasOwnProperty(key)){const ArdJSON::JSONVar removed;_valueSaveFailed(key,removed,_saveAttempts,result.error);}return true;
+    });
+  }
   if (_saved) _saved(result.ok, result.error);
 }
 

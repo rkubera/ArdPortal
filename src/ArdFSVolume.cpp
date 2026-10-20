@@ -111,13 +111,13 @@ bool ArdFSVolume::eraseRaw(uint32_t address,size_t n){if(address%Sector||n%Secto
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdFSVolume::scan(uint32_t bank,std::vector<Entry>& entries,uint32_t& next){next=Sector;entries.clear();
- while(next+Header<=_bankSize){uint8_t h[Header];if(!readRaw(bank+next,h,sizeof(h)))return false;
+ while(next+Header<=_bankSize){uint8_t h[Header];if(!readRaw(bank+next,h,sizeof(h))){_error=-5;return false;}
  if(get(h)==0xffffffff){return true;}
  uint32_t extent=get(h+4),name=get(h+8),length=get(h+12);
  if(get(h)!=RecordMagic||extent!=aligned(Header+name+length)||extent>_bankSize-next||!name||name>72||length>ArdFSMaxJournalBytes){next=_bankSize;return true;}
- if(get(h+24)==Commit){uint8_t bytes[256];uint32_t c=crc(h,16);String path;if(!path.reserve(name))return false;
- for(uint32_t offset=0;offset<name+length;offset+=sizeof(bytes)){size_t count=std::min<size_t>(size_t(name+length-offset),sizeof(bytes));if(!readRaw(bank+next+Header+offset,bytes,count))return false;c=crc(bytes,count,c);for(size_t j=0;j<count&&offset+j<name;++j)path+=char(bytes[j]);}
- if(~c==get(h+16)){auto it=std::find_if(entries.begin(),entries.end(),[&](const Entry&e){return e.path==path;});Entry e{path,bank+next+Header+name,length};if(it==entries.end()){if(entries.size()>=32)return false;entries.push_back(e);}else *it=e;}}
+ if(get(h+24)==Commit){uint8_t bytes[256];uint32_t c=crc(h,16);String path;if(!path.reserve(name)){_error=-12;return false;}
+ for(uint32_t offset=0;offset<name+length;offset+=sizeof(bytes)){size_t count=std::min<size_t>(size_t(name+length-offset),sizeof(bytes));if(!readRaw(bank+next+Header+offset,bytes,count)){_error=-5;return false;}c=crc(bytes,count,c);for(size_t j=0;j<count&&offset+j<name;++j)path+=char(bytes[j]);}
+ if(~c==get(h+16)){auto it=std::find_if(entries.begin(),entries.end(),[&](const Entry&e){return e.path==path;});Entry e{path,bank+next+Header+name,length};if(it==entries.end()){if(entries.size()>=32){_error=-28;return false;}entries.push_back(e);}else *it=e;}}
  next+=extent;yield();
  }return true;}
 /**
@@ -128,8 +128,10 @@ bool ArdFSVolume::begin(){if(_mounted)return true;
  if(!configure()){_error=-22;return false;}uint8_t h[2][Header];bool valid[2];
  for(int i=0;i<2;++i){if(!readRaw(i*_bankSize,h[i],Header)){_error=-5;return false;}valid[i]=get(h[i])==BankMagic&&get(h[i]+4)==1&&get(h[i]+12)==_bankSize&&get(h[i]+24)==Commit&&get(h[i]+16)==~crc(h[i],16);}
  int first=valid[1]&&(!valid[0]||int32_t(get(h[1]+8)-get(h[0]+8))>0)?1:0;
- for(int k=0;k<2;++k){int i=k?1-first:first;if(valid[i]&&scan(i*_bankSize,_entries,_next)){_active=i*_bankSize;_generation=get(h[i]+8);_mounted=true;_error=0;return true;}}
- _error=-84;return false;}
+ if(!valid[first]){_error=-84;return false;}
+ // A valid newest bank is authoritative; allocation/I/O failure is not corruption.
+ if(!scan(first*_bankSize,_entries,_next))return false;
+ _active=first*_bankSize;_generation=get(h[first]+8);_mounted=true;_error=0;return true;}
 /**
  * @brief Format the storage volume, discarding its existing records.
  * @return True on success; false if validation, resource allocation or the operation fails.
@@ -155,7 +157,16 @@ bool ArdFSVolume::exists(const char* path){
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdFSVolume::append(uint32_t bank,uint32_t& next,const String& path,const String& data,std::vector<Entry>& entries){uint32_t n=path.length(),extent=aligned(Header+n+data.length());if(extent>_bankSize-next)return false;
- uint8_t probe[256];bool erased=true;for(uint32_t i=0;i<extent&&erased;i+=sizeof(probe)){if(!readRaw(bank+next+i,probe,sizeof(probe)))return false;for(uint8_t b:probe)if(b!=0xff){erased=false;break;}}
+ // Keep an erased successor header before replacing the current end marker.
+ // Reused banks still contain committed records from their previous generation.
+ // Without this boundary, filling the marker exposes that stale tail on reboot.
+ uint8_t probe[256];
+ if(next+extent<_bankSize){
+  if(!readRaw(bank+next+extent,probe,Header))return false;
+  bool endErased=true;for(size_t i=0;i<Header;++i)if(probe[i]!=0xff){endErased=false;break;}
+  if(!endErased&&!eraseRaw(bank+next+extent,Sector))return false;
+ }
+ bool erased=true;for(uint32_t i=0;i<extent&&erased;i+=sizeof(probe)){if(!readRaw(bank+next+i,probe,sizeof(probe)))return false;for(uint8_t b:probe)if(b!=0xff){erased=false;break;}}
  if(!erased&&!eraseRaw(bank+next,extent))return false;
  uint8_t h[Header];memset(h,255,Header);put(h,RecordMagic);put(h+4,extent);put(h+8,n);put(h+12,data.length());uint32_t c=crc(h,16);c=crc(path.c_str(),n,c);c=crc(data.c_str(),data.length(),c);put(h+16,~c);
  if(!writeRaw(bank+next,h,Header)||!writeRaw(bank+next+Header,path.c_str(),n)||(data.length()!=0&&!writeRaw(bank+next+Header+n,data.c_str(),data.length())))return false;
@@ -173,7 +184,6 @@ bool ArdFSVolume::compact(const String& path,const String& replacement){uint32_t
  uint32_t bank=_active?0:_bankSize,next=Sector;std::vector<Entry> copied;if(!eraseRaw(bank,Sector))return false;
  for(const Entry&e:_entries){if(e.path==path)continue;String data;if(!data.reserve(e.length))return false;uint8_t chunk[256];for(uint32_t offset=0;offset<e.length;offset+=sizeof(chunk)){size_t n=std::min<size_t>(size_t(e.length-offset),sizeof(chunk));if(!readRaw(e.address+offset,chunk,n))return false;for(size_t i=0;i<n;++i)data+=char(chunk[i]);}if(data.length()!=e.length||!append(bank,next,e.path,data,copied))return false;}
  if(!append(bank,next,path,replacement,copied))return false;
- if(next<_bankSize&&!eraseRaw(bank+next,Sector))return false;
  uint8_t h[Header];memset(h,255,Header);put(h,BankMagic);put(h+4,1);put(h+8,_generation+1);put(h+12,_bankSize);put(h+16,~crc(h,16));if(!writeRaw(bank,h,Header))return false;uint8_t marker[4];put(marker,Commit);if(!writeRaw(bank+24,marker,4))return false;
  _active=bank;_next=next;++_generation;_entries=std::move(copied);return true;}
 /**

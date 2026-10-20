@@ -42,6 +42,9 @@ or invalid CRCs are rejected in favor of the other record.
 After a power interruption, loading can recover the previous document or a fully
 committed new one; uncommitted RAM updates are lost. The journal runs over
 ArdFS, which adds atomic record commits and two-bank compaction.
+An erased successor header bounds each bank log, including after bank reuse and
+compaction. It is prepared before replacing the previous end marker, so a restart
+cannot expose committed records left over from an earlier bank generation.
 Both invalid records produce an error and an AP with default settings, without
 formatting the entire filesystem. Each stored configuration is a JSON document.
 
@@ -52,9 +55,13 @@ portal settings saves and explicit `flushPortalAndAppConfig()` bypass these dela
 dynamic control edits retain the debounce. Logs, uptime, connection
 states, NTP time and write statistics are not persisted.
 
-A failed mount triggers automatic formatting and a remount, including on a new
-board. Mount diagnostics cannot reliably distinguish an unformatted filesystem from a
-corrupted one, so mount failure recovery can remove existing files. On ESP8266,
+A mount with no valid committed bank header triggers automatic formatting and a
+remount, including on a new board; this can remove files when both bank headers
+are damaged. Allocation, flash I/O, index capacity and flash layout errors abort
+mounting without formatting or selecting an older committed bank. Likewise, an
+allocation failure while validating configuration copies reports an error instead
+of silently restoring an older value. Genuine invalid CRCs still allow recovery
+from the other configuration copy. On ESP8266,
 formatting is refused when the configured flash exceeds its physical size. For
 a 4 MB ESP-12F, select a matching layout such as 4 MB with 1 MB filesystem and OTA.
 A module name alone does not confirm its physical flash or selected layout.
@@ -292,3 +299,85 @@ alongside the portal. Formatting affects all files in that volume.
 ---
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
+
+Local regression coverage and the USB ESP32-C5 bank-reuse investigation are recorded
+in [configuration persistence validation](../testing/Configuration-persistence-validation.md).
+
+### Application edits during a save
+
+`setAppConfigValue()` and `removeAppConfigValue()` accept valid application edits
+while another configuration save is active. They return `true` after retaining the
+edit in RAM. A separate bounded patch stores the latest intent per key; it never
+changes the snapshot currently being written. Subsequent `portal.loop()` calls save
+that patch in the next transaction. Edits to different keys are preserved, and the
+latest accepted edit to the same key wins.
+
+`portalAndAppConfigBusy()` includes these waiting edits. Calling
+`flushPortalAndAppConfig()` requests their next save without the normal debounce;
+manual/OTA restart draining also waits for them. Each completed transaction still
+reports its result through `onPortalAndAppConfigSaved()`. `true` is acceptance in
+RAM, not synchronous confirmation of flash persistence. Invalid values, memory or
+size limits, unavailable storage and incompatible lifecycle operations can still
+return `false`. Power loss before the queued transaction commits can lose RAM edits.
+
+### Failed writes and retry limit
+
+An ordinary configuration batch gets at most **three total attempts** (the first
+write plus two retries). A failed batch remains intact in RAM. Retries wait at
+least 1000 ms after the preceding failure; explicit flush and restart draining do
+not bypass that delay. New application edits remain in their separate queue,
+including newer values of the same key. They form the next batch and have their
+own attempt budget. No failed older batch is resubmitted after a newer batch.
+
+`portalAndAppConfigSaveAttempts()` returns the attempts made for the active or
+most recently completed batch (0 initially, then 1–3). The existing
+`onPortalAndAppConfigSaved()` callback receives the outcome of every attempt.
+After the third failure, retrying that batch stops and
+`onAppConfigValueSaveFailed()` reports each application field in its failed
+snapshot, including its attempted value and the last error:
+
+```cpp
+portal.onAppConfigValueSaveFailed([](const String& id,
+    const ArdJSON::JSONVar& value, uint8_t attempts, const String& error) {
+  Serial.printf("Field %s failed after %u attempts: %s\n",
+                id.c_str(), unsigned(attempts), error.c_str());
+  // value.isUndefined() means that deleting this key failed.
+  // Copy any data needed beyond this callback; references are borrowed.
+});
+```
+
+A full application snapshot reports all fields it contains, plus deleted keys;
+a patch reports only its affected keys. Portal/network-only failures still use
+the ordinary configuration callback. A newer value of a reported key may still be
+waiting in the next batch. After exhaustion, a new accepted edit creates a new
+batch; it does not automatically resubmit the exhausted one.
+
+The original failed snapshot is retained without copying it on the error path.
+Already accepted later edits survive both retries and exhaustion. Power loss can
+still discard all changes awaiting a successful commit in RAM. Failed MQTT
+connection-trial saves keep their deliberate rollback behavior instead of
+retrying settings that the trial rejected.
+
+### Startup redundancy repair
+
+Portal startup calls `ArdFS::read(path, callback, true)` to validate both copies and
+repair a missing or invalid alternate before marking configuration ready. Two
+valid copies do not need equal generations or contents: the older valid copy is
+normal journal history and is left untouched. Repair copies the surviving
+verified document with its existing generation, flushes/closes the replacement
+and checks the complete bytes by reading it back. It never writes the surviving
+copy. Interrupted repair can be attempted again at the next boot.
+
+Repair uses at most three attempts with one-second failure backoff. If all fail,
+the surviving document is still returned in `Result::data` with `ok=false` and an
+error. Portal can restore it for operation, reports unsuccessful storage status,
+and refuses ordinary persistent changes until a later successful startup repair.
+Explicit factory reset/storage format remain available as deliberate recovery
+operations. If neither copy is valid, repair cannot reconstruct a document.
+
+`Result::redundant` reports validated redundancy for a read;
+`Result::repaired` indicates successful repair and `Result::repairAttempts` records
+its attempt count. Standalone `read(path, callback)` retains its read-only default;
+pass `true` as the third argument to request repair. Startup repair uses the read
+completion/ready path, not the per-value failure callback for a new configuration
+batch. The existing storage error/status API exposes a failed repair.

@@ -53,7 +53,8 @@ public:
   void trim() { size_t first = value.find_first_not_of(" \t\r\n"); if(first == std::string::npos) value.clear(); else value = value.substr(first, value.find_last_not_of(" \t\r\n") - first + 1); }
   void replace(const String& a, const String& b) { size_t p = 0; while ((p = value.find(a.value, p)) != std::string::npos) { value.replace(p, a.length(), b.value); p += b.length(); } }
   static size_t& reserveLimitForTest() { static size_t limit = SIZE_MAX; return limit; }
-  bool reserve(size_t size) { if(size > reserveLimitForTest()) return false; value.reserve(size); return true; }
+  static size_t& reserveFailCountdownForTest() { static size_t count = SIZE_MAX; return count; }
+  bool reserve(size_t size) { auto& count=reserveFailCountdownForTest(); if(count != SIZE_MAX && count-- == 0) return false; if(size > reserveLimitForTest()) return false; value.reserve(size); return true; }
 };
 struct SerialStub {
   void begin(int) {}

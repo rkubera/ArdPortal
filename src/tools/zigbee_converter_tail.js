@@ -95,6 +95,8 @@ for(const f of fields){
     // Frontends render child features of standard devices; label those as well as the parent.
     for(const expose of extension.exposes??[]){
       if(f.kind!=='action')expose.label=label;
+      // Discovery needs explicit names even for primary/device-class entities.
+      expose.homeassistant={...expose.homeassistant,name:expose.label};
       if(expose.features)for(const feature of expose.features){
         const detail=feature.label||feature.name;
         feature.label=feature.name==='state'?(f.kind==='cover'||f.kind==='lock'?'State':label):label+' / '+detail;
@@ -102,6 +104,17 @@ for(const f of fields){
     }
     // Z2M chooses converters by property and endpoint: never route to another control.
     if(extension.toZigbee)extension.toZigbee=extension.toZigbee.map(converter=>({...converter,endpoints:endpointNames}));
+    if(f.kind==='climate'){
+      // ArdPortal reports thermostat values itself; SDK setpoints are readable
+      // but not report-configurable. A failed configReport would prevent every
+      // later field from receiving its initial read after an interview.
+      extension.configure=[async(device)=>{
+        const endpoint=device.getEndpoint(f.ep);
+        const names=['localTemp',...(f.modes.includes('heat')||f.modes.includes('heat_cool')||!f.modes.includes('cool')?['occupiedHeatingSetpoint']:[]),...(f.modes.includes('cool')||f.modes.includes('heat_cool')?['occupiedCoolingSetpoint']:[]),'systemMode','runningState'];
+        for(let offset=0;offset<names.length;offset+=4)await endpoint.read('hvacThermostat',names.slice(offset,offset+4));
+        if(f.fanModes?.length)await endpoint.read('hvacFanCtrl',['fanMode']);
+      }];
+    }
     if(['switch','light','cover','lock'].includes(f.kind)){
       const attributes={switch:{genOnOff:['onOff']},light:{genOnOff:['onOff'],genLevelCtrl:['currentLevel'],lightingColorCtrl:['currentX','currentY','currentHue','currentSaturation']},
         cover:{closuresWindowCovering:['currentPositionLiftPercentage','currentPositionTiltPercentage']},lock:{closuresDoorLock:['lockState']}}[f.kind];
@@ -116,12 +129,8 @@ for(const f of fields){
     }
   }
 }
-// Keep unique MQTT property suffixes and converter endpoint scopes, but hide UI annotations.
-function hideEndpoint(expose){
-  delete expose.endpoint;
-  for(const feature of expose.features??[])hideEndpoint(feature);
-}
-for(const extension of extend)for(const expose of extension.exposes??[])hideEndpoint(expose);
+// Keep endpoint identity in exposes as well as converter routes. Home Assistant
+// Discovery uses it to distinguish repeated switches, measurements and numbers.
 export default {
   fingerprint:[{modelID:identity.model,manufacturerName:'ArdPortal'}],
   model:identity.model,vendor:'ArdPortal',description:'ArdPortal registered controls',extend,

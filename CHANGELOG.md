@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased — Startup copy repair
+
+- Validate both configuration copies at startup and repair a missing or invalid alternate from the surviving verified document before accepting persistent edits.
+- Stream and verify the replacement without rewriting the good copy; leave two already valid copies untouched, including copies with different generations.
+- Limit repair to three attempts with one-second failure backoff. If repair exhausts its attempts, restore the surviving configuration for operation but block ordinary persistent edits until a successful startup repair or explicit recovery.
+- Cover either damaged/missing slot, healthy-copy preservation, repair failures and interrupted repair with torn raw flash operations.
+
+## Unreleased — Bounded save retries
+
+- Retain failed configuration batches for up to three total attempts, with at least one second between failed attempts, including during explicit flush/restart draining.
+- Keep later application edits in their own queue and retain MQTT acknowledgement state until the batch succeeds or exhausts its attempts.
+- Expose `portalAndAppConfigSaveAttempts()` and `onAppConfigValueSaveFailed()` with key, attempted value, attempt count and error after terminal failure. Existing save callbacks continue reporting each attempt.
+
+## Unreleased — Application edit queue
+
+- Accept valid application edits during an active configuration save using a separate coalescing patch, preserving the immutable streaming snapshot.
+- Include waiting edits in storage busy status, explicit flush and restart draining; retain the latest accepted value per key, including deletions.
+- Keep `true` as acceptance in RAM, with persistent completion reported by the existing save callback.
+
+## Unreleased — Configuration recovery
+
+- Maintain an erased end marker when appending to reused flash banks so older committed records cannot override newer configuration after restart.
+- Report allocation failures while validating configuration journals instead of silently selecting an older valid copy.
+- Keep the newest committed flash bank authoritative when scanning fails; do not automatically format on allocation, flash I/O, index capacity or layout errors.
+- Cover either journal slot, generation rollover, corrupted-copy recovery, failed mount preservation and rapid multi-key edits across restart.
+
+## Unreleased — Zigbee2MQTT Home Assistant discovery
+
+- Preserve expose endpoint identity and explicit registered names so repeated controls have unique Home Assistant Discovery IDs instead of colliding or falling back to the device name.
+- Read initial thermostat values without configuring reporting for SDK-unreportable setpoints, preventing a thermostat configuration failure from skipping subsequent controls after interview/re-pairing.
+- Exercise multiple same-type controls against the actual Zigbee2MQTT Discovery mapper and verify thermostat initial reads against a reporting-rejection fixture.
+
 ## Unreleased — Application firmware version
 
 - Add `setFirmwareVersion()` and `getFirmwareVersion()` with a default application version of `1.0`; configure before `begin()` using up to 16 UTF-8 bytes.
