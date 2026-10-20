@@ -1111,6 +1111,7 @@ String ArdPortal::infoJson() {
 #endif
   String out;
   out += F("{\"deviceName\":"); appendQuoted(out,_config.deviceName); out += F(",\"deviceDescription\":"); appendQuoted(out,_config.deviceDescription); out += F(",\"deviceManufacturer\":"); appendQuoted(out,_config.deviceManufacturer); out += F(",\"chip\":"); appendQuoted(out,chip);
+  out += F(",\"firmwareVersion\":"); appendQuoted(out,getFirmwareVersion());
   out += F(",\"chipId\":"); appendQuoted(out,chipId()); out += F(",\"flashBytes\":"); out += String(ESP.getFlashChipSize());
   out += F(",\"physicalFlashBytes\":"); out += String(physicalFlash); out += F(",\"heapBytes\":"); out += String(heap); out += F(",\"freeHeapBytes\":"); out += String(memory.free8);
   out += F(",\"resetReason\":"); appendQuoted(out,ArdUILanguage::text(resetReasonKey())); out += F(",\"minimumFreeHeapBytes\":"); out += String(_minimumFreeHeap==UINT32_MAX?memory.free8:_minimumFreeHeap); out += F(",\"maximumHeapBlockBytes\":"); out += String(maximumBlock);

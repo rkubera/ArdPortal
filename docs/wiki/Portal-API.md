@@ -609,6 +609,8 @@ void setup() {
 }
 ```
 
+The Device information view and `GET /api/info` expose this value as `firmwareVersion`, including when HA and Zigbee are disabled.
+
 - `bool setFirmwareVersion(const char* version)` copies a nonempty version of up to 16 UTF-8 bytes. It returns `false` for null/empty/oversized input or after startup, preserving the previous version.
 - `const char* getFirmwareVersion() const` returns the current version; the returned text belongs to the portal.
 
