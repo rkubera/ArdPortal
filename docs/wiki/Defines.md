@@ -264,9 +264,7 @@ See [ZHA quirk download](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zha-qu
 
 Wi-Fi disabled overrides even explicit `ARDPORTAL_ENABLE_WWW=1` and
 `ARDPORTAL_ENABLE_MQTT=1`. It disables Wi-Fi radio use by ArdPortal, NTP over
-Wi-Fi and Wi-Fi/Zigbee coexistence setup. ArdPortal does not include or call the
-Wi-Fi driver in this build; it does not stop Wi-Fi started separately by the sketch.
-Existing saved network settings are
+Wi-Fi and Wi-Fi/Zigbee coexistence setup. Existing saved network settings are
 preserved; re-enabling Wi-Fi in a later firmware can use them again. Both flags
 are compile-time options, not runtime switches. Continue `begin()`/`loop()` for
 storage, AppConfig and Zigbee. Disabling WWW removes HTTP OTA. Zigbee OTA remains available when
