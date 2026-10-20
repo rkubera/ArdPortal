@@ -55,10 +55,12 @@ bool ArdZigbee::createControls(esp_zb_ep_list_t* endpoints){
       case Kind::Action:case Kind::Switch:device=ESP_ZB_HA_ON_OFF_OUTPUT_DEVICE_ID;if(!add(esp_zb_on_off_cluster_create(nullptr),esp_zb_cluster_list_add_on_off_cluster))return false;break;
       case Kind::Slider:{auto* list=esp_zb_analog_output_cluster_create(nullptr);if(!list)return false;
 
-        if(esp_zb_analog_output_cluster_add_attr(list,0x1c,text)!=ESP_OK||esp_zb_analog_output_cluster_add_attr(list,ESP_ZB_ZCL_ATTR_ANALOG_OUTPUT_MAX_PRESENT_VALUE_ID,&s.max)!=ESP_OK||esp_zb_analog_output_cluster_add_attr(list,ESP_ZB_ZCL_ATTR_ANALOG_OUTPUT_MIN_PRESENT_VALUE_ID,&s.min)!=ESP_OK||esp_zb_analog_output_cluster_add_attr(list,0x6a,&s.step)!=ESP_OK||!add(list,esp_zb_cluster_list_add_analog_output_cluster))return false;break;}
+        if(esp_zb_analog_output_cluster_add_attr(list,0x1c,text)!=ESP_OK||esp_zb_analog_output_cluster_add_attr(list,ESP_ZB_ZCL_ATTR_ANALOG_OUTPUT_MAX_PRESENT_VALUE_ID,&s.max)!=ESP_OK||esp_zb_analog_output_cluster_add_attr(list,ESP_ZB_ZCL_ATTR_ANALOG_OUTPUT_MIN_PRESENT_VALUE_ID,&s.min)!=ESP_OK||esp_zb_analog_output_cluster_add_attr(list,0x6a,&s.step)!=ESP_OK||!add(list,esp_zb_cluster_list_add_analog_output_cluster))return false;
+        break;}
       case Kind::Select:{auto* list=esp_zb_multistate_output_cluster_create(nullptr);if(!list)return false;
         uint16_t state=1;
-        if(esp_zb_cluster_update_attr(list,0x4a,&s.states)!=ESP_OK||esp_zb_cluster_update_attr(list,0x55,&state)!=ESP_OK||esp_zb_multistate_output_cluster_add_attr(list,0x1c,text)!=ESP_OK||!add(list,esp_zb_cluster_list_add_multistate_output_cluster))return false;break;}
+        if(esp_zb_cluster_update_attr(list,0x4a,&s.states)!=ESP_OK||esp_zb_cluster_update_attr(list,0x55,&state)!=ESP_OK||esp_zb_multistate_output_cluster_add_attr(list,0x1c,text)!=ESP_OK||!add(list,esp_zb_cluster_list_add_multistate_output_cluster))return false;
+        break;}
       case Kind::State:{auto* list=esp_zb_multistate_input_cluster_create(nullptr);if(!list)return false;uint16_t state=1;if(esp_zb_cluster_update_attr(list,0x4a,&s.states)!=ESP_OK||esp_zb_cluster_update_attr(list,0x55,&state)!=ESP_OK||esp_zb_multistate_input_cluster_add_attr(list,0x1c,text)!=ESP_OK||!add(list,esp_zb_cluster_list_add_multistate_input_cluster))return false;break;}
 #if !defined(ARDPORTAL_ENABLE_CONTROL_TEXT) || ARDPORTAL_ENABLE_CONTROL_TEXT
       case Kind::Number:{auto* list=esp_zb_analog_input_cluster_create(nullptr);if(!list)return false;if(esp_zb_analog_input_cluster_add_attr(list,0x1c,text)!=ESP_OK||!add(list,esp_zb_cluster_list_add_analog_input_cluster))return false;break;}
@@ -85,17 +87,20 @@ bool ArdZigbee::createControls(esp_zb_ep_list_t* endpoints){
       case Kind::Light:{device=ESP_ZB_HA_COLOR_DIMMABLE_LIGHT_DEVICE_ID;esp_zb_color_cluster_cfg_t color={};color.color_capabilities=11;color.color_mode=0;color.enhanced_color_mode=0;
         // Initial values below update existing attributes and add missing optional
         // attributes with explicit types; typed helpers may reject duplicates.
-        if(!add(esp_zb_on_off_cluster_create(nullptr),esp_zb_cluster_list_add_on_off_cluster)||!add(esp_zb_level_cluster_create(nullptr),esp_zb_cluster_list_add_level_cluster)||!add(esp_zb_color_control_cluster_create(&color),esp_zb_cluster_list_add_color_control_cluster))return false;break;}
+        if(!add(esp_zb_on_off_cluster_create(nullptr),esp_zb_cluster_list_add_on_off_cluster)||!add(esp_zb_level_cluster_create(nullptr),esp_zb_cluster_list_add_level_cluster)||!add(esp_zb_color_control_cluster_create(&color),esp_zb_cluster_list_add_color_control_cluster))return false;
+        break;}
 #endif
 #if !defined(ARDPORTAL_ENABLE_CONTROL_CLIMATE) || ARDPORTAL_ENABLE_CONTROL_CLIMATE
       case Kind::Climate:{device=ESP_ZB_HA_THERMOSTAT_DEVICE_ID;esp_zb_thermostat_cluster_cfg_t cfg={};cfg.local_temperature=0x8000;cfg.occupied_cooling_setpoint=cfg.occupied_heating_setpoint=2000;cfg.control_sequence_of_operation=s.sequence;
         auto* list=esp_zb_thermostat_cluster_create(&cfg);int16_t min=std::lround(s.min*100),max=std::lround(s.max*100);uint16_t running=0;int16_t heatMin=min-(s.sequence==4?250:0),coolMax=max+(s.sequence==4?250:0);
         if(!list||esp_zb_thermostat_cluster_add_attr(list,0x03,&heatMin)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x04,&max)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x05,&min)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x06,&coolMax)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x15,&heatMin)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x16,&max)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x17,&min)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x18,&coolMax)!=ESP_OK||esp_zb_thermostat_cluster_add_attr(list,0x29,&running)!=ESP_OK||!add(list,esp_zb_cluster_list_add_thermostat_cluster))return false;
-        if(s.fan&&!add(esp_zb_fan_control_cluster_create(nullptr),esp_zb_cluster_list_add_fan_control_cluster))return false;break;}
+        if(s.fan&&!add(esp_zb_fan_control_cluster_create(nullptr),esp_zb_cluster_list_add_fan_control_cluster))return false;
+        break;}
 #endif
 #if !defined(ARDPORTAL_ENABLE_CONTROL_COVER) || ARDPORTAL_ENABLE_CONTROL_COVER
       case Kind::Cover:{device=ESP_ZB_HA_WINDOW_COVERING_DEVICE_ID;esp_zb_window_covering_cluster_cfg_t cfg={};cfg.covering_type=8;auto* list=esp_zb_window_covering_cluster_create(&cfg);uint8_t position=100;
-        if(!list||esp_zb_window_covering_cluster_add_attr(list,8,&position)!=ESP_OK||esp_zb_window_covering_cluster_add_attr(list,9,&position)!=ESP_OK||!add(list,esp_zb_cluster_list_add_window_covering_cluster))return false;break;}
+        if(!list||esp_zb_window_covering_cluster_add_attr(list,8,&position)!=ESP_OK||esp_zb_window_covering_cluster_add_attr(list,9,&position)!=ESP_OK||!add(list,esp_zb_cluster_list_add_window_covering_cluster))return false;
+        break;}
 #endif
 #if !defined(ARDPORTAL_ENABLE_CONTROL_LOCK) || ARDPORTAL_ENABLE_CONTROL_LOCK
       case Kind::Lock:{device=ESP_ZB_HA_DOOR_LOCK_DEVICE_ID;esp_zb_door_lock_cluster_cfg_t cfg={};cfg.actuator_enabled=true;cfg.lock_state=1;if(!add(esp_zb_door_lock_cluster_create(&cfg),esp_zb_cluster_list_add_door_lock_cluster))return false;break;}
