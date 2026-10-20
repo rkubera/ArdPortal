@@ -5,6 +5,7 @@
 #include "HeapMemory.h"
 #include "ArdAsset.h"
 #include <Arduino.h>
+#include <IPAddress.h>
 namespace ArdUILanguageData { enum class Key : uint16_t; }
 #include <functional>
 #include <memory>
@@ -36,17 +37,15 @@ namespace ArdUILanguageData { enum class Key : uint16_t; }
 #if ARDPORTAL_HTTP_OTA_SUPPORT
 #include "ArdOta.h"
 #endif
-#if defined(ESP32) && defined(CONFIG_IDF_TARGET_ESP32H2)
-#include <NetworkClient.h>
-#include <NetworkServer.h>
-using WiFiClient=NetworkClient;
-using WiFiServer=NetworkServer;
-#elif defined(ESP32)
+#if !defined(ESP32) && !defined(ESP8266)
+#error ArdPortal requires an ESP8266 or ESP32 Arduino core
+#endif
+#if ARDPORTAL_ENABLE_WIFI
+#if defined(ESP32)
 #include <WiFi.h>
 #elif defined(ESP8266)
 #include <ESP8266WiFi.h>
-#else
-#error ArdPortal requires an ESP8266 or ESP32 with Wi-Fi and an Arduino core
+#endif
 #endif
 
 // Single-threaded: call begin(), loop() and public methods from the Arduino task.
@@ -680,9 +679,9 @@ public:
 #endif
   static bool validPortalConfig(const PortalConfig& config);
 private:
+#if ARDPORTAL_ENABLE_WIFI
   bool _wifiAutoReconnect=ARDPORTAL_ENABLE_WIFI;
   ApPolicy _apPolicy=ApPolicy::Automatic;
-#if ARDPORTAL_ENABLE_WIFI
   WifiStateCallback _wifiStateCallback;
   WifiScanCallback _wifiScanCallback;
   ApStateCallback _apStateCallback;
@@ -745,7 +744,10 @@ private:
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   bool appConfigRegistrationFailed(const char* stage,const String& field,const String& reason) {
     _appConfigRegistrationError={stage,field,reason};
-    log(String("AppConfig registration: stage=")+stage+" field="+field+" reason="+reason);return false;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+    log(String("AppConfig registration: stage=")+stage+" field="+field+" reason="+reason);
+#endif
+    return false;
   }
 #endif
   friend class ArdMqtt;
@@ -1114,12 +1116,18 @@ private:
    * @return No value.
    */
   void websocketCommand(const String& command);
+#if ARDPORTAL_ENABLE_WIFI
   WifiState _wifiState = WifiState::NoCredentials;
+#else
+  static constexpr WifiState _wifiState=WifiState::Disconnected;
+#endif
 
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   unsigned _diagnosticApStations = 0;
 #endif
-  bool _started = false, _apActive = false, _storageOK = false, _pendingReady = false;
+  bool _started = false, _storageOK = false, _pendingReady = false;
+#if ARDPORTAL_ENABLE_WIFI
+  bool _apActive = false;
   bool _attempting = false, _wasConnected = false, _scanRequested = false, _scanning = false;
   uint32_t _wifiRevision = 0;
   uint8_t _wifiResult = 0; // 0 pending, 1 connected, 2 failed; retained across retries.
@@ -1127,6 +1135,10 @@ private:
 
   String _networks = "[]";
   uint32_t _scanId = 0, _scanCompletedId = 0;
+#else
+  static constexpr bool _scanning=false;
+  static constexpr bool _apActive=false;
+#endif
   #if ARDPORTAL_ENABLE_WWW
   String _request, _response;
   const char* _page = nullptr;

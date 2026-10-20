@@ -63,7 +63,9 @@ bool ArdOta::writeUpgrade(uint8_t* data, size_t length) {
   if (_otaReceived == _otaExpected) {
     bool ok = Update.end(false); _otaActive = false;
     if (!ok) { _portal.reply(500, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_153) + String(Update.getError())); return false; }
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_155));
+#endif
     _portal.scheduleRestart(ArdPortal::RestartReason::FirmwareUpdate);
     _portal.replyMessage(200,ArdUILanguage::Key::s_155);
   }
@@ -80,7 +82,9 @@ void ArdOta::startUpload(uint32_t bodySize, int split) {
     if (!_portal._configurationReady || _portal.portalAndAppConfigBusy() || _portal.mqttTrialActive() || _portal._rebootPending || _portal._scanning) { _portal.replyMessage(409,ArdUILanguage::Key::s_132); return; }
     if (!bodySize || bodySize > ESP.getFreeSketchSpace()) { _portal.replyMessage(413,ArdUILanguage::Key::s_116); return; }
     _portal.closeMqtt();
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_117));
+#endif
     if (!Update.begin(bodySize, U_FLASH)) { _portal.reply(500, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_153) + String(Update.getError())); return; }
 #if defined(ESP8266)
     _gzipPrefixSize = 0;

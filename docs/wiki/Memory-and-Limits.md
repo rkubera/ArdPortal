@@ -7,6 +7,21 @@
 - [Network memory reserves](#network-memory-reserves)
 - [Handling memory errors](#handling-memory-errors)
 - [Independent limits](#independent-limits)
+- [Compile-time feature sizes](#compile-time-feature-sizes)
+
+## Compile-time feature sizes
+
+The [measured feature-size report](../testing/Feature-size-report.md) compares
+ESP8266 and classic ESP32 profiles, individual controls, and native Zigbee on
+ESP32-C6. It includes complete binary/static-RAM totals, prerequisite profiles,
+incremental costs and reproducible CSV/JSON data. These are compile-time
+measurements; application values, TLS sessions, history contents, heap and stack
+usage require runtime measurements.
+
+MQTT keeps a fixed 2048-byte receive buffer. Its transmit storage owns only the
+queued packet and is released after transmission or disconnect. The packet limit
+is unchanged; a large queued packet still needs heap memory and allocator
+overhead, so the reduction in static RAM is not a worst-case heap guarantee.
 
 ## Network memory reserves
 

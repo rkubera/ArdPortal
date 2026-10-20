@@ -20,9 +20,11 @@ namespace { void appendText(String& packet, const String& text) { packet += char
  */
 bool ArdMqtt::queuePacket(uint8_t type, const String& body) {
   if (_txSize || body.length() > PacketCapacity - 5) return false;
-  size_t length = body.length(), index = 0; _tx[index++] = type;
-  do { uint8_t byte = length % 128; length /= 128; if (length) byte |= 128; _tx[index++] = byte; } while (length);
-  memcpy(_tx + index, body.c_str(), body.length()); _txSize = index + body.length(); _txOffset = 0; _txSince = millis(); return true;
+  char header[5];size_t length=body.length(),index=0;header[index++]=char(type);
+  do { uint8_t byte=length%128;length/=128;if(length)byte|=128;header[index++]=char(byte); } while(length);
+  String packet;
+  if(!packet.reserve(index+body.length())||!packet.concat(header,index)||!packet.concat(body.c_str(),body.length()))return false;
+  _tx=std::move(packet);_txSize=index+body.length();_txOffset=0;_txSince=millis();return true;
 }
 
 /**
@@ -76,7 +78,9 @@ bool ArdMqtt::publishRaw(const char* topic, const char* payload, bool retain) {
       strlen(topic) + strlen(payload) + 2 > PacketCapacity - 5) return false;
   String body; appendText(body, topic); body += payload;
   bool queued = queuePacket(retain ? 0x31 : 0x30, body);
+#if ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL
   if (queued) _portal.logMqtt(ArdUILanguage::text(ArdUILanguage::Key::s_146), topic, reinterpret_cast<const uint8_t*>(payload), strlen(payload));
+#endif
   return queued;
 }
 
@@ -109,6 +113,7 @@ bool ArdMqtt::subscribeRaw(const char* topic) {
  * @return No value.
  */
 void ArdMqtt::closeMqtt(const char* reason) {
+#if ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL
   if (reason || _mqttState == MqttState::Connecting || _mqttState == MqttState::Connected) {
     String message=ArdUILanguage::text(ArdUILanguage::Key::s_147);
     _portal.consoleLine(true,message);
@@ -127,6 +132,9 @@ void ArdMqtt::closeMqtt(const char* reason) {
     (void)reason;
 #endif
   }
+#else
+  (void)reason;
+#endif
   if (_mqttTrial) _mqttTrialFailed = true;
 #if ARDPORTAL_ENABLE_MQTT_TLS
   if (_tls) { _tls->stop(); _tls.reset(); }
@@ -137,7 +145,7 @@ void ArdMqtt::closeMqtt(const char* reason) {
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   _portal._appControls.disconnected();
 #endif
-  stopClient(_mqtt); _txSize = _txOffset = _rxSize = 0; _pingPending = false; _subscriptionPending = false;
+  stopClient(_mqtt); _tx=String();_txSize = _txOffset = _rxSize = 0; _pingPending = false; _subscriptionPending = false;
   _mqttSince = millis();
   _mqttState = !_portal._config.host.length() ? MqttState::Disabled : (_portal.wifiConnected() ? MqttState::WaitingRetry : MqttState::WaitingForWifi);
 }
@@ -162,7 +170,9 @@ bool ArdMqtt::processPacket(uint8_t type, const uint8_t* body, size_t length) {
 #endif
       return false;
     }
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_148));
+#endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
     String message=String("MQTT connected; clientId=")+_clientId+"; connectMs="+String(uint32_t(millis()-_mqttSince));_portal.logMessage(message);
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
@@ -196,7 +206,12 @@ _portal._appControls.resetMqtt();
 #if ARDPORTAL_ENABLE_HA
     if (_portal._homeAssistant.handleStatus(topic, body + 2 + topicSize, length - 2 - topicSize)) return true;
 #endif
-    if (!validMqttTopic(topic)) { _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_149)); return true; }
+    if (!validMqttTopic(topic)) {
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+      _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_149));
+#endif
+      return true;
+    }
     _portal.logMqtt("RX", topic, body + 2 + topicSize, length - 2 - topicSize);
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
     _portal._appControls.dynamicMqtt(topic,body+2+topicSize,length-2-topicSize,type&1);
@@ -231,7 +246,9 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
   if (_mqttState == MqttState::WaitingForTime) { _mqttSince = now - _portal._options.retryMs; _mqttState = MqttState::WaitingRetry; }
   if (_mqttState == MqttState::WaitingForWifi) _mqttState = MqttState::WaitingRetry;
   if (_mqttState == MqttState::WaitingRetry && uint32_t(now - _mqttSince) >= _portal._options.retryMs) {
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_145));
+#endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
     String message=String("MQTT connecting: ")+_portal._config.host+":"+String(_portal._config.port)+
       "; clientId="+_clientId+"; TLS="+String(_portal._config.mqttTls ? "yes" : "no");_portal.logMessage(message);
@@ -239,7 +256,12 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
     ardMqttSerialDiagnostic(message);
 #endif
 #endif
-    if (!connectMqttTransport()) { _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_151)); closeMqtt("transport connect failed"); return; }
+    if (!connectMqttTransport()) {
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+      _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_151));
+#endif
+      closeMqtt("transport connect failed"); return;
+    }
     _mqttState = MqttState::Connecting; _mqttSince = _lastTx = millis();
     String body; appendText(body, "MQTT"); body += char(4);
     uint8_t flags = 2;
@@ -261,8 +283,8 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
   now = millis();
   if (_txSize) {
     size_t length = _txSize - _txOffset; if (length > 256) length = 256;
-    size_t written = writeMqtt(_tx + _txOffset, length); _txOffset += written;
-    if (_txOffset == _txSize) { _txSize = _txOffset = 0; _lastTx = millis(); }
+    size_t written = writeMqtt(reinterpret_cast<const uint8_t*>(_tx.c_str()) + _txOffset, length); _txOffset += written;
+    if (_txOffset == _txSize) { _tx=String();_txSize = _txOffset = 0; _lastTx = millis(); }
     else if (uint32_t(now - _txSince) >= _portal._options.mqttTimeoutMs) { closeMqtt("send timeout"); return; }
   }
   // Consume at most 256 bytes per loop. Remaining Length can span multiple loops.

@@ -22,6 +22,19 @@ for chip in esp32c5 esp32c6 esp32h2; do
 done
 # Compile-time probes verify APIs disappear with their feature switches.
 "${PYTHON:-python3}" tests/public-api-matrix.py "$build_root/api"
+# The network-free ESP32 profile must not retain the native Wi-Fi driver.
+"$cli" compile --fqbn esp32:esp32:esp32 \
+  --library "$repo_root" --build-path "$build_root/esp32-no-network" "$build_root/api/no_network"
+"${PYTHON:-python3}" - "$build_root/esp32-no-network/no_network.ino.map" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+link_map = Path(sys.argv[1]).read_text()
+assert not re.search(r'^\s+0x[0-9a-fA-F]+\s+esp_wifi_\w+\s*$', link_map, re.MULTILINE), \
+    'Network-free ESP32 firmware unexpectedly retains Wi-Fi driver symbols'
+print('PASS: network-free ESP32 firmware excludes Wi-Fi driver symbols')
+PY
 for sketch in "$build_root"/api/*; do
   env PYTHONWARNINGS="$esp8266_python_warnings" "$cli" compile --fqbn esp8266:esp8266:generic \
     --library "$repo_root" --build-path "$build_root/api-build-$(basename "$sketch")" "$sketch"

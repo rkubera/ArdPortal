@@ -10,13 +10,17 @@
 #if ARDPORTAL_SUPPORT_WEBSOCKET
 #include "WebSocketAccept.h"
 #endif
+#if ARDPORTAL_ENABLE_WWW
 #include "NetworkIo.h"
 using ArdNetworkIo::writeChunk;
 using ArdNetworkIo::stopClient;
+#endif
 #if defined(ESP32)
 #include <esp_system.h>
+#if ARDPORTAL_ENABLE_WWW
 #include <lwip/sockets.h>
 #include <errno.h>
+#endif
 #endif
 
 namespace {
@@ -222,10 +226,8 @@ bool ArdPortal::begin(const Options& options) {
   // Keep the radio enabled and preserve SDK credentials without flash writes.
   WiFi.disconnect(false, false);
   #else
-  #if !defined(CONFIG_IDF_TARGET_ESP32H2)
-  WiFi.mode(WIFI_OFF);
-  #endif
-  _wifiAutoReconnect=false;_apPolicy=ApPolicy::Disabled;_wifiState=WifiState::Disconnected;
+  // A network-free build must not reference WiFi: even mode(WIFI_OFF)
+  // links the ESP32 Wi-Fi driver and its network dependencies.
   #endif
   configureIdentity();
   _lastLoopMs = millis(); _uptimeMs = _lastLoopMs;
@@ -233,7 +235,9 @@ bool ArdPortal::begin(const Options& options) {
   _server.begin();
   #endif
   _started = true;_minimumFreeHeap=ArdHeap::sample().free8;_minimumFreeDma=ArdHeap::sample().freeDma;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   log(ArdUILanguage::text(ArdUILanguage::Key::s_188)+ArdUILanguage::text(resetReasonKey()));
+#endif
   _storage.begin();
   return true; // Storage state is separate; a missing config is normal on first boot.
 }
@@ -248,7 +252,9 @@ void ArdPortal::connectWifi() {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   logMessage(String("Wi-Fi connecting: ")+_config.ssid);
 #endif
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   log(ArdUILanguage::text(ArdUILanguage::Key::s_209)+String(_wifiSince));
+#endif
   WiFi.begin(_config.ssid.c_str(), _config.password.c_str());
   _attempting = true; _wifiState = WifiState::Connecting;
 #else
@@ -263,7 +269,9 @@ void ArdPortal::startAP() {
   if(_apPolicy==ApPolicy::Disabled)return;
   if (!_apActive) {
     WiFi.mode(WIFI_AP_STA);
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     log(ArdUILanguage::text(ArdUILanguage::Key::s_101) + _config.apName);
+#endif
 #if ARDPORTAL_SUPPORT_DUAL_BAND_AP
     // One radio/channel is shared with STA; use the preference when disconnected.
     const int apChannel = wifiConnected() ? WiFi.channel() : (_config.apBand==5?36:1);
@@ -302,11 +310,16 @@ void ArdPortal::serviceWifi(uint32_t now) {
   }
 #endif
   if (wifiConnected()) {
-    const bool wasAttempting=_attempting;_wifiState = WifiState::Connected; _attempting = false;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+    const bool wasAttempting=_attempting;
+#endif
+    _wifiState = WifiState::Connected; _attempting = false;
     if (!_wifiResult) _wifiResult = 1;
     if (!_wasConnected) {
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
       log(ArdUILanguage::text(ArdUILanguage::Key::s_102) + localIP().toString());
       if(wasAttempting) log(ArdUILanguage::text(ArdUILanguage::Key::s_210)+String(uint32_t(now-_wifiSince)));
+#endif
       _wasConnected = true;
 #if ARDPORTAL_ENABLE_MQTT
       _mqttClient.wifiAvailable(now);
@@ -321,7 +334,11 @@ void ArdPortal::serviceWifi(uint32_t now) {
     apChannelConflict = (_config.apBand==5)!=(WiFi.channel()>14);
 #endif
     if (_apActive && (apChannelConflict || (_apPolicy==ApPolicy::Automatic && !_http && WiFi.softAPgetStationNum() == 0))) {
-      if (WiFi.softAPdisconnect(true)) { log(ArdUILanguage::text(ArdUILanguage::Key::s_103)); _apActive = false;
+      if (WiFi.softAPdisconnect(true)) {
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+        log(ArdUILanguage::text(ArdUILanguage::Key::s_103));
+#endif
+        _apActive = false;
 #if ARDPORTAL_ENABLE_WWW
         _dns.stop();
 #endif
@@ -333,15 +350,20 @@ void ArdPortal::serviceWifi(uint32_t now) {
   // Keep automatic retries paused while someone is using the fallback portal.
   const bool apInUse = _apActive && WiFi.softAPgetStationNum() != 0;
   if (_wasConnected) {
-    log(ArdUILanguage::text(ArdUILanguage::Key::s_104)); _wasConnected = false; closeMqtt();
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+    log(ArdUILanguage::text(ArdUILanguage::Key::s_104));
+#endif
+    _wasConnected = false; closeMqtt();
     if(!_wifiAutoReconnect)_wifiState=_apActive?WifiState::FallbackAP:WifiState::Disconnected;
     if (apInUse) startAP(); else connectWifi();
     return;
   }
   if (_attempting && uint32_t(now - _wifiSince) >= _options.wifiTimeoutMs) {
     if (!_wifiResult) _wifiResult = 2;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     log(ArdUILanguage::text(ArdUILanguage::Key::s_105));
     log(ArdUILanguage::text(ArdUILanguage::Key::s_210)+String(uint32_t(now-_wifiSince)));
+#endif
     WiFi.disconnect(false, false); _attempting = false; _wifiState=WifiState::Disconnected; startAP();
   } else if (_wifiAutoReconnect && !_attempting && !apInUse && !_scanning && _config.ssid.length() && uint32_t(now - _retrySince) >= _options.retryMs) connectWifi();
   else if (!_attempting && !_apActive && uint32_t(now - _retrySince) >= _options.retryMs) startAP();
@@ -360,7 +382,11 @@ void ArdPortal::serviceScan() {
     _scanRequested = false; _scanSucceeded=false; WiFi.scanDelete();
     int result = WiFi.scanNetworks(true);
     _scanning = result == WIFI_SCAN_RUNNING || result >= 0;
-    if (!_scanning) { _networks = "[]"; _scanCompletedId = _scanId; log(ArdUILanguage::text(ArdUILanguage::Key::s_106)); }
+    if (!_scanning) { _networks = "[]"; _scanCompletedId = _scanId;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+      log(ArdUILanguage::text(ArdUILanguage::Key::s_106));
+#endif
+    }
   }
   if (!_scanning) return;
   int count = WiFi.scanComplete();
@@ -424,23 +450,27 @@ void ArdPortal::loop() {
   _uptimeMs += uint32_t(tick - _lastLoopMs); _lastLoopMs = tick;
   // Apply settings only after the HTTP response has been sent/closed.
   if (_pendingReady && !_http && !_scanning) {
+#if ARDPORTAL_ENABLE_WIFI
     bool apChanged = _config.apName != _pending.apName || _config.apPassword != _pending.apPassword || _config.apBand != _pending.apBand;
+#endif
     closeMqtt(); _config = std::move(_pending); applyPendingApp(); _pendingReady = false;_pendingApp=ArdJSON::JSONVar::object();_pending.caCert=String();
+#if ARDPORTAL_ENABLE_WIFI
     ++_wifiRevision; _wifiResult = _config.ssid.length() ? 0 : 2;
     configureIdentity();
     if (apChanged && _apActive) {
       // Reconfigure the active AP only after the HTTP confirmation was sent.
       _apActive = false; startAP();
     }
+#endif
   
 #if ARDPORTAL_ENABLE_MQTT
   _mqttClient.configurationLoaded();
 #endif
     #if ARDPORTAL_ENABLE_WIFI
     WiFi.disconnect();
-    #endif
     _wasConnected = false; _attempting = false;
     if (_config.ssid.length()) connectWifi(); else startAP();
+    #endif
     _pending = PortalConfig();
     if (_notifyPending) { _notifyPending = false; notifyConfig(); }
   }
@@ -1441,8 +1471,10 @@ void ArdPortal::finishLoad(const ArdFS::Result& result) {
   if (!_config.deviceName.length()) _config.deviceName = defaultDeviceName();
   _config.apName = ArdDeviceName::ap(_config.deviceName);
   configureIdentity(); _configurationReady = true;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   log(result.recovered ? ArdUILanguage::text(ArdUILanguage::Key::s_167) : ArdUILanguage::text(ArdUILanguage::Key::s_168));
   if (_storageError.length()) log(_storageError);
+#endif
 
 #if ARDPORTAL_ENABLE_MQTT
   _mqttClient.configurationLoaded();
@@ -1739,7 +1771,9 @@ void ArdPortal::finishSave(const ArdFS::Result& result) {
 #if ARDPORTAL_ENABLE_WWW
     if (respond) reply(500, "text/plain", result.error);
 #endif
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     log(ArdUILanguage::text(ArdUILanguage::Key::s_176) + result.error);
+#endif
   }
 #if ARDPORTAL_ENABLE_MQTT
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
@@ -1754,7 +1788,7 @@ void ArdPortal::finishSave(const ArdFS::Result& result) {
   ArdJSON::JSONVar failedValues;
   // Move rather than copy: reporting must not require another snapshot allocation.
   if(exhausted)failedValues=std::move(_pendingApp);
-  if(!_savePending&&!_saveQueued&&!_pendingReady) {_pendingApp=ArdJSON::JSONVar::object();_pendingAppPatch=false;_pending.caCert=String();}
+  if(!_savePending&&!_saveQueued&&!_pendingReady) {_pendingApp=ArdJSON::JSONVar::object();_pendingAppPatch=false;_pending=PortalConfig();}
   if(exhausted&&_valueSaveFailed){
     failedValues.forEachObjectMember([&](const String& key,const ArdJSON::JSONVar& value){
       _valueSaveFailed(key,value,_saveAttempts,result.error);return true;

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Store only the queued MQTT transmit packet instead of a permanent 2048-byte TX buffer; release it after transmission/disconnect while preserving packet limits and partial writes. Avoid formatting internal diagnostic messages when Messages logging is disabled.
+- Add reproducible ESP8266/ESP32/C6 feature-size measurements and flash/static-RAM reports, including individual controls, prerequisites, numeric flags and before/after comparisons.
+- Remove unused Wi-Fi scan/reconnect state from network-free instances and release the staged portal configuration after completed saves instead of retaining duplicate setting strings.
+- Exclude Wi-Fi headers and driver calls from network-free builds, avoiding ESP32 network-stack linkage when `ARDPORTAL_ENABLE_WIFI=0`. Add an ESP32 linker-map regression check.
 - Parse portal style/script elements with the standard HTML parser instead of tag regexes; preserve generated assets and validate mixed-case tags, attributes and feature variants.
 
 

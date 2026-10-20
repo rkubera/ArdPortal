@@ -248,7 +248,8 @@ private:
   uint32_t _mqttSince = 0, _lastTx = 0, _pingSince = 0, _txSince = 0;
   uint32_t _lastServiceMs=0,_maxServiceGapMs=0;
   bool _pingPending = false;
-  uint8_t _rx[PacketCapacity], _tx[PacketCapacity];
+  uint8_t _rx[PacketCapacity];
+  String _tx; // Own only the queued packet; release it after send/disconnect.
   size_t _rxSize = 0, _txSize = 0, _txOffset = 0;
   uint16_t _packetId = 0, _subscriptionId = 0;
   bool _subscriptionPending = false;
