@@ -52,6 +52,13 @@ def _measurement(value, kind):
     return value / divisor
 
 
+def _thermostat_update(self, attrid, value):
+    """Keep the ZCL unknown-temperature sentinel out of HA's temperature display."""
+    if getattr(attrid, "id", attrid) in (0x0000, 0x0001) and value == -32768:
+        value = None
+    CustomCluster._update_attribute(self, attrid, value)
+
+
 builder = QuirkBuilder("ArdPortal", MODEL)
 reporting = ReportingConfig(min_interval=1, max_interval=3600, reportable_change=1)
 measurements = {
@@ -74,7 +81,12 @@ for field in FIELDS:
                   unique_id_suffix=field["endpoint"], translation_key="ardportal_" + field["endpoint"],
                   entity_type=EntityType.STANDARD)
     if kind in ("slider", "select", "state", "binary", "action") or kind in measurements:
-        builder.prevent_default_entity_creation(endpoint_id=ep)
+        # Current ZHA applies this filter to quirk entities as well as defaults.
+        # Keep the explicitly exposed entity, identified by its unique suffix.
+        builder.prevent_default_entity_creation(
+            endpoint_id=ep,
+            function=lambda entity, suffix=field["endpoint"]: not entity.unique_id.endswith("-" + suffix),
+        )
     if kind == "slider":
         builder.number("present_value", 0x000D, min_value=field["min"],
                        max_value=field["max"], step=field["step"],
@@ -100,12 +112,15 @@ for field in FIELDS:
                    "cover": 0x0102, "lock": 0x0101, "siren": 0x0502}.get(kind)
         if cluster is not None:
             builder.change_entity_metadata(endpoint_id=ep, cluster_id=cluster,
+                                           function=lambda entity, platform=kind: entity.PLATFORM.value == platform,
+                                           new_translation_key=common["translation_key"],
                                            new_fallback_name=field["label"])
         if kind == "climate":
             limits = {0x0015: round(field["min"] * 100), 0x0016: round(field["max"] * 100),
                       0x0017: round(field["min"] * 100), 0x0018: round(field["max"] * 100)}
             thermostat = type("ArdPortalThermostat" + str(ep), (CustomCluster, Thermostat),
-                              {"_CONSTANT_ATTRIBUTES": limits, "__module__": __name__})
+                              {"_CONSTANT_ATTRIBUTES": limits, "_update_attribute": _thermostat_update,
+                               "__module__": __name__})
             builder.replaces(thermostat, endpoint_id=ep)
 
 ARDPORTAL_QUIRK_ENTRY = builder.add_to_registry()

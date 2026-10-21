@@ -622,7 +622,9 @@ so ZHA sees the new model and endpoints.
 - Typed text measurements become sensors in application units, with invalid wire
   readings converted to unavailable values. Ordinary text has no Zigbee endpoint.
 - Standard switches, lights, covers, locks, sirens and thermostats use ZHA's native
-  entities with the registered labels. Thermostat temperature limits are supplied
+  entities with the registered labels. Auxiliary native configuration and diagnostic
+  entities retain their own names. Unknown thermostat temperature readings are
+  displayed as unknown instead of the ZCL sentinel value. Thermostat temperature limits are supplied
   locally by the quirk; ZHA chooses its temperature step and available modes from
   its native thermostat implementation. The native mapping supplies independent heating/cooling setpoints for `heat_cool`; the ZHA entity chooses how to present the supported modes and setpoints.
 - Composite fan, valve, humidifier, alarm, vacuum, mower and water-heater controls
