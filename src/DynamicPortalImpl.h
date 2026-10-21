@@ -216,7 +216,7 @@ bool ArdPortal::buildDynamicHttpPart() {
     if((_httpDynamicMode==0||_httpDynamicMode==3)&&!_httpDynamicPageCount){_httpDynamicText="[]";_httpDynamicPages=false;return true;}
     if(_httpDynamicMode==3){_httpDynamicText="["+_dynamic.pages.menu(0);_httpDynamicStage=1;return true;}
     _httpDynamicText=_httpDynamicMode==2?String(F("{\"values\":{")):
-      (_httpDynamicMode==0?String("["):String())+_dynamic.pages.headerPrefix(_httpDynamicPageIndex);
+      (_httpDynamicMode==0?String(F("[")):String())+_dynamic.pages.headerPrefix(_httpDynamicPageIndex);
     _httpDynamicStage=1;return _httpDynamicText.length();
   }
   if(_httpDynamicMode==3){
@@ -232,17 +232,17 @@ bool ArdPortal::buildDynamicHttpPart() {
       const char* id=_dynamic.pages.fieldId(p,f);
       String value=_json.stringify(getAppConfigValue(id),false,nullptr,snapshotLimits());
       if(!value.length())return false;
-      _httpDynamicText=(f?String(","):String())+_json.stringify(V(id))+":"+value;
+      _httpDynamicText=(f?String(F(",")):String())+_json.stringify(V(id))+":"+value;
     }else{
       String value=_dynamic.pages.fieldHttpText(p,f);if(!value.length())return false;
-      _httpDynamicText=(f?String(","):String())+value;
+      _httpDynamicText=(f?String(F(",")):String())+value;
     }
     return true;
   }
   if(_httpDynamicMode!=2){
     ++_httpDynamicPageIndex;_httpDynamicField=0;
     if(_httpDynamicPageIndex<_httpDynamicPageCount){_httpDynamicText="]},"+_dynamic.pages.headerPrefix(_httpDynamicPageIndex);return true;}
-    _httpDynamicText=_httpDynamicMode==0?String("]}]"):String("]}");_httpDynamicPages=false;return true;
+    _httpDynamicText=_httpDynamicMode==0?String(F("]}]")):String(F("]}"));_httpDynamicPages=false;return true;
   }
   if(_httpDynamicStage==1){
     _httpDynamicField=0;_httpDynamicStage=2;
@@ -255,8 +255,8 @@ bool ArdPortal::buildDynamicHttpPart() {
     const size_t f=_httpDynamicField++;
     if(!_dynamic.pages.dependent(p,f)){_httpDynamicText=" ";return true;}
     V field=_dynamic.pages.fieldConditions(p,f);if(!field.isValid()||field.isUndefined())return false;
-    _httpDynamicText=(_httpDynamicConditionFirst?String():String(","))+_json.stringify(V(_dynamic.pages.fieldId(p,f)))+F(":{\"visible\":")+
-      (_appControls.appFieldVisible(field)?String("true"):String("false"))+"}";
+    _httpDynamicText=(_httpDynamicConditionFirst?String():String(F(",")))+_json.stringify(V(_dynamic.pages.fieldId(p,f)))+F(":{\"visible\":")+
+      (_appControls.appFieldVisible(field)?String(F("true")):String(F("false")))+"}";
     _httpDynamicConditionFirst=false;return true;
   }
 #endif

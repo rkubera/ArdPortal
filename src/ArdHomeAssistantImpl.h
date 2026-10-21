@@ -152,8 +152,8 @@ String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) cons
     if(type=="climate") {
     c["temperature_command_topic"]=command+"_temperature"; c["temperature_state_topic"]=state; c["temperature_state_template"]="{{ value_json.temperature }}";
     if(ArdDynamicPages::contains(f["modes"],"heat_cool")) for(const char* suffix:{"low","high"}) {
-      String key=String("temperature_")+suffix;
-      c[key+"_command_topic"]=command+"_"+key;c[key+"_state_topic"]=state;c[key+"_state_template"]=String("{{ value_json.")+key+" }}";
+      String key=String(F("temperature_"))+suffix;
+      c[key+"_command_topic"]=command+"_"+key;c[key+"_state_topic"]=state;c[key+"_state_template"]=String(F("{{ value_json."))+key+" }}";
     }
     c["current_temperature_topic"]=state; c["current_temperature_template"]="{{ value_json.current_temperature | default('', true) }}";
     c["min_temp"]=f["min"]; c["max_temp"]=f["max"]; c["temp_step"]=f["step"].isUndefined()?V(0.5):f["step"]; c["temperature_unit"]="C";

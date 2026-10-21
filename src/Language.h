@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "LanguageData.h"
+#include "FlashText.h"
 
 // Native messages follow the language of the most recent portal HTTP request.
 // This preference stays in RAM; browser preferences do not wear out flash.
@@ -29,7 +30,7 @@ inline ArdUILanguageData::Language language(size_t index) {
  */
 inline int find(const String& code) {
   for (size_t i = 0; i < ArdUILanguageData::Count; ++i) {
-    if (code == String(FPSTR(language(i).code))) return int(i);
+    if (ardFlashEqual(code,language(i).code)) return int(i);
   }
   return -1;
 }
@@ -51,14 +52,29 @@ using Key = ArdUILanguageData::Key;
  * @return Localized text for the active language, or an empty string if the ID is absent.
  */
 template<size_t Size>
-inline String lookup(uint16_t id, const ArdUILanguageData::Message (&messages)[Size]) {
+inline const char* lookupFlash(uint16_t id, const ArdUILanguageData::Message (&messages)[Size]) {
   for (size_t i = 0; i < Size; ++i) {
-    ArdUILanguageData::Message message;
-    // Copy records from flash before reading their fields.
-    memcpy_P(&message, &messages[i], sizeof(message));
-    if (id == message.id) return String(FPSTR(message.values[active()]));
+    uint16_t messageId;
+    memcpy_P(&messageId,&messages[i].id,sizeof(messageId));
+    if(id==messageId) {
+      const char* value;
+      const size_t index=active()<ArdUILanguageData::Count?active():0;
+      memcpy_P(&value,&messages[i].values[index],sizeof(value));
+      return value&&pgm_read_byte(value)?value:nullptr;
+    }
   }
-  return String();
+  return nullptr;
+}
+/** @brief Copy a selected flash message only when the caller needs owned text. */
+template<size_t Size>
+inline String lookup(uint16_t id,const ArdUILanguageData::Message (&messages)[Size]) {
+  const char* value=lookupFlash(id,messages);
+  return value?String(FPSTR(value)):String();
+}
+/** @brief Borrow a translated message in flash; nullptr requests the legacy key fallback. */
+inline const char* textFlash(Key key) {
+  const char* value=lookupFlash(uint16_t(key),ArdUILanguageData::Messages);
+  return value?value:lookupFlash(uint16_t(key),ArdUILanguageData::StorageMessages);
 }
 /**
  * @brief Decode a storage message key in the form s_<decimal ID>.
@@ -71,6 +87,18 @@ inline uint16_t messageId(const char* key) {
   for(const char* p=key+2;*p;++p) {
     if(*p<'0'||*p>'9')return 0;
     id=id*10+uint32_t(*p-'0');if(id>65535)return 0;
+  }
+  return uint16_t(id);
+}
+/** @brief Decode a flash-backed s_<ID> key without copying it into RAM. */
+inline uint16_t messageId(const __FlashStringHelper* key) {
+  const char* bytes=reinterpret_cast<const char*>(key);
+  if(!bytes||pgm_read_byte(bytes)!='s'||pgm_read_byte(bytes+1)!='_')return 0;
+  uint32_t id=0;uint8_t c=pgm_read_byte(bytes+2);
+  if(c<'1'||c>'9')return 0;
+  for(size_t i=2;(c=pgm_read_byte(bytes+i))!=0;++i) {
+    if(c<'0'||c>'9')return 0;
+    id=id*10+uint32_t(c-'0');if(id>65535)return 0;
   }
   return uint16_t(id);
 }
@@ -117,11 +145,17 @@ inline String text(const char* key) {
  * @param key Configuration key or JSON object member name.
  * @return Localized storage message, or its s_<ID> key if no translation is present.
  */
-inline String storageText(const __FlashStringHelper* key) { return storageText(String(key).c_str()); }
+inline String storageText(const __FlashStringHelper* key) {
+  const char* value=lookupFlash(messageId(key),ArdUILanguageData::StorageMessages);
+  return value?String(FPSTR(value)):String(key);
+}
 /**
  * @brief Resolve a UI message in the active language with storage-message fallback.
  * @param key Configuration key or JSON object member name.
  * @return Localized message, or the original message key when unavailable.
  */
-inline String text(const __FlashStringHelper* key) { return text(String(key).c_str()); }
+inline String text(const __FlashStringHelper* key) {
+  const char* value=textFlash(static_cast<Key>(messageId(key)));
+  return value?String(FPSTR(value)):String(key);
+}
 }

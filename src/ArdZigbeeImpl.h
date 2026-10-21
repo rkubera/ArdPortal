@@ -192,7 +192,7 @@ void ArdZigbee::loop(uint32_t now){
     if(_otaHandle){esp_ota_abort(_otaHandle);_otaHandle=0;}_otaActive=false;esp_zb_lock_release();log("Zigbee OTA timed out; current firmware retained");
   }
 #endif
-  if(_cancelledOperation!=Operation::None){auto op=_cancelledOperation;_cancelledOperation=Operation::None;auto cb=_finished;if(cb)cb(op,false,String("Cancelled by factory reset"));}
+  if(_cancelledOperation!=Operation::None){auto op=_cancelledOperation;_cancelledOperation=Operation::None;auto cb=_finished;if(cb)cb(op,false,String(F("Cancelled by factory reset")));}
   Event e;for(unsigned budget=0;budget<8&&xQueueReceive(_events,&e,0)==pdTRUE;++budget){
 
     if(e.type==2&&_resetWaitingCancel){_resetWaitingCancel=false;_retryAt=now;}

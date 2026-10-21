@@ -582,7 +582,7 @@ public:
     struct Rollback {ArdDynamicPages& owner;size_t previous;bool keep=false;~Rollback(){if(keep)return;owner.totalFields=previous;owner.entityBytes-=owner.entities->source.length();auto next=std::move(owner.entities->next);owner.entities=std::move(next);}} rollback{*this,previousCount};
     ArdJSON::Limits limits;limits.maxNodes=4096;limits.maxOutputBytes=ArdAppConfigMaxDefinitionBytes;
     size_t bytes=pages.measure(limits);if(!bytes)return fail("registry","","definition measurement failed");
-    if(bytes+entityBytes>ArdAppConfigMaxDefinitionBytes)return fail("limits","",String("total definition limit: ")+String(ArdAppConfigMaxDefinitionBytes)+" bytes");
+    if(bytes+entityBytes>ArdAppConfigMaxDefinitionBytes)return fail("limits","",String(F("total definition limit: "))+String(ArdAppConfigMaxDefinitionBytes)+" bytes");
     // Every generated command and acknowledgement name must be unambiguous.
     for(size_t i=0;i<count();++i) {V f=at(i);V suffixes=V::array();
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE

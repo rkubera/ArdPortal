@@ -1,15 +1,11 @@
 #pragma once
 #include "Arduino.h"
+#include "IPAddress.h"
 #define WL_CONNECTED 3
 #define WIFI_OFF 0
 #define WIFI_STA 1
 #define WIFI_AP_STA 3
 #define WIFI_SCAN_RUNNING -1
-struct IPAddress {
-  String text = "192.168.4.1";
-  bool fromString(const String& s) { text = s; return s.indexOf('.') >= 0; }
-  String toString() const { return text; }
-};
 struct Endpoint { std::deque<uint8_t> input; std::vector<uint8_t> output; bool connected = true; size_t writeLimit = 4096; };
 class WiFiClient {
 public:

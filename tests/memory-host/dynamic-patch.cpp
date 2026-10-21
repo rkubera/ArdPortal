@@ -36,6 +36,17 @@ bool failFileWrite = false, failRename = false;
 
 void drain(ArdPortal& p){if(p._savePending&&!p._saveQueued)p.flushPortalAndAppConfig();for(int i=0;i<10000&&(p.portalAndAppConfigBusy()||!p.portalAndAppConfigReady());++i){fakeMillis+=10;p.serviceStorage(fakeMillis);}assert(!p._storage.busy()&&!p._savePending);}
 int main(){
+  {ArdPortal p;auto& mqtt=p._mqttClient;const auto savedMillis=fakeMillis;const int savedWifi=WiFi.state;
+   WiFi.state=WL_CONNECTED;p._config.host="broker";mqtt._mqttState=ArdPortal::MqttState::Connected;mqtt._lastTx=fakeMillis;
+   assert(mqtt._mqtt.connect(IPAddress(),1883));auto endpoint=mqtt._mqtt.endpoint;endpoint->writeLimit=7;
+   String body;for(size_t i=0;i<130;++i)body+=char(i);assert(mqtt.queuePacket(0x30,body));
+   assert(mqtt._tx.length()==133);mqtt.serviceMqtt(++fakeMillis);assert(mqtt._txSize==133&&mqtt._txOffset==7&&mqtt._tx.length()==133);
+   for(size_t i=0;i<30&&mqtt._txSize;++i)mqtt.serviceMqtt(++fakeMillis);
+   assert(!mqtt._txSize&&!mqtt._tx.length()&&endpoint->output.size()==133);
+   assert(endpoint->output[0]==0x30&&endpoint->output[1]==0x82&&endpoint->output[2]==1);
+   assert(!memcmp(endpoint->output.data()+3,body.c_str(),body.length()));
+   assert(mqtt.queuePacket(0x30,body));mqtt.closeMqtt();assert(!mqtt._txSize&&!mqtt._tx.length());
+   WiFi.state=savedWifi;fakeMillis=savedMillis;}
   {ArdPortal p;assert(String(p.getFirmwareVersion())=="1.0");
    assert(ArdJSON::JSON.parse(p.infoJson())["firmwareVersion"].asString()=="1.0");
    auto f=ArdJSON::JSON.parse(R"({"id":"version_test","type":"switch","name":"Relay"})");

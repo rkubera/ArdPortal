@@ -103,7 +103,12 @@ void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t 
       for(size_t c=0;c<entity["controls"].length();++c) {
         const V& control=entity["controls"][c]; String suffix=control["command"].asString();
         if(command!=id+(suffix.length()?"_"+suffix:String())) continue;
-        if(!appFieldVisible(f)){_portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_207));return;}
+        if(!appFieldVisible(f)){
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+          _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_207));
+#endif
+          return;
+        }
         V input=payload;
         String kind=control["type"].asString();
         if(kind=="action"&&payload!=control["payload"].asString()) continue;
@@ -118,7 +123,11 @@ void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t 
           else {acceptMqttState(id,next);}
           return;
         }
-        if(!appControl(f,c,input,ChangeSource::Mqtt)) _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177));
+        if(!appControl(f,c,input,ChangeSource::Mqtt)) {
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+          _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177));
+#endif
+        }
         return;
       }
       continue;
@@ -151,9 +160,16 @@ void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t 
       else value=payload;
 #endif
     }
-    if(!appFieldVisible(f)){_portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_207));return;}
+    if(!appFieldVisible(f)){
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+      _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_207));
+#endif
+      return;
+    }
     if(ArdDynamicPages::validValue(f,value)) { acceptMqttState(id,value); }
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     else _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177));
+#endif
     return;
   }
 }
@@ -290,7 +306,7 @@ bool ArdAppControls::appControl(const V& definition,size_t index,const V& value,
       V ack=V::object();ack["command"]=suffix;ack["value"]=value;ack["accepted"]=true;
       // The callback accepts an action; it must report actual hardware state separately.
       if(!ArdHa::transient(f)) {V state=_portal.getAppConfigValue(key.c_str());String payload=state.type()==V::Type::String?state.asString():_portal._json.stringify(state);queueAppEmission(_portal._mqttClient.mqttTopic("stat",key.c_str()),payload);}
-      queueAppEmission(_portal._mqttClient.mqttTopic("stat",(key+(ArdHa::transient(f)?String():String("_ack"))).c_str()),_portal._json.stringify(ack));
+      queueAppEmission(_portal._mqttClient.mqttTopic("stat",(key+(ArdHa::transient(f)?String():String(F("_ack")))).c_str()),_portal._json.stringify(ack));
     }
 #endif
     // Acceptance depends on the local callback, even if MQTT delivery is unavailable.

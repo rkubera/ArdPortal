@@ -5,13 +5,14 @@ import tempfile
 
 root = Path(__file__).resolve().parents[1]
 source = (root / "src/ArdPortalImpl.h").read_text()
-start = source.index('  if (method == "POST" && path == "/api/factory-reset") {')
-end = source.index('  if (method == "POST" && path == "/api/storage/format") {', start)
+start = source.index('  if (ardFlashEqual(method,F("POST")) && ardFlashEqual(path,F("/api/factory-reset"))) {')
+end = source.index('  if (ardFlashEqual(method,F("POST")) && ardFlashEqual(path,F("/api/storage/format"))) {', start)
 branch = source[start:end]
 fixture = r'''
 #include <cassert>
 #include <functional>
 #include "Arduino.h"
+#include "FlashText.h"
 namespace ArdJSON { struct JSONVar { static JSONVar object() { return {}; } }; }
 namespace ArdUILanguage { enum class Key { s_132, s_124, s_107 }; }
 enum class ChangeSource { FactoryReset };
@@ -73,6 +74,6 @@ with tempfile.TemporaryDirectory(prefix="ardportal-reset-test-") as tmp:
     for zigbee in (0, 1):
         subprocess.run(["c++", "-std=c++17", "-Wall", "-Wextra", "-Werror",
                         "-DARDPORTAL_ENABLE_ZIGBEE=" + str(zigbee),
-                        "-fsanitize=address,undefined", "-I" + str(root / "tests/host"),
+                        "-fsanitize=address,undefined", "-I" + str(root / "tests/host"), "-I" + str(root / "src"),
                         str(tmp / "test.cpp"), "-o", str(tmp / "test")], check=True)
         subprocess.run([str(tmp / "test")], check=True)

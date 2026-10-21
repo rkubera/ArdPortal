@@ -47,9 +47,15 @@ int main() {
   assert(portal.begin());
   for(int i=0;i<1000;++i){fakeMillis+=10;portal.loop();}
   assert(portal.portalAndAppConfigReady());
+  auto config=portal.getPortalConfig();
+  config.deviceDescription=String("Description retained only in the active configuration after saving");
+  assert(portal.setPortalConfig(config));
+  for(int i=0;i<1000;++i){fakeMillis+=10;portal.loop();}
   assert(portal.setAppConfigValue("saved",17));
   for(int i=0;i<1000;++i){fakeMillis+=10;portal.loop();}
   assert(portal.getAppConfigValue("saved").asDouble()==17);
+  assert(portal.getPortalConfig().deviceDescription==config.deviceDescription);
+  assert(!portal._pending.deviceDescription.length());
   ArdPortal restored;assert(restored.begin());
   for(int i=0;i<1000;++i){fakeMillis+=10;restored.loop();}
   assert(restored.portalAndAppConfigReady());
