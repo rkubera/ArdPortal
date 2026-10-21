@@ -1,5 +1,20 @@
 # Power Management
 
+[Documentation home](https://github.com/rkubera/ArdPortal/wiki/Home) · [All topics](https://github.com/rkubera/ArdPortal/wiki/Home#start-here) · [Source](https://github.com/rkubera/ArdPortal)
+
+## On this page
+
+- [Policies: when to sleep](#policy-when-to-sleep)
+- [Sleep types: how to sleep](#sleep-type-how-to-sleep)
+- [Wi-Fi only](#wi-fi-only-esp8266-and-esp32)
+- [Zigbee only](#zigbee-only-esp32-c5c6h2-end-device)
+- [Wi-Fi and Zigbee together](#wi-fi--zigbee-together-esp32-c5c6-end-device)
+- [Parameters and wake sources](#parameters-that-change-the-result)
+- [Periodic application cycles](#periodic-application-cycles)
+- [Manual requests](#manual-sleep-requests)
+- [GPIO, interrupts and timers](#gpio-interrupts-and-timers)
+- [Diagnostics](#diagnostics)
+
 The power manager is an integral part of ArdPortal and is always available through `portal.power()`. Its default policy is `AlwaysOn`; configure a sleep policy explicitly to enable sleeping. Configure **when** the device may sleep independently from **how** it sleeps:
 
 ```cpp
@@ -28,7 +43,7 @@ Call configuration and application methods from the Arduino task together with `
 | Policy | Behaviour |
 |---|---|
 | `AlwaysOn` | Default. Forces the effective sleep type to `None`, adds no idle wait and refuses `requestSleep()`, regardless of the selected type. GPIO/ISR events and software timers are still dispatched. |
-| `EventDriven` | Applies the selected type automatically after the idle grace period, when blockers are clear. CPU idle waits are limited by the time until the application next needs to run (`wakeIn()`) and registered timers. `DeepSleep` automatically restarts the device after its selected wake interval. |
+| `EventDriven` | Enables the selected radio-saving policy; adds CPU waits or enters deep sleep automatically after `sleepDelayMs`, when blockers are clear. CPU idle waits are limited by the time until the application next needs to run (`wakeIn()`) and registered timers. `DeepSleep` automatically restarts the device after its selected wake interval. |
 | `Periodic` | Schedules application cycles at `periodic.intervalMs`. Sleeps between cycles after `sleepDelayMs`, subject to all blockers. RAM-retaining modes deliver a `Periodic` event; deep sleep restarts `setup()`. |
 | `Manual` | Applies the selected radio policy, but adds no CPU wait/light/deep sleep until `requestSleep()` is accepted. The same admission checks still apply. |
 
@@ -36,7 +51,7 @@ Call configuration and application methods from the Arduino task together with `
 
 | Sleep type | Behaviour and platform support |
 |---|---|
-| `None` | Default. Disables Wi-Fi power saving, adds no idle wait and refuses explicit sleep requests. |
+| `None` | Default. Disables Wi-Fi power saving and native Zigbee sleep, adds no idle wait and refuses explicit sleep requests. A Zigbee receiver capability selected at startup remains fixed until restart. |
 | `ConnectedSleep` | Keeps Wi-Fi or Zigbee end-device connectivity and saves radio power. Its `connectedSleep.allowCpuSleep` option additionally controls permission to sleep the CPU; see below. |
 | `LightSleep` | Timer/GPIO-wake light sleep on ESP32, with RAM retained. Zigbee end devices use native stack-coordinated automatic light sleep; without Zigbee the manager enters standalone light sleep. The Wi-Fi radio must already be off; active Wi-Fi adds the `Network` blocker. The manager does not silently disconnect it. Not implemented on ESP8266: selecting it returns false; use `ConnectedSleep` there when Wi-Fi is connected. |
 | `DeepSleep` | Timed deep sleep, optionally interrupted by one configured ESP32 GPIO. RAM and network sessions are lost; execution restarts in `setup()`. Automatic under `EventDriven`/`Periodic`, explicitly requested under `Manual`, suppressed under `AlwaysOn`. |
@@ -57,6 +72,117 @@ The option applies only to `ConnectedSleep`; it does not change `None`, `LightSl
 `sleepDelayMs` is the inactivity delay before automatic sleep, not its duration. New activity or an active blocker restarts the delay; explicit `requestSleep()` skips it. It must be at most `INT32_MAX`; `maxIdleMs` must be 1–100. `ConnectedSleep` and standalone `LightSleep` use bounded slices so portal/network work continues between them. Without a connected Wi-Fi or Zigbee end device, `ConnectedSleep` only yields; choose `LightSleep` on ESP32 to enter standalone hardware sleep.
 
 When connected light-sleep is supported on ESP32, the manager temporarily enables automatic PM light-sleep while preserving the current CPU frequency. Previous PM and Wi-Fi settings are restored when the manager is destroyed. A sketch define cannot rebuild missing precompiled SDK capabilities. `ConnectedSleep` reports permission to sleep, not proof of physical sleep entry: traffic, other tasks and SDK locks also matter.
+
+## Policy and sleep type by network configuration
+
+A **policy** decides when ArdPortal may pause application execution or enter deep sleep. A **sleep type** decides what happens to the CPU, RAM and radios. Select both before `portal.begin()`, especially with Zigbee. `AlwaysOn` + `None` is the default; no power-management define is needed.
+
+The tables below cover all 16 policy/type combinations for each network configuration. `ConnectedSleep` includes both values of `connectedSleep.allowCpuSleep`, explained separately below. "Wi-Fi only" means Zigbee is disabled in the build; a Zigbee-enabled build adds its readiness checks even before the Zigbee connection is established.
+
+### Reading the tables
+
+| Term | Exact meaning |
+|---|---|
+| Radio saving | The stack may turn off reception between scheduled network activity. The network connection remains established, but incoming commands can be delayed. CPU sleep is a separate decision. |
+| CPU permission | ArdPortal enables the platform's connected light-sleep mechanism when admission checks pass. The SDK scheduler, other tasks and native power locks decide whether physical sleep happens. |
+| Automatic | `EventDriven` waits for `sleepDelayMs` after the last reported activity or blocker. `Periodic` uses the same delay and limits sleep to the remaining time until the next scheduled cycle. Radio saving can already be enabled during this delay. |
+| Manual request | Call `requestSleep(ms)` and keep calling `portal.loop()`. It skips `sleepDelayMs`, but waits for admission checks. Radio saving does not require the request. |
+| Common admission checks | No startup/configuration work, pending storage, OTA, restart, active provisioning AP, Wi-Fi connect/scan work, HTTP/WebSocket client, pending MQTT work, application lock, active wake level, incompatible interrupt registration or undelivered event. These checks gate manager-controlled CPU/deep sleep; they do not generally disable modem/radio saving. |
+| Zigbee readiness | An end device must use the sleepy startup profile and be connected, with no pairing/rejoin/Zigbee OTA. `DeepSleep` additionally requires at least 5 seconds connected, a successful `CAN_SLEEP` signal no older than 100 ms, empty native/application report queues, no outstanding Time request and a final successful native stack-lock check. |
+
+`maxIdleMs` bounds each non-deep application wait to 1–100 ms; `wakeIn()` and software timers can shorten it. An automatic non-deep wait also needs scheduled work (`Periodic`, `wakeIn()` or `setTimer()`), a registered pin, or an `onWake()` handler. A plain GPIO/ISR callback is delivered from `portal.loop()`; it does not automatically configure every peripheral as a hardware wake source.
+
+### Wi-Fi only: ESP8266 and ESP32
+
+For `ConnectedSleep`, Wi-Fi stays associated. On ESP8266, `allowCpuSleep=false` selects `WIFI_MODEM_SLEEP`; `true` permits `WIFI_LIGHT_SLEEP` only after CPU admission. On ESP32, radio saving uses `WIFI_PS_MIN_MODEM`; CPU permission additionally requires both `CONFIG_PM_ENABLE` and `CONFIG_FREERTOS_USE_TICKLESS_IDLE`. Without them, an otherwise admitted CPU-sleep attempt reports `ModemSleepFallback`.
+
+| Policy | Selected sleep type | Wi-Fi behaviour | ESP8266 CPU / wake behaviour | ESP32 CPU / wake behaviour and conditions |
+|---|---|---|---|---|
+| `AlwaysOn` | `None` | Wi-Fi saving disabled. | No managed sleep or added wait. | No managed sleep or added wait. |
+| `AlwaysOn` | `ConnectedSleep` | Effective type is `None`; saving disabled. | No managed sleep; requests rejected. | No managed sleep; requests rejected. |
+| `AlwaysOn` | `LightSleep` | Effective type would be `None`. | Configuration rejected: this type is unsupported, even with `AlwaysOn`. | No managed sleep; requests rejected. |
+| `AlwaysOn` | `DeepSleep` | Effective type is `None`; saving disabled. | No managed sleep; requests rejected. Deep-sleep configuration must still be valid. | No managed sleep; requests rejected. Deep-sleep configuration must still be valid. |
+| `EventDriven` | `None` | Wi-Fi saving disabled. | Events/timers run; no sleep. | Events/timers run; no sleep. |
+| `EventDriven` | `ConnectedSleep` | Radio saving enabled while Wi-Fi is active. | Automatic bounded waits; connected light sleep only with `allowCpuSleep=true`, association and clear admission checks. | Automatic bounded waits; connected CPU permission only with `allowCpuSleep=true`, association, clear admission checks and PM support. |
+| `EventDriven` | `LightSleep` | Must already be off; ArdPortal does not disconnect it for this type. | Configuration rejected. | Automatic standalone light sleep only after Wi-Fi is off and admission checks pass; RAM retained, timer/GPIO wake. |
+| `EventDriven` | `DeepSleep` | Saving while waiting; MQTT closed and Wi-Fi stopped at final sleep entry. | Automatic sleep for `deepSleepMs`, shortened by `wakeIn()`; timer wake requires GPIO16 wired to RST. | Automatic sleep for `deepSleepMs`, shortened by `wakeIn()`; timer or supported GPIO wake restarts `setup()`. |
+| `Manual` | `None` | Wi-Fi saving disabled. | No sleep; requests rejected. | No sleep; requests rejected. |
+| `Manual` | `ConnectedSleep` | Radio saving enabled without `requestSleep()`. | Application wait requires a request. CPU permission also requires `allowCpuSleep=true`, association and admission checks. | Application wait requires a request. CPU permission also requires `allowCpuSleep=true`, association, admission checks and PM support. |
+| `Manual` | `LightSleep` | Must already be off. | Configuration rejected. | Request required; standalone light sleep after admission, retaining RAM. |
+| `Manual` | `DeepSleep` | Saving while waiting; MQTT closed and Wi-Fi stopped at final sleep entry. | Request required; timer wake through GPIO16→RST; restarts `setup()`. | Request required; timer/supported GPIO wake restarts `setup()`. |
+| `Periodic` | `None` | Wi-Fi saving disabled. | `Periodic` events every `intervalMs`; no sleep. | `Periodic` events every `intervalMs`; no sleep. |
+| `Periodic` | `ConnectedSleep` | Radio saving enabled between network activity. | Automatic waits between cycles; CPU permission follows `allowCpuSleep`, association and admission checks. | Automatic waits between cycles; CPU permission follows `allowCpuSleep`, association, admission checks and PM support. |
+| `Periodic` | `LightSleep` | Must already be off. | Configuration rejected. | Automatic standalone light sleep between cycles, subject to admission; `Periodic` callbacks continue with RAM retained. |
+| `Periodic` | `DeepSleep` | MQTT closed and Wi-Fi stopped at final sleep entry; reconnect after boot. | Automatic deep sleep for the remaining cycle; timer wake through GPIO16→RST. | Automatic deep sleep for the remaining cycle; timer/supported GPIO wake. Rebuild the cycle from `setup()`. |
+
+All deep-sleep rows require the common admission checks and a valid nonzero hardware interval, with no RAM software timers or incompatible pin registrations. Wi-Fi association itself is not required for deep sleep: an active AP, connection attempt or scan can still block entry. With `ConnectedSleep` and Wi-Fi off/disconnected, cooperative waits may occur, but ArdPortal does not enter standalone hardware light sleep.
+
+### Zigbee only: ESP32-C5/C6/H2 end device
+
+ESP8266 has no native Zigbee support. A standard ESP32 without an IEEE 802.15.4 radio cannot run this native Zigbee implementation either. In this table Wi-Fi is disabled or already off.
+
+A sleepy Zigbee profile must be selected **before stack startup**. The parent buffers commands while the end device polls; the configured keep-alive is 3000 ms. Native Zigbee radio/task sleep is coordinated by the stack, never by forcing standalone `esp_light_sleep_start()` underneath it. CPU light sleep additionally needs PM + tickless idle; otherwise the admitted mode falls back to `ModemSleepFallback`.
+
+| Policy | Selected sleep type | Zigbee behaviour | CPU, application and wake behaviour | Conditions / limits |
+|---|---|---|---|---|
+| `AlwaysOn` | `None` | Native radio sleep disabled. | No managed CPU sleep or added wait. | Full receiver if selected before startup; existing sleepy capability stays fixed until restart. |
+| `AlwaysOn` | `ConnectedSleep` | Effective type `None`; native sleep disabled. | No managed CPU sleep; requests rejected. | Same startup-profile rule. |
+| `AlwaysOn` | `LightSleep` | Effective type `None`; native sleep disabled. | No managed CPU sleep; requests rejected. | Same startup-profile rule. |
+| `AlwaysOn` | `DeepSleep` | Effective type `None`; native sleep disabled. | No deep sleep; requests rejected. | Deep-sleep configuration must still be valid. |
+| `EventDriven` | `None` | Native radio sleep disabled. | GPIO/ISR/timer events run; no sleep. | No automatic change of advertised receiver capability. |
+| `EventDriven` | `ConnectedSleep` | Native radio saving once Zigbee readiness permits it. | Automatic bounded waits; CPU permission follows `allowCpuSleep`. RAM and association retained. | Common admission + Zigbee readiness; PM support for CPU light sleep. |
+| `EventDriven` | `LightSleep` | Native stack controls radio/task sleep. | Automatic bounded waits and CPU light-sleep permission; RAM retained. | Common admission + Zigbee readiness; PM support, otherwise fallback. No forced standalone light sleep. |
+| `EventDriven` | `DeepSleep` | Native readiness checked; live session ends at sleep. Saved identity restored/rejoined on boot. | Automatic sleep for `deepSleepMs`, limited by `wakeIn()`; timer/supported GPIO wake restarts `setup()`. | Common admission + additional Zigbee deep-sleep readiness. |
+| `Manual` | `None` | Native radio sleep disabled. | No sleep; requests rejected. | Startup receiver capability remains fixed. |
+| `Manual` | `ConnectedSleep` | Native radio saving can start without a manual request. | Application wait/CPU permission requires a request; `allowCpuSleep` still applies. | Common admission + Zigbee readiness; PM support for CPU light sleep. |
+| `Manual` | `LightSleep` | Native radio/task sleep can start without a manual request. | Request required for the manager's application wait and CPU permission. | Common admission + Zigbee readiness; PM support, otherwise fallback. |
+| `Manual` | `DeepSleep` | Native saving/readiness prepared; deep sleep only after request. | Request required; wake reboots and restores/rejoins saved network. | Common admission + additional Zigbee deep-sleep readiness. |
+| `Periodic` | `None` | Native radio sleep disabled. | `Periodic` events every `intervalMs`; no sleep. | No sleep despite the repeating application schedule. |
+| `Periodic` | `ConnectedSleep` | Native radio saving; parent buffers/polls as usual. | Automatic waits between cycles; CPU permission follows `allowCpuSleep`. | Common admission + Zigbee readiness; PM support for CPU light sleep. |
+| `Periodic` | `LightSleep` | Native stack controls radio/task sleep. | Automatic waits/CPU permission between cycles; RAM `Periodic` callbacks retained. | Common admission + Zigbee readiness; PM support, otherwise fallback. |
+| `Periodic` | `DeepSleep` | Saved identity retained; reconnect/rejoin after each wake. | Automatic sleep for the remaining cycle; work starts again in `setup()`. | Common admission + additional Zigbee deep-sleep readiness; no RAM software timers. |
+
+**Router exception:** with `ARDPORTAL_ZIGBEE_ROUTER=1`, Zigbee keeps its router role and continuous reception. This manager blocks CPU light/deep sleep for every non-`None` type; choosing a policy does not make a router a sleepy end device. The RAM event/timer dispatcher still runs.
+
+### Wi-Fi + Zigbee together: ESP32-C5/C6 end device
+
+Both stacks share the device and radio coexistence mechanism. Wi-Fi-only hardware and ESP8266 cannot use this native combination; ESP32-H2 has Zigbee but no Wi-Fi radio. Connected operation requires Wi-Fi association and Zigbee readiness before the manager grants CPU sleep. Wi-Fi or Zigbee traffic and native PM locks can keep the CPU awake even after that permission is enabled.
+
+| Policy | Selected sleep type | Wi-Fi behaviour | Zigbee behaviour | CPU / entry conditions |
+|---|---|---|---|---|
+| `AlwaysOn` | `None` | Saving disabled; connection retained. | Native sleep disabled. | No managed sleep or added wait. |
+| `AlwaysOn` | `ConnectedSleep` | Effective type `None`; saving disabled. | Effective type `None`; sleep disabled. | No managed sleep; requests rejected. |
+| `AlwaysOn` | `LightSleep` | Effective type `None`; saving disabled. | Effective type `None`; sleep disabled. | No managed sleep; requests rejected. |
+| `AlwaysOn` | `DeepSleep` | Effective type `None`; saving disabled. | Effective type `None`; sleep disabled. | No managed sleep; requests rejected. Configuration must still be valid. |
+| `EventDriven` | `None` | Saving disabled. | Native sleep disabled. | Events/timers run; no sleep. |
+| `EventDriven` | `ConnectedSleep` | Modem saving, association retained. | Native radio saving, sleepy association retained. | Automatic waits; CPU permission only with `allowCpuSleep=true`, both networks ready, common admission and PM support. |
+| `EventDriven` | `LightSleep` | Active Wi-Fi blocks CPU entry; it is not disconnected. Modem saving may remain enabled. | Native radio/task saving can still operate when ready. | CPU light sleep blocked while Wi-Fi is active. Turn Wi-Fi off first to use the Zigbee-only row. |
+| `EventDriven` | `DeepSleep` | MQTT closed; Wi-Fi stopped only at final entry. | Wait for deep-sleep readiness; restore/rejoin saved network on boot. | Automatic after common admission + Zigbee deep-sleep readiness. Both live sessions end. |
+| `Manual` | `None` | Saving disabled. | Native sleep disabled. | No sleep; requests rejected. |
+| `Manual` | `ConnectedSleep` | Modem saving without a request. | Native radio saving without a request. | Request required for application wait/CPU permission; both networks ready, `allowCpuSleep` and common admission still apply. |
+| `Manual` | `LightSleep` | Active Wi-Fi blocks CPU entry; modem saving can operate. | Native radio/task saving can operate. | Request does not bypass active-Wi-Fi restriction. Turn Wi-Fi off first. |
+| `Manual` | `DeepSleep` | Saving while pending; MQTT/Wi-Fi closed at entry. | Native readiness checked before shutdown. | Request required; common admission + Zigbee deep-sleep readiness. Wake restarts both stacks. |
+| `Periodic` | `None` | Saving disabled. | Native sleep disabled. | `Periodic` events continue; no sleep. |
+| `Periodic` | `ConnectedSleep` | Modem saving, association retained. | Native radio saving, association retained. | Automatic waits between cycles; both networks ready, `allowCpuSleep`, common admission and PM support. |
+| `Periodic` | `LightSleep` | Active Wi-Fi blocks CPU entry; modem saving can operate. | Native radio/task saving can operate. | `Periodic` events continue, but CPU light sleep needs Wi-Fi off first. |
+| `Periodic` | `DeepSleep` | MQTT/Wi-Fi closed at entry; reconnect after boot. | Identity retained; restore/rejoin after boot. | Automatic sleep for remaining cycle after common admission + Zigbee deep-sleep readiness; restart work from `setup()`. |
+
+With a Zigbee **router**, Wi-Fi may still use modem saving under non-`None` types, but the Zigbee blocker prevents manager-controlled CPU/deep sleep. The manager never suspends routing to satisfy a Wi-Fi sleep request.
+
+### Parameters that change the result
+
+| Setting / action | Effect across the tables |
+|---|---|
+| `connectedSleep.allowCpuSleep=false` | Only affects `ConnectedSleep`. Enables radio saving without connected CPU light-sleep permission or automatic application waits. An explicit request may still add cooperative waits. Periodic callbacks still run. |
+| `connectedSleep.allowCpuSleep=true` | Allows connected CPU sleep after policy/admission checks. ESP8266 uses its Wi-Fi light-sleep mechanism; ESP32 needs PM + tickless idle. Does not guarantee physical sleep. |
+| `sleepDelayMs` | Time to remain active after reported activity or a blocker; not sleep duration. Applies to automatic CPU/deep sleep, not initial radio-saving configuration. A request skips this delay. |
+| `periodic.intervalMs` | Time between RAM-retaining application cycles; `Periodic` + deep sleep uses the remaining cycle as sleep duration. Boot/configuration rebases the schedule after deep sleep. |
+| `deepSleepMs` | Default deep-sleep duration for `EventDriven` and `Manual`. `Periodic` uses its cycle instead. A request duration or `wakeIn()` may shorten the result. |
+| `lock()` / `unlock()` | Counted application guard against manager-controlled CPU/deep sleep; does not disable radio saving. Keep locked until required asynchronous work/acknowledgements finish. |
+| Wake sources | Standalone ESP32 light sleep keeps RAM and returns to the running program. Deep sleep loses RAM and restarts `setup()`; ESP32 supports a valid configured wake GPIO, ESP8266 timer wake needs GPIO16→RST. Software timers cannot be combined with `DeepSleep`. |
+| Runtime Zigbee profile change | A full-receiver startup cannot become sleepy after joining without restart. A sleepy startup switched to `AlwaysOn`/`None` disables native radio sleep but keeps its advertised sleepy capability until restart. Pairing data need not be erased. |
+
+`state()` describes the last applied configuration/permission, not measured power consumption. For example, `ModemSleepFallback` means radio saving is available but the SDK cannot provide the requested connected CPU light sleep. Use `blockers()` to explain why a requested CPU/deep sleep has not entered; radio activity alone is not proof that the manager ignored the policy.
 
 ## Periodic application cycles
 

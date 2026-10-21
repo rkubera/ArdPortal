@@ -45,6 +45,7 @@
 - [Zigbee hardware validation](https://github.com/rkubera/ArdPortal/wiki/Zigbee-Validation)
 - [Home Assistant integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant)
 - [MQTT message construction](https://github.com/rkubera/ArdPortal/wiki/MQTT-Messages)
+- [Power management: policies, sleep types and network matrices](https://github.com/rkubera/ArdPortal/wiki/Power-Management)
 - [Wi-Fi, AP and device identity](https://github.com/rkubera/ArdPortal/wiki/Wi-Fi-and-Device-Identity)
 - [Console, diagnostics and OTA](https://github.com/rkubera/ArdPortal/wiki/Console-and-OTA)
 - [Memory and limits](https://github.com/rkubera/ArdPortal/wiki/Memory-and-Limits)
