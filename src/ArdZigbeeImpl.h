@@ -10,6 +10,14 @@
 #include <ha/esp_zigbee_ha_standard.h>
 #include <zdo/esp_zigbee_zdo_common.h>
 #include <nwk/esp_zigbee_nwk.h>
+#if !ARDPORTAL_ZIGBEE_ROUTER
+extern "C" {
+#include <zboss_api.h>
+// Same startup descriptor workaround used by Arduino-ESP32 ZigbeeCore.
+void zb_set_ed_node_descriptor(bool power_src,bool rx_on_when_idle,bool alloc_addr);
+}
+#endif
+
 #if ARDPORTAL_ENABLE_WIFI && CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_SOC_IEEE802154_SUPPORTED
 #include <esp_coexist.h>
 #endif
@@ -66,12 +74,15 @@ void ArdZigbee::task(void* arg){
   for(auto* entry=self._controls.get();entry;entry=entry->next.get())schedulerSlots+=uint16_t(entry->initialCount)*2;
   if(esp_zb_scheduler_queue_size_set(schedulerSlots)!=ESP_OK){snprintf(self._startupError,sizeof(self._startupError),"Cannot size Zigbee reporting scheduler");self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
 #endif
+#if !ARDPORTAL_ZIGBEE_ROUTER
+  // The SDK ignores RxOnWhenIdle changes after joining. Select the network
+  // capability before initialization/start, including saved-network rejoin.
+  esp_zb_sleep_enable(self._sleepyProfile);
+#endif
   esp_zb_init(&config);
 #if !ARDPORTAL_ZIGBEE_ROUTER
-  // A portal device is continuously powered: receive commands directly instead
-  // of relying on its parent's queue and periodic end-device data polls.
-  esp_zb_set_rx_on_when_idle(true);
-  self.traffic("Zigbee end-device receiver enabled while idle");
+  esp_zb_set_rx_on_when_idle(!self._sleepyProfile);
+  self.traffic(self._sleepyProfile?"Zigbee sleepy end-device profile selected":"Zigbee end-device receiver enabled while idle");
 #endif
 #if ARDPORTAL_ENABLE_WIFI && CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_SOC_IEEE802154_SUPPORTED
   if(esp_coex_wifi_i154_enable()!=ESP_OK){snprintf(self._startupError,sizeof(self._startupError),"Could not enable Wi-Fi/Zigbee radio coexistence");self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
@@ -99,6 +110,14 @@ void ArdZigbee::task(void* arg){
   if(!endpoints||esp_zb_device_register(endpoints)!=ESP_OK){self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
   esp_zb_set_primary_network_channel_set(0x07FFF800);
   if(esp_zb_start(false)!=ESP_OK){self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
+#if !ARDPORTAL_ZIGBEE_ROUTER
+  // start(false) restores NVRAM before BDB/network startup. Its saved joined
+  // flag makes the esp_zb_* receiver setter a no-op, even here. Reapply the
+  // staged capability through ZBOSS before the scheduler can rejoin; update
+  // the advertised descriptor as Arduino's sleepy-device workaround does.
+  zb_set_rx_on_when_idle(self._sleepyProfile?ZB_FALSE:ZB_TRUE);
+  zb_set_ed_node_descriptor(true,!self._sleepyProfile,true);
+#endif
   esp_zb_stack_main_loop();vTaskDelete(nullptr);
 }
 /** @brief Copy a lifecycle result to the bounded loop queue. @param type Result kind. @param status SDK status. @return No value. */
@@ -108,10 +127,80 @@ void ArdZigbee::event(uint8_t type,int32_t status){
   // Bounded native events; overwrite the oldest record if the consumer falls behind.
   if(xQueueSend(_events,&e,0)!=pdTRUE){Event discarded;xQueueReceive(_events,&discarded,0);xQueueSend(_events,&e,0);}
 }
+// Network data is persisted by the SDK's native NVRAM backend. No leave,
+// factory reset or unconditional dataset rewrite belongs on the sleep path.
+bool ArdZigbee::canDeepSleep()const{
+#if ARDPORTAL_ZIGBEE_ROUTER
+  return false;
+#else
+  if(!_ready||busy()||_state!=State::Connected||uint32_t(millis()-_powerConnectedAt)<5000)return false;
+#if ARDPORTAL_ZIGBEE_OTA_SUPPORT
+  if(otaActive())return false;
+#endif
+  if(!_powerSaving.load()||!_sleepyProfile||!_deepSleepWanted.load())return false;
+  const uint32_t idle=_powerIdleAt.load();
+  if(!idle||uint32_t(millis()-(idle-1))>100)return false;
+  if((_events&&uxQueueMessagesWaiting(_events))||_timeSequence.load()<256)return false;
+#if ARDPORTAL_ENABLE_DYNAMIC_PAGES
+  if(_commands&&uxQueueMessagesWaiting(_commands))return false;
+  for(auto* entry=_controls.get();entry;entry=entry->next.get())
+    if(entry->reportQueued||entry->pendingReports)return false;
+#endif
+  return true;
+#endif
+}
+bool ArdZigbee::prepareDeepSleep(){
+  if(!canDeepSleep()||!esp_zb_lock_acquire(0))return false;
+  // Hold the native lock through Wi-Fi shutdown and sleep entry. Native flash
+  // writes run synchronously under this lock; no stack work can start midway.
+  if(!canDeepSleep()){esp_zb_lock_release();return false;}
+  _deepSleepLocked=true;return true;
+}
+void ArdZigbee::cancelDeepSleep(){
+  if(_deepSleepLocked){_deepSleepLocked=false;esp_zb_lock_release();}
+}
+bool ArdZigbee::powerSaving(bool enable,bool deepSleep){
+#if ARDPORTAL_ZIGBEE_ROUTER
+  (void)enable;(void)deepSleep;return false;
+#else
+  _deepSleepWanted.store(deepSleep);
+  if(!_begun){_sleepyProfile=enable;return false;}
+  if(!_ready)return false;
+  enable=enable&&!busy()&&_state==State::Connected;
+#if ARDPORTAL_ZIGBEE_OTA_SUPPORT
+  enable=enable&&!otaActive();
+#endif
+  // Enabling sleep on an already joined full-receiver device needs a restart;
+  // never claim success for the SDK's silent no-op setter in that state.
+  if(enable&&!_sleepyProfile)return false;
+  if(!_powerConfigured||enable!=_powerSaving.load()){
+    if(!esp_zb_lock_acquire(0))return false;
+    const bool applied=enable&&!esp_zb_get_rx_on_when_idle();
+    esp_zb_sleep_enable(applied);
+    _powerSaving.store(applied);_powerConfigured=true;
+    esp_zb_lock_release();
+    return applied;
+  }
+  return enable&&_powerSaving.load();
+#endif
+}
 /** @brief Observe SDK signals and schedule only initial stack commissioning. @param signal Borrowed SDK signal. @return No value. */
 void ArdZigbee::signal(esp_zb_app_signal_t* signal){
   if(!_instance||!signal||!signal->p_app_signal)return;
   auto type=static_cast<esp_zb_app_signal_type_t>(*signal->p_app_signal);auto status=signal->esp_err_status;
+#if !ARDPORTAL_ZIGBEE_ROUTER
+  // This callback runs inside the native scheduler. Never force light-sleep
+  // from Arduino loop beneath the stack. The SDK suspends its own radio/task;
+  // IDF may sleep the CPU only when every task and PM lock permits it.
+  if(type==ESP_ZB_COMMON_SIGNAL_CAN_SLEEP){
+    _instance->_powerIdleAt.store(status==ESP_OK?millis()+1:0);
+    if(status==ESP_OK){
+      if(_instance->_powerSaving.load()&&!_instance->_deepSleepWanted.load())esp_zb_sleep_now();
+    }
+    return; // Sleep readiness is frequent; do not fill the diagnostic queue.
+  }
+#endif
+  _instance->_powerIdleAt.store(0);
   char message[128];snprintf(message,sizeof(message),"SIGNAL %s status=0x%lx",esp_zb_zdo_signal_to_string(type),(unsigned long)status);_instance->traffic(message);
   switch(type){
     case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
@@ -130,6 +219,7 @@ void ArdZigbee::setState(State state){
     if(!_reconnectPending){_reconnectPending=true;_reconnectAt=millis()+30000;}
   }else _reconnectPending=false;
   if(_state==state)return;
+  if(state==State::Connected)_powerConnectedAt=millis();
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   if(state==State::Connected)for(auto* entry=_controls.get();entry;entry=entry->next.get())entry->pendingReports=0;
 #endif
@@ -240,6 +330,7 @@ void ArdZigbee::traffic(const char* text){
 /** @brief Observe APS metadata without taking over stack processing. @param frame Borrowed APS indication. @return False so the stack continues processing it. */
 bool ArdZigbee::received(esp_zb_apsde_data_ind_t frame){
   if(_instance){
+    _instance->_powerIdleAt.store(0);
     char metadata[128];snprintf(metadata,sizeof(metadata),"RX payload={\"src\":%u,\"fromEp\":%u,\"ep\":%u,\"profile\":%u,\"cluster\":%u,\"LQI\":%d,\"status\":%u}",unsigned(frame.src_short_addr),unsigned(frame.src_endpoint),unsigned(frame.dst_endpoint),unsigned(frame.profile_id),unsigned(frame.cluster_id),frame.lqi,unsigned(frame.status));_instance->traffic(metadata);
     if(frame.profile_id!=0x104){_instance->traffic("RX payload={\"decoded\":false,\"reason\":\"unsupported_profile\"}");return false;}
     if(frame.cluster_id==0x000a&&frame.src_short_addr==0&&frame.src_endpoint==1&&frame.dst_endpoint==1&&frame.status==0){

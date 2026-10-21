@@ -180,6 +180,7 @@ bool ArdZigbee::publish(uint8_t endpoint,const ArdZigbeeFields::Values& values,b
   Control* entry=_controls.get();while(entry&&entry->spec.endpoint!=endpoint)entry=entry->next.get();if(!entry)return false;
   entry->reportIncomplete=false;
   if(!_ready||_state!=State::Connected||!ArdHeap::permits(1024,512)||!esp_zb_lock_acquire(0))return false;
+  _powerIdleAt.store(0); // Require fresh SDK sleep readiness after this submission.
   const uint16_t previous=entry->pendingReports;
   // A retry retains only attributes not yet queued successfully.
   if(force&&!previous)entry->pendingReports=uint16_t((1u<<values.count)-1u);

@@ -3,6 +3,7 @@
 #pragma once
 #include "ArdPortalFeatures.h"
 #include "HeapMemory.h"
+#include "ArdPower.h"
 #include "ArdAsset.h"
 #include <Arduino.h>
 #include <IPAddress.h>
@@ -81,6 +82,9 @@ public:
    * @return No result; this operation is deleted and cannot be called.
    */
   ArdPortal& operator=(ArdPortal&&) = delete;
+  /** @brief Power policy; configure and call only from the Arduino task. */
+  ArdPower& power(){return _power;}
+  const ArdPower& power()const{return _power;}
   using PortalConfig = ArdPortalConfig;
   static constexpr size_t MaxPortalConfigBytes = 5 * 1024;
   static constexpr size_t MaxAppConfigBytes = 8 * 1024;
@@ -679,6 +683,11 @@ public:
 #endif
   static bool validPortalConfig(const PortalConfig& config);
 private:
+  ArdPower _power;
+  void servicePower();
+#if ARDPORTAL_ENABLE_ZIGBEE
+  void prepareZigbeePower();
+#endif
 #if ARDPORTAL_ENABLE_WIFI
   bool _wifiAutoReconnect=ARDPORTAL_ENABLE_WIFI;
   ApPolicy _apPolicy=ApPolicy::Automatic;

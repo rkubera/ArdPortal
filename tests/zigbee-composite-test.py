@@ -45,6 +45,7 @@ class ArdPortal {public:
  ArdAppConfigFieldMask _zigbeeDirty,_zigbeeForce;Command _zigbeePendingCommand;unsigned actions=0;
  bool otaActive(){return false;}bool portalAndAppConfigBusy(){return false;}bool scheduleAppPatch(const V&,ChangeSource){return true;}
  V getAppConfigValue(const char* key){return values[key];}bool acceptZigbeeState(const String& id,const V& value){values[id]=value;return true;}
+ void prepareZigbeePower(){}
  void markZigbeeStateDirty(const String&);void serviceZigbeeControls(uint32_t);
 };
 bool Controls::appControl(const V& f,size_t part,const V& value,ChangeSource){const V& c=f["controls"][part];String key=c["key"].asString();if(c["type"].asString()=="action"){++portal->actions;return true;}portal->values[f["id"].asString()][key]=value;portal->markZigbeeStateDirty(f["id"].asString());return true;}

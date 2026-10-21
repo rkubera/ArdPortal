@@ -18,8 +18,8 @@ run_test bash tests/run-zigbee.sh
 
 for test_name in \
   ap-band-start factory-reset-callback flash-text http-memory mqtt-api mqtt-packet mqtt-serial portal-assets \
-  network-api network-features page-stream runtime-state \
-  zigbee-composite zigbee-persistence; do
+  network-api network-features power-policy power-periodic power-wake-cause power-integration power-platform power-events page-stream runtime-state \
+  zigbee-power zigbee-composite zigbee-persistence; do
   run_test "${PYTHON:-python3}" "tests/${test_name}-test.py"
 done
 for test_name in ap-band-ui climate-range-ui wifi-console-ui zigbee-ui; do

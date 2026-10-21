@@ -8,6 +8,11 @@
 | `DHT/DHT.ino` | DHT22 on GPIO2: temperature/humidity, C/F selection, calibration, MQTT/HA and OTA; three control types, no TLS/Console. |
 | `MinimalPortal/MinimalPortal.ino` | Portal with OTA enabled and MQTT disabled; HA and Console are disabled automatically. |
 | `BasicPortal/BasicPortal.ino` | Minimal portal; configuration, JSON and ArdFS journal are managed by the library. The loop only calls `portal.loop()`. |
+| `PowerManagement/PowerManagement.ino` | Independent power policy/sleep type, GPIO/ISR events and software timers. |
+| `ZigbeeDeepSleep/ZigbeeDeepSleep.ino` | Automatic end-device deep sleep with saved network identity and native readiness checks; Wi-Fi disabled. |
+| `ZigbeePowerManagement/ZigbeePowerManagement.ino` | Native Zigbee end-device radio sleep, optional CPU light sleep and periodic application events; Wi-Fi disabled. |
+| `PowerManagementPeriodic/PowerManagementPeriodic.ino` | Scheduled application cycles, Periodic wake events and automatic sleep between cycles. |
+| `PowerManagementDeepSleep/PowerManagementDeepSleep.ino` | Automatic timed deep-sleep, boot/wake cause diagnostics and cooperative storage work, with Wi-Fi disabled. |
 | `DynamicPages/DynamicPages.ino` | Two JSON-defined pages registered cooperatively in sequence; completion/error callbacks and startup values applied after both storage and registration are ready. |
 | `DynamicPagesWithDependencies/DynamicPagesWithDependencies.ino` | A toggle controls slider and text-field visibility, including retained HA discovery removal/recreation. |
 | `HomeAssistantEntities/HomeAssistantEntities.ino` | HA sensor and switch without panel pages; bounded HA work and shared AppConfig callbacks. |
