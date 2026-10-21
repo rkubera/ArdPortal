@@ -30,6 +30,8 @@ struct WiFiServer {
   void begin() {}
   WiFiClient accept() { if(incoming.empty()) return {}; auto client = incoming.front(); incoming.pop_front(); return client; }
 };
+using WiFiSleepType_t=int;
+constexpr int WIFI_NONE_SLEEP=0,WIFI_MODEM_SLEEP=1,WIFI_LIGHT_SLEEP=2;
 struct WiFiStub {
   int state = 0, scans = -2, attempts = 0, apStarts = 0, disconnects = 0;
   unsigned stations = 0;
@@ -40,7 +42,12 @@ struct WiFiStub {
   int status() const { return state; }
   void persistent(bool) {}
   void setAutoReconnect(bool) {}
-  void mode(int) {}
+  bool mode(int mode) { radio=mode;return true; }
+  int radio=WIFI_STA,sleep=0,listen=0;
+  int getMode()const{return radio;}
+  WiFiSleepType_t getSleepMode()const{return sleep;}
+  int getListenInterval()const{return listen;}
+  bool setSleepMode(WiFiSleepType_t value,int interval=0){sleep=value;listen=interval;return true;}
   void begin(const char*, const char*) { ++attempts; }
   void disconnect(bool = false, bool = false) { ++disconnects; state = 0; }
   bool softAP(const char* name, const char* password) { ++apStarts; apName = name; apPassword = password; return true; }

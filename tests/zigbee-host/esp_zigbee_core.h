@@ -21,7 +21,7 @@ inline int xTaskCreate(void(*entry)(void*),const char*,unsigned,void* arg,unsign
 inline void vTaskDelete(void*){}
 constexpr unsigned ESP_ZB_BDB_MODE_INITIALIZATION=0,ESP_ZB_BDB_MODE_NETWORK_STEERING=2;
 constexpr int ZB_RADIO_MODE_NATIVE=0,ZB_HOST_CONNECTION_MODE_NONE=0,ESP_ZB_DEVICE_TYPE_ROUTER=1,ESP_ZB_DEVICE_TYPE_ED=2,ESP_ZB_ED_AGING_TIMEOUT_64MIN=6;
-enum esp_zb_app_signal_type_t {ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP,ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START,ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT,ESP_ZB_BDB_SIGNAL_STEERING,ESP_ZB_BDB_SIGNAL_TC_REJOIN_DONE,ESP_ZB_ZDO_SIGNAL_LEAVE,ESP_ZB_NWK_SIGNAL_NO_ACTIVE_LINKS_LEFT};
+enum esp_zb_app_signal_type_t {ESP_ZB_COMMON_SIGNAL_CAN_SLEEP,ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP,ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START,ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT,ESP_ZB_BDB_SIGNAL_STEERING,ESP_ZB_BDB_SIGNAL_TC_REJOIN_DONE,ESP_ZB_ZDO_SIGNAL_LEAVE,ESP_ZB_NWK_SIGNAL_NO_ACTIVE_LINKS_LEFT};
 struct esp_zb_app_signal_t {uint32_t* p_app_signal;int esp_err_status;};
 inline bool factoryNew=true,lockAvailable=true;
 inline unsigned steering=0,initialization=0,cancelled=0,resets=0;
@@ -56,3 +56,7 @@ constexpr int ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT=2;
 struct esp_zb_zcl_read_attr_cmd_t {int address_mode;struct {uint8_t src_endpoint,dst_endpoint;struct{uint16_t addr_short;}dst_addr_u;}zcl_basic_cmd;uint16_t clusterID,attr_number;uint16_t* attr_field;};
 inline unsigned timeReads=0;
 inline uint8_t esp_zb_zcl_read_attr_cmd_req(esp_zb_zcl_read_attr_cmd_t*){++timeReads;return 77;}
+
+inline size_t uxQueueMessagesWaiting(QueueHandle_t q){return q->items.size();}
+inline void esp_zb_sleep_enable(bool){}
+inline void esp_zb_sleep_now(){}

@@ -7,3 +7,11 @@ with tempfile.TemporaryDirectory() as d:
   p=Path(d)/'test.cpp';p.write_text(flags+'#include "ArdPortalFeatures.h"\n'+f'static_assert(ARDPORTAL_ENABLE_WIFI=={wifi});\nstatic_assert(ARDPORTAL_ENABLE_WWW=={www});\nstatic_assert(ARDPORTAL_ENABLE_MQTT=={mqtt});\n'+('static_assert(!ARDPORTAL_ENABLE_MQTT_TLS&&!ARDPORTAL_ENABLE_HA);\n' if not wifi else '')+('static_assert(!ARDPORTAL_SUPPORT_WEBSOCKET&&!ARDPORTAL_HTTP_OTA_SUPPORT);\nstatic_assert(ARDPORTAL_ENABLE_OTA);\n' if not www else '')+'int main(){}\n')
   subprocess.run(['c++','-std=c++17','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(p),'-o',str(Path(d)/'test')],check=True)
 print('PASS: defaults, independent WWW switch and Wi-Fi override of WWW/MQTT/TLS/HA/WebSockets')
+
+# The manager and its integration are always compiled into ArdPortal.
+for filename in ('ArdPortalDeclarations.h', 'ArdPortalImplementation.h', 'ArdPortalImpl.h',
+                 'ArdPower.h', 'ArdPowerImpl.h', 'ArdZigbeeImpl.h'):
+ assert 'ARDPORTAL_ENABLE_POWER_MANAGEMENT' not in (root/'src'/filename).read_text(),filename
+assert '#include "ArdPower.h"' in (root/'src/ArdPortalDeclarations.h').read_text()
+assert '#include "ArdPowerImpl.h"' in (root/'src/ArdPortalImplementation.h').read_text()
+print('PASS: power management is integral to ArdPortal without a feature flag')

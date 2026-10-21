@@ -37,6 +37,12 @@ static char Model[ModelCapacity]="\x0c" "ArdPortal-C6";
 // All application callbacks and String allocations run in the Arduino loop.
 class ArdZigbee {
 public:
+  /** Stage the sleepy profile before begin(); later toggle native sleep only.
+   * RxOnWhenIdle is fixed at network startup. Routers always refuse sleep. */
+  bool powerSaving(bool enable,bool deepSleep=false);
+  bool canDeepSleep()const;
+  bool prepareDeepSleep();
+  void cancelDeepSleep();
   enum class Operation : uint8_t { None, Pair, Rejoin, ResetPairing, FactoryReset };
   enum class State : uint8_t { Starting, Idle, Pairing, Rejoining, Resetting, Connected, Failed };
   struct Options { uint32_t timeoutMs=60000, retryMs=3000, attemptTimeoutMs=15000; uint8_t maxAttempts=3; };
@@ -149,6 +155,10 @@ public:
   bool queryOta();
 #endif
 private:
+  std::atomic<bool> _powerSaving{false},_deepSleepWanted{false};
+  std::atomic<uint32_t> _powerIdleAt{0};
+  uint32_t _powerConnectedAt=0;
+  bool _deepSleepLocked=false,_sleepyProfile=false,_powerConfigured=false;
   const char* _firmwareVersion="\x03" "1.0";
   std::atomic<uint32_t> _timeReceived{0};
   std::atomic<uint16_t> _timeSequence{256};

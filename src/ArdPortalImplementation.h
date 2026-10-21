@@ -23,3 +23,6 @@
 #endif
 
 #include "NetworkApiImpl.h"
+
+#include "PowerSignalsImpl.h"
+#include "ArdPowerImpl.h"

@@ -92,6 +92,8 @@ inline bool ardfsFlashFailure() {
 struct rst_info {uint32_t reason=4;};
 struct EspStub {
   rst_info resetInfo;
+  uint64_t deepSleepMax()const{return 100000000;}
+  void deepSleep(uint64_t){}
   uint32_t freeHeap=32000;
   rst_info* getResetInfoPtr(){return &resetInfo;}
   uint32_t getMaxFreeBlockSize() const{return 24000;}
@@ -126,3 +128,31 @@ extern EspStub ESP;
 
 inline unsigned fakeYieldCalls=0;
 inline void yield() { ++fakeYieldCalls; } // Core scheduling point in host tests.
+
+#define IRAM_ATTR
+#define ARDUINO_ISR_FLAG 0
+#define GPIO_PORT_0 0
+#define HIGH 1
+#define LOW 0
+#define RISING 1
+#define FALLING 2
+#define CHANGE 3
+#define ONLOW 4
+#define ONHIGH 5
+using gpio_num_t=int;using gpio_int_type_t=int;using esp_err_t=int;
+inline int pinLevels[64]={};
+inline void (*pinHandlers[64])(void*)={};
+inline void* pinArguments[64]={};
+inline bool pinEnabled[64]={},pinWake[64]={};
+inline uint32_t pinRegisters[64]={};
+inline bool gpioFail=false;
+inline int digitalRead(uint8_t pin){return pinLevels[pin];}
+inline void attachInterruptArg(uint8_t pin,void(*handler)(void*),void* arg,int mode){pinHandlers[pin]=handler;pinArguments[pin]=arg;pinEnabled[pin]=true;pinRegisters[pin]=uint32_t(mode)<<7;}
+inline void detachInterrupt(uint8_t pin){pinHandlers[pin]=nullptr;pinEnabled[pin]=false;pinRegisters[pin]=0;}
+inline uint32_t xt_rsil(int){return 0;}
+inline void xt_wsr_ps(uint32_t){}
+#define GPC(pin) pinRegisters[pin]
+#define GPCI 7
+inline void triggerPin(uint8_t pin){if(pinHandlers[pin]&&pinEnabled[pin]&&(pinRegisters[pin]>>7))pinHandlers[pin](pinArguments[pin]);}
+
+inline void delay(uint32_t ms){fakeMillis+=ms;}

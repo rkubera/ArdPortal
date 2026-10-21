@@ -430,7 +430,10 @@ void ArdPortal::loop() {
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   serviceZigbeeControls(tick);
 #else
-  if(_configurationReady&&!_zigbeeBeginTried&&!otaActive()){_zigbeeBeginTried=true;_zigbee.begin(_zigbeeOptions);}
+  if(_configurationReady&&!_zigbeeBeginTried&&!otaActive()){
+    prepareZigbeePower();
+    _zigbeeBeginTried=true;_zigbee.begin(_zigbeeOptions);
+  }
 #endif
   _zigbee.loop(millis());
 #if ARDPORTAL_ZIGBEE_EXPORT_SUPPORT
@@ -535,6 +538,8 @@ void ArdPortal::loop() {
 #if ARDPORTAL_ENABLE_MQTT
   _mqttClient.serviceTrial();
 #endif
+
+  servicePower();
 
 }
 /**
