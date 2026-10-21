@@ -20,6 +20,7 @@ This Wiki documents the current development branch, including Zigbee. Check the 
 | --- | --- |
 | [Overview](https://github.com/rkubera/ArdPortal/wiki/Overview) | Architecture, main features and hardware responsibilities |
 | [Getting started](https://github.com/rkubera/ArdPortal/wiki/Getting-Started) | Installation, first boot, a minimal sketch and examples |
+| [Power management](https://github.com/rkubera/ArdPortal/wiki/Power-Management) | Policies, sleep types and full Wi-Fi / Zigbee / combined behaviour tables |
 | [All defines](https://github.com/rkubera/ArdPortal/wiki/Defines) | Every supported compile-time flag, defaults and dependencies |
 | [Portal API](https://github.com/rkubera/ArdPortal/wiki/Portal-API) | Methods, callbacks, configuration fields, options and lifecycle |
 | [FS API](https://github.com/rkubera/ArdPortal/wiki/FS-API) | ArdFS operations, results, streaming writes and recovery |
