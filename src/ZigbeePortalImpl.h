@@ -153,7 +153,9 @@ void ArdPortal::serviceZigbeeControls(uint32_t now){
     snprintf(model+1,sizeof(ArdZigbeeIdentity::Model)-1,"ArdPortal-%08lx%08lx",(unsigned long)_converterHashA,(unsigned long)_converterHashB);
     model[0]=strlen(model+1);_converterLayoutReady=true;
 #endif
+#if ARDPORTAL_ENABLE_POWER_MANAGEMENT
     prepareZigbeePower();
+#endif
     _zigbeeBeginTried=true;_zigbee.begin(_zigbeeOptions);return;
   }
   if(_zigbeeSeenFields!=_dynamic.count()){

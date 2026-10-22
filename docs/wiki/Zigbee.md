@@ -596,20 +596,121 @@ The ZHA and Z2M exports use the same `ArdPortal-<signature>` model, including
 when only one exporter is enabled. No IEEE address is embedded. One quirk
 therefore matches all devices with identical exported control layouts.
 
-Place the downloaded `.py` file in a custom quirks directory on Home Assistant,
-configure ZHA's custom quirk loading, and restart Home Assistant. For example:
+### Install the quirk in Home Assistant
 
-```yaml
-zha:
-  custom_quirks_path: /config/custom_zha_quirks
+Install the file **on the Home Assistant machine**, not on the ESP32 or in the
+browser's download directory. Do this before pairing the device when possible.
+ZHA must already be configured with a working Zigbee coordinator.
+
+1. Build and upload firmware using the ArdPortal version whose exporter you want
+   to install. Open the device's web portal, select **Zigbee**, then **Download
+   ZHA quirk**. Save the downloaded `ardportal_zha_<signature>.py` file.
+   The button requires completed control registration and stack startup, but
+   joining a Zigbee network is not required. Devices without WWW can use the
+   [C++ export API](#export-converters-through-the-c-api-without-www).
+2. Open the downloaded file in a text editor. Its beginning should contain
+   `MODEL = "ArdPortal-<signature>"` and a `FIELDS` list describing your controls.
+   Use the Python `.py` export for ZHA; the `.mjs` export is for Zigbee2MQTT.
+3. On Home Assistant, create a directory named `custom_zha_quirks` alongside
+   `configuration.yaml`, using File editor, Studio Code Server, or SSH. In the
+   usual HA Core filesystem this is `/config/custom_zha_quirks`. Upload the
+   downloaded `.py` file directly into that directory:
+
+   ```text
+   /config/
+     configuration.yaml
+     custom_zha_quirks/
+       ardportal_zha_<signature>.py
+   ```
+
+   In an editor or file share that already opens the configuration directory,
+   create `custom_zha_quirks` there; do not create another nested `config` folder.
+   With Home Assistant Container, place it in the host directory mounted at
+   `/config`. The YAML path below is the path visible to **HA Core**, even if an
+   SSH app or file share calls the same directory `/homeassistant`.
+4. Back up `configuration.yaml`, then add the following top-level section. If
+   `zha:` already exists, add these options to that section instead of creating
+   a second `zha:` key. Preserve its other options.
+
+   ```yaml
+   zha:
+     enable_quirks: true
+     custom_quirks_path: /config/custom_zha_quirks
+   ```
+
+5. Check the YAML configuration with Home Assistant's configuration check, then
+   **restart Home Assistant Core**. Reloading the browser, reconfiguring the
+   device, or restarting only the ESP32 does not load a changed Python module.
+   On HA OS, an SSH terminal can use `ha core check` followed by
+   `ha core restart` after the check succeeds. Wait for each operation to finish;
+   a Supervisor or host restart is not normally needed.
+6. After HA starts, open **Settings → Devices & services → Zigbee Home
+   Automation → Add device** to allow joining. Start the ESP32. A device without
+   saved pairing joins automatically. If it remembers another network, open
+   **Zigbee → Reset pairing and pair again** in its ArdPortal web portal.
+   This clears Zigbee network data while preserving Wi-Fi and application
+   settings. **Rejoin saved network** returns to the old network instead.
+7. Wait until ZHA finishes interviewing and configuring the device, then open
+   its device page. The model must match the `MODEL` in the installed file.
+   Verify the controls expected from your layout: sliders should be number
+   entities, choices should have named options, actions should be buttons, and
+   measurements should have the expected names and units.
+
+For a first installation with one layout, you can also download directly in an
+HA SSH terminal that exposes the configuration directory as `/config`. Replace
+`DEVICE_IP` with the **ESP32 portal's IP**, not the HA server's IP:
+
+```sh
+mkdir -p /config/custom_zha_quirks
+curl --fail --show-error http://DEVICE_IP/api/zigbee/zha-quirk.py \
+  -o /config/custom_zha_quirks/ardportal.py
 ```
+
+This uses `ardportal.py` as the local filename; do not also keep a second copy
+of the same model under its downloaded signature filename. Then complete steps
+4–7 above. If your SSH app exposes the configuration directory at another path,
+adjust these shell paths; keep the YAML path relative to HA Core's filesystem.
+
+If the device was paired **before installing the quirk**, first restart Core
+and inspect the device again. If the expected entities still do not appear,
+remove only that ArdPortal device from ZHA and repeat step 6 using **Reset
+pairing and pair again**. Removing it can affect entity IDs and references in
+dashboards or automations; record those before removal. Do not remove the ZHA
+integration or reset the coordinator to refresh one device.
+
+### Replace an installed quirk
+
+Download a new export after changing the control layout or updating firmware
+to an ArdPortal version with exporter fixes. Updating firmware does **not**
+replace the Python file already installed in HA. Conversely, downloading from
+old firmware still produces that firmware's exporter, even if your local
+library checkout is newer.
+
+For the same model, replace its installed file and restart Core. Keep only one
+active `.py` file for each ArdPortal model; store backup copies outside the
+custom quirks directory. Distinct layout models can have separate files in the
+same directory. After a layout/model change, install the matching file and
+refresh the device interview, using removal and pairing again if needed.
+One installed file supports multiple physical devices with the same layout.
+
+### Check installation problems
+
+| Symptom | What to check |
+| --- | --- |
+| No download button | Zigbee, dynamic pages, WWW and `ARDPORTAL_ENABLE_ZHA_QUIRK` must be enabled; registration and stack startup must finish. |
+| HA reports a Python import error | Check **Settings → System → Logs** for the filename and traceback. Confirm that this is the `.py` export and that HA provides the APIs listed below. |
+| Log says custom quirks were loaded, but controls are missing | That message confirms directory loading, not a match for this device. Compare the installed `MODEL` with the device model and verify the expected entities. Restart Core after replacing the file. |
+| Actions appear as switches, sliders/selects/sensors are missing | Install an export from firmware containing the current exporter fixes. Older exports can suppress their own custom entities; merely pairing again with the same old file does not fix that. |
+| New HA cannot find a previously paired ESP32 | Allow joining in the new ZHA network, then use **Reset pairing and pair again** on the ESP32. Wait for an active operation to finish before retrying a rejected reset. |
+| Long device prefix on every dashboard control | HA can display device + entity names. In the card or entity row, use `name: {type: entity}` to show just the control name; see [card naming](https://www.home-assistant.io/dashboards/naming/). |
+| Climate appears as a row rather than a dial | Click the climate row for its controls, or add a **Thermostat** card to a dashboard. The quirk creates the entity; the dashboard determines its presentation. |
 
 See the [official ZHA device handlers documentation](https://github.com/zigpy/zha-device-handlers).
 The exporter uses the public `zhaquirks.builder` API and is tested with
 **zha-quirks 2.3.0, zigpy 2.3.0 and zha 2.3.1**. It is not installed automatically.
-Older API generations are not supported by this generated module. After a
-layout change, download the matching quirk and refresh the device interview
-so ZHA sees the new model and endpoints.
+Older API generations are not supported by this generated module. These Python
+dependencies are supplied by HA; do not install packages into an SSH app and
+expect that to change the libraries used by HA Core.
 
 ### Exported entities and limits
 

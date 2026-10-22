@@ -8,10 +8,12 @@ with tempfile.TemporaryDirectory() as d:
   subprocess.run(['c++','-std=c++17','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(p),'-o',str(Path(d)/'test')],check=True)
 print('PASS: defaults, independent WWW switch and Wi-Fi override of WWW/MQTT/TLS/HA/WebSockets')
 
-# The manager and its integration are always compiled into ArdPortal.
-for filename in ('ArdPortalDeclarations.h', 'ArdPortalImplementation.h', 'ArdPortalImpl.h',
-                 'ArdPower.h', 'ArdPowerImpl.h', 'ArdZigbeeImpl.h'):
- assert 'ARDPORTAL_ENABLE_POWER_MANAGEMENT' not in (root/'src'/filename).read_text(),filename
-assert '#include "ArdPower.h"' in (root/'src/ArdPortalDeclarations.h').read_text()
-assert '#include "ArdPowerImpl.h"' in (root/'src/ArdPortalImplementation.h').read_text()
-print('PASS: power management is integral to ArdPortal without a feature flag')
+# Power management defaults on, can be disabled, and rejects invalid flags.
+with tempfile.TemporaryDirectory() as d:
+ for value in (None, 0, 1, 2):
+  p=Path(d)/'power.cpp'
+  flags='' if value is None else f'#define ARDPORTAL_ENABLE_POWER_MANAGEMENT {value}\n'
+  p.write_text(flags+'#include "ArdPortalFeatures.h"\n'+f'static_assert(ARDPORTAL_ENABLE_POWER_MANAGEMENT=={1 if value is None else value});\nint main(){{}}\n')
+  result=subprocess.run(['c++','-std=c++17','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(p),'-o',str(Path(d)/'power')],capture_output=True)
+  assert (result.returncode==0)==(value!=2),result.stderr.decode()
+print('PASS: power management defaults, overrides and validation')

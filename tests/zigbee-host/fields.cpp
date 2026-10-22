@@ -39,6 +39,10 @@ int main(){
  f=json(R"({"type":"climate","min":10,"max":35,"step":0.5,"modes":["off","heat_cool"]})");current=json(R"({"temperature":22,"temperature_low":20,"temperature_high":25,"mode":"heat_cool"})");s=describe(f,current);out=encode(s,f,current);assert(s.sequence==4&&out.attributes[1].data.u==2500&&out.attributes[2].data.u==2000&&out.attributes[3].data.u==1);
  c.cluster=0x201;c.id=0x12;c.value=2150;assert(decode(s,f,current,c,next,action,property)&&next["temperature_low"].asDouble()==21.5&&next["temperature_high"].asDouble()==25);
  c.value=2400;assert(!decode(s,f,current,c,next,action,property));c.value=2125;assert(!decode(s,f,current,c,next,action,property));c.id=0x1c;c.value=1;assert(decode(s,f,current,c,next,action,property)&&next["mode"].asString()=="heat_cool");
+ // Persisted single-target states must be able to enter range mode.
+ current=json(R"({"temperature":22,"mode":"off"})");
+ assert(decode(s,f,current,c,next,action,property)&&next["mode"].asString()=="heat_cool"&&next["temperature_low"].asDouble()==10&&next["temperature_high"].asDouble()==35);
+ out=encode(s,f,next);assert(out.attributes[1].data.u==3500&&out.attributes[2].data.u==1000&&out.attributes[3].data.u==1);
  f=json(R"({"type":"cover"})");current=json(R"({"position":25,"tilt":80})");s=describe(f,current);out=encode(s,f,current);assert(out.attributes[0].data.u==75&&out.attributes[1].data.u==20);c.kind=1;c.id=5;c.value=0;assert(decode(s,f,current,c,next,action,property)&&next.asDouble()==100&&property=="position");c.id=2;assert(decode(s,f,current,c,next,action,property)&&action=="STOP");c.id=4;assert(!decode(s,f,current,c,next,action,property));
  f=json(R"({"type":"lock"})");s=describe(f,"LOCKED");out=encode(s,f,"LOCKED");assert(out.attributes[0].data.u==1);c.id=1;assert(decode(s,f,"LOCKED",c,next,action,property)&&action=="UNLOCK");c.id=2;assert(!decode(s,f,"LOCKED",c,next,action,property));
  f=json(R"({"type":"siren"})");s=describe(f,current);c.id=1;c.duration=10;c.volume=2;assert(decode(s,f,current,c,next,action,property)&&next["state"].asString()=="ON"&&next["volume_level"].asDouble()==0.7);

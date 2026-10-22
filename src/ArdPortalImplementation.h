@@ -24,5 +24,7 @@
 
 #include "NetworkApiImpl.h"
 
+#if ARDPORTAL_ENABLE_POWER_MANAGEMENT
 #include "PowerSignalsImpl.h"
 #include "ArdPowerImpl.h"
+#endif

@@ -75,7 +75,7 @@ When connected light-sleep is supported on ESP32, the manager temporarily enable
 
 ## Policy and sleep type by network configuration
 
-A **policy** decides when ArdPortal may pause application execution or enter deep sleep. A **sleep type** decides what happens to the CPU, RAM and radios. Select both before `portal.begin()`, especially with Zigbee. `AlwaysOn` + `None` is the default; no power-management define is needed.
+A **policy** decides when ArdPortal may pause application execution or enter deep sleep. A **sleep type** decides what happens to the CPU, RAM and radios. Select both before `portal.begin()`, especially with Zigbee. `AlwaysOn` + `None` is the default; `ARDPORTAL_ENABLE_POWER_MANAGEMENT` defaults to `1`. Set it to `0` before including `ArdPortal.h` to omit the module and `portal.power()` API.
 
 The tables below cover all 16 policy/type combinations for each network configuration. `ConnectedSleep` includes both values of `connectedSleep.allowCpuSleep`, explained separately below. "Wi-Fi only" means Zigbee is disabled in the build; a Zigbee-enabled build adds its readiness checks even before the Zigbee connection is established.
 
