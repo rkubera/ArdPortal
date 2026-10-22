@@ -70,6 +70,8 @@ private:
    * @return No value.
    */
   void abortUpgrade();
+  /** @brief Send the current updater error using the existing HTTP response format. */
+  void replyUpgradeError();
   /**
    * @brief Write firmware bytes to the OTA updater and check the result.
    * @param data Data buffer or value used by the operation.

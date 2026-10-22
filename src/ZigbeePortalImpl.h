@@ -13,23 +13,24 @@ bool ArdPortal::resetZigbeePairing(){return _configurationReady&&!portalAndAppCo
 #if ARDPORTAL_ENABLE_WWW
 String ArdPortal::zigbeeStatusJson(){
   const char* states[]={"starting","idle","pairing","rejoining","resetting","connected","failed"};
-  String out="{\"type\":\"zigbee\",\"state\":";out+=quote(states[unsigned(_zigbee.state())]);
-  out+=",\"role\":";out+=quote(ARDPORTAL_ZIGBEE_ROUTER?"router":"end-device");
-  out+=",\"pairing\":";out+=_zigbee.pairing()?"true":"false";
-  out+=",\"busy\":";out+=_zigbee.busy()?"true":"false";out+=",\"paired\":";out+=_zigbee.hasNetwork()?"true":"false";
+  String out;appendJsonText(out,F("{\"type\":\"zigbee\",\"state\":"),states[unsigned(_zigbee.state())]);
+  appendJsonText(out,F(",\"role\":"),ARDPORTAL_ZIGBEE_ROUTER?"router":"end-device");
+  appendJsonBool(out,F(",\"pairing\":"),_zigbee.pairing());
+  appendJsonBool(out,F(",\"busy\":"),_zigbee.busy());appendJsonBool(out,F(",\"paired\":"),_zigbee.hasNetwork());
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  out+=",\"endpoints\":"+String(_zigbee.controlCount());
+  appendJsonNumber(out,F(",\"endpoints\":"),_zigbee.controlCount());
 #endif
 #if ARDPORTAL_ZIGBEE_EXPORT_SUPPORT
   const bool exportReady=_converterLayoutReady&&_zigbee.nativeReady()&&_zigbeeBeginTried&&!_zigbeeMappingFailed&&!_appConfigPageRegistration&&_zigbeeSeenFields==_dynamic.count()&&_zigbeeBuildIndex==_dynamic.count();
 #if ARDPORTAL_ZIGBEE_CONVERTER_SUPPORT
-  out+=",\"converterReady\":";out+=exportReady?"true":"false";
+  appendJsonBool(out,F(",\"converterReady\":"),exportReady);
 #endif
 #if ARDPORTAL_ZHA_QUIRK_SUPPORT
-  out+=",\"zhaQuirkReady\":";out+=exportReady?"true":"false";
+  appendJsonBool(out,F(",\"zhaQuirkReady\":"),exportReady);
 #endif
 #endif
-  out+=",\"channel\":"+String(_zigbee.channel())+",\"panId\":"+String(_zigbee.pan())+",\"attempts\":"+String(_zigbee.attempts())+",\"error\":"+quote(_zigbee.error())+"}";return out;
+  appendJsonNumber(out,F(",\"channel\":"),_zigbee.channel());appendJsonNumber(out,F(",\"panId\":"),_zigbee.pan());
+  appendJsonNumber(out,F(",\"attempts\":"),_zigbee.attempts());appendJsonText(out,F(",\"error\":"),_zigbee.error());out+='}';return out;
 }
 /** @brief Handle Zigbee page and command routes. @param method HTTP method. @param path Request resource. @return True if handled. */
 bool ArdPortal::handleZigbeeHttp(const String& method,const String& path){

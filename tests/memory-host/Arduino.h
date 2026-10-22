@@ -12,10 +12,12 @@
 #include <cctype>
 #include <type_traits>
 #define pgm_read_byte(address) (*reinterpret_cast<const uint8_t*>(address))
+#define PSTR(value) (value)
 #define PROGMEM
 #define memcpy_P memcpy
 #define strlen_P strlen
 #define strcmp_P strcmp
+#define strncmp_P strncmp
 class __FlashStringHelper;
 #define FPSTR(value) reinterpret_cast<const __FlashStringHelper*>(value)
 #define F(value) FPSTR(value)
@@ -52,6 +54,7 @@ public:
   void remove(size_t first) { if (first < value.size()) value.erase(first); }
   void toLowerCase() { for (char& c : value) c = std::tolower(static_cast<unsigned char>(c)); }
   void trim() { size_t first = value.find_first_not_of(" \t\r\n"); if(first == std::string::npos) value.clear(); else value = value.substr(first, value.find_last_not_of(" \t\r\n") - first + 1); }
+  void replace(char a,char b) {std::replace(value.begin(),value.end(),a,b);}
   void replace(const String& a, const String& b) { size_t p = 0; while ((p = value.find(a.value, p)) != std::string::npos) { value.replace(p, a.length(), b.value); p += b.length(); } }
   static size_t& reserveLimitForTest() { static size_t limit = SIZE_MAX; return limit; }
   static size_t& reserveFailCountdownForTest() { static size_t count = SIZE_MAX; return count; }

@@ -1086,18 +1086,24 @@ private:
    * @param text Text to read, encode or display.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool append(const String& text){
-    size_t before=_bytes;if(text.length()>_limits.maxOutputBytes || before>_limits.maxOutputBytes-text.length())return fail("output limit");
-    _bytes+=text.length();if(_measure)return true;
-    if(_slice) {if(_bytes<=_sliceOffset||_output.length()>=_sliceMaximum)return true;size_t start=before<_sliceOffset?_sliceOffset-before:0;size_t count=text.length()-start;if(count>_sliceMaximum-_output.length())count=_sliceMaximum-_output.length();size_t old=_output.length();_output+=text.substring(start,start+count);return _output.length()==old+count||fail("out of memory");}
-    _output+=text;return _output.length()==_bytes || fail("out of memory");
+  bool append(const char* text,size_t length){
+    const size_t before=_bytes;
+    if(length>_limits.maxOutputBytes||before>_limits.maxOutputBytes-length)return fail("output limit");
+    _bytes+=length;if(_measure)return true;
+    size_t start=0,count=length;
+    if(_slice){
+      if(_bytes<=_sliceOffset||_output.length()>=_sliceMaximum)return true;
+      if(before<_sliceOffset)start=_sliceOffset-before;
+      count=length-start;
+      if(count>_sliceMaximum-_output.length())count=_sliceMaximum-_output.length();
+    }
+    if(!count)return true;
+    const size_t old=_output.length();
+    _output.concat(text+start,count);
+    return _output.length()==old+count||fail("out of memory");
   }
-  /**
-   * @brief Append the supplied data or journal record to the current destination.
-   * @param text Text to read, encode or display.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool append(const char* text){String value(text);if(value.length()!=strlen(text))return fail("out of memory");return append(value);}
+  bool append(const String& text){return append(text.c_str(),text.length());}
+  bool append(const char* text){return append(text,strlen(text));}
   /**
    * @brief Append the indentation required for pretty JSON output.
    * @param depth Current JSON nesting depth.
@@ -1114,10 +1120,13 @@ private:
     if(!validUtf8(text))return fail("invalid UTF-8");
     if(!append("\""))return false;
     for(size_t i=0;i<text.length();++i){if((i&127)==0)_budget.checkpoint();uint8_t c=text[i];
-      if(_limits.escapeHtml&&(c=='<'||c=='>'||c=='&')) {char escaped[7];snprintf(escaped,sizeof(escaped),"\\u%04x",c);if(!append(escaped))return false;}
-      else if(c=='"'||c=='\\'){String byte;byte+=char(c);if(byte.length()!=1)return fail("out of memory");if(!append("\\") || !append(byte))return false;}
-      else if(c<32){char escaped[7];snprintf(escaped,sizeof(escaped),"\\u%04x",c);if(!append(escaped))return false;}
-      else {String byte;byte+=char(c);if(byte.length()!=1)return fail("out of memory");if(!append(byte))return false;}
+      if(c<32||(_limits.escapeHtml&&(c=='<'||c=='>'||c=='&'))){
+        char escaped[7];snprintf(escaped,sizeof(escaped),"\\u%04x",c);if(!append(escaped,6))return false;
+      }else if(c=='"'||c=='\\'){
+        const char escaped[]={'\\',char(c)};if(!append(escaped,sizeof(escaped)))return false;
+      }else{
+        const char byte=char(c);if(!append(&byte,1))return false;
+      }
     }return append("\"");
   }
   /**

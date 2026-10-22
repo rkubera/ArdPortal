@@ -140,9 +140,9 @@ public:
   /** @brief Set operation timeout/retry options. @param options Limits in milliseconds and maximum attempts. @return True for valid limits; false leaves existing options unchanged. */
   bool setZigbeeOptions(const ZigbeeOptions& options){if(!ArdZigbee::validOptions(options))return false;_zigbeeOptions=options;return true;}
   /** @brief Install operation result handler. @param callback Receives operation, success and error from loop(). @return No value. */
-  void onZigbeeOperationFinished(ArdZigbee::FinishedCallback callback){_zigbee.onFinished(callback);}
+  void onZigbeeOperationFinished(ArdZigbee::FinishedCallback callback){_zigbee.onFinished(std::move(callback));}
   /** @brief Install Zigbee state handler. @param callback Receives cached state changes from loop(). @return No value. */
-  void onZigbeeStateChanged(ArdZigbee::StateCallback callback){_zigbee.onState(callback);}
+  void onZigbeeStateChanged(ArdZigbee::StateCallback callback){_zigbee.onState(std::move(callback));}
   /** @brief Get Zigbee network state. @return Current state. */
   ZigbeeState zigbeeState()const{return _zigbee.state();}
 #if ARDPORTAL_ZIGBEE_EXPORT_SUPPORT
@@ -224,31 +224,31 @@ public:
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onPortalConfigChanged(PortalConfigChangedCallback callback) { _changed = callback; }
+  void onPortalConfigChanged(PortalConfigChangedCallback callback) { _changed = std::move(callback); }
   /**
    * @brief Install the callback run before manual or OTA restarts; factory reset and storage formatting bypass it.
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onBeforeRestart(RestartCallback callback) { _beforeRestart = callback; }
+  void onBeforeRestart(RestartCallback callback) { _beforeRestart = std::move(callback); }
   /**
    * @brief Install the callback run before a confirmed factory reset, even if settings are already default.
    * @param callback Synchronous handler called once before default settings are scheduled for storage. An empty handler disables it.
    * @return No value. Ordinary restarts and storage formatting do not invoke this callback.
    */
-  void onBeforeFactoryReset(BeforeFactoryResetCallback callback) { _beforeFactoryReset = callback; }
+  void onBeforeFactoryReset(BeforeFactoryResetCallback callback) { _beforeFactoryReset = std::move(callback); }
   /**
    * @brief Install the callback reporting completion of a persistent configuration save.
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onPortalAndAppConfigSaved(PortalAndAppConfigSavedCallback callback) { _saved = callback; }
+  void onPortalAndAppConfigSaved(PortalAndAppConfigSavedCallback callback) { _saved = std::move(callback); }
   /**
    * @brief Report each application value whose batch exhausted its three save attempts.
    * @param callback Receives key, attempted value (Undefined for deletion), attempt count and error. References are valid only during the call.
    * @return No value.
    */
-  void onAppConfigValueSaveFailed(AppConfigValueSaveFailedCallback callback) { _valueSaveFailed = callback; }
+  void onAppConfigValueSaveFailed(AppConfigValueSaveFailedCallback callback) { _valueSaveFailed = std::move(callback); }
   /** @brief Read attempts made for the current or most recently completed save batch. @return Zero before any attempt, otherwise 1 to 3. */
   uint8_t portalAndAppConfigSaveAttempts() const { return _saveAttempts; }
   /**
@@ -256,7 +256,7 @@ public:
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onPortalAndAppConfigReady(PortalAndAppConfigReadyCallback callback) { _readyCallback = callback; }
+  void onPortalAndAppConfigReady(PortalAndAppConfigReadyCallback callback) { _readyCallback = std::move(callback); }
   /**
    * @brief Check whether initial portal and application configuration loading has completed.
    * @return True once initial configuration loading has completed, including a failed load.
@@ -318,7 +318,7 @@ public:
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onAppConfigPageRegistrationFinished(AppConfigPageRegistrationFinishedCallback callback) { _appConfigPageRegistrationFinished=callback; }
+  void onAppConfigPageRegistrationFinished(AppConfigPageRegistrationFinishedCallback callback) { _appConfigPageRegistrationFinished=std::move(callback); }
   /**
    * @brief Read the current page registration job state.
    * @return Idle, Pending, Succeeded or Failed for the current or most recent registration.
@@ -381,7 +381,7 @@ public:
    */
   void onAppConfigCommand(AppConfigCommandCallback callback) {
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
-    _appCommand=callback;
+    _appCommand=std::move(callback);
 #else
     (void)callback;
 #endif
@@ -419,7 +419,7 @@ public:
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onAppConfigValueChanged(AppConfigValueChangedCallback callback) { _appChanged = callback; }
+  void onAppConfigValueChanged(AppConfigValueChangedCallback callback) { _appChanged = std::move(callback); }
   /**
    * @brief Request a configuration save without debounce; flash work continues through loop().
    * @return True if accepted in RAM; persistent completion is reported through onPortalAndAppConfigSaved().

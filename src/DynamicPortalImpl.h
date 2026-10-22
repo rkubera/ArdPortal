@@ -51,22 +51,23 @@ bool ArdPortal::addAppConfigEntity(const String& definition) {
  */
 #if ARDPORTAL_ENABLE_WWW
 bool ArdPortal::dynamicHttp(const String& method,const String& path) {
-  if(method=="GET"&&(path.indexOf("/api/pages")==0||path.indexOf("/api/app")==0||path=="/api/page-conditions"||path=="/api/page-catalog")&&!reserveDynamicHttpMemory(2048,1024)){
+  const bool get=ardFlashEqual(method,F("GET")),post=ardFlashEqual(method,F("POST"));
+  if(get&&(path.indexOf("/api/pages")==0||path.indexOf("/api/app")==0||path=="/api/page-conditions"||path=="/api/page-catalog")&&!reserveDynamicHttpMemory(2048,1024)){
     reply(503,"text/plain","Network memory reserve; retry later");return true;
   }
-  if(method=="GET"&&path.indexOf("/api/entity-type?type=")==0) {
+  if(get&&path.indexOf("/api/entity-type?type=")==0) {
     String type=path.substring(strlen("/api/entity-type?type="));
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
-    for(size_t i=0;i<ARD_HA_SPEC_COUNT;++i) {ArdHaSpec spec;memcpy_P(&spec,&ARD_HA_SPECS[i],sizeof(spec));if(type==String(FPSTR(spec.name))) {_page=spec.json;_pageLength=strlen_P(_page);_pageOffset=0;responseHeader(200,"application/json",_pageLength,false,true);return true;}}
+    for(size_t i=0;i<ARD_HA_SPEC_COUNT;++i) {ArdHaSpec spec;memcpy_P(&spec,&ARD_HA_SPECS[i],sizeof(spec));if(ardFlashEqual(type,spec.name)) {_page=spec.json;_pageLength=strlen_P(_page);_pageOffset=0;responseHeader(200,"application/json",_pageLength,false,true);return true;}}
 #endif
     reply(404,"text/plain",ArdUILanguage::text(ArdUILanguage::Key::s_191)+type);return true;
   }
-  if(method=="GET"&&path.indexOf("/p/")==0) {
+  if(get&&path.indexOf("/p/")==0) {
     for(size_t p=0;p<_dynamic.pages.length();++p) if(path=="/p/"+_dynamic.pages.id(p)) return false;
     reply(404,"text/plain",ArdUILanguage::text(ArdUILanguage::Key::s_192)+path.substring(3)); return true;
   }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-  if(method=="GET"&&path=="/api/page-conditions") {
+  if(get&&path=="/api/page-conditions") {
     String body="{";
     for(size_t p=0;p<_dynamic.pages.length();++p) {
       if(p)body+=',';
@@ -75,12 +76,12 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     body+='}';reply(200,"application/json",body);return true;
   }
 #endif
-  if(method=="GET"&&path=="/api/page-catalog") {
+  if(get&&path=="/api/page-catalog") {
     responseHeader(200,"application/json",_dynamic.pages.menuLength(),false,true);
     _httpDynamicPages=true;_httpDynamicMode=3;_httpDynamicStage=0;
     _httpDynamicPageIndex=0;_httpDynamicPageCount=_dynamic.pages.length();_httpDynamicPageOffset=0;return true;
   }
-  if(method=="GET"&&path.indexOf("/api/pages?page=")==0) {
+  if(get&&path.indexOf("/api/pages?page=")==0) {
     const String id=path.substring(strlen("/api/pages?page="));
     for(size_t p=0;p<_dynamic.pages.length();++p)if(_dynamic.pages.id(p)==id){
       size_t work=2048,block=1024;for(size_t f=0;f<_dynamic.pages.fields(p);++f){size_t i=_dynamic.pages.fieldIndex(p,f),cost=_dynamic.pages.fieldHttpWork(i),single=_dynamic.pages.fieldBlock(i);if(cost>work)work=cost;if(single>block)block=single;}
@@ -91,7 +92,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     }
     reply(404,"text/plain",ArdUILanguage::text(ArdUILanguage::Key::s_192)+id);return true;
   }
-  if(method=="GET"&&path=="/api/pages") {
+  if(get&&path=="/api/pages") {
     // Measure without an output buffer, then emit bounded JSON slices in loop().
     ArdJSON::Limits limits;limits.maxNodes=4096;limits.maxOutputBytes=ArdAppConfigMaxDefinitionBytes;String error;
     size_t length=_dynamic.pages.measure(limits,&error);
@@ -101,7 +102,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     responseHeader(200,"application/json",size_t(-1),false,true);
     _httpDynamicPages=true;_httpDynamicMode=0;_httpDynamicStage=0;_httpDynamicField=0;_httpDynamicPageStarted=true;_httpDynamicPageIndex=0;_httpDynamicPageCount=_dynamic.pages.length();_httpDynamicPageOffset=0;return true;
   }
-  if(method=="GET"&&(path=="/api/app"||path.indexOf("/api/app?page=")==0)) {
+  if(get&&(path=="/api/app"||path.indexOf("/api/app?page=")==0)) {
     String pageId=path=="/api/app"?String():path.substring(strlen("/api/app?page="));
     if(pageId.length()) {
       for(size_t p=0;p<_dynamic.pages.length();++p)if(_dynamic.pages.id(p)==pageId){
@@ -126,7 +127,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     if(!output.length())replyMessage(503,ArdUILanguage::Key::s_169);else reply(200,"application/json",output);return true;
   }
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
-  if(method=="POST"&&path=="/api/app/command") {
+  if(post&&path=="/api/app/command") {
     V body=_json.parse(_request.substring(_request.indexOf("\r\n\r\n")+4),nullptr,snapshotLimits());const V& request=body;
     const V& field=_dynamic.field(request["field"].asString());bool belongs=false;
     for(size_t p=0;p<_dynamic.pages.length();++p) if(_dynamic.pages.id(p)==request["page"].asString()) if(_dynamic.pages.belongs(p,request["field"].asString())) belongs=true;
@@ -136,7 +137,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     replyMessage(202,ArdUILanguage::Key::s_175);return true;
   }
 #endif
-  if(method!="POST"||path!="/api/app") return false;
+  if(!post||path!="/api/app") return false;
   V body=_json.parse(_request.substring(_request.indexOf("\r\n\r\n")+4),nullptr,snapshotLimits());
   const V& request=body; String pageId=request["page"].asString(); const V& values=request["values"];
   bool known=false; for(size_t p=0;p<_dynamic.pages.length();++p) if(_dynamic.pages.id(p)==pageId) known=true;
@@ -156,7 +157,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
   }
   if(!applied.isValid()||!patch.isValid()){replyMessage(503,ArdUILanguage::Key::s_169);return true;}
   if(needsSave){
-    if(!_configurationReady||_saveQueued||_pendingReady||mqttTrialActive()||_httpWaitingStorage||(_savePending&&ArdPortalJson::encode(_pending,_json)!=ArdPortalJson::encode(_config,_json))) {replyMessage(409,ArdUILanguage::Key::s_107);return true;}
+    if(!_configurationReady||_saveQueued||_pendingReady||mqttTrialActive()||_httpWaitingStorage||(_savePending&&!ArdPortalJson::equal(_pending,_config))) {replyMessage(409,ArdUILanguage::Key::s_107);return true;}
     if(!scheduleAppPatch(std::move(patch),ChangeSource::Portal,true)) {replyMessage(409,ArdUILanguage::Key::s_107);return true;}
   }
   for(size_t i=0;i<keys.length();++i) {String key=keys[i].asString();_appControls.applyAppState(key,applied[key],ChangeSource::Portal);}

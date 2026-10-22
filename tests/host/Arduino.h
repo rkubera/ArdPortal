@@ -13,10 +13,12 @@
 #include <type_traits>
 #define pgm_read_dword(address) (*reinterpret_cast<const uint32_t*>(address))
 #define pgm_read_byte(address) (*reinterpret_cast<const uint8_t*>(address))
+#define PSTR(value) (value)
 #define PROGMEM
 #define memcpy_P memcpy
 #define strlen_P strlen
 #define strcmp_P strcmp
+#define strncmp_P strncmp
 class __FlashStringHelper;
 #define FPSTR(value) reinterpret_cast<const __FlashStringHelper*>(value)
 #define F(value) FPSTR(value)

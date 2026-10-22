@@ -69,7 +69,17 @@ void appendQuoted(String& out, const String& s) {
   }
   out += '"';
 }
-#if ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_ENABLE_ZIGBEE
+// Keep conversion and temporary cleanup shared across diagnostic fields.
+__attribute__((noinline)) void appendJsonBool(String& out, const __FlashStringHelper* prefix, bool value) {
+  out += prefix; out += value ? "true" : "false";
+}
+__attribute__((noinline)) void appendJsonNumber(String& out, const __FlashStringHelper* prefix, uint32_t value) {
+  out += prefix; out += String(value);
+}
+__attribute__((noinline)) void appendJsonText(String& out, const __FlashStringHelper* prefix, const String& value) {
+  out += prefix; appendQuoted(out, value);
+}
+#if ARDPORTAL_ENABLE_ZIGBEE
 /**
  * @brief Serialize text as an escaped JSON string.
  * @param s Input text or component state, as indicated by the signature.
@@ -109,10 +119,10 @@ int hex(char c) {
   return -1;
 }
 /**
- * @brief Decode the next UTF-8 code point while advancing the input offset.
- * @param s Input text or component state, as indicated by the signature.
- * @param out Output destination populated by this operation.
- * @return True on success; false if validation, resource allocation or the operation fails.
+ * @brief Decode a URL-encoded form field; reject invalid escapes and NULs.
+ * @param s Encoded field.
+ * @param out Decoded field, cleared before decoding.
+ * @return True when every input byte was decoded successfully.
  */
 bool decode(const String& s, String& out) {
   out = "";
@@ -399,10 +409,10 @@ void ArdPortal::serviceScan() {
 #else
     bool secured = WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
 #endif
-    _networks += F("{\"ssid\":"); appendQuoted(_networks,WiFi.SSID(i));
+    appendJsonText(_networks,F("{\"ssid\":"),WiFi.SSID(i));
     _networks += F(",\"rssi\":"); _networks += String(WiFi.RSSI(i));
     _networks += F(",\"channel\":"); _networks += String(WiFi.channel(i));
-    _networks += F(",\"secured\":"); _networks += secured ? "true" : "false"; _networks += '}';
+    appendJsonBool(_networks,F(",\"secured\":"),secured); _networks += '}';
   }
   _scanSucceeded=count>=0;_networks += ']'; WiFi.scanDelete(); _scanning = false; _scanCompletedId = _scanId;
 #endif
@@ -805,6 +815,7 @@ void ArdPortal::handleHttp() {
  * @return No value.
  */
 void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
+  const bool get=ardFlashEqual(method,F("GET")),post=ardFlashEqual(method,F("POST"));
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_WWW
   if(handleZigbeeHttp(method,path))return;
 #else
@@ -819,15 +830,15 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
 #if !ARDPORTAL_ENABLE_MQTT
   if(ardFlashEqual(path,F("/mqtt")) || ardFlashEqual(path,F("/api/mqtt/connect"))) { replyMessage(404,ArdUILanguage::Key::s_131); return; }
 #endif
-  if(ardFlashEqual(method,F("GET"))&&(ardFlashEqual(path,F("/portal.css"))||ardFlashEqual(path,F("/portal.js")))) {
+  if(get&&(ardFlashEqual(path,F("/portal.css"))||ardFlashEqual(path,F("/portal.js")))) {
     bool css=ardFlashEqual(path,F("/portal.css"));size_t length=css?beginAsset(PORTAL_CSS_GZIP,sizeof(PORTAL_CSS_GZIP)/sizeof(PORTAL_CSS_GZIP[0])):beginAsset(PORTAL_JS_GZIP,sizeof(PORTAL_JS_GZIP)/sizeof(PORTAL_JS_GZIP[0]));
     responseHeader(200,css?"text/css":"application/javascript",length,true,true);return;
   }
-  if (ardFlashEqual(method,F("GET")) && ardFlashEqual(path,F("/api/languages"))) {
+  if (get && ardFlashEqual(path,F("/api/languages"))) {
     _page = ArdUILanguageData::Manifest; _pageLength = strlen_P(_page); _pageOffset = 0;
     responseHeader(200,"application/json",_pageLength,false,true); return;
   }
-  if (ardFlashEqual(method,F("GET")) && path.indexOf("/api/language?code=") == 0) {
+  if (get && path.indexOf("/api/language?code=") == 0) {
     String code = path.substring(strlen("/api/language?code=")); int index = ArdUILanguage::find(code);
     if (index < 0) { replyMessage(404,ArdUILanguage::Key::s_131); return; }
     ArdUILanguage::select(code);
@@ -836,7 +847,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     responseHeader(200,"application/json",length,true,true); return;
   }
 #if ARDPORTAL_SUPPORT_WEBSOCKET
-  if (ardFlashEqual(method,F("GET")) && (ardFlashEqual(path,F("/api/events"))
+  if (get && (ardFlashEqual(path,F("/api/events"))
 #if ARDPORTAL_ENABLE_CONSOLE
     || ardFlashEqual(path,F("/api/console"))
 #endif
@@ -872,12 +883,12 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     _responseOffset=0; _httpSince=millis(); _wsUpgrade=true; return;
   }
 #endif
-  if (_apActive && ardFlashEqual(method,F("GET")) && !ardFlashEqual(path,F("/")) && !ardFlashEqual(path,F("/device")) && !ardFlashEqual(path,F("/wifi")) &&
+  if (_apActive && get && !ardFlashEqual(path,F("/")) && !ardFlashEqual(path,F("/device")) && !ardFlashEqual(path,F("/wifi")) &&
       path.indexOf("/p/") != 0 && !ardFlashEqual(path,F("/zigbee")) && !ardFlashEqual(path,F("/ap")) && !ardFlashEqual(path,F("/mqtt")) && !ardFlashEqual(path,F("/upgrade")) && !ardFlashEqual(path,F("/console")) && path.indexOf("/api/") != 0) {
     _response = String(F("HTTP/1.1 302 Found\r\nConnection: close\r\nCache-Control: no-store\r\nLocation: http://")) + apIP().toString() + "/\r\nContent-Length: 0\r\n\r\n";
     _responseOffset = 0; _httpSince = millis(); return;
   }
-  if (ardFlashEqual(method,F("GET")) && (path.indexOf("/api/") != 0 && path.indexOf('.') < 0)) {
+  if (get && (path.indexOf("/api/") != 0 && path.indexOf('.') < 0)) {
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
     const size_t catalogLength=_dynamic.pages.menuLength();
     _page=PORTAL_PAGE_HEAD;_pageLength=strlen_P(_page);_pageOffset=0;
@@ -893,12 +904,12 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
 #endif
     return;
   }
-  if (ardFlashEqual(method,F("POST")) && ardFlashEqual(path,F("/api/restart"))) {
+  if (post && ardFlashEqual(path,F("/api/restart"))) {
     if (!_configurationReady || mqttTrialActive() || _rebootPending) {replyMessage(409,ArdUILanguage::Key::s_132);return;}
     if(_request.substring(_request.indexOf("\r\n\r\n")+4)!="confirm=RESTART") {replyMessage(400,ArdUILanguage::Key::s_124);return;}
     replyMessage(202,ArdUILanguage::Key::s_179);scheduleRestart(RestartReason::Portal);return;
   }
-  if (ardFlashEqual(method,F("POST")) && ardFlashEqual(path,F("/api/factory-reset"))) {
+  if (post && ardFlashEqual(path,F("/api/factory-reset"))) {
     if (!_configurationReady || portalAndAppConfigBusy() || mqttTrialActive() || _rebootPending) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
     if (_request.substring(_request.indexOf("\r\n\r\n") + 4) != "confirm=RESET") { replyMessage(400,ArdUILanguage::Key::s_124); return; }
     PortalConfig defaults; defaults.deviceName = defaultDeviceName(); defaults.apName = defaults.deviceName;
@@ -912,7 +923,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
 #endif
     _resetAfterSave = true; _httpWaitingStorage = true; return;
   }
-  if (ardFlashEqual(method,F("POST")) && ardFlashEqual(path,F("/api/storage/format"))) {
+  if (post && ardFlashEqual(path,F("/api/storage/format"))) {
     if (!_configurationReady || portalAndAppConfigBusy() || mqttTrialActive() || _rebootPending) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
     if (_request.substring(_request.indexOf("\r\n\r\n") + 4) != "confirm=FORMAT") { replyMessage(400,ArdUILanguage::Key::s_124); return; }
     closeMqtt(); _httpWaitingStorage = true;
@@ -924,49 +935,60 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     })) { _httpWaitingStorage = false; replyMessage(500,ArdUILanguage::Key::s_129); }
     return;
   }
-  if (ardFlashEqual(method,F("GET")) && ardFlashEqual(path,F("/api/status"))) {
+  if (get && ardFlashEqual(path,F("/api/status"))) {
     String out;
-    out += F("{\"wifi\":"); out += wifiConnected() ? "true" : "false"; out += F(",\"mqtt\":"); out += mqttConnected() ? "true" : "false";
-    out += F(",\"portalConfigRevision\":");out+=String(_portalConfigRevision);
-    out += F(",\"state\":"); out += String(int(_wifiState)); out += F(",\"wifiRevision\":"); out += String(_wifiRevision); out += F(",\"wifiResult\":"); out += String(_wifiResult); out += F(",\"mqttRevision\":"); out += String(mqttTrialRevision()); out += F(",\"mqttResult\":"); out += String(mqttTrialResult()); out += F(",\"mqttResultMessage\":"); appendQuoted(out,mqttTrialMessage()); out += F(",\"mqttState\":"); out += String(int(mqttState()));
-    out += F(",\"ap\":"); out += _apActive ? "true" : "false"; out += F(",\"ip\":"); appendQuoted(out,localIP().toString());
-    out += F(",\"apIp\":"); appendQuoted(out,apIP().toString()); out += F(",\"storage\":"); out += _storageOK ? "true" : "false"; out += F(",\"tls\":"); out += _config.mqttTls ? "true" : "false";
-    out += F(",\"clockReady\":"); out += tlsClockReady() ? "true" : "false"; out += F(",\"filesystemMounted\":"); out += _storageMounted ? "true" : "false";
+    appendJsonBool(out,F("{\"wifi\":"),wifiConnected());
+    appendJsonBool(out,F(",\"mqtt\":"),mqttConnected());
+    appendJsonNumber(out,F(",\"portalConfigRevision\":"),_portalConfigRevision);
+    out += F(",\"state\":"); out += String(int(_wifiState));
+    appendJsonNumber(out,F(",\"wifiRevision\":"),_wifiRevision); out += F(",\"wifiResult\":"); out += String(_wifiResult);
+    appendJsonNumber(out,F(",\"mqttRevision\":"),mqttTrialRevision()); out += F(",\"mqttResult\":"); out += String(mqttTrialResult());
+    appendJsonText(out,F(",\"mqttResultMessage\":"),mqttTrialMessage()); out += F(",\"mqttState\":"); out += String(int(mqttState()));
+    appendJsonBool(out,F(",\"ap\":"),_apActive);
+    appendJsonText(out,F(",\"ip\":"),localIP().toString());
+    appendJsonText(out,F(",\"apIp\":"),apIP().toString());
+    appendJsonBool(out,F(",\"storage\":"),_storageOK);
+    appendJsonBool(out,F(",\"tls\":"),_config.mqttTls);
+    appendJsonBool(out,F(",\"clockReady\":"),tlsClockReady());
+    appendJsonBool(out,F(",\"filesystemMounted\":"),_storageMounted);
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-    out += F(",\"appConfigPageCount\":");out += String(_dynamic.pages.length());
+    appendJsonNumber(out,F(",\"appConfigPageCount\":"),_dynamic.pages.length());
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE
     out += F(",\"zigbee\":true");
-    out += F(",\"zigbeeConnected\":");
-    out += _zigbee.state()==ZigbeeState::Connected?"true":"false";
+    appendJsonBool(out,F(",\"zigbeeConnected\":"),_zigbee.state()==ZigbeeState::Connected);
 #endif
-    out += F(",\"configurationReady\":"); out += _configurationReady ? "true" : "false"; out += F(",\"storageBusy\":"); out += portalAndAppConfigBusy() ? "true" : "false"; out += F(",\"storageError\":"); appendQuoted(out,_storageError); out += F(",\"scanCompletedId\":"); out += String(_scanCompletedId); out += F(",\"deviceName\":"); appendQuoted(out,_config.deviceName); out += "}";
+    appendJsonBool(out,F(",\"configurationReady\":"),_configurationReady);
+    appendJsonBool(out,F(",\"storageBusy\":"),portalAndAppConfigBusy());
+    appendJsonText(out,F(",\"storageError\":"),_storageError);
+    appendJsonNumber(out,F(",\"scanCompletedId\":"),_scanCompletedId);
+    appendJsonText(out,F(",\"deviceName\":"),_config.deviceName); out += "}";
     reply(200, "application/json", out); return;
   }
-  if (ardFlashEqual(method,F("GET")) && ardFlashEqual(path,F("/api/config"))) {
+  if (get && ardFlashEqual(path,F("/api/config"))) {
     String out;
-    out += F("{\"ssid\":"); appendQuoted(out,_config.ssid);
-    out += F(",\"host\":"); appendQuoted(out,_config.host);
-    out += F(",\"port\":"); out += String(_config.port);
-    out += F(",\"user\":"); appendQuoted(out,_config.user);
-    out += F(",\"mqttTls\":"); out += String(_config.mqttTls ? "1" : "0");
-    out += F(",\"caCert\":"); appendQuoted(out,_config.caCert);
-    out += F(",\"apName\":"); appendQuoted(out,_config.apName);
-    out += F(",\"apBand\":");out += String(_config.apBand);
-    out += F(",\"apDualBand\":");out += ARDPORTAL_SUPPORT_DUAL_BAND_AP?"true":"false";
-    out += F(",\"deviceName\":"); appendQuoted(out,_config.deviceName);
-    out += F(",\"mqttName\":"); appendQuoted(out,ArdDeviceName::mqtt(_config.deviceName));
-    out += F(",\"deviceDescription\":"); appendQuoted(out,_config.deviceDescription);
+    appendJsonText(out,F("{\"ssid\":"),_config.ssid);
+    appendJsonText(out,F(",\"host\":"),_config.host);
+    appendJsonNumber(out,F(",\"port\":"),_config.port);
+    appendJsonText(out,F(",\"user\":"),_config.user);
+    appendJsonNumber(out,F(",\"mqttTls\":"),_config.mqttTls ? 1u : 0u);
+    appendJsonText(out,F(",\"caCert\":"),_config.caCert);
+    appendJsonText(out,F(",\"apName\":"),_config.apName);
+    appendJsonNumber(out,F(",\"apBand\":"),_config.apBand);
+    appendJsonBool(out,F(",\"apDualBand\":"),ARDPORTAL_SUPPORT_DUAL_BAND_AP);
+    appendJsonText(out,F(",\"deviceName\":"),_config.deviceName);
+    appendJsonText(out,F(",\"mqttName\":"),ArdDeviceName::mqtt(_config.deviceName));
+    appendJsonText(out,F(",\"deviceDescription\":"),_config.deviceDescription);
     out += '}';
     reply(200,"application/json",out);return;
   }
-  if (ardFlashEqual(method,F("POST")) && ardFlashEqual(path,F("/api/scan"))) {
+  if (post && ardFlashEqual(path,F("/api/scan"))) {
     if (_scanRequested || _scanning) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
     _scanRequested = true; ++_scanId;
     reply(202, "application/json", String(F("{\"scanId\":")) + String(_scanId) + "}"); return;
   }
-  if (ardFlashEqual(method,F("GET")) && ardFlashEqual(path,F("/api/networks"))) { reply(200, "application/json", _networks); return; }
-  if (!ardFlashEqual(method,F("POST")) || (!ardFlashEqual(path,F("/api/config")) && !ardFlashEqual(path,F("/api/mqtt/connect")))) { replyMessage(404,ArdUILanguage::Key::s_131); return; }
+  if (get && ardFlashEqual(path,F("/api/networks"))) { reply(200, "application/json", _networks); return; }
+  if (!post || (!ardFlashEqual(path,F("/api/config")) && !ardFlashEqual(path,F("/api/mqtt/connect")))) { replyMessage(404,ArdUILanguage::Key::s_131); return; }
   if (!_configurationReady || portalAndAppConfigBusy() || mqttTrialActive()) { replyMessage(409,ArdUILanguage::Key::s_132); return; }
   static const char keys[][18] PROGMEM = {"ssid", "password", "host", "port", "user", "mqttPassword", "mqttTls", "caCert", "apName", "apPassword", "deviceName", "clearWifi", "deviceDescription", "apBand"};
   String values[14]; uint16_t seen = 0;
@@ -974,10 +996,10 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
   int offset = 0;
   while (offset < int(body.length())) {
     int end = body.indexOf('&', offset); if (end < 0) end = body.length();
-    String pair = body.substring(offset, end); int equal = pair.indexOf('=');
-    if (equal < 0) { replyMessage(400,ArdUILanguage::Key::s_120); return; }
+    int equal=body.indexOf('=',offset);
+    if (equal < 0 || equal >= end) { replyMessage(400,ArdUILanguage::Key::s_120); return; }
     String key, value;
-    if (!decode(pair.substring(0, equal), key) || !decode(pair.substring(equal + 1), value)) { replyMessage(400,ArdUILanguage::Key::s_120); return; }
+    if (!decode(body.substring(offset,equal),key) || !decode(body.substring(equal+1,end),value)) { replyMessage(400,ArdUILanguage::Key::s_120); return; }
     int index = -1;
     for (int i = 0; i < 14; ++i) if (ardFlashEqual(key,keys[i])) {index = i;break;}
     if (index < 0 || (seen & (1 << index))) { replyMessage(400,ArdUILanguage::Key::s_120); return; }
@@ -1152,27 +1174,46 @@ String ArdPortal::infoJson() {
   String chip = "ESP8266"; uint32_t heap = memory.total8; uint32_t physicalFlash = ESP.getFlashChipRealSize();uint32_t maximumBlock=memory.block8;
 #endif
   String out;
-  out += F("{\"deviceName\":"); appendQuoted(out,_config.deviceName); out += F(",\"deviceDescription\":"); appendQuoted(out,_config.deviceDescription); out += F(",\"deviceManufacturer\":"); appendQuoted(out,_config.deviceManufacturer); out += F(",\"chip\":"); appendQuoted(out,chip);
-  out += F(",\"firmwareVersion\":"); appendQuoted(out,getFirmwareVersion());
-  out += F(",\"chipId\":"); appendQuoted(out,chipId()); out += F(",\"flashBytes\":"); out += String(ESP.getFlashChipSize());
-  out += F(",\"physicalFlashBytes\":"); out += String(physicalFlash); out += F(",\"heapBytes\":"); out += String(heap); out += F(",\"freeHeapBytes\":"); out += String(memory.free8);
-  out += F(",\"resetReason\":"); appendQuoted(out,ArdUILanguage::text(resetReasonKey())); out += F(",\"minimumFreeHeapBytes\":"); out += String(_minimumFreeHeap==UINT32_MAX?memory.free8:_minimumFreeHeap); out += F(",\"maximumHeapBlockBytes\":"); out += String(maximumBlock);
+  appendJsonText(out,F("{\"deviceName\":"),_config.deviceName);
+  appendJsonText(out,F(",\"deviceDescription\":"),_config.deviceDescription);
+  appendJsonText(out,F(",\"deviceManufacturer\":"),_config.deviceManufacturer);
+  appendJsonText(out,F(",\"chip\":"),chip);
+  appendJsonText(out,F(",\"firmwareVersion\":"),getFirmwareVersion());
+  appendJsonText(out,F(",\"chipId\":"),chipId());
+  appendJsonNumber(out,F(",\"flashBytes\":"),ESP.getFlashChipSize());
+  appendJsonNumber(out,F(",\"physicalFlashBytes\":"),physicalFlash);
+  appendJsonNumber(out,F(",\"heapBytes\":"),heap);
+  appendJsonNumber(out,F(",\"freeHeapBytes\":"),memory.free8);
+  appendJsonText(out,F(",\"resetReason\":"),ArdUILanguage::text(resetReasonKey()));
+  appendJsonNumber(out,F(",\"minimumFreeHeapBytes\":"),_minimumFreeHeap==UINT32_MAX?memory.free8:_minimumFreeHeap);
+  appendJsonNumber(out,F(",\"maximumHeapBlockBytes\":"),maximumBlock);
   const auto& byteHeap=memory;
-  out += F(",\"heap8FreeBytes\":");out+=String(byteHeap.free8);out+=F(",\"heap8LargestBlockBytes\":");out+=String(byteHeap.block8);
+  appendJsonNumber(out,F(",\"heap8FreeBytes\":"),byteHeap.free8);
+  appendJsonNumber(out,F(",\"heap8LargestBlockBytes\":"),byteHeap.block8);
   out += F(",\"dmaAvailable\":");
 #if defined(ESP32)
   out += "true";
 #else
   out += "false";
 #endif
-  out += F(",\"dmaFreeBytes\":");out+=String(byteHeap.freeDma);out+=F(",\"dmaLargestBlockBytes\":");out+=String(byteHeap.blockDma);out+=F(",\"minimumDmaFreeBytes\":");out+=String(_minimumFreeDma==UINT32_MAX?byteHeap.freeDma:_minimumFreeDma);
-  out += F(",\"sketchBytes\":"); out += String(ESP.getSketchSize()); out += F(",\"otaFreeBytes\":"); out += String(ESP.getFreeSketchSpace());
-  out += F(",\"uptimeSeconds\":"); out += String(static_cast<unsigned long>(_uptimeMs / 1000)); out += F(",\"utc\":"); appendQuoted(out,timestamp);
-  out += F(",\"wifi\":"); out += wifiConnected() ? "true" : "false"; out += F(",\"mqtt\":"); out += mqttConnected() ? "true" : "false";
+  appendJsonNumber(out,F(",\"dmaFreeBytes\":"),byteHeap.freeDma);
+  appendJsonNumber(out,F(",\"dmaLargestBlockBytes\":"),byteHeap.blockDma);
+  appendJsonNumber(out,F(",\"minimumDmaFreeBytes\":"),_minimumFreeDma==UINT32_MAX?byteHeap.freeDma:_minimumFreeDma);
+  appendJsonNumber(out,F(",\"sketchBytes\":"),ESP.getSketchSize());
+  appendJsonNumber(out,F(",\"otaFreeBytes\":"),ESP.getFreeSketchSpace());
+  appendJsonNumber(out,F(",\"uptimeSeconds\":"),static_cast<unsigned long>(_uptimeMs / 1000));
+  appendJsonText(out,F(",\"utc\":"),timestamp);
+  appendJsonBool(out,F(",\"wifi\":"),wifiConnected());
+  appendJsonBool(out,F(",\"mqtt\":"),mqttConnected());
   out += F(",\"wifiState\":"); out += String(int(_wifiState)); out += F(",\"mqttState\":"); out += String(int(mqttState()));
-  out += F(",\"ip\":"); appendQuoted(out,localIP().toString()); out += F(",\"apIp\":"); appendQuoted(out,apIP().toString());
-  out += F(",\"storageBackend\":"); appendQuoted(out,"ArdFS"); out += F(",\"jsonBackend\":"); appendQuoted(out,"ArdJSON");
-  out += F(",\"filesystemMounted\":"); out += _storageMounted ? "true" : "false"; out += F(",\"configurationReady\":"); out += _configurationReady ? "true" : "false"; out += F(",\"storageBusy\":"); out += portalAndAppConfigBusy() ? "true" : "false"; out += F(",\"storageError\":"); appendQuoted(out,_storageError); out += "}";
+  appendJsonText(out,F(",\"ip\":"),localIP().toString());
+  appendJsonText(out,F(",\"apIp\":"),apIP().toString());
+  appendJsonText(out,F(",\"storageBackend\":"),"ArdFS");
+  appendJsonText(out,F(",\"jsonBackend\":"),"ArdJSON");
+  appendJsonBool(out,F(",\"filesystemMounted\":"),_storageMounted);
+  appendJsonBool(out,F(",\"configurationReady\":"),_configurationReady);
+  appendJsonBool(out,F(",\"storageBusy\":"),portalAndAppConfigBusy());
+  appendJsonText(out,F(",\"storageError\":"),_storageError); out += "}";
   return out;
 }
 
@@ -1344,8 +1385,8 @@ void ArdPortal::websocketCommand(const String& command) {
   String topic, value; unsigned seen=0; int offset=0;
   while(offset<int(command.length())) {
     int end=command.indexOf('&',offset);if(end<0)end=command.length();
-    String pair=command.substring(offset,end);int equal=pair.indexOf('=');String key, decoded;
-    if(equal<0 || !decode(pair.substring(0,equal),key) || !decode(pair.substring(equal+1),decoded)) { log(ArdUILanguage::text(ArdUILanguage::Key::s_120)); return; }
+    int equal=command.indexOf('=',offset);String key, decoded;
+    if(equal<0 || equal>=end || !decode(command.substring(offset,equal),key) || !decode(command.substring(equal+1,end),decoded)) { log(ArdUILanguage::text(ArdUILanguage::Key::s_120)); return; }
     unsigned flag=ardFlashEqual(key,F("topic"))?1:ardFlashEqual(key,F("value"))?2:0;
     if(!flag || (seen&flag)) { log(ArdUILanguage::text(ArdUILanguage::Key::s_120)); return; }
     seen|=flag; if(flag==1)topic=decoded;else value=decoded;offset=end+1;
@@ -1403,15 +1444,19 @@ void ArdPortal::serviceWebSocket(WebSocketState& ws,uint32_t now) {
 #if ARDPORTAL_ENABLE_ZIGBEE
     else if(&ws==&_zigbeeWs){
       if(!ws.statusSent||uint32_t(now-ws.statusSince)>=1000){ws.statusSent=true;ws.statusSince=now;queueWebSocket(ws,1,zigbeeStatusJson());}
-      else if(const auto* line=_zigbee.nextLine(ws.cursor)){ws.cursor=line->id;queueWebSocket(ws,1,String(F("{\"type\":\"log\",\"id\":"))+String(line->id)+",\"text\":"+quote(line->text)+"}");}
+      else if(const auto* line=_zigbee.nextLine(ws.cursor)){
+        ws.cursor=line->id;String payload;
+        appendJsonNumber(payload,F("{\"type\":\"log\",\"id\":"),line->id);
+        appendJsonText(payload,F(",\"text\":"),line->text);payload+='}';queueWebSocket(ws,1,payload);
+      }
     }
 #endif
     else if(!ws.statusSent || ws.mqtt!=mqttConnected() || uint32_t(now-ws.statusSince)>=10000) {
       ws.mqtt=mqttConnected();ws.statusSent=true;ws.statusSince=now;
-      queueWebSocket(ws,1,String(F("{\"type\":\"status\",\"mqtt\":"))+(ws.mqtt?"true":"false")+"}");
+      String payload;appendJsonBool(payload,F("{\"type\":\"status\",\"mqtt\":"),ws.mqtt);payload+='}';queueWebSocket(ws,1,payload);
     } else if(!ws.appSent || ws.appRevision!=_appRevision) {
       ws.appSent=true; ws.appRevision=_appRevision;
-      queueWebSocket(ws,1,String(F("{\"type\":\"app\",\"revision\":"))+String(ws.appRevision)+"}");
+      String payload;appendJsonNumber(payload,F("{\"type\":\"app\",\"revision\":"),ws.appRevision);payload+='}';queueWebSocket(ws,1,payload);
     }
 #if ARDPORTAL_ENABLE_CONSOLE
     if(!ws.tx.length() && ws.logs) {
@@ -1425,7 +1470,9 @@ void ArdPortal::serviceWebSocket(WebSocketState& ws,uint32_t now) {
 #endif
       if(next) {
         ws.cursor=next->id;
-        queueWebSocket(ws,1,String(F("{\"type\":\"log\",\"channel\":"))+quote(next->mqtt?"mqtt":"messages")+String(F(",\"id\":")) +String(next->id)+String(F(",\"text\":")) +quote(next->text)+"}");
+        String payload;appendJsonText(payload,F("{\"type\":\"log\",\"channel\":"),next->mqtt?"mqtt":"messages");
+        appendJsonNumber(payload,F(",\"id\":"),next->id);appendJsonText(payload,F(",\"text\":"),next->text);
+        payload+='}';queueWebSocket(ws,1,payload);
       }
     }
 #endif

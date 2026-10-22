@@ -27,6 +27,11 @@ void ArdOta::abortUpgrade() {
 #endif
 }
 
+// Share message construction across begin, write and finalization failures.
+__attribute__((noinline)) void ArdOta::replyUpgradeError() {
+  _portal.reply(500, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_153) + String(Update.getError()));
+}
+
 /**
  * @brief Write firmware bytes to the OTA updater and check the result.
  * @param data Data buffer or value used by the operation.
@@ -52,17 +57,17 @@ bool ArdOta::writeUpgrade(uint8_t* data, size_t length) {
       abortUpgrade(); _portal.replyMessage(400,ArdUILanguage::Key::s_152); return false;
     }
     if (Update.write(_gzipPrefix,sizeof(_gzipPrefix)) != sizeof(_gzipPrefix)) {
-      abortUpgrade(); _portal.reply(500,"text/plain",ArdUILanguage::text(ArdUILanguage::Key::s_153)+String(Update.getError())); return false;
+      abortUpgrade(); replyUpgradeError(); return false;
     }
     _gzipPrefixSize = 0;
   }
 #endif
   size_t written = Update.write(data, length);
-  if (written != length) { abortUpgrade(); _portal.reply(500, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_153) + String(Update.getError())); return false; }
+  if (written != length) { abortUpgrade(); replyUpgradeError(); return false; }
   _otaReceived += length;
   if (_otaReceived == _otaExpected) {
     bool ok = Update.end(false); _otaActive = false;
-    if (!ok) { _portal.reply(500, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_153) + String(Update.getError())); return false; }
+    if (!ok) { replyUpgradeError(); return false; }
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_155));
 #endif
@@ -85,7 +90,7 @@ void ArdOta::startUpload(uint32_t bodySize, int split) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_117));
 #endif
-    if (!Update.begin(bodySize, U_FLASH)) { _portal.reply(500, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_153) + String(Update.getError())); return; }
+    if (!Update.begin(bodySize, U_FLASH)) { replyUpgradeError(); return; }
 #if defined(ESP8266)
     _gzipPrefixSize = 0;
 #endif
