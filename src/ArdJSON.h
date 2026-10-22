@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 #include <Arduino.h>
 #include "CooperativeBudget.h"
 #include "ArdAllocation.h"
@@ -873,9 +874,9 @@ public:
    */
   JSONVar parse() {
     JSONVar value;
-    if(_input.length()>_limits.maxInputBytes){fail("input limit");return value;}
+    if(_input.length()>_limits.maxInputBytes){fail(ARD_LANG_NATIVE_INPUT_LIMIT);return value;}
     if(!readValue(value,0))return JSONVar();
-    whitespace();if(_offset!=_input.length()){fail("trailing data");return JSONVar();}
+    whitespace();if(_offset!=_input.length()){fail(ARD_LANG_NATIVE_TRAILING_DATA);return JSONVar();}
     return value;
   }
   /**
@@ -924,7 +925,7 @@ private:
    * @param c Current character or running CRC state, according to its type.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool put(String& out,char c){size_t size=out.length();out+=c;return out.length()==size+1 || fail("out of memory");}
+  bool put(String& out,char c){size_t size=out.length();out+=c;return out.length()==size+1 || fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);}
   /**
    * @brief Decode four hexadecimal digits from a JSON Unicode escape.
    * @param code Protocol, language or error code.
@@ -932,7 +933,7 @@ private:
    */
   bool hex4(uint32_t& code) {
     code=0;for(unsigned i=0;i<4;++i){char c=peek();unsigned digit;
-      if(c>='0'&&c<='9')digit=c-'0';else if(c>='a'&&c<='f')digit=c-'a'+10;else if(c>='A'&&c<='F')digit=c-'A'+10;else return fail("invalid unicode escape");
+      if(c>='0'&&c<='9')digit=c-'0';else if(c>='a'&&c<='f')digit=c-'a'+10;else if(c>='A'&&c<='F')digit=c-'A'+10;else return fail(ARD_LANG_NATIVE_INVALID_UNICODE_ESCAPE);
       ++_offset;code=(code<<4)|digit;
     }return true;
   }
@@ -944,13 +945,13 @@ private:
   bool unicode(String& out) {
     uint32_t code;if(!hex4(code))return false;
     if(code>=0xd800 && code<=0xdbff){
-      if(peek()!='\\')return fail("missing low surrogate");
+      if(peek()!='\\')return fail(ARD_LANG_NATIVE_MISSING_LOW_SURROGATE);
       ++_offset;
-      if(peek()!='u')return fail("missing low surrogate");
+      if(peek()!='u')return fail(ARD_LANG_NATIVE_MISSING_LOW_SURROGATE);
       ++_offset;
-      uint32_t low;if(!hex4(low) || low<0xdc00 || low>0xdfff)return fail("invalid low surrogate");
+      uint32_t low;if(!hex4(low) || low<0xdc00 || low>0xdfff)return fail(ARD_LANG_NATIVE_INVALID_LOW_SURROGATE);
       code=0x10000+((code-0xd800)<<10)+low-0xdc00;
-    }else if(code>=0xdc00 && code<=0xdfff)return fail("unpaired surrogate");
+    }else if(code>=0xdc00 && code<=0xdfff)return fail(ARD_LANG_NATIVE_UNPAIRED_SURROGATE);
     if(code<0x80)return put(out,char(code));
     if(code<0x800)return put(out,char(0xc0|(code>>6))) && put(out,char(0x80|(code&63)));
     if(code<0x10000)return put(out,char(0xe0|(code>>12))) && put(out,char(0x80|((code>>6)&63))) && put(out,char(0x80|(code&63)));
@@ -962,25 +963,25 @@ private:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool string(String& out) {
-    if(!take('"'))return fail("expected string");
+    if(!take('"'))return fail(ARD_LANG_NATIVE_EXPECTED_STRING);
     out="";
     while(_offset<_input.length()){
       if((_offset&127)==0)_budget.checkpoint();
-      uint8_t c=_input[_offset++];if(c=='"')return validUtf8(out) || fail("invalid UTF-8");
-      if(c<32)return fail("unescaped control character");
+      uint8_t c=_input[_offset++];if(c=='"')return validUtf8(out) || fail(ARD_LANG_NATIVE_INVALID_UTF_8);
+      if(c<32)return fail(ARD_LANG_NATIVE_UNESCAPED_CONTROL_CHARACTER);
       if(c=='\\'){
-        if(_offset==_input.length())return fail("unfinished escape");
+        if(_offset==_input.length())return fail(ARD_LANG_NATIVE_UNFINISHED_ESCAPE);
         char escape=_input[_offset++];
         switch(escape){
           case '"':case '\\':case '/':if(!put(out,escape))return false;break;
           case 'b':if(!put(out,'\b'))return false;break;case 'f':if(!put(out,'\f'))return false;break;
           case 'n':if(!put(out,'\n'))return false;break;case 'r':if(!put(out,'\r'))return false;break;
           case 't':if(!put(out,'\t'))return false;break;case 'u':if(!unicode(out))return false;break;
-          default:return fail("invalid escape");
+          default:return fail(ARD_LANG_NATIVE_INVALID_ESCAPE);
         }
       }else if(!put(out,char(c)))return false;
-      if(out.length()>_limits.maxStringBytes)return fail("string limit");
-    }return fail("unterminated string");
+      if(out.length()>_limits.maxStringBytes)return fail(ARD_LANG_NATIVE_STRING_LIMIT);
+    }return fail(ARD_LANG_NATIVE_UNTERMINATED_STRING);
   }
   /**
    * @brief Convert a decimal or hexadecimal digit to its numeric value.
@@ -994,11 +995,11 @@ private:
    */
   bool number(JSONVar& value) {
     size_t start=_offset;if(peek()=='-')++_offset;
-    if(peek()=='0')++_offset;else {if(peek()<'1'||peek()>'9')return fail("invalid number");while(digit()){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
-    if(peek()=='.'){++_offset;if(!digit())return fail("missing fraction");while(digit()){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
-    if(peek()=='e'||peek()=='E'){++_offset;if(peek()=='+'||peek()=='-')++_offset;if(!digit())return fail("missing exponent");while(digit()){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
+    if(peek()=='0')++_offset;else {if(peek()<'1'||peek()>'9')return fail(ARD_LANG_NATIVE_INVALID_NUMBER);while(digit()){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
+    if(peek()=='.'){++_offset;if(!digit())return fail(ARD_LANG_NATIVE_MISSING_FRACTION);while(digit()){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
+    if(peek()=='e'||peek()=='E'){++_offset;if(peek()=='+'||peek()=='-')++_offset;if(!digit())return fail(ARD_LANG_NATIVE_MISSING_EXPONENT);while(digit()){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
     value._type=JSONVar::Type::Number;value._text=_input.substring(start,_offset);
-    if(value._text.length()!=_offset-start)return fail("out of memory");
+    if(value._text.length()!=_offset-start)return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
     return true;
   }
   /**
@@ -1008,8 +1009,8 @@ private:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool readValue(JSONVar& value,unsigned depth) {
-    if(depth>_limits.maxDepth || depth>32)return fail("depth limit");
-    if(++_nodes>_limits.maxNodes)return fail("node limit");
+    if(depth>_limits.maxDepth || depth>32)return fail(ARD_LANG_NATIVE_DEPTH_LIMIT);
+    if(++_nodes>_limits.maxNodes)return fail(ARD_LANG_NATIVE_NODE_LIMIT);
     if((_nodes&31)==0)_budget.checkpoint();
     whitespace();char c=peek();
     if(c=='"'){value._type=JSONVar::Type::String;return string(value._text);}
@@ -1018,16 +1019,16 @@ private:
       bool object=c=='{';++_offset;value=object?JSONVar::object():JSONVar::array();char end=object?'}':']';
       if(take(end))return true;
       do{
-        String key;if(object){if(!string(key) || !take(':'))return fail("expected object member");if(value.hasOwnProperty(key))return fail("duplicate key");}
-        if(value.length()>=MaxContainerElements)return fail("container limit");
-        JSONVar::Member* item=value.append(key);if(!item)return fail("out of memory");
+        String key;if(object){if(!string(key) || !take(':'))return fail(ARD_LANG_NATIVE_EXPECTED_OBJECT_MEMBER);if(value.hasOwnProperty(key))return fail(ARD_LANG_NATIVE_DUPLICATE_KEY);}
+        if(value.length()>=MaxContainerElements)return fail(ARD_LANG_NATIVE_CONTAINER_LIMIT);
+        JSONVar::Member* item=value.append(key);if(!item)return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
         if(!readValue(item->value,depth+1))return false;
         if(take(end))return true;
-      }while(take(','));return fail("expected comma or closing bracket");
+      }while(take(','));return fail(ARD_LANG_NATIVE_EXPECTED_COMMA_OR_CLOSING_BRACKET);
     }
     const char* literal=c=='t'?"true":c=='f'?"false":c=='n'?"null":nullptr;
-    if(!literal)return fail("expected value");
-    size_t size=strlen(literal);if(_input.substring(_offset,_offset+size)!=literal)return fail("invalid literal");
+    if(!literal)return fail(ARD_LANG_NATIVE_EXPECTED_VALUE);
+    size_t size=strlen(literal);if(_input.substring(_offset,_offset+size)!=literal)return fail(ARD_LANG_NATIVE_INVALID_LITERAL);
     _offset+=size;value=c=='n'?JSONVar(nullptr):JSONVar(c=='t');return true;
   }
 };
@@ -1088,7 +1089,7 @@ private:
    */
   bool append(const char* text,size_t length){
     const size_t before=_bytes;
-    if(length>_limits.maxOutputBytes||before>_limits.maxOutputBytes-length)return fail("output limit");
+    if(length>_limits.maxOutputBytes||before>_limits.maxOutputBytes-length)return fail(ARD_LANG_NATIVE_OUTPUT_LIMIT);
     _bytes+=length;if(_measure)return true;
     size_t start=0,count=length;
     if(_slice){
@@ -1100,7 +1101,7 @@ private:
     if(!count)return true;
     const size_t old=_output.length();
     _output.concat(text+start,count);
-    return _output.length()==old+count||fail("out of memory");
+    return _output.length()==old+count||fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
   }
   bool append(const String& text){return append(text.c_str(),text.length());}
   bool append(const char* text){return append(text,strlen(text));}
@@ -1116,8 +1117,8 @@ private:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool string(const String& text){
-    if(text.length()>_limits.maxStringBytes)return fail("string limit");
-    if(!validUtf8(text))return fail("invalid UTF-8");
+    if(text.length()>_limits.maxStringBytes)return fail(ARD_LANG_NATIVE_STRING_LIMIT);
+    if(!validUtf8(text))return fail(ARD_LANG_NATIVE_INVALID_UTF_8);
     if(!append("\""))return false;
     for(size_t i=0;i<text.length();++i){if((i&127)==0)_budget.checkpoint();uint8_t c=text[i];
       if(c<32||(_limits.escapeHtml&&(c=='<'||c=='>'||c=='&'))){
@@ -1137,35 +1138,35 @@ private:
    */
 
   bool writeObjectPatch(const JSONVar& base,const JSONVar& patch){
-    if(base._type!=JSONVar::Type::Object||patch._type!=JSONVar::Type::Object||!base.isValid()||!patch.isObjectPatchValid())return fail("invalid object patch");
-    if(++_nodes>_limits.maxNodes)return fail("node limit");
+    if(base._type!=JSONVar::Type::Object||patch._type!=JSONVar::Type::Object||!base.isValid()||!patch.isObjectPatchValid())return fail(ARD_LANG_NATIVE_INVALID_OBJECT_PATCH);
+    if(++_nodes>_limits.maxNodes)return fail(ARD_LANG_NATIVE_NODE_LIMIT);
     if(!append("{"))return false;
     bool first=true;size_t members=0;
     auto emit=[&](const JSONVar::Member* item,const JSONVar& value){
       if(value.isUndefined())return true;
-      if(++members>MaxContainerElements)return fail("element limit");
+      if(++members>MaxContainerElements)return fail(ARD_LANG_NATIVE_ELEMENT_LIMIT);
       if(!first&&!append(","))return false;
       first=false;
-      String key=item->key.text();if(key.length()!=item->key.length())return fail("out of memory");
+      String key=item->key.text();if(key.length()!=item->key.length())return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
       return string(key)&&append(":")&&write(value,1);
     };
     for(const JSONVar::Member* item=base._children.get();item;item=item->next.get()){
-      String key=item->key.text();if(key.length()!=item->key.length())return fail("out of memory");
+      String key=item->key.text();if(key.length()!=item->key.length())return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
       const auto& value=patch.hasOwnProperty(key)?patch[key]:item->value;if(!emit(item,value))return false;
     }
     for(const JSONVar::Member* item=patch._children.get();item;item=item->next.get()){
-      String key=item->key.text();if(key.length()!=item->key.length())return fail("out of memory");
+      String key=item->key.text();if(key.length()!=item->key.length())return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
       if(!base.hasOwnProperty(key)&&!emit(item,item->value))return false;
     }
     return append("}");
   }
   bool write(const JSONVar& value,unsigned depth){
-    if(depth>_limits.maxDepth || depth>32)return fail("depth limit");
-    if(++_nodes>_limits.maxNodes)return fail("node limit");
+    if(depth>_limits.maxDepth || depth>32)return fail(ARD_LANG_NATIVE_DEPTH_LIMIT);
+    if(++_nodes>_limits.maxNodes)return fail(ARD_LANG_NATIVE_NODE_LIMIT);
     if((_nodes&31)==0)_budget.checkpoint();
-    if(value._failed)return fail("invalid value or out of memory");
+    if(value._failed)return fail(ARD_LANG_NATIVE_INVALID_VALUE_OR_OUT_OF_MEMORY);
     switch(value._type){
-      case JSONVar::Type::Undefined:return fail("undefined value");
+      case JSONVar::Type::Undefined:return fail(ARD_LANG_NATIVE_UNDEFINED_VALUE);
       case JSONVar::Type::Null:return append("null");
       case JSONVar::Type::Boolean:return append(value._boolean?"true":"false");
       case JSONVar::Type::Number:return append(value._text);
@@ -1177,7 +1178,7 @@ private:
       if(!first && !append(","))return false;
       if(!indent(depth+1))return false;
       first=false;
-      if(object) {String key=item->key.text();if(key.length()!=item->key.length())return fail("out of memory");if(!string(key) || !append(_pretty?": ":":"))return false;}
+      if(object) {String key=item->key.text();if(key.length()!=item->key.length())return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);if(!string(key) || !append(_pretty?": ":":"))return false;}
       if(!write(item->value,depth+1))return false;
     }
     if(!first && !indent(depth))return false;
@@ -1194,7 +1195,7 @@ struct API {
    */
   JSONVar parse(const String& text,String* error=nullptr,const Limits& limits=Limits())const {
     Parser parser(text,limits);JSONVar value=parser.parse();
-    if(error)*error=parser.error()?String(parser.error())+" at byte "+String(parser.offset()):String();
+    if(error)*error=parser.error()?String(parser.error())+ARD_LANG_NATIVE_AT_BYTE+String(parser.offset()):String();
     return value;
   }
   /**

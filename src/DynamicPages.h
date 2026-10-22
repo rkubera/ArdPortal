@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 #include "AppConfigFields.h"
 #include "AppConfigRegistrationError.h"
 #include "ArdJSON.h"
@@ -242,7 +243,7 @@ public:
      * @return Required serialized byte count, or zero on failure with error text where supplied.
      */
     size_t measure(const ArdJSON::Limits& limits,String* error=nullptr) const {
-      size_t bytes=2;for(size_t i=0;i<size;++i){size_t length=entries[i]->jsonLength;if(limits.escapeHtml||limits.maxNodes!=4096){V page=(*this)[i];length=ArdJSON::JSON.measure(page,error,limits);}if(!length)return 0;bytes+=length+(i?1:0);yield();}if(bytes>limits.maxOutputBytes){if(error)*error="output limit";return 0;}return bytes;
+      size_t bytes=2;for(size_t i=0;i<size;++i){size_t length=entries[i]->jsonLength;if(limits.escapeHtml||limits.maxNodes!=4096){V page=(*this)[i];length=ArdJSON::JSON.measure(page,error,limits);}if(!length)return 0;bytes+=length+(i?1:0);yield();}if(bytes>limits.maxOutputBytes){if(error)*error=ARD_LANG_NATIVE_OUTPUT_LIMIT;return 0;}return bytes;
     }
   };
   PageStore pages;
@@ -503,35 +504,35 @@ public:
   bool validateField(const V& f,const V& fields,bool checkDependencies=true) {
       (void)fields;(void)checkDependencies;
       String id=f["id"].asString(),type=f["type"].asString();
-      if(id=="availability"||id=="status")return fail("field",id,"reserved id");
-      if(!identifier(id))return fail("field",id,"invalid id: use 1..48 ASCII letters, digits, - or _");
-      if(indexOf(id)<count())return fail("field",id,"duplicate field id");
-      if(!title(f))return fail("field",id,"invalid name/names (1..80 bytes)");
+      if(id=="availability"||id=="status")return fail("field",id,ARD_LANG_NATIVE_RESERVED_ID);
+      if(!identifier(id))return fail("field",id,ARD_LANG_NATIVE_INVALID_ID_USE_1_48_ASCII_LETTERS_DIGITS_OR);
+      if(indexOf(id)<count())return fail("field",id,ARD_LANG_NATIVE_DUPLICATE_FIELD_ID);
+      if(!title(f))return fail("field",id,ARD_LANG_NATIVE_INVALID_NAME_NAMES_1_80_BYTES);
 
-      if(!ardPortalBasicControl(type)&&(!ArdHa::extended(f)||ArdHa::descriptor(type,true).isUndefined())) return fail("field",id,"unsupported or disabled control type");
+      if(!ardPortalBasicControl(type)&&(!ArdHa::extended(f)||ArdHa::descriptor(type,true).isUndefined())) return fail("field",id,ARD_LANG_NATIVE_UNSUPPORTED_OR_DISABLED_CONTROL_TYPE);
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-      if(type=="text"&&ArdText::pattern(f).type==ArdText::Type::Invalid)return fail("field",id,"unsupported textType");
+      if(type=="text"&&ArdText::pattern(f).type==ArdText::Type::Invalid)return fail("field",id,ARD_LANG_NATIVE_UNSUPPORTED_TEXTTYPE);
 #endif
-      if(f.hasOwnProperty("mqtt")&&f["mqtt"].type()!=T::Object) return fail("field",id,"mqtt must be an object");
-      if(f["mqtt"].hasOwnProperty("state_topic")&&f["mqtt"]["state_topic"].type()!=T::String) return fail("field",id,"mqtt.state_topic must be a string");
-      if(f.hasOwnProperty("ha")&&f["ha"].type()!=T::Object) return fail("field",id,"ha must be an object");
-      if(f.hasOwnProperty("icon")) { String icon=f["icon"].asString(); if(icon.indexOf("mdi:")!=0 || icon.length()>80 || icon.length()<5) return fail("field",id,"invalid icon: expected mdi: name, 5..80 bytes"); }
+      if(f.hasOwnProperty("mqtt")&&f["mqtt"].type()!=T::Object) return fail("field",id,ARD_LANG_NATIVE_MQTT_MUST_BE_AN_OBJECT);
+      if(f["mqtt"].hasOwnProperty("state_topic")&&f["mqtt"]["state_topic"].type()!=T::String) return fail("field",id,ARD_LANG_NATIVE_MQTT_STATE_TOPIC_MUST_BE_A_STRING);
+      if(f.hasOwnProperty("ha")&&f["ha"].type()!=T::Object) return fail("field",id,ARD_LANG_NATIVE_HA_MUST_BE_AN_OBJECT);
+      if(f.hasOwnProperty("icon")) { String icon=f["icon"].asString(); if(icon.indexOf("mdi:")!=0 || icon.length()>80 || icon.length()<5) return fail("field",id,ARD_LANG_NATIVE_INVALID_ICON_EXPECTED_MDI_NAME_5_80_BYTES); }
 #if (ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_CLIMATE)
-    if(type=="slider" || type=="climate") { double lo,hi,step; if(!f["min"].toDouble(lo)||!f["max"].toDouble(hi)||lo>=hi) return fail("field",id,"invalid min/max: expected numbers and min < max"); if(f.hasOwnProperty("step")&&(!f["step"].toDouble(step)||step<=0)) return fail("field",id,"step must be a positive number"); }
+    if(type=="slider" || type=="climate") { double lo,hi,step; if(!f["min"].toDouble(lo)||!f["max"].toDouble(hi)||lo>=hi) return fail("field",id,ARD_LANG_NATIVE_INVALID_MIN_MAX_EXPECTED_NUMBERS_AND_MIN_LESS_THAN_MAX); if(f.hasOwnProperty("step")&&(!f["step"].toDouble(step)||step<=0)) return fail("field",id,ARD_LANG_NATIVE_STEP_MUST_BE_A_POSITIVE_NUMBER); }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SELECT
-    if(type=="select") { const V& o=f["options"]; if(o.type()!=T::Array||!o.length()||o.length()>16) return fail("field",id,"options must contain 1..16 entries"); for(size_t j=0;j<o.length();++j) { if(o[j]["value"].type()!=T::String || o[j]["value"].asString().length()>128 || strlen(o[j]["value"].asString().c_str())!=o[j]["value"].asString().length() || !title(o[j])) return fail("field",id,"invalid option value/title"); for(size_t k=0;k<j;++k) if(o[j]["value"].asString()==o[k]["value"].asString()) return fail("field",id,"duplicate option value"); } }
+    if(type=="select") { const V& o=f["options"]; if(o.type()!=T::Array||!o.length()||o.length()>16) return fail("field",id,ARD_LANG_NATIVE_OPTIONS_MUST_CONTAIN_1_16_ENTRIES); for(size_t j=0;j<o.length();++j) { if(o[j]["value"].type()!=T::String || o[j]["value"].asString().length()>128 || strlen(o[j]["value"].asString().c_str())!=o[j]["value"].asString().length() || !title(o[j])) return fail("field",id,ARD_LANG_NATIVE_INVALID_OPTION_VALUE_TITLE); for(size_t k=0;k<j;++k) if(o[j]["value"].asString()==o[k]["value"].asString()) return fail("field",id,ARD_LANG_NATIVE_DUPLICATE_OPTION_VALUE); } }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
-    if(type=="climate") for(const char* key:{"modes","fan_modes"}) if(f.hasOwnProperty(key)) { const V& modes=f[key]; if(modes.type()!=T::Array||!modes.length()||modes.length()>10) return fail("field",id,"modes/fan_modes must contain 1..10 entries"); for(size_t j=0;j<modes.length();++j) { String m=modes[j].asString(); if(!identifier(m)) return fail("field",id,"invalid mode identifier"); if(String(key)=="modes"&&m!="off"&&m!="heat"&&m!="cool"&&m!="auto"&&m!="heat_cool"&&m!="dry"&&m!="fan_only") return fail("field",id,"unsupported climate mode"); for(size_t k=0;k<j;++k) if(m==modes[k].asString()) return fail("field",id,"duplicate mode"); } }
+    if(type=="climate") for(const char* key:{"modes","fan_modes"}) if(f.hasOwnProperty(key)) { const V& modes=f[key]; if(modes.type()!=T::Array||!modes.length()||modes.length()>10) return fail("field",id,ARD_LANG_NATIVE_MODES_FAN_MODES_MUST_CONTAIN_1_10_ENTRIES); for(size_t j=0;j<modes.length();++j) { String m=modes[j].asString(); if(!identifier(m)) return fail("field",id,ARD_LANG_NATIVE_INVALID_MODE_IDENTIFIER); if(String(key)=="modes"&&m!="off"&&m!="heat"&&m!="cool"&&m!="auto"&&m!="heat_cool"&&m!="dry"&&m!="fan_only") return fail("field",id,ARD_LANG_NATIVE_UNSUPPORTED_CLIMATE_MODE); for(size_t k=0;k<j;++k) if(m==modes[k].asString()) return fail("field",id,ARD_LANG_NATIVE_DUPLICATE_MODE); } }
 #endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-      if(checkDependencies&&f.hasOwnProperty("visibleWhen")&&!validCondition(f["visibleWhen"],fields))return fail("field",id,"invalid visibleWhen condition or referenced field");
+      if(checkDependencies&&f.hasOwnProperty("visibleWhen")&&!validCondition(f["visibleWhen"],fields))return fail("field",id,ARD_LANG_NATIVE_INVALID_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD);
 #else
       // Reject unsupported dependencies rather than exposing conditional fields.
-      if(f.hasOwnProperty("visibleWhen")) return fail("field",id,"dependencies are disabled");
+      if(f.hasOwnProperty("visibleWhen")) return fail("field",id,ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED);
 #endif
-      if(!validValue(f,initial(f))) return fail("field",id,"invalid default value for control");
+      if(!validValue(f,initial(f))) return fail("field",id,ARD_LANG_NATIVE_INVALID_DEFAULT_VALUE_FOR_CONTROL);
     return true;
   }
   /**
@@ -541,21 +542,21 @@ public:
    */
   bool addEntity(const V& page) {
     error={};
-    if(page.type()!=T::Object)return fail("page","","page must be an object");
-    if(!identifier(page["id"].asString()))return fail("page","","invalid page id");
-    if(!title(page))return fail("page","","invalid page name/names (1..80 bytes)");
-    if(!page["order"].isInteger())return fail("page","","order must be an integer");
-    if(page["fields"].type()!=T::Array||!page["fields"].length())return fail("page","","fields must be a nonempty array");
-    if(count()+page["fields"].length()>ArdAppConfigMaxFields)return fail("limits","","field limit: 1024");
+    if(page.type()!=T::Object)return fail("page","",ARD_LANG_NATIVE_PAGE_MUST_BE_AN_OBJECT);
+    if(!identifier(page["id"].asString()))return fail("page","",ARD_LANG_NATIVE_INVALID_PAGE_ID);
+    if(!title(page))return fail("page","",ARD_LANG_NATIVE_INVALID_PAGE_NAME_NAMES_1_80_BYTES);
+    if(!page["order"].isInteger())return fail("page","",ARD_LANG_NATIVE_ORDER_MUST_BE_AN_INTEGER);
+    if(page["fields"].type()!=T::Array||!page["fields"].length())return fail("page","",ARD_LANG_NATIVE_FIELDS_MUST_BE_A_NONEMPTY_ARRAY);
+    if(count()+page["fields"].length()>ArdAppConfigMaxFields)return fail("limits","",ARD_LANG_NATIVE_FIELD_LIMIT_1024);
     const V& fields=page["fields"];
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-    if(page.hasOwnProperty("visibleWhen")&&!validCondition(page["visibleWhen"],fields))return fail("page","","invalid page visibleWhen condition");
+    if(page.hasOwnProperty("visibleWhen")&&!validCondition(page["visibleWhen"],fields))return fail("page","",ARD_LANG_NATIVE_INVALID_PAGE_VISIBLEWHEN_CONDITION);
 #else
-    if(page.hasOwnProperty("visibleWhen"))return fail("page","","dependencies are disabled");
+    if(page.hasOwnProperty("visibleWhen"))return fail("page","",ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED);
 #endif
     for(size_t i=0;i<fields.length();++i) {
       if(!validateField(fields[i],fields))return false;
-      for(size_t j=0;j<i;++j)if(fields[j]["id"].asString()==fields[i]["id"].asString())return fail("field",fields[i]["id"].asString(),"duplicate field id in page");
+      for(size_t j=0;j<i;++j)if(fields[j]["id"].asString()==fields[i]["id"].asString())return fail("field",fields[i]["id"].asString(),ARD_LANG_NATIVE_DUPLICATE_FIELD_ID_IN_PAGE);
     }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     for(size_t i=0;i<fields.length();++i) {
@@ -563,35 +564,35 @@ public:
         const V& rule=fields[i][key];
         for(size_t ordinal=0;;++ordinal){size_t skip=ordinal;const V* leaf=ArdDependencies::leaf(rule,skip);
           if(!leaf)break;
-          if((*leaf)["field"].asString()==fields[i]["id"].asString())return fail("field",fields[i]["id"].asString(),"dependency cycle");
+          if((*leaf)["field"].asString()==fields[i]["id"].asString())return fail("field",fields[i]["id"].asString(),ARD_LANG_NATIVE_DEPENDENCY_CYCLE);
         }
       }
     }
 #endif
     const size_t previousCount=totalFields;
     {
-      if(fields.length()!=1)return fail("registry","","expected one HA-only field");
-      std::unique_ptr<Entity> entry(new(std::nothrow) Entity());if(!entry)return fail("registry","","out of memory allocating entity");
-      entry->id=fields[0]["id"].asString();ArdJSON::Limits limits;limits.maxNodes=4096;entry->source=ArdJSON::JSON.stringify(fields[0],false,nullptr,limits);if(!entry->source.length())return fail("registry",entry->id,"entity serialization failed");
+      if(fields.length()!=1)return fail("registry","",ARD_LANG_NATIVE_EXPECTED_ONE_HA_ONLY_FIELD);
+      std::unique_ptr<Entity> entry(new(std::nothrow) Entity());if(!entry)return fail("registry","",ARD_LANG_NATIVE_OUT_OF_MEMORY_ALLOCATING_ENTITY);
+      entry->id=fields[0]["id"].asString();ArdJSON::Limits limits;limits.maxNodes=4096;entry->source=ArdJSON::JSON.stringify(fields[0],false,nullptr,limits);if(!entry->source.length())return fail("registry",entry->id,ARD_LANG_NATIVE_ENTITY_SERIALIZATION_FAILED);
       entry->index=uint16_t(totalFields);entry->extended=fields[0]["extended"].asBool();entry->persist=fields[0]["persist"].asBool();entry->transient=ArdHa::transient(fields[0]);entry->dependent=fields[0].hasOwnProperty("visibleWhen");
 #if ARDPORTAL_ENABLE_DEPENDENCIES
       auto resolve=[&](const String& id){return indexOf(id);};
-      if(!entry->edges.addField(fields[0],entry->index,resolve))return fail("registry",entry->id,"out of memory indexing dependencies");
+      if(!entry->edges.addField(fields[0],entry->index,resolve))return fail("registry",entry->id,ARD_LANG_NATIVE_OUT_OF_MEMORY_INDEXING_DEPENDENCIES);
 #endif
       entityBytes+=entry->source.length();entry->next=std::move(entities);entities=std::move(entry);
     }
     totalFields+=fields.length();
     struct Rollback {ArdDynamicPages& owner;size_t previous;bool keep=false;~Rollback(){if(keep)return;owner.totalFields=previous;owner.entityBytes-=owner.entities->source.length();auto next=std::move(owner.entities->next);owner.entities=std::move(next);}} rollback{*this,previousCount};
     ArdJSON::Limits limits;limits.maxNodes=4096;limits.maxOutputBytes=ArdAppConfigMaxDefinitionBytes;
-    size_t bytes=pages.measure(limits);if(!bytes)return fail("registry","","definition measurement failed");
-    if(bytes+entityBytes>ArdAppConfigMaxDefinitionBytes)return fail("limits","",String(F("total definition limit: "))+String(ArdAppConfigMaxDefinitionBytes)+" bytes");
+    size_t bytes=pages.measure(limits);if(!bytes)return fail("registry","",ARD_LANG_NATIVE_DEFINITION_MEASUREMENT_FAILED);
+    if(bytes+entityBytes>ArdAppConfigMaxDefinitionBytes)return fail("limits","",String(F(ARD_LANG_NATIVE_TOTAL_DEFINITION_LIMIT))+String(ArdAppConfigMaxDefinitionBytes)+ARD_LANG_NATIVE_BYTES);
     // Every generated command and acknowledgement name must be unambiguous.
     for(size_t i=0;i<count();++i) {V f=at(i);V suffixes=V::array();
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
       if(f["type"].asString()=="climate")for(const char* suffix:{"temperature","temperature_low","temperature_high","mode","fan"})suffixes.push(suffix);
 #endif
-      if(ArdHa::extended(f)){V resolved=f;if(!ArdHa::normalize(resolved,true))return fail("commands",f["id"].asString(),"descriptor normalization failed");for(size_t c=0;c<resolved["controls"].length();++c)if(resolved["controls"][c]["command"].asString().length())suffixes.push(resolved["controls"][c]["command"]);suffixes.push("ack");}
-      for(size_t k=0;k<suffixes.length();++k)if(indexOf(f["id"].asString()+"_"+suffixes[k].asString())<count())return fail("commands",f["id"].asString(),"generated command/ack id collides with field: "+f["id"].asString()+"_"+suffixes[k].asString());yield();
+      if(ArdHa::extended(f)){V resolved=f;if(!ArdHa::normalize(resolved,true))return fail("commands",f["id"].asString(),ARD_LANG_NATIVE_DESCRIPTOR_NORMALIZATION_FAILED);for(size_t c=0;c<resolved["controls"].length();++c)if(resolved["controls"][c]["command"].asString().length())suffixes.push(resolved["controls"][c]["command"]);suffixes.push("ack");}
+      for(size_t k=0;k<suffixes.length();++k)if(indexOf(f["id"].asString()+"_"+suffixes[k].asString())<count())return fail("commands",f["id"].asString(),ARD_LANG_NATIVE_GENERATED_COMMAND_ACK_ID_COLLIDES_WITH_FIELD+f["id"].asString()+"_"+suffixes[k].asString());yield();
     }
     if(fields[0]["extended"].asBool()||fields[0]["type"].asString()=="climate")commandOwners|=ArdAppConfigFieldMask::forField(previousCount);
 #if ARDPORTAL_ENABLE_DEPENDENCIES

@@ -1,5 +1,6 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+#include "LanguageLiterals.h"
 #include "ArdPortalFeatures.h"
 #if ARDPORTAL_ENABLE_HA
 #include "ArdHomeAssistant.h"
@@ -132,11 +133,11 @@ bool ArdHomeAssistant::serviceDependencies() {
  */
 String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) const {
   V resolved;const V* source=&definition;
-  if(!definition.isValid()){if(error)*error="invalid discovery definition";return String();}
+  if(!definition.isValid()){if(error)*error=ARD_LANG_NATIVE_INVALID_DISCOVERY_DEFINITION;return String();}
   if(ArdHa::extended(definition)){
     resolved=definition;
     if(!resolved.isValid()||!ArdHa::normalize(resolved)||!resolved.isValid()){
-      if(error) *error="descriptor normalization failed";
+      if(error) *error=ARD_LANG_NATIVE_DESCRIPTOR_NORMALIZATION_FAILED;
       return String();
     }
     source=&resolved;

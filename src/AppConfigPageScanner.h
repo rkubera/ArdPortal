@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 #include "JsonFieldSlices.h"
 
 // A bounded structural scanner. Each emitted value is subsequently validated by
@@ -39,11 +40,11 @@ private:
       --budget;++offset;
       if(quoted){if(escape)escape=false;else if(c=='\\')escape=true;else if(c=='"'){quoted=false;if(stringToken){finished=true;break;}}continue;}
       if(c=='"'){quoted=true;continue;}
-      if(composite){if(c=='{'||c=='['){if(depth>=32){reason="depth limit";return false;}closing[depth++]=c=='{'?'}':']';}
-        else if(c=='}'||c==']'){if(!depth||closing[depth-1]!=c){reason="mismatched bracket";return false;}if(!--depth){finished=true;break;}}}
+      if(composite){if(c=='{'||c=='['){if(depth>=32){reason=ARD_LANG_NATIVE_DEPTH_LIMIT;return false;}closing[depth++]=c=='{'?'}':']';}
+        else if(c=='}'||c==']'){if(!depth||closing[depth-1]!=c){reason=ARD_LANG_NATIVE_MISMATCHED_BRACKET;return false;}if(!--depth){finished=true;break;}}}
     }
-    if(offset==source.size()&&!finished){if(quoted||depth||stringToken){reason="unfinished JSON value";return false;}finished=true;}
-    if(finished&&offset==tokenStart){reason="expected value";return false;}return true;
+    if(offset==source.size()&&!finished){if(quoted||depth||stringToken){reason=ARD_LANG_NATIVE_UNFINISHED_JSON_VALUE;return false;}finished=true;}
+    if(finished&&offset==tokenStart){reason=ARD_LANG_NATIVE_EXPECTED_VALUE;return false;}return true;
   }
 public:
   /**
@@ -59,30 +60,30 @@ public:
    */
   template<class Source> Event step(const Source& source,size_t budget=256) {
     if(state==Done)return Complete;
-    auto fail=[&](const char* text){reason=String(text)+" at byte "+String(offset);return Failed;};
+    auto fail=[&](const char* text){reason=String(text)+ARD_LANG_NATIVE_AT_BYTE+String(offset);return Failed;};
     while(budget){
       if(state==KeyToken||state==ValueToken||state==FieldToken){bool finished;if(!token(source,budget,finished))return Failed;if(!finished)return Waiting;
         start=tokenStart;bytes=offset-start;
-        if(state==KeyToken){String error;String text=source.slice(start,bytes);if(text.length()!=bytes){reason="out of memory copying key";return Failed;}auto value=ArdJSON::JSON.parse(text,&error);if(value.type()!=ArdJSON::JSONVar::Type::String){reason=error.length()?error:String(F("expected key string"));return Failed;}key=value.asString();state=Colon;continue;}
+        if(state==KeyToken){String error;String text=source.slice(start,bytes);if(text.length()!=bytes){reason=ARD_LANG_NATIVE_OUT_OF_MEMORY_COPYING_KEY;return Failed;}auto value=ArdJSON::JSON.parse(text,&error);if(value.type()!=ArdJSON::JSONVar::Type::String){reason=error.length()?error:String(F(ARD_LANG_NATIVE_EXPECTED_KEY_STRING));return Failed;}key=value.asString();state=Colon;continue;}
         if(state==FieldToken){++fieldCount;state=FieldEnd;return Field;}
         state=MemberEnd;return Member;
       }
-      if(offset==source.size()){if(state==Tail){state=Done;return Complete;}return fail("unexpected end");}
+      if(offset==source.size()){if(state==Tail){state=Done;return Complete;}return fail(ARD_LANG_NATIVE_UNEXPECTED_END);}
       char c=source.character(offset);
       if(c==' '||c=='\t'||c=='\r'||c=='\n'){++offset;--budget;continue;}
       --budget;
       switch(state){
-        case Open:if(c!='{')return fail("page must be an object");++offset;state=Key;break;
-        case Key:if(c=='}'&&!afterComma){++offset;state=Tail;break;}if(c!='"')return fail("expected member key");beginToken(source);state=KeyToken;break;
-        case Colon:if(c!=':')return fail("expected colon");++offset;state=Value;break;
+        case Open:if(c!='{')return fail(ARD_LANG_NATIVE_PAGE_MUST_BE_AN_OBJECT);++offset;state=Key;break;
+        case Key:if(c=='}'&&!afterComma){++offset;state=Tail;break;}if(c!='"')return fail(ARD_LANG_NATIVE_EXPECTED_MEMBER_KEY);beginToken(source);state=KeyToken;break;
+        case Colon:if(c!=':')return fail(ARD_LANG_NATIVE_EXPECTED_COLON);++offset;state=Value;break;
         case Value:
-          if(key=="fields"){if(fieldsSeen)return fail("duplicate fields key");fieldsSeen=true;if(c!='[')return fail("fields must be an array");++offset;afterComma=false;state=FieldStart;}
+          if(key=="fields"){if(fieldsSeen)return fail(ARD_LANG_NATIVE_DUPLICATE_FIELDS_KEY);fieldsSeen=true;if(c!='[')return fail(ARD_LANG_NATIVE_FIELDS_MUST_BE_AN_ARRAY);++offset;afterComma=false;state=FieldStart;}
           else {beginToken(source);state=ValueToken;}break;
-        case MemberEnd:if(c==','){++offset;afterComma=true;state=Key;}else if(c=='}'){++offset;state=Tail;}else return fail("expected comma or closing object");break;
+        case MemberEnd:if(c==','){++offset;afterComma=true;state=Key;}else if(c=='}'){++offset;state=Tail;}else return fail(ARD_LANG_NATIVE_EXPECTED_COMMA_OR_CLOSING_OBJECT);break;
         case FieldStart:if(c==']'&&!afterComma){++offset;state=MemberEnd;break;}beginToken(source);state=FieldToken;break;
-        case FieldEnd:if(c==','){++offset;afterComma=true;state=FieldStart;}else if(c==']'){++offset;state=MemberEnd;}else return fail("expected comma or closing fields array");break;
-        case Tail:return fail("trailing data");
-        default:return fail("invalid scanner state");
+        case FieldEnd:if(c==','){++offset;afterComma=true;state=FieldStart;}else if(c==']'){++offset;state=MemberEnd;}else return fail(ARD_LANG_NATIVE_EXPECTED_COMMA_OR_CLOSING_FIELDS_ARRAY);break;
+        case Tail:return fail(ARD_LANG_NATIVE_TRAILING_DATA);
+        default:return fail(ARD_LANG_NATIVE_INVALID_SCANNER_STATE);
       }
     }return Waiting;
   }

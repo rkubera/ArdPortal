@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 /** @brief Queue pairing when portal operations permit it. @return True if accepted. */
 bool ArdPortal::startZigbeePairing(){return _configurationReady&&!otaActive()&&!_rebootPending&&_zigbee.request(ZigbeeOperation::Pair,_zigbeeOptions);}
 /** @brief Queue cancellation without erasing network data. @return True if accepted. */
@@ -37,9 +38,9 @@ bool ArdPortal::handleZigbeeHttp(const String& method,const String& path){
 #if ARDPORTAL_ZIGBEE_HTTP_EXPORT_SUPPORT
   const bool python=ARDPORTAL_ZHA_QUIRK_SUPPORT&&path=="/api/zigbee/zha-quirk.py";
   if(python||(ARDPORTAL_ZIGBEE_CONVERTER_SUPPORT&&path=="/api/zigbee/converter.mjs")){
-    if(method!="GET"){reply(405,"text/plain","Use GET");return true;}
+    if(method!="GET"){reply(405,"text/plain",ARD_LANG_NATIVE_USE_GET);return true;}
     if(!_converterLayoutReady||!_zigbee.nativeReady()||!_zigbeeBeginTried||_zigbeeMappingFailed||_appConfigPageRegistration||_zigbeeSeenFields!=_dynamic.count()||_zigbeeBuildIndex!=_dynamic.count()){
-      reply(409,"text/plain","Wait for endpoint registration; restart after changing the page layout");return true;
+      reply(409,"text/plain",ARD_LANG_NATIVE_WAIT_FOR_ENDPOINT_REGISTRATION_RESTART_AFTER_CHANGING_TH);return true;
     }
     _converterPython=python;
 #if ARDPORTAL_ZHA_QUIRK_SUPPORT
@@ -63,10 +64,10 @@ bool ArdPortal::handleZigbeeHttp(const String& method,const String& path){
 #endif
   if(path=="/api/zigbee/status"&&method=="GET"){reply(200,"application/json",zigbeeStatusJson());return true;}
   if(path=="/api/zigbee/stop"||path=="/api/zigbee/pair"||path=="/api/zigbee/rejoin"||path=="/api/zigbee/reset"){
-    if(method!="POST"){reply(405,"text/plain","Use POST");return true;}
-    if(path=="/api/zigbee/reset"&&_request.substring(_request.indexOf("\r\n\r\n")+4)!="confirm=RESET-ZIGBEE"){reply(400,"text/plain","Reset confirmation required");return true;}
+    if(method!="POST"){reply(405,"text/plain",ARD_LANG_NATIVE_USE_POST);return true;}
+    if(path=="/api/zigbee/reset"&&_request.substring(_request.indexOf("\r\n\r\n")+4)!="confirm=RESET-ZIGBEE"){reply(400,"text/plain",ARD_LANG_NATIVE_RESET_CONFIRMATION_REQUIRED);return true;}
     bool accepted=path=="/api/zigbee/stop"?stopZigbeePairing():path=="/api/zigbee/pair"?startZigbeePairing():path=="/api/zigbee/rejoin"?rejoinZigbee():resetZigbeePairing();
-    reply(accepted?202:409,"text/plain",accepted?String(F("Zigbee operation accepted")):(_zigbee.error().length()?_zigbee.error():String(F("Zigbee is not ready or busy"))));return true;
+    reply(accepted?202:409,"text/plain",accepted?String(F(ARD_LANG_NATIVE_ZIGBEE_OPERATION_ACCEPTED)):(_zigbee.error().length()?_zigbee.error():String(F(ARD_LANG_NATIVE_ZIGBEE_IS_NOT_READY_OR_BUSY))));return true;
   }
   return false;
 }
@@ -123,11 +124,11 @@ void ArdPortal::serviceZigbeeControls(uint32_t now){
         if(_zigbeeBuildPart<parts){mapped=describePart(normalized,_zigbeeBuildPart);mapped.field=i;const V& c=static_cast<const V&>(normalized)["controls"][_zigbeeBuildPart];suffix=c["key"].asString();if(!suffix.length())suffix=c["payload"].asString();}
         else if(_zigbeeBuildPart==parts){String type=field["type"].asString();if(type=="humidifier"||type=="water_heater"){mapped.part=0xfffe;mapped.kind=type=="humidifier"?Kind::Humidity:Kind::Temperature;suffix="current";}}
         else if(_zigbeeBuildPart==parts+1){uint16_t states=stateCount(normalized);if(states){mapped.part=0xfffe;mapped.kind=Kind::State;mapped.states=states;suffix="state";}}
-        else {_zigbeeBuildPart=0;_zigbee.diagnostic("Zigbee composite: "+field["id"].asString());++_zigbeeBuildIndex;return;}
+        else {_zigbeeBuildPart=0;_zigbee.diagnostic(ARD_LANG_NATIVE_ZIGBEE_COMPOSITE+field["id"].asString());++_zigbeeBuildIndex;return;}
         if(mapped.kind!=Kind::None){Values values;
           if(mapped.part==0xfffe&&mapped.kind!=Kind::State){Spec scalar=mapped;scalar.part=0xffff;values=encode(scalar,normalized,value[field["type"].asString()=="humidifier"?"current_humidity":"current_temperature"]);}
           else values=encode(mapped,normalized,value);
-          if(!_zigbee.addControl(mapped,values,label+" / "+suffix)){_zigbeeMappingFailed=true;_zigbee.diagnostic("Zigbee composite registration failed: "+field["id"].asString()+": "+_zigbee.error());return;}
+          if(!_zigbee.addControl(mapped,values,label+" / "+suffix)){_zigbeeMappingFailed=true;_zigbee.diagnostic(ARD_LANG_NATIVE_ZIGBEE_COMPOSITE_REGISTRATION_FAILED+field["id"].asString()+": "+_zigbee.error());return;}
         }
         ++_zigbeeBuildPart;return;
 
@@ -138,8 +139,8 @@ void ArdPortal::serviceZigbeeControls(uint32_t now){
       if(!value.isValid()||value.isUndefined()){_zigbeeRetryPending=true;_zigbeeRetryAt=now+1000;return;}
       spec=describe(field,value);spec.field=i;
       if(spec.kind!=Kind::None){auto values=encode(spec,field,value);String label=field["name"].asString();if(!label.length())label=field["id"].asString();
-        if(!_zigbee.addControl(spec,values,label)){_zigbeeMappingFailed=true;_zigbee.diagnostic("Zigbee endpoint registration failed: "+field["id"].asString()+": "+_zigbee.error());return;}
-        _zigbee.diagnostic("Zigbee endpoint "+String(_zigbee.controlCount()+1)+": "+field["id"].asString());
+        if(!_zigbee.addControl(spec,values,label)){_zigbeeMappingFailed=true;_zigbee.diagnostic(ARD_LANG_NATIVE_ZIGBEE_ENDPOINT_REGISTRATION_FAILED+field["id"].asString()+": "+_zigbee.error());return;}
+        _zigbee.diagnostic(ARD_LANG_NATIVE_ZIGBEE_ENDPOINT+String(_zigbee.controlCount()+1)+": "+field["id"].asString());
       }++_zigbeeBuildIndex;return;
     }
 #if ARDPORTAL_ZIGBEE_LAYOUT_SUPPORT
@@ -160,7 +161,7 @@ void ArdPortal::serviceZigbeeControls(uint32_t now){
     _zigbeeBeginTried=true;_zigbee.begin(_zigbeeOptions);return;
   }
   if(_zigbeeSeenFields!=_dynamic.count()){
-    _zigbeeSeenFields=_dynamic.count();_zigbee.diagnostic("Zigbee: new fields require restart to rebuild native endpoints");
+    _zigbeeSeenFields=_dynamic.count();_zigbee.diagnostic(ARD_LANG_NATIVE_ZIGBEE_NEW_FIELDS_REQUIRE_RESTART_TO_REBUILD_NATIVE_ENDP);
   }
   bool connected=_zigbee.state()==ZigbeeState::Connected;
   if(connected!=_zigbeeWasConnected){
@@ -191,7 +192,7 @@ void ArdPortal::serviceZigbeeControls(uint32_t now){
           }
         }else if(ArdDynamicPages::validValue(f,next))accepted=acceptZigbeeState(id,next);
       }
-      _zigbee.diagnostic("Zigbee RX "+id+(accepted?" accepted":" rejected"));_zigbee.queueReports(entry->spec.field,true);break;
+      _zigbee.diagnostic(ARD_LANG_NATIVE_ZIGBEE_RX+id+(accepted?ARD_LANG_NATIVE_ACCEPTED:ARD_LANG_NATIVE_REJECTED));_zigbee.queueReports(entry->spec.field,true);break;
     }
   }
   if(!connected||int32_t(now-_zigbeeReportReadyAt)<0)return;

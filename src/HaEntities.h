@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 #include "ArdJSON.h"
 #include "HaEntityData.h"
 #include "TextTypes.h"
@@ -236,13 +237,13 @@ inline bool validValue(const V& f,const V& value) {
 inline bool normalize(V& field,bool stateOnly=false,String* error=nullptr) {
   auto fail=[&](const String& reason){if(error)*error=reason;return false;};
   if(error)*error=String();
-  V spec=descriptor(field["type"].asString(),stateOnly); if(spec.isUndefined()) return fail("unsupported/disabled descriptor type: "+field["type"].asString());
+  V spec=descriptor(field["type"].asString(),stateOnly); if(spec.isUndefined()) return fail(ARD_LANG_NATIVE_UNSUPPORTED_DISABLED_DESCRIPTOR_TYPE+field["type"].asString());
   V supplied=std::move(field["ha"]);
   V keys=spec.keys();for(size_t i=0;i<keys.length();++i) { String key=keys[i].asString(); if(key!="ha"&&!field.hasOwnProperty(key)) field[key]=std::move(spec[key]); }
-  V ha=std::move(spec["ha"]); if(!supplied.isUndefined()) { if(supplied.type()!=V::Type::Object) return fail("ha must be an object"); V options=supplied.keys();for(size_t i=0;i<options.length();++i) ha[options[i].asString()]=std::move(supplied[options[i].asString()]); }
+  V ha=std::move(spec["ha"]); if(!supplied.isUndefined()) { if(supplied.type()!=V::Type::Object) return fail(ARD_LANG_NATIVE_HA_MUST_BE_AN_OBJECT); V options=supplied.keys();for(size_t i=0;i<options.length();++i) ha[options[i].asString()]=std::move(supplied[options[i].asString()]); }
   field["ha"]=std::move(ha); field["extended"]=true; if(!field.hasOwnProperty("persist")) field["persist"]=!readonly(field)&&!transient(field);
   for(const char* key:{"unit_of_measurement","device_class","state_class","entity_category"}) if(field.hasOwnProperty(key)) field["ha"][key]=field[key];
-  if(field["controls"].type()!=V::Type::Array) return fail("controls must be an array");
+  if(field["controls"].type()!=V::Type::Array) return fail(ARD_LANG_NATIVE_CONTROLS_MUST_BE_AN_ARRAY);
   for(size_t i=0;i<field["controls"].length();++i) {
     const V& c=static_cast<const V&>(field)["controls"][i];String t=c["type"].asString();
     bool supported=false;
@@ -279,11 +280,11 @@ inline bool normalize(V& field,bool stateOnly=false,String* error=nullptr) {
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
     supported=supported||t=="edit";
 #endif
-    if(!supported) return fail("unsupported/disabled control type at controls["+String(i)+"]: "+t);
-    if(!c["command"].isUndefined()&&!string(c["command"],24)) return fail("invalid command at controls["+String(i)+"] (maximum 24 bytes)");
-    if(t=="slider"&&(!c["min"].isValid()||c["min"].asDouble()>=c["max"].asDouble()||c["step"].asDouble()<=0)) return fail("invalid slider min/max/step at controls["+String(i)+"]");
+    if(!supported) return fail(ARD_LANG_NATIVE_UNSUPPORTED_DISABLED_CONTROL_TYPE_AT_CONTROLS+String(i)+"]: "+t);
+    if(!c["command"].isUndefined()&&!string(c["command"],24)) return fail(ARD_LANG_NATIVE_INVALID_COMMAND_AT_CONTROLS+String(i)+ARD_LANG_NATIVE_MAXIMUM_24_BYTES);
+    if(t=="slider"&&(!c["min"].isValid()||c["min"].asDouble()>=c["max"].asDouble()||c["step"].asDouble()<=0)) return fail(ARD_LANG_NATIVE_INVALID_SLIDER_MIN_MAX_STEP_AT_CONTROLS+String(i)+"]");
   }
-  return validValue(field,field["default"]) || fail("invalid descriptor default value");
+  return validValue(field,field["default"]) || fail(ARD_LANG_NATIVE_INVALID_DESCRIPTOR_DEFAULT_VALUE);
 }
 #else
 /**
@@ -293,7 +294,7 @@ inline bool normalize(V& field,bool stateOnly=false,String* error=nullptr) {
  * @param error Output error text; populated when the operation fails.
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
-inline bool normalize(V&,bool=false,String* error=nullptr) {if(error)*error="extended controls are disabled";return false;}
+inline bool normalize(V&,bool=false,String* error=nullptr) {if(error)*error=ARD_LANG_NATIVE_EXTENDED_CONTROLS_ARE_DISABLED;return false;}
 /**
  * @brief Validate a proposed value against its extended control definition.
  * Input: const V&.

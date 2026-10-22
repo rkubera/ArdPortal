@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 #include <stddef.h>
 #include <stdint.h>
 constexpr size_t ArdAppConfigMaxFields = 1024;
@@ -10,7 +11,7 @@ constexpr size_t ArdAppConfigMaxFields = 1024;
 #endif
 static_assert(ARDPORTAL_APP_CONFIG_MAX_DEFINITION_BYTES > 0 &&
               static_cast<unsigned long long>(ARDPORTAL_APP_CONFIG_MAX_DEFINITION_BYTES) <= UINT32_MAX,
-              "ARDPORTAL_APP_CONFIG_MAX_DEFINITION_BYTES must be 1..UINT32_MAX");
+              ARD_LANG_NATIVE_ARDPORTAL_APP_CONFIG_MAX_DEFINITION_BYTES_MUST_BE_1_UINT);
 constexpr size_t ArdAppConfigMaxDefinitionBytes = ARDPORTAL_APP_CONFIG_MAX_DEFINITION_BYTES;
 // Fixed storage; no allocation or shifts beyond a machine word.
 class ArdAppConfigFieldMask {

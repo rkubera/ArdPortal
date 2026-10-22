@@ -69,6 +69,7 @@ int main(){
  puts("PASS: factory-reset callback ordering, unchanged defaults, guards, missing handler, save rejection and other routes");
 }
 '''
+fixture = '#include "' + str(root / "src/LanguageLiterals.h") + '"\n' + fixture
 with tempfile.TemporaryDirectory(prefix="ardportal-reset-test-") as tmp:
     tmp = Path(tmp)
     (tmp / "test.cpp").write_text(fixture + branch + main)

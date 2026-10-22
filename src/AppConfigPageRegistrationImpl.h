@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 
 /**
  * @brief Accept an AppConfig page registration job; complete accepted jobs from loop(), including small pages.
@@ -28,24 +29,24 @@ bool ArdPortal::startAppConfigPageRegistration(const __FlashStringHelper* defini
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdPortal::beginAppConfigPageRegistration(const String* source,const __FlashStringHelper* flash,String* owned) {
-  if(appConfigPageRegistrationBusy())return appConfigRegistrationFailed("busy","",F("another page registration is pending"));
-  if(otaActive()||_rebootPending)return appConfigRegistrationFailed("busy","",F("OTA or restart is in progress"));
+  if(appConfigPageRegistrationBusy())return appConfigRegistrationFailed("busy","",F(ARD_LANG_NATIVE_ANOTHER_PAGE_REGISTRATION_IS_PENDING));
+  if(otaActive()||_rebootPending)return appConfigRegistrationFailed("busy","",F(ARD_LANG_NATIVE_OTA_OR_RESTART_IS_IN_PROGRESS));
   _appConfigPageRegistrationState=AppConfigPageRegistrationState::Failed;
   _appConfigRegistrationError={};_appConfigPageRegistrationProcessed=_appConfigPageRegistrationTotal=0;
-  if(!source&&!flash)return appConfigRegistrationFailed("input","",F("null definition"));
-  if(_dynamic.pages.length()>=16)return appConfigRegistrationFailed("limits","",F("page limit: 16"));
+  if(!source&&!flash)return appConfigRegistrationFailed("input","",F(ARD_LANG_NATIVE_NULL_DEFINITION));
+  if(_dynamic.pages.length()>=16)return appConfigRegistrationFailed("limits","",F(ARD_LANG_NATIVE_PAGE_LIMIT_16));
   const auto heapBefore=ArdHeap::sample();
   std::unique_ptr<ArdAppConfigPageRegistration> work(new(std::nothrow) ArdAppConfigPageRegistration());
-  if(!work)return appConfigRegistrationFailed("registry","",F("out of memory allocating registration"));
+  if(!work)return appConfigRegistrationFailed("registry","",F(ARD_LANG_NATIVE_OUT_OF_MEMORY_ALLOCATING_REGISTRATION));
   work->heapBefore=heapBefore;
   work->length=source?source->length():strlen_P(reinterpret_cast<const char*>(flash));
-  if(!work->length||work->length>ArdAppConfigMaxDefinitionBytes)return appConfigRegistrationFailed("input","",String(F("definition is empty or exceeds the definition budget: "))+String(ArdAppConfigMaxDefinitionBytes)+" bytes");
-  if(source&&!owned&&!ArdHeap::permits(work->length))return appConfigRegistrationFailed("memory","",F("network heap reserve prevents definition copy"));
-  if(source){if(owned)work->source=std::move(*owned);else work->source=*source;if(work->source.length()!=work->length)return appConfigRegistrationFailed("input","",F("out of memory copying definition"));}
+  if(!work->length||work->length>ArdAppConfigMaxDefinitionBytes)return appConfigRegistrationFailed("input","",String(F(ARD_LANG_NATIVE_DEFINITION_IS_EMPTY_OR_EXCEEDS_THE_DEFINITION_BUDGET))+String(ArdAppConfigMaxDefinitionBytes)+ARD_LANG_NATIVE_BYTES);
+  if(source&&!owned&&!ArdHeap::permits(work->length))return appConfigRegistrationFailed("memory","",F(ARD_LANG_NATIVE_NETWORK_HEAP_RESERVE_PREVENTS_DEFINITION_COPY));
+  if(source){if(owned)work->source=std::move(*owned);else work->source=*source;if(work->source.length()!=work->length)return appConfigRegistrationFailed("input","",F(ARD_LANG_NATIVE_OUT_OF_MEMORY_COPYING_DEFINITION));}
   work->flash=flash;work->first=_dynamic.count();work->topicDevice=_dynamic.pages.topicDevice;
   work->wholePass=work->length<=2048;
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-  log(String(F("AppConfig registration accepted: "))+ArdHeap::describe(work->heapBefore));
+  log(String(F(ARD_LANG_NATIVE_APPCONFIG_REGISTRATION_ACCEPTED))+ArdHeap::describe(work->heapBefore));
 #endif
   _appConfigPageRegistration=std::move(work);_appConfigPageRegistrationState=AppConfigPageRegistrationState::Pending;
   ++_appConfigPageRegistrationGeneration;
@@ -63,7 +64,7 @@ void ArdPortal::finishAppConfigPageRegistration(bool success) {
   _appConfigPageRegistration.reset();
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   auto after=ArdHeap::sample();
-  log(String(F("AppConfig registration "))+(success?"completed":"FAILED")+"; before "+ArdHeap::describe(before)+"; after "+ArdHeap::describe(after)+"; used8="+String(int32_t(before.free8)-int32_t(after.free8))+" usedDMA="+String(int32_t(before.freeDma)-int32_t(after.freeDma)));
+  log(String(F(ARD_LANG_NATIVE_APPCONFIG_REGISTRATION))+(success?ARD_LANG_NATIVE_COMPLETED:ARD_LANG_NATIVE_FAILED)+ARD_LANG_NATIVE_BEFORE+ArdHeap::describe(before)+ARD_LANG_NATIVE_AFTER+ArdHeap::describe(after)+ARD_LANG_NATIVE_USED8+String(int32_t(before.free8)-int32_t(after.free8))+ARD_LANG_NATIVE_USEDDMA+String(int32_t(before.freeDma)-int32_t(after.freeDma)));
 #endif
   _appConfigPageRegistrationState=success?AppConfigPageRegistrationState::Succeeded:AppConfigPageRegistrationState::Failed;
   if(success)_appConfigRegistrationError={};
@@ -100,7 +101,7 @@ void ArdPortal::serviceAppConfigPageRegistration() {
     if(!ArdHeap::permits(_appConfigPageRegistration->maximumFieldWork,_appConfigPageRegistration->maximumFieldBlock)){
       if(!_appConfigPageRegistration->memoryDeferred){_appConfigPageRegistration->memoryDeferred=true;
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-        log(String(F("AppConfig registration deferred: "))+ArdHeap::describe(ArdHeap::sample()));
+        log(String(F(ARD_LANG_NATIVE_APPCONFIG_REGISTRATION_DEFERRED))+ArdHeap::describe(ArdHeap::sample()));
 #endif
       }
       break;
@@ -130,19 +131,19 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     if(event==ArdAppConfigPageScanner::Complete){
       if(scanning){
         const V& header=work.header;
-        if(!work.scanner.fieldsSeen||!work.scanner.fieldCount){failAppConfigPageRegistration("page","",F("fields must be a nonempty array"));return;}
-        if(!ArdDynamicPages::identifier(header["id"].asString())){failAppConfigPageRegistration("page","",F("invalid page id"));return;}
-        if(!ArdDynamicPages::title(header)){failAppConfigPageRegistration("page","",F("invalid page name/names (1..80 bytes)"));return;}
-        if(!header["order"].isInteger()){failAppConfigPageRegistration("page","",F("order must be an integer"));return;}
-        for(size_t i=0;i<_dynamic.pages.length();++i)if(_dynamic.pages.id(i)==header["id"].asString()){failAppConfigPageRegistration("page","",F("duplicate page id"));return;}
+        if(!work.scanner.fieldsSeen||!work.scanner.fieldCount){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_FIELDS_MUST_BE_A_NONEMPTY_ARRAY));return;}
+        if(!ArdDynamicPages::identifier(header["id"].asString())){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_PAGE_ID));return;}
+        if(!ArdDynamicPages::title(header)){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_PAGE_NAME_NAMES_1_80_BYTES));return;}
+        if(!header["order"].isInteger()){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_ORDER_MUST_BE_AN_INTEGER));return;}
+        for(size_t i=0;i<_dynamic.pages.length();++i)if(_dynamic.pages.id(i)==header["id"].asString()){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_DUPLICATE_PAGE_ID));return;}
         _appConfigPageRegistrationTotal=work.scanner.fieldCount;
         work.entry.reset(new(std::nothrow) ArdDynamicPages::PageStore::Entry());
-        if(!work.entry){failAppConfigPageRegistration("registry","",F("out of memory allocating page"));return;}
+        if(!work.entry){failAppConfigPageRegistration("registry","",F(ARD_LANG_NATIVE_OUT_OF_MEMORY_ALLOCATING_PAGE));return;}
         work.entry->count=work.scanner.fieldCount;
         work.entry->fields.reset(new(std::nothrow) ArdDynamicPages::PageStore::Field[work.entry->count]);
-        if(!work.entry->fields){failAppConfigPageRegistration("registry","",F("out of memory allocating field index"));return;}
+        if(!work.entry->fields){failAppConfigPageRegistration("registry","",F(ARD_LANG_NATIVE_OUT_OF_MEMORY_ALLOCATING_FIELD_INDEX));return;}
         work.entry->id=header["id"].asString();work.entry->sourceLength=work.length;if(header.hasOwnProperty("visibleWhen"))work.entry->condition=_json.stringify(header["visibleWhen"]);
-        if(work.entry->id!=header["id"].asString()||(header.hasOwnProperty("visibleWhen")&&!work.entry->condition.length())){failAppConfigPageRegistration("registry","",F("out of memory copying page metadata"));return;}
+        if(work.entry->id!=header["id"].asString()||(header.hasOwnProperty("visibleWhen")&&!work.entry->condition.length())){failAppConfigPageRegistration("registry","",F(ARD_LANG_NATIVE_OUT_OF_MEMORY_COPYING_PAGE_METADATA));return;}
         V menu=V::object();for(const char* key:{"id","name","names","order","visibleWhen"})if(header.hasOwnProperty(key))menu[key]=header[key];
         ArdJSON::Limits limits;limits.maxNodes=4096;limits.escapeHtml=true;String reason;
         work.entry->menu=_json.stringify(menu,false,&reason,limits);if(!work.entry->menu.length()){failed("serialize","",reason);return;}
@@ -157,36 +158,36 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
       if(indexBytes>block)block=indexBytes;
       if(block>work.maximumFieldBlock)work.maximumFieldBlock=block;
       if(indexBytes>work.maximumFieldWork)work.maximumFieldWork=indexBytes;
-      if(work.first+work.scanner.fieldCount>ArdAppConfigMaxFields){failAppConfigPageRegistration("limits","",F("field limit: 1024"));return;}
+      if(work.first+work.scanner.fieldCount>ArdAppConfigMaxFields){failAppConfigPageRegistration("limits","",F(ARD_LANG_NATIVE_FIELD_LIMIT_1024));return;}
       return; // Index pass parses each field only once, after its exact count is known.
     }
     String slice=source.slice(work.scanner.start,work.scanner.bytes);
-    if(slice.length()!=work.scanner.bytes){failAppConfigPageRegistration("parse","",F("out of memory copying JSON slice"));return;}
+    if(slice.length()!=work.scanner.bytes){failAppConfigPageRegistration("parse","",F(ARD_LANG_NATIVE_OUT_OF_MEMORY_COPYING_JSON_SLICE));return;}
     ArdJSON::Limits limits;limits.maxNodes=4096;limits.maxDepth=event==ArdAppConfigPageScanner::Field?14:15;
     ArdJSON::Parser parser(slice,limits);V value=parser.parse();
-    if(parser.error()){failed("parse",event==ArdAppConfigPageScanner::Field?value["id"].asString():String(),String(parser.error())+" at byte "+String(work.scanner.start+parser.offset()));return;}
+    if(parser.error()){failed("parse",event==ArdAppConfigPageScanner::Field?value["id"].asString():String(),String(parser.error())+ARD_LANG_NATIVE_AT_BYTE+String(work.scanner.start+parser.offset()));return;}
     if(scanning){
-      work.nodes+=parser.nodes();if(work.nodes>4096){failAppConfigPageRegistration("parse","",F("node limit: 4096"));return;}
+      work.nodes+=parser.nodes();if(work.nodes>4096){failAppConfigPageRegistration("parse","",F(ARD_LANG_NATIVE_NODE_LIMIT_4096));return;}
       if(event==ArdAppConfigPageScanner::Member){
-        if(work.header.hasOwnProperty(work.scanner.key)){failed("parse","","duplicate root key: "+work.scanner.key);return;}
-        work.header[work.scanner.key]=std::move(value);if(!work.header.isValid()){failAppConfigPageRegistration("parse","",F("out of memory storing page header"));return;}
-      }else if(work.first+work.scanner.fieldCount>ArdAppConfigMaxFields){failed("limits",value["id"].asString(),"field limit: 1024");return;}
+        if(work.header.hasOwnProperty(work.scanner.key)){failed("parse","",ARD_LANG_NATIVE_DUPLICATE_ROOT_KEY+work.scanner.key);return;}
+        work.header[work.scanner.key]=std::move(value);if(!work.header.isValid()){failAppConfigPageRegistration("parse","",F(ARD_LANG_NATIVE_OUT_OF_MEMORY_STORING_PAGE_HEADER));return;}
+      }else if(work.first+work.scanner.fieldCount>ArdAppConfigMaxFields){failed("limits",value["id"].asString(),ARD_LANG_NATIVE_FIELD_LIMIT_1024);return;}
       return;
     }
-    work.nodes+=parser.nodes();if(work.nodes>4096){failAppConfigPageRegistration("parse","",F("node limit: 4096"));return;}
-    if(!ArdTopicTemplates::resolve(value,work.topicDevice)){failAppConfigPageRegistration("topics","",F("cannot resolve topic template"));return;}
+    work.nodes+=parser.nodes();if(work.nodes>4096){failAppConfigPageRegistration("parse","",F(ARD_LANG_NATIVE_NODE_LIMIT_4096));return;}
+    if(!ArdTopicTemplates::resolve(value,work.topicDevice)){failAppConfigPageRegistration("topics","",F(ARD_LANG_NATIVE_CANNOT_RESOLVE_TOPIC_TEMPLATE));return;}
     const size_t index=work.processed;const String id=static_cast<const V&>(value)["id"].asString();String reason;
     if(!ardPortalBasicControl(value["type"].asString())){
       V resolved=value;if(!ArdHa::normalize(resolved,false,&reason)){failed("normalize",id,reason);return;}
       if(!value.hasOwnProperty("extended"))++work.nodes;
       value["extended"]=true;if(!value.hasOwnProperty("persist")){++work.nodes;value["persist"]=resolved["persist"];}
-      if(work.nodes>4096){failAppConfigPageRegistration("serialize",id,F("normalized page node limit: 4096"));return;}
+      if(work.nodes>4096){failAppConfigPageRegistration("serialize",id,F(ARD_LANG_NATIVE_NORMALIZED_PAGE_NODE_LIMIT_4096));return;}
     }
     if(!_dynamic.validateField(value,V::array(),false)){failed(_dynamic.error.stage,_dynamic.error.fieldId,_dynamic.error.reason);return;}
-    for(size_t i=0;i<index;++i)if(id==work.idAt(i)){failAppConfigPageRegistration("field",id,F("duplicate field id in page"));return;}
+    for(size_t i=0;i<index;++i)if(id==work.idAt(i)){failAppConfigPageRegistration("field",id,F(ARD_LANG_NATIVE_DUPLICATE_FIELD_ID_IN_PAGE));return;}
 #if ARDPORTAL_ENABLE_HA
     String discoveryError;String payload=_homeAssistant.discoveryConfig(value,&discoveryError);
-    if(!payload.length()||payload.length()+400>ArdMqtt::PacketCapacity-5){failed("discovery",id,!payload.length()?discoveryError:String(F("Discovery payload exceeds MQTT packet capacity: payload="))+String(payload.length())+" reserve=400 capacity="+String(ArdMqtt::PacketCapacity-5));return;}
+    if(!payload.length()||payload.length()+400>ArdMqtt::PacketCapacity-5){failed("discovery",id,!payload.length()?discoveryError:String(F(ARD_LANG_NATIVE_DISCOVERY_PAYLOAD_EXCEEDS_MQTT_PACKET_CAPACITY_PAYLOAD))+String(payload.length())+ARD_LANG_NATIVE_RESERVE_400_CAPACITY+String(ArdMqtt::PacketCapacity-5));return;}
 #endif
     // Only existing owners whose generated names might match this new ID need
     // parsing. Unrelated earlier pages/entities are never reparsed here.
@@ -200,7 +201,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     // retaining at most 31 bytes of spare capacity, without per-field Strings.
     if(!work.entry->ids.reserve(((idOffset+idBytes+32)&~size_t(31))-1)||
        !work.entry->ids.concat(id.c_str(),idBytes)){
-      failAppConfigPageRegistration("registry",id,F("out of memory growing field id pool"));return;
+      failAppConfigPageRegistration("registry",id,F(ARD_LANG_NATIVE_OUT_OF_MEMORY_GROWING_FIELD_ID_POOL));return;
     }
     meta.idOffset=uint16_t(idOffset);
     meta.sourceNodes=parser.nodes()<=UINT8_MAX?uint8_t(parser.nodes()):0;
@@ -238,18 +239,18 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     work.checkIndex=pending.firstSet();
     if(work.checkIndex>=ArdAppConfigMaxFields){work.stage=existing?ArdAppConfigPageRegistration::Cycles:ArdAppConfigPageRegistration::ExistingCommands;return;}
     V field=existing?_dynamic.at(work.checkIndex):work.field(work.checkIndex);
-    if(field.isUndefined()||!field.isValid()){failed("parse",existing?_dynamic.idAt(work.checkIndex):String(work.idAt(work.checkIndex)),"cannot read indexed field (memory or JSON failure)");return;}
+    if(field.isUndefined()||!field.isValid()){failed("parse",existing?_dynamic.idAt(work.checkIndex):String(work.idAt(work.checkIndex)),ARD_LANG_NATIVE_CANNOT_READ_INDEXED_FIELD_MEMORY_OR_JSON_FAILURE);return;}
     String id=static_cast<const V&>(field)["id"].asString();
     if(!existing){
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-      if(!conditionValid(static_cast<const V&>(field)["visibleWhen"])){failAppConfigPageRegistration("field",id,F("invalid visibleWhen condition or referenced field"));return;}
+      if(!conditionValid(static_cast<const V&>(field)["visibleWhen"])){failAppConfigPageRegistration("field",id,F(ARD_LANG_NATIVE_INVALID_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD));return;}
       if(work.header.hasOwnProperty("visibleWhen"))field["_pageVisibleWhen"]=static_cast<const V&>(work.header)["visibleWhen"];
       auto resolve=[&](const String& id){size_t i=_dynamic.indexOf(id);return i<work.first?i:work.first+work.indexOf(id);};
       if(!field.isValid()||!work.entry->edges.addField(field,work.first+work.checkIndex,resolve)){
-        failAppConfigPageRegistration("registry",id,F("out of memory indexing dependencies"));return;
+        failAppConfigPageRegistration("registry",id,F(ARD_LANG_NATIVE_OUT_OF_MEMORY_INDEXING_DEPENDENCIES));return;
       }
 #else
-      if(work.header.hasOwnProperty("visibleWhen")){failAppConfigPageRegistration("page","",F("dependencies are disabled"));return;}
+      if(work.header.hasOwnProperty("visibleWhen")){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED));return;}
 #endif
 
     }
@@ -258,7 +259,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     if(field["type"].asString()=="climate")for(const char* suffix:{"temperature","mode","fan"})suffixes.push(suffix);
 #endif
     if(ArdHa::extended(field)){String reason;V resolved=field;if(!ArdHa::normalize(resolved,true,&reason)){failed("commands",id,reason);return;}for(size_t i=0;i<resolved["controls"].length();++i)if(resolved["controls"][i]["command"].asString().length())suffixes.push(resolved["controls"][i]["command"]);suffixes.push("ack");}
-    for(size_t i=0;i<suffixes.length();++i){String generated=id+"_"+suffixes[i].asString();if(work.indexOf(generated)<work.entry->count||(!existing&&_dynamic.indexOf(generated)<work.first)){failed("commands",id,"generated command/ack id collides with field: "+generated);return;}}
+    for(size_t i=0;i<suffixes.length();++i){String generated=id+"_"+suffixes[i].asString();if(work.indexOf(generated)<work.entry->count||(!existing&&_dynamic.indexOf(generated)<work.first)){failed("commands",id,ARD_LANG_NATIVE_GENERATED_COMMAND_ACK_ID_COLLIDES_WITH_FIELD+generated);return;}}
     pending&=~ArdAppConfigFieldMask::forField(work.checkIndex);return;
   }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
@@ -266,11 +267,11 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     const size_t count=work.first+work.entry->count;
     if(!work.cycleStack) {
       if(!conditionValid(static_cast<const V&>(work.header)["visibleWhen"])){
-        failAppConfigPageRegistration("page","",F("invalid page visibleWhen condition or referenced field"));return;
+        failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_PAGE_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD));return;
       }
       work.checksMask=work.dependencyMask;
       if(work.checksMask) {
-        if(!work.cycleStack.reserve(1,count)){failAppConfigPageRegistration("registry","",F("out of memory checking dependency cycles"));return;}
+        if(!work.cycleStack.reserve(1,count)){failAppConfigPageRegistration("registry","",F(ARD_LANG_NATIVE_OUT_OF_MEMORY_CHECKING_DEPENDENCY_CYCLES));return;}
       } else {work.stage=ArdAppConfigPageRegistration::Commit;return;}
     }
     if(!work.cycleDepth) {
@@ -293,16 +294,16 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     auto match=[](const V&){return true;};
     auto result=ArdDependencies::step(work.cycleStack,work.cycleDepth,work.cycleActive,work.cycleComplete,
                                      work.cycleComplete,count,load,indexOf,dependent,match);
-    if(result==ArdDependencies::Result::Cycle){failed("field",String(work.idAt(work.cycleRoot-work.first)),"dependency cycle");return;}
-    if(result==ArdDependencies::Result::Invalid){failed("field",String(work.idAt(work.cycleRoot-work.first)),"cannot read dependency graph (memory or JSON failure)");return;}
+    if(result==ArdDependencies::Result::Cycle){failed("field",String(work.idAt(work.cycleRoot-work.first)),ARD_LANG_NATIVE_DEPENDENCY_CYCLE);return;}
+    if(result==ArdDependencies::Result::Invalid){failed("field",String(work.idAt(work.cycleRoot-work.first)),ARD_LANG_NATIVE_CANNOT_READ_DEPENDENCY_GRAPH_MEMORY_OR_JSON_FAILURE);return;}
     if(result!=ArdDependencies::Result::Running)work.checksMask&=~ArdAppConfigFieldMask::forField(work.cycleRoot);
     return;
   }
 #endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-  if(!conditionValid(static_cast<const V&>(work.header)["visibleWhen"])){failAppConfigPageRegistration("page","",F("invalid page visibleWhen condition or referenced field"));return;}
+  if(!conditionValid(static_cast<const V&>(work.header)["visibleWhen"])){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_PAGE_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD));return;}
 #else
-  if(work.header.hasOwnProperty("visibleWhen")){failAppConfigPageRegistration("page","",F("dependencies are disabled"));return;}
+  if(work.header.hasOwnProperty("visibleWhen")){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED));return;}
 #endif
   // The only visibility change is this final move. No partial page is ever
   // available to HTTP, MQTT, dependency evaluation or Discovery.
@@ -314,10 +315,10 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
   if(!work.entry->headerPrefix.length()){failed("serialize","",reason);return;}
   work.entry->headerPrefix.remove(work.entry->headerPrefix.length()-1);
   work.entry->headerPrefix+=F(",\"fields\":[");
-  if(work.entry->headerPrefix.length()!=headerBytes-2){failAppConfigPageRegistration("serialize","",F("out of memory storing page header"));return;}
+  if(work.entry->headerPrefix.length()!=headerBytes-2){failAppConfigPageRegistration("serialize","",F(ARD_LANG_NATIVE_OUT_OF_MEMORY_STORING_PAGE_HEADER));return;}
   limits.maxOutputBytes=ArdAppConfigMaxDefinitionBytes;
   size_t existingBytes=_dynamic.pages.measure(limits);
-  if(!existingBytes||existingBytes+work.entry->jsonLength+(_dynamic.pages.length()?1:0)+_dynamic.entityBytes>ArdAppConfigMaxDefinitionBytes){failed("limits","",String(F("total definition limit: "))+String(ArdAppConfigMaxDefinitionBytes)+" bytes");return;}
+  if(!existingBytes||existingBytes+work.entry->jsonLength+(_dynamic.pages.length()?1:0)+_dynamic.entityBytes>ArdAppConfigMaxDefinitionBytes){failed("limits","",String(F(ARD_LANG_NATIVE_TOTAL_DEFINITION_LIMIT))+String(ArdAppConfigMaxDefinitionBytes)+ARD_LANG_NATIVE_BYTES);return;}
   work.entry->flash=work.flash;work.entry->source=std::move(work.source);
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   work.entry->edges.controllers(_dynamic.dependencyControllers);

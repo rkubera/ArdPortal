@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 #include <esp_zigbee_attribute.h>
 #include <esp_zigbee_cluster.h>
 #include <ha/esp_zigbee_ha_standard.h>
@@ -19,24 +20,24 @@ static void ardZigbeePayload(char* out,size_t capacity,const void* data,uint8_t 
 }
 /** @brief Retain compact endpoint metadata without copying a page. @param spec Mapping. @param initial Initial attributes. @param label Description. @return True if staged. */
 bool ArdZigbee::addControl(ArdZigbeeFields::Spec spec,const ArdZigbeeFields::Values& initial,const String& label){
-  if(_begun){_error="Endpoints are frozen; restart required";return false;}
+  if(_begun){_error=ARD_LANG_NATIVE_ENDPOINTS_ARE_FROZEN_RESTART_REQUIRED;return false;}
   auto failed=[&](const char* reason){_error=reason;setState(State::Failed);return false;};
-  if(spec.kind==ArdZigbeeFields::Kind::None||_controlCount>=239)return failed("Unsupported mapping or Zigbee endpoint limit (239)");
+  if(spec.kind==ArdZigbeeFields::Kind::None||_controlCount>=239)return failed(ARD_LANG_NATIVE_UNSUPPORTED_MAPPING_OR_ZIGBEE_ENDPOINT_LIMIT_239);
 #if ARDPORTAL_ZIGBEE_OTA_SUPPORT
-  if(spec.kind==ArdZigbeeFields::Kind::Update)for(auto* entry=_controls.get();entry;entry=entry->next.get())if(entry->spec.kind==spec.kind)return failed("Only one update field may own Zigbee OTA");
+  if(spec.kind==ArdZigbeeFields::Kind::Update)for(auto* entry=_controls.get();entry;entry=entry->next.get())if(entry->spec.kind==spec.kind)return failed(ARD_LANG_NATIVE_ONLY_ONE_UPDATE_FIELD_MAY_OWN_ZIGBEE_OTA);
 #endif
-  auto* raw=new(std::nothrow) Control();if(!raw)return failed("Out of memory allocating endpoint metadata");
+  auto* raw=new(std::nothrow) Control();if(!raw)return failed(ARD_LANG_NATIVE_OUT_OF_MEMORY_ALLOCATING_ENDPOINT_METADATA);
   std::unique_ptr<Control> entry(raw);entry->spec=spec;entry->spec.endpoint=_controlCount+2;entry->initialCount=initial.count;
-  if(initial.count){entry->initial.reset(static_cast<ArdZigbeeFields::Attribute*>(std::malloc(initial.count*sizeof(ArdZigbeeFields::Attribute))));if(!entry->initial)return failed("Out of memory staging endpoint attributes");memcpy(entry->initial.get(),initial.attributes,initial.count*sizeof(ArdZigbeeFields::Attribute));}
-  size_t labelBytes=std::min(size_t(63),label.length());if(labelBytes<label.length())while(labelBytes&&(uint8_t(label[labelBytes])&0xc0)==0x80)--labelBytes;if(labelBytes){entry->label.reset(static_cast<char*>(std::malloc(labelBytes+1)));if(!entry->label)return failed("Out of memory copying endpoint label");entry->label.get()[0]=char(labelBytes);memcpy(entry->label.get()+1,label.c_str(),labelBytes);}
+  if(initial.count){entry->initial.reset(static_cast<ArdZigbeeFields::Attribute*>(std::malloc(initial.count*sizeof(ArdZigbeeFields::Attribute))));if(!entry->initial)return failed(ARD_LANG_NATIVE_OUT_OF_MEMORY_STAGING_ENDPOINT_ATTRIBUTES);memcpy(entry->initial.get(),initial.attributes,initial.count*sizeof(ArdZigbeeFields::Attribute));}
+  size_t labelBytes=std::min(size_t(63),label.length());if(labelBytes<label.length())while(labelBytes&&(uint8_t(label[labelBytes])&0xc0)==0x80)--labelBytes;if(labelBytes){entry->label.reset(static_cast<char*>(std::malloc(labelBytes+1)));if(!entry->label)return failed(ARD_LANG_NATIVE_OUT_OF_MEMORY_COPYING_ENDPOINT_LABEL);entry->label.get()[0]=char(labelBytes);memcpy(entry->label.get()+1,label.c_str(),labelBytes);}
   auto* tail=&_controls;while(*tail)tail=&(*tail)->next;*tail=std::move(entry);++_controlCount;return true;
 }
 /** @brief Create every staged standard server endpoint. @param endpoints SDK endpoint list. @return False on any SDK allocation/registration failure. */
 bool ArdZigbee::createControls(esp_zb_ep_list_t* endpoints){
   using namespace ArdZigbeeFields;
   for(auto* entry=_controls.get();entry;entry=entry->next.get()){
-    auto stage=[&](const char* name){snprintf(_startupError,sizeof(_startupError),"Endpoint %u kind=%u: %s failed",unsigned(entry->spec.endpoint),unsigned(entry->spec.kind),name);};
-    stage("memory reserve/cluster allocation");
+    auto stage=[&](const char* name){snprintf(_startupError,sizeof(_startupError),ARD_LANG_NATIVE_ENDPOINT_U_KIND_U_S_FAILED,unsigned(entry->spec.endpoint),unsigned(entry->spec.kind),name);};
+    stage(ARD_LANG_NATIVE_MEMORY_RESERVE_CLUSTER_ALLOCATION);
     if(!ArdHeap::permits(2048,1024))return false;
     auto* clusters=esp_zb_zcl_cluster_list_create();if(!clusters)return false;
     auto add=[&](esp_zb_attribute_list_t* list,auto function){return list&&function(clusters,list,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE)==ESP_OK;};
@@ -50,7 +51,7 @@ bool ArdZigbee::createControls(esp_zb_ep_list_t* endpoints){
     stage("ProductLabel");
     if((entry->label?uint8_t(entry->label.get()[0]):0)){if(esp_zb_cluster_add_attr(basic,0,0x0e,ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING,ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY,text)!=ESP_OK)return false;}
     uint16_t device=ESP_ZB_HA_SIMPLE_SENSOR_DEVICE_ID;auto& s=entry->spec;
-    stage("control cluster");
+    stage(ARD_LANG_NATIVE_CONTROL_CLUSTER);
     switch(s.kind){
       case Kind::Action:case Kind::Switch:device=ESP_ZB_HA_ON_OFF_OUTPUT_DEVICE_ID;if(!add(esp_zb_on_off_cluster_create(nullptr),esp_zb_cluster_list_add_on_off_cluster))return false;break;
       case Kind::Slider:{auto* list=esp_zb_analog_output_cluster_create(nullptr);if(!list)return false;
@@ -121,13 +122,13 @@ bool ArdZigbee::createControls(esp_zb_ep_list_t* endpoints){
       default:return false;
     }
     if(s.kind==Kind::Light||s.kind==Kind::Cover){if(!add(esp_zb_groups_cluster_create(nullptr),esp_zb_cluster_list_add_groups_cluster)||!add(esp_zb_scenes_cluster_create(nullptr),esp_zb_cluster_list_add_scenes_cluster))return false;}
-    for(uint8_t i=0;i<entry->initialCount;++i){auto& a=entry->initial.get()[i];snprintf(_startupError,sizeof(_startupError),"Endpoint %u: cluster 0x%04x attribute 0x%04x failed",unsigned(s.endpoint),unsigned(a.cluster),unsigned(a.id));auto* list=esp_zb_cluster_list_get_cluster(clusters,a.cluster,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    for(uint8_t i=0;i<entry->initialCount;++i){auto& a=entry->initial.get()[i];snprintf(_startupError,sizeof(_startupError),ARD_LANG_NATIVE_ENDPOINT_U_CLUSTER_0X_04X_ATTRIBUTE_0X_04X_FAILED,unsigned(s.endpoint),unsigned(a.cluster),unsigned(a.id));auto* list=esp_zb_cluster_list_get_cluster(clusters,a.cluster,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
       if(!list)return false;
       const uint8_t access=ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY|((a.cluster==0x300&&a.id>=0x4000)?0:ESP_ZB_ZCL_ATTR_ACCESS_REPORTING);
       if(esp_zb_cluster_update_attr(list,a.id,&a.data)!=ESP_OK&&esp_zb_cluster_add_attr(list,a.cluster,a.id,a.type,access,&a.data)!=ESP_OK)return false;
     }
     esp_zb_endpoint_config_t endpoint={};endpoint.endpoint=s.endpoint;endpoint.app_profile_id=ESP_ZB_AF_HA_PROFILE_ID;endpoint.app_device_id=device;
-    stage("endpoint registration");
+    stage(ARD_LANG_NATIVE_ENDPOINT_REGISTRATION);
     if(esp_zb_ep_list_add_ep(endpoints,clusters,endpoint)!=ESP_OK)return false;
     // The SDK copies attribute values; startup buffers have no runtime purpose.
     entry->initial.reset();entry->initialCount=0;entry->label.reset();
@@ -156,7 +157,7 @@ esp_err_t ArdZigbee::action(esp_zb_core_action_callback_id_t id,const void* mess
     size_t expectedSize=expected==0x39||expected==0x23?4:expected==0x29||expected==0x21?2:1;
     if(data.type!=expected||data.size!=expectedSize)return ESP_ERR_INVALID_ARG;
     char payload[32],line[128];ardZigbeePayload(payload,sizeof(payload),data.value,data.type,data.size);
-    snprintf(line,sizeof(line),"RX applied ep=%u payload={\"cluster\":%u,\"attr\":%u,\"type\":%u,\"value\":%s}",c.endpoint,c.cluster,c.id,data.type,payload);_instance->traffic(line);
+    snprintf(line,sizeof(line),ARD_LANG_NATIVE_RX_ATTRIBUTE,c.endpoint,c.cluster,c.id,data.type,payload);_instance->traffic(line);
     memcpy(&c.value,data.value,data.size);
     if(c.cluster==0x300){auto* hue=esp_zb_zcl_get_attribute(c.endpoint,0x300,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,0);auto* saturation=esp_zb_zcl_get_attribute(c.endpoint,0x300,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,1);if(!hue||!saturation||!hue->data_p||!saturation->data_p)return ESP_FAIL;c.hue=*static_cast<uint8_t*>(hue->data_p);c.saturation=*static_cast<uint8_t*>(saturation->data_p);
       auto* enhanced=esp_zb_zcl_get_attribute(c.endpoint,0x300,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,0x4000);auto* colorMode=esp_zb_zcl_get_attribute(c.endpoint,0x300,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,0x4001);
@@ -169,9 +170,9 @@ esp_err_t ArdZigbee::action(esp_zb_core_action_callback_id_t id,const void* mess
   }else if(id==ESP_ZB_CORE_WINDOW_COVERING_MOVEMENT_CB_ID){auto* m=static_cast<const esp_zb_zcl_window_covering_movement_message_t*>(message);if(m->info.status!=ESP_ZB_ZCL_STATUS_SUCCESS)return ESP_FAIL;c.kind=1;c.endpoint=m->info.dst_endpoint;c.cluster=0x102;c.id=m->command;c.value=m->payload.percentage_lift_value;
   }else if(id==ESP_ZB_CORE_IAS_WD_START_WARNING_CB_ID){auto* m=static_cast<const esp_zb_zcl_ias_wd_start_warning_message_t*>(message);if(m->info.status!=ESP_ZB_ZCL_STATUS_SUCCESS||!m->msg_in)return ESP_FAIL;c.kind=1;c.endpoint=m->info.dst_endpoint;c.cluster=0x502;c.id=m->msg_in->warning_mode;c.duration=m->msg_in->duration;c.volume=m->msg_in->siren_level;
   }else return ESP_OK;
-  if(c.kind==1){char line[128];snprintf(line,sizeof(line),"RX applied ep=%u payload={\"cluster\":%u,\"cmd\":%u,\"value\":%lu,\"duration\":%u,\"volume\":%u}",c.endpoint,c.cluster,c.id,(unsigned long)c.value,unsigned(c.duration),unsigned(c.volume));_instance->traffic(line);}
+  if(c.kind==1){char line[128];snprintf(line,sizeof(line),ARD_LANG_NATIVE_RX_COMMAND,c.endpoint,c.cluster,c.id,(unsigned long)c.value,unsigned(c.duration),unsigned(c.volume));_instance->traffic(line);}
   for(auto* entry=_instance->_controls.get();entry;entry=entry->next.get())if(entry->spec.endpoint==c.endpoint){
-    if(!_instance->_commands||xQueueSend(_instance->_commands,&c,0)!=pdTRUE){_instance->traffic("RX ZCL command queue full; command rejected");return ESP_ERR_NO_MEM;}return ESP_OK;
+    if(!_instance->_commands||xQueueSend(_instance->_commands,&c,0)!=pdTRUE){_instance->traffic(ARD_LANG_NATIVE_RX_ZCL_COMMAND_QUEUE_FULL_COMMAND_REJECTED);return ESP_ERR_NO_MEM;}return ESP_OK;
   }
   return ESP_OK;
 }
@@ -192,12 +193,12 @@ bool ArdZigbee::publish(uint8_t endpoint,const ArdZigbeeFields::Values& values,b
   }
   for(uint8_t order=0;order<values.count;++order){uint8_t i=heatFirst&&(order==1||order==2)?3-order:order;const auto& a=values.attributes[i];const uint16_t bit=uint16_t(1u<<i);auto* current=esp_zb_zcl_get_attribute(endpoint,a.cluster,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,a.id);size_t size=a.type==0x39||a.type==0x23||a.type==0x1b?4:a.type==0x21||a.type==0x29||a.type==0x19?2:1;
     if(achromatic&&a.cluster==0x300&&(a.id==0||a.id==0x4000)){entry->pendingReports&=~bit;continue;}
-    if(!current||!current->data_p){entry->pendingReports|=bit;ok=false;char message[112];snprintf(message,sizeof(message),"TX attribute missing ep=%u cluster=%04x attr=%04x",endpoint,a.cluster,a.id);traffic(message);continue;}
+    if(!current||!current->data_p){entry->pendingReports|=bit;ok=false;char message[112];snprintf(message,sizeof(message),ARD_LANG_NATIVE_TX_ATTRIBUTE_MISSING_EP_U_CLUSTER_04X_ATTR_04X,endpoint,a.cluster,a.id);traffic(message);continue;}
     const bool changed=memcmp(current->data_p,&a.data,size)!=0;
     if(changed)entry->pendingReports|=bit;
     if(!(entry->pendingReports&bit))continue;
     const auto stored=changed?esp_zb_zcl_set_attribute_val(endpoint,a.cluster,ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,a.id,const_cast<void*>(static_cast<const void*>(&a.data)),false):ESP_ZB_ZCL_STATUS_SUCCESS;
-    if(stored!=ESP_ZB_ZCL_STATUS_SUCCESS){ok=false;char message[112];snprintf(message,sizeof(message),"TX attribute rejected ep=%u cluster=%04x attr=%04x status=0x%x",endpoint,a.cluster,a.id,unsigned(stored));traffic(message);continue;}
+    if(stored!=ESP_ZB_ZCL_STATUS_SUCCESS){ok=false;char message[112];snprintf(message,sizeof(message),ARD_LANG_NATIVE_TX_ATTRIBUTE_REJECTED_EP_U_CLUSTER_04X_ATTR_04X_STATUS_0,endpoint,a.cluster,a.id,unsigned(stored));traffic(message);continue;}
     // Enhanced color metadata is readable; ordinary color mode is reported.
     if(a.cluster==0x300&&a.id>=0x4000){entry->pendingReports&=~bit;continue;}
     if(submitted)continue; // Release the stack lock between outgoing attributes.
@@ -213,14 +214,14 @@ bool ArdZigbee::publish(uint8_t endpoint,const ArdZigbeeFields::Values& values,b
     report.profile_id=ESP_ZB_AF_HA_PROFILE_ID;report.cluster_id=a.cluster;
     report.asdu=frame;report.asdu_length=6+size;report.radius=30;report.tx_options=ESP_ZB_APSDE_TX_OPT_ACK_TX;
     const auto result=esp_zb_aps_data_request(&report);
-    if(result!=ESP_OK){ok=false;{char message[128];snprintf(message,sizeof(message),"TX report deferred ep=%u cluster=%04x attr=%04x status=0x%lx",endpoint,a.cluster,a.id,(unsigned long)result);traffic(message);}}
+    if(result!=ESP_OK){ok=false;{char message[128];snprintf(message,sizeof(message),ARD_LANG_NATIVE_TX_REPORT_DEFERRED_EP_U_CLUSTER_04X_ATTR_04X_STATUS_0X_L,endpoint,a.cluster,a.id,(unsigned long)result);traffic(message);}}
     else {
       entry->pendingReports&=~bit;
       // Float32 formatted with %.7g and all supported integer/boolean values fit in 16 bytes.
       // This also keeps the complete JSON record inside the 128-byte traffic queue slot.
       char payload[16],message[128];
       ardZigbeePayload(payload,sizeof(payload),&a.data,a.type,size);
-      snprintf(message,sizeof(message),"TX queued ep=%u payload={\"cmd\":\"report_attributes\",\"cluster\":%u,\"attr\":%u,\"type\":%u,\"value\":%s}",endpoint,a.cluster,a.id,a.type,payload);
+      snprintf(message,sizeof(message),ARD_LANG_NATIVE_TX_REPORT,endpoint,a.cluster,a.id,a.type,payload);
       traffic(message);
     }
   }

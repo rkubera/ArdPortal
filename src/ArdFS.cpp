@@ -1,5 +1,6 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+#include "LanguageLiterals.h"
 #include "ArdFS.h"
 #define ARDUI_DEFINE_STORAGE_MESSAGES
 #include "Language.h"
@@ -237,7 +238,7 @@ void ArdFS::loop() {
         const auto limits = journalLimits();
         ArdJSON::Parser parser(_buffer, limits);
         const JSONVar root = parser.parse();
-        if (parser.error() && !strcmp(parser.error(), "out of memory")) {
+        if (parser.error() && !strcmp(parser.error(), ARD_LANG_NATIVE_OUT_OF_MEMORY)) {
           finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return;
         }
         int64_t version = 0, generation = 0, crc = 0;
@@ -263,7 +264,7 @@ void ArdFS::loop() {
           const ArdJSON::Limits legacyLimits;
           ArdJSON::Parser legacyParser(_buffer, legacyLimits);
           const JSONVar legacy = legacyParser.parse();
-          if (legacyParser.error() && !strcmp(legacyParser.error(), "out of memory")) {
+          if (legacyParser.error() && !strcmp(legacyParser.error(), ARD_LANG_NATIVE_OUT_OF_MEMORY)) {
             finish(false, ArdUILanguage::storageText(ArdUILanguage::Key::s_198)); return;
           }
           if (legacy.isValid() && legacy.type() == JSONVar::Type::Object && !legacy.hasOwnProperty("journal")) {

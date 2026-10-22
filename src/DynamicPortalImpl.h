@@ -1,5 +1,6 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+#include "LanguageLiterals.h"
 #include "ArdPortalDeclarations.h"
 #include "Language.h"
 #include "ConfigJson.h"
@@ -25,14 +26,14 @@ bool ArdPortal::addAppConfigEntity(const __FlashStringHelper* definition) {
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdPortal::addAppConfigEntity(const String& definition) {
-  if(appConfigPageRegistrationBusy())return appConfigRegistrationFailed("busy","","another page registration is pending");
+  if(appConfigPageRegistrationBusy())return appConfigRegistrationFailed("busy","",ARD_LANG_NATIVE_ANOTHER_PAGE_REGISTRATION_IS_PENDING);
 #if ARDPORTAL_ENABLE_HA
   ArdJSON::Limits limits;limits.maxNodes=4096;
   V field=_json.parse(definition,nullptr,limits);
   if(field.type()!=V::Type::Object||!ArdTopicTemplates::resolve(field,_dynamic.pages.topicDevice))return false;
   if(!ardPortalBasicControl(field["type"].asString())){V resolved=field;if(!ArdHa::normalize(resolved))return false;field["extended"]=true;if(!field.hasOwnProperty("persist"))field["persist"]=resolved["persist"];}
   String payload=_homeAssistant.discoveryConfig(field);if(!payload.length()||payload.length()+400>ArdMqtt::PacketCapacity-5)return false;
-  V page=V::object(),fields=V::array();page["id"]="ha_entities";page["name"]="HA entities";page["order"]=0;fields.push(field);page["fields"]=std::move(fields);
+  V page=V::object(),fields=V::array();page["id"]="ha_entities";page["name"]=ARD_LANG_NATIVE_HA_ENTITIES;page["order"]=0;fields.push(field);page["fields"]=std::move(fields);
   size_t first=_dynamic.count();if(!_dynamic.addEntity(page))return false;
   _homeAssistant.registered(first);return true;
 #else
@@ -53,7 +54,7 @@ bool ArdPortal::addAppConfigEntity(const String& definition) {
 bool ArdPortal::dynamicHttp(const String& method,const String& path) {
   const bool get=ardFlashEqual(method,F("GET")),post=ardFlashEqual(method,F("POST"));
   if(get&&(path.indexOf("/api/pages")==0||path.indexOf("/api/app")==0||path=="/api/page-conditions"||path=="/api/page-catalog")&&!reserveDynamicHttpMemory(2048,1024)){
-    reply(503,"text/plain","Network memory reserve; retry later");return true;
+    reply(503,"text/plain",ARD_LANG_NATIVE_NETWORK_MEMORY_RESERVE_RETRY_LATER);return true;
   }
   if(get&&path.indexOf("/api/entity-type?type=")==0) {
     String type=path.substring(strlen("/api/entity-type?type="));
@@ -85,7 +86,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     const String id=path.substring(strlen("/api/pages?page="));
     for(size_t p=0;p<_dynamic.pages.length();++p)if(_dynamic.pages.id(p)==id){
       size_t work=2048,block=1024;for(size_t f=0;f<_dynamic.pages.fields(p);++f){size_t i=_dynamic.pages.fieldIndex(p,f),cost=_dynamic.pages.fieldHttpWork(i),single=_dynamic.pages.fieldBlock(i);if(cost>work)work=cost;if(single>block)block=single;}
-      if(!reserveDynamicHttpMemory(work,block)){reply(503,"text/plain","Network memory reserve; retry later");return true;}
+      if(!reserveDynamicHttpMemory(work,block)){reply(503,"text/plain",ARD_LANG_NATIVE_NETWORK_MEMORY_RESERVE_RETRY_LATER);return true;}
       responseHeader(200,"application/json",size_t(-1),false,true);
       _httpDynamicPages=true;_httpDynamicMode=1;_httpDynamicStage=0;_httpDynamicField=0;
       _httpDynamicPageIndex=p;_httpDynamicPageCount=p+1;_httpDynamicPageOffset=0;return true;
@@ -98,7 +99,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     size_t length=_dynamic.pages.measure(limits,&error);
     if(!length) {reply(503,"text/plain",ArdUILanguage::text(error.indexOf("memory")>=0?ArdUILanguage::Key::s_169:ArdUILanguage::Key::s_190));return true;}
     size_t work=2048,block=1024;for(size_t p=0;p<_dynamic.pages.length();++p)for(size_t f=0;f<_dynamic.pages.fields(p);++f){size_t i=_dynamic.pages.fieldIndex(p,f),cost=_dynamic.pages.fieldHttpWork(i),single=_dynamic.pages.fieldBlock(i);if(cost>work)work=cost;if(single>block)block=single;}
-    if(!reserveDynamicHttpMemory(work,block)){reply(503,"text/plain","Network memory reserve; retry later");return true;}
+    if(!reserveDynamicHttpMemory(work,block)){reply(503,"text/plain",ARD_LANG_NATIVE_NETWORK_MEMORY_RESERVE_RETRY_LATER);return true;}
     responseHeader(200,"application/json",size_t(-1),false,true);
     _httpDynamicPages=true;_httpDynamicMode=0;_httpDynamicStage=0;_httpDynamicField=0;_httpDynamicPageStarted=true;_httpDynamicPageIndex=0;_httpDynamicPageCount=_dynamic.pages.length();_httpDynamicPageOffset=0;return true;
   }
@@ -107,7 +108,7 @@ bool ArdPortal::dynamicHttp(const String& method,const String& path) {
     if(pageId.length()) {
       for(size_t p=0;p<_dynamic.pages.length();++p)if(_dynamic.pages.id(p)==pageId){
         size_t work=2048,block=1024;for(size_t f=0;f<_dynamic.pages.fields(p);++f){size_t i=_dynamic.pages.fieldIndex(p,f),cost=_dynamic.pages.fieldHttpWork(i),single=_dynamic.pages.fieldBlock(i);if(cost>work)work=cost;if(single>block)block=single;}
-        if(!reserveDynamicHttpMemory(work,block)){reply(503,"text/plain","Network memory reserve; retry later");return true;}
+        if(!reserveDynamicHttpMemory(work,block)){reply(503,"text/plain",ARD_LANG_NATIVE_NETWORK_MEMORY_RESERVE_RETRY_LATER);return true;}
         // Connection-close framing permits unknown state lengths without a full
         // measurement pass or a composite state allocation.
         responseHeader(200,"application/json",size_t(-1),false,true);

@@ -94,6 +94,7 @@ int main(){
 #endif
 }
 '''
+fixture = '#include "' + str(root / "src/LanguageLiterals.h") + '"\n' + fixture
 with tempfile.TemporaryDirectory(prefix='ardportal-zigbee-power-') as directory:
  d=Path(directory);cpp=d/'test.cpp';cpp.write_text(fixture+transition+signal+main)
  for router in (0,1):

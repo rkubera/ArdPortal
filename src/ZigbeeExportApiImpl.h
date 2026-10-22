@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 /** @brief Read export admission without consulting HTTP state. @return True for a frozen, successfully started registry. */
 bool ArdPortal::zigbeeConverterExportReady()const{
   return _configurationReady&&!_rebootPending&&!otaActive()&&_converterLayoutReady&&_zigbee.nativeReady()&&_zigbeeBeginTried&&!_zigbeeMappingFailed&&!_appConfigPageRegistration&&_zigbeeSeenFields==_dynamic.count()&&_zigbeeBuildIndex==_dynamic.count();
@@ -28,9 +29,9 @@ void ArdPortal::finishZigbeeConverterExport(bool success,const String& error){
 /** @brief Emit one bounded chunk without a complete-file RAM buffer. @return No value. */
 void ArdPortal::serviceZigbeeConverterExport(){
   if(!zigbeeConverterExportBusy())return;
-  if(_apiExportCancel){finishZigbeeConverterExport(false,"Cancelled");return;}
-  if(!zigbeeConverterExportReady()){finishZigbeeConverterExport(false,"Endpoint layout changed or portal unavailable");return;}
-  if(uint32_t(millis()-_apiExportProgressAt)>=30000){finishZigbeeConverterExport(false,"Export stalled for 30 seconds");return;}
+  if(_apiExportCancel){finishZigbeeConverterExport(false,ARD_LANG_NATIVE_CANCELLED);return;}
+  if(!zigbeeConverterExportReady()){finishZigbeeConverterExport(false,ARD_LANG_NATIVE_ENDPOINT_LAYOUT_CHANGED_OR_PORTAL_UNAVAILABLE);return;}
+  if(uint32_t(millis()-_apiExportProgressAt)>=30000){finishZigbeeConverterExport(false,ARD_LANG_NATIVE_EXPORT_STALLED_FOR_30_SECONDS);return;}
   if(_apiExportStage==1&& !_apiExportText.length()){
     String raw(ArdZigbeeIdentity::Model+1);if(raw.length()!=strlen(ArdZigbeeIdentity::Model+1))return;
     ArdJSON::JSONVar value(raw);if(!value.isValid())return;

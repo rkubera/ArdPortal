@@ -1,5 +1,6 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+#include "LanguageLiterals.h"
 #include "ArdPortalDeclarations.h"
 #include "Language.h"
 #include "PortalPage.h"
@@ -212,7 +213,7 @@ bool ArdPortal::begin(const Options& options) {
   _zigbee.setFirmwareVersion(_firmwareVersion);
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-  _zigbee.onLifecycleDiagnostic(this,[](void* context,const String& message){static_cast<ArdPortal*>(context)->log("Zigbee: "+message);});
+  _zigbee.onLifecycleDiagnostic(this,[](void* context,const String& message){static_cast<ArdPortal*>(context)->log(ARD_LANG_NATIVE_ZIGBEE+message);});
 #endif
   _options = options; _config.apName = options.deviceName ? options.deviceName : defaultDeviceName();
   _config.apPassword = options.apPassword ? options.apPassword : "";
@@ -260,7 +261,7 @@ void ArdPortal::connectWifi() {
   if(!_wifiAutoReconnect)return;
   _wifiSince=millis();
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-  logMessage(String(F("Wi-Fi connecting: "))+_config.ssid);
+  logMessage(String(F(ARD_LANG_NATIVE_WI_FI_CONNECTING))+_config.ssid);
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   log(ArdUILanguage::text(ArdUILanguage::Key::s_209)+String(_wifiSince));
@@ -291,7 +292,7 @@ void ArdPortal::startAP() {
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     _diagnosticApStations = 0;
-    logMessage(_apActive ? String(F("AP started: "))+_config.apName+"; IP="+WiFi.softAPIP().toString() : String(F("AP start failed: "))+_config.apName);
+    logMessage(_apActive ? String(F(ARD_LANG_NATIVE_AP_STARTED))+_config.apName+ARD_LANG_NATIVE_IP+WiFi.softAPIP().toString() : String(F(ARD_LANG_NATIVE_AP_START_FAILED))+_config.apName);
 #endif
 #if ARDPORTAL_ENABLE_WWW
     if (_apActive) { _dns.setErrorReplyCode(DNSReplyCode::NoError); _dns.start(53, "*", WiFi.softAPIP()); }
@@ -313,9 +314,9 @@ void ArdPortal::serviceWifi(uint32_t now) {
   const unsigned stations = _apActive ? WiFi.softAPgetStationNum() : 0;
   if(stations != _diagnosticApStations) {
     const bool connected = stations > _diagnosticApStations;
-    logMessage(String(connected ? "AP clients connected: " : "AP clients disconnected: ")+
+    logMessage(String(connected ? ARD_LANG_NATIVE_AP_CLIENTS_CONNECTED : ARD_LANG_NATIVE_AP_CLIENTS_DISCONNECTED)+
       String(connected ? stations-_diagnosticApStations : _diagnosticApStations-stations)+
-      "; active="+String(stations));
+      ARD_LANG_NATIVE_ACTIVE+String(stations));
     _diagnosticApStations = stations;
   }
 #endif
@@ -496,7 +497,7 @@ void ArdPortal::loop() {
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
     if(_zigbeeAppQueue.length()){
-      if(!_storage.mounted()||uint32_t(tick-_rebootSince)>=5000){_zigbeeAppQueue=ArdJSON::JSONVar::object();_zigbee.diagnostic("Zigbee pending save failed before restart");}
+      if(!_storage.mounted()||uint32_t(tick-_rebootSince)>=5000){_zigbeeAppQueue=ArdJSON::JSONVar::object();_zigbee.diagnostic(ARD_LANG_NATIVE_ZIGBEE_PENDING_SAVE_FAILED_BEFORE_RESTART);}
       else {flushPortalAndAppConfig();return;}
     }
 #endif
@@ -819,7 +820,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_WWW
   if(handleZigbeeHttp(method,path))return;
 #else
-  if(ardFlashEqual(path,F("/zigbee"))||path.indexOf("/api/zigbee")==0){reply(404,"text/plain","Zigbee is disabled");return;}
+  if(ardFlashEqual(path,F("/zigbee"))||path.indexOf("/api/zigbee")==0){reply(404,"text/plain",ARD_LANG_NATIVE_ZIGBEE_IS_DISABLED);return;}
 #endif
 #if !ARDPORTAL_HTTP_OTA_SUPPORT
   if(ardFlashEqual(path,F("/upgrade")) || ardFlashEqual(path,F("/api/upgrade"))) { replyMessage(404,ArdUILanguage::Key::s_131); return; }
@@ -919,7 +920,7 @@ void ArdPortal::handleBuiltinHttp(const String& method,const String& path) {
     closeMqtt();
     if (!scheduleConfig(defaults, ArdJSON::JSONVar::object(), ChangeSource::FactoryReset, true)) { replyMessage(500,ArdUILanguage::Key::s_107); return; }
 #if ARDPORTAL_ENABLE_ZIGBEE
-    if(!_zigbee.request(ZigbeeOperation::FactoryReset,_zigbeeOptions))log("Zigbee factory reset could not start");
+    if(!_zigbee.request(ZigbeeOperation::FactoryReset,_zigbeeOptions))log(ARD_LANG_NATIVE_ZIGBEE_FACTORY_RESET_COULD_NOT_START);
 #endif
     _resetAfterSave = true; _httpWaitingStorage = true; return;
   }
@@ -1221,7 +1222,7 @@ String ArdPortal::infoJson() {
 /** @brief Mirror an MQTT diagnostic without waiting for Serial buffer space.
  * @param text Diagnostic or traffic record. @return No value. */
 static void ardMqttSerialDiagnostic(const String& text){
-  char prefix[40];const int size=snprintf(prefix,sizeof(prefix),"[%lu ms] MQTT ",static_cast<unsigned long>(millis()));
+  char prefix[40];const int size=snprintf(prefix,sizeof(prefix),ARD_LANG_NATIVE_LU_MS_MQTT,static_cast<unsigned long>(millis()));
   if(size<=0||size>=int(sizeof(prefix)))return;
   const int capacity=Serial.availableForWrite();
   if(capacity<0||size_t(capacity)<size_t(size)+text.length()+1)return;
@@ -1260,7 +1261,7 @@ void ArdPortal::consoleLine(bool mqtt, const String& text) {
   size_t incoming=(mqtt?text.length():(text.length()>320?320:text.length()))+64;
   for(size_t i=1;used+incoming>_consoleHistoryBudget&&i<ConsoleCapacity;++i) {auto& old=history[(slot+i)%ConsoleCapacity];used-=old.text.length();old=ConsoleLine();}
   line.id = ++_consoleId; line.mqtt = mqtt;
-  String timestamp = String(millis()) + " ms";
+  String timestamp = String(millis()) + ARD_LANG_NATIVE_MS;
   if (tlsClockReady()) {
     time_t current = time(nullptr); char formatted[32];
     if (utcTimestamp(current, formatted, sizeof(formatted))) timestamp = formatted;

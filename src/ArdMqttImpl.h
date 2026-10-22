@@ -1,3 +1,4 @@
+#include "LanguageLiterals.h"
 #include "DeviceName.h"
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
@@ -125,9 +126,9 @@ void ArdMqtt::closeMqtt(const char* reason) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
     if(reason){
       const uint32_t now=millis();
-      message+=String(F(" ["))+reason+"; state="+(_mqttState==MqttState::Connected?"connected":_mqttState==MqttState::Connecting?"connecting":"retry");
-      message+="; sessionMs="+String(uint32_t(now-_mqttSince))+"; txIdleMs="+String(uint32_t(now-_lastTx));
-      message+="; maxLoopGapMs="+String(_maxServiceGapMs)+"; heap="+String(ArdHeap::sample().free8)+"]";
+      message+=String(F(" ["))+reason+ARD_LANG_NATIVE_STATE+(_mqttState==MqttState::Connected?"connected":_mqttState==MqttState::Connecting?"connecting":"retry");
+      message+=ARD_LANG_NATIVE_SESSIONMS+String(uint32_t(now-_mqttSince))+ARD_LANG_NATIVE_TXIDLEMS+String(uint32_t(now-_lastTx));
+      message+=ARD_LANG_NATIVE_MAXLOOPGAPMS+String(_maxServiceGapMs)+ARD_LANG_NATIVE_HEAP+String(ArdHeap::sample().free8)+"]";
     }
     _portal.logMessage(message);
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
@@ -167,7 +168,7 @@ bool ArdMqtt::processPacket(uint8_t type, const uint8_t* body, size_t length) {
     if (type != 0x20 || length != 2 || body[0] != 0 || body[1] != 0) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
       if(type==0x20 && length==2 && body[1]!=0){
-        String message=String(F("MQTT CONNACK refused; code="))+String(body[1]);_portal.logMessage(message);
+        String message=String(F(ARD_LANG_NATIVE_MQTT_CONNACK_REFUSED_CODE))+String(body[1]);_portal.logMessage(message);
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
         ardMqttSerialDiagnostic(message);
 #endif
@@ -179,7 +180,7 @@ bool ArdMqtt::processPacket(uint8_t type, const uint8_t* body, size_t length) {
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_148));
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
-    String message=String(F("MQTT connected; clientId="))+_clientId+"; connectMs="+String(uint32_t(millis()-_mqttSince));_portal.logMessage(message);
+    String message=String(F(ARD_LANG_NATIVE_MQTT_CONNECTED_CLIENTID))+_clientId+ARD_LANG_NATIVE_CONNECTMS+String(uint32_t(millis()-_mqttSince));_portal.logMessage(message);
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
     ardMqttSerialDiagnostic(message);
 #endif
@@ -233,7 +234,7 @@ _portal._appControls.resetMqtt();
  * @return No value.
  */
 void ArdMqtt::serviceMqtt(uint32_t now) {
-  if(!_autoReconnect){if(connected())closeMqtt("disabled by API");_mqttState=MqttState::Disabled;return;}
+  if(!_autoReconnect){if(connected())closeMqtt(ARD_LANG_NATIVE_DISABLED_BY_API);_mqttState=MqttState::Disabled;return;}
   if(_mqttState==MqttState::Connected){const uint32_t gap=uint32_t(now-_lastServiceMs);if(gap>_maxServiceGapMs)_maxServiceGapMs=gap;}
   _lastServiceMs=now;
   if (_portal._httpConfigUpload) return;
@@ -255,8 +256,8 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
     _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_145));
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES || ARDPORTAL_MQTT_DEBUG_SERIAL
-    String message=String(F("MQTT connecting: "))+_portal._config.host+":"+String(_portal._config.port)+
-      "; clientId="+_clientId+"; TLS="+String(_portal._config.mqttTls ? "yes" : "no");_portal.logMessage(message);
+    String message=String(F(ARD_LANG_NATIVE_MQTT_CONNECTING))+_portal._config.host+":"+String(_portal._config.port)+
+      ARD_LANG_NATIVE_CLIENTID+_clientId+ARD_LANG_NATIVE_TLS+String(_portal._config.mqttTls ? "yes" : "no");_portal.logMessage(message);
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
     ardMqttSerialDiagnostic(message);
 #endif
@@ -265,7 +266,7 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
       _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_151));
 #endif
-      closeMqtt("transport connect failed"); return;
+      closeMqtt(ARD_LANG_NATIVE_TRANSPORT_CONNECT_FAILED); return;
     }
     _mqttState = MqttState::Connecting; _mqttSince = _lastTx = millis();
     String body; appendText(body, "MQTT"); body += char(4);
@@ -284,17 +285,17 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
     if (!queuePacket(0x10, body)) { closeMqtt(); return; }
   }
   if (_mqttState != MqttState::Connecting && _mqttState != MqttState::Connected) return;
-  if (!mqttTransport().connected() && !mqttTransport().available()) { closeMqtt("transport closed"); return; }
+  if (!mqttTransport().connected() && !mqttTransport().available()) { closeMqtt(ARD_LANG_NATIVE_TRANSPORT_CLOSED); return; }
   now = millis();
   if (_txSize) {
     size_t length = _txSize - _txOffset; if (length > 256) length = 256;
     size_t written = writeMqtt(reinterpret_cast<const uint8_t*>(_tx.c_str()) + _txOffset, length); _txOffset += written;
     if (_txOffset == _txSize) { _tx=String();_txSize = _txOffset = 0; _lastTx = millis(); }
-    else if (uint32_t(now - _txSince) >= _portal._options.mqttTimeoutMs) { closeMqtt("send timeout"); return; }
+    else if (uint32_t(now - _txSince) >= _portal._options.mqttTimeoutMs) { closeMqtt(ARD_LANG_NATIVE_SEND_TIMEOUT); return; }
   }
   // Consume at most 256 bytes per loop. Remaining Length can span multiple loops.
   for (size_t budget = 0; budget < 256 && mqttTransport().available(); ++budget) {
-    if (_rxSize >= PacketCapacity) { closeMqtt("receive buffer full"); return; }
+    if (_rxSize >= PacketCapacity) { closeMqtt(ARD_LANG_NATIVE_RECEIVE_BUFFER_FULL); return; }
     int c = mqttTransport().read(); if (c < 0) break;
     if (!_rxSize) _packetSince = millis();
     _rx[_rxSize++] = c;
@@ -304,19 +305,19 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
       remaining += (_rx[i] & 127) * multiplier; multiplier *= 128; header = i + 1;
       if (!(_rx[i] & 128)) { complete = true; break; }
     }
-    if (!complete) { if (_rxSize >= 5) { closeMqtt("invalid packet length"); return; } continue; }
-    if (remaining > PacketCapacity - header) { closeMqtt("packet too large"); return; }
+    if (!complete) { if (_rxSize >= 5) { closeMqtt(ARD_LANG_NATIVE_INVALID_PACKET_LENGTH); return; } continue; }
+    if (remaining > PacketCapacity - header) { closeMqtt(ARD_LANG_NATIVE_PACKET_TOO_LARGE); return; }
     if (_rxSize == header + remaining) {
       bool ok = processPacket(_rx[0], _rx + header, remaining); _rxSize = 0;
-      if (!ok) { closeMqtt("packet rejected"); return; }
+      if (!ok) { closeMqtt(ARD_LANG_NATIVE_PACKET_REJECTED); return; }
     }
   }
   // Consume buffered acknowledgements before judging deadlines after a slow loop.
   now=millis();
-  if(_mqttState==MqttState::Connecting&&uint32_t(now-_mqttSince)>=_portal._options.mqttTimeoutMs){closeMqtt("CONNACK timeout");return;}
-  if(_pingPending&&uint32_t(now-_pingSince)>=_portal._options.mqttTimeoutMs){closeMqtt("PINGRESP timeout");return;}
-  if(_subscriptionPending&&uint32_t(now-_subscriptionSince)>=_portal._options.mqttTimeoutMs){closeMqtt("subscription acknowledgement timeout");return;}
-  if(_rxSize&&uint32_t(now-_packetSince)>=_portal._options.mqttTimeoutMs){closeMqtt("incomplete packet timeout");return;}
+  if(_mqttState==MqttState::Connecting&&uint32_t(now-_mqttSince)>=_portal._options.mqttTimeoutMs){closeMqtt(ARD_LANG_NATIVE_CONNACK_TIMEOUT);return;}
+  if(_pingPending&&uint32_t(now-_pingSince)>=_portal._options.mqttTimeoutMs){closeMqtt(ARD_LANG_NATIVE_PINGRESP_TIMEOUT);return;}
+  if(_subscriptionPending&&uint32_t(now-_subscriptionSince)>=_portal._options.mqttTimeoutMs){closeMqtt(ARD_LANG_NATIVE_SUBSCRIPTION_ACKNOWLEDGEMENT_TIMEOUT);return;}
+  if(_rxSize&&uint32_t(now-_packetSince)>=_portal._options.mqttTimeoutMs){closeMqtt(ARD_LANG_NATIVE_INCOMPLETE_PACKET_TIMEOUT);return;}
   if (connected() && !_pingPending && !_txSize && uint32_t(millis() - _lastTx) >= uint32_t(_portal._options.keepAliveSeconds) * 500) {
     if (queuePacket(0xc0, "")) { _pingPending = true; _pingSince = millis(); }
   }
@@ -478,7 +479,7 @@ bool ArdMqtt::connect(){
 /** @brief Stop MQTT and future retries. @return True when accepted. */
 bool ArdMqtt::disconnect(){
   if(connectionTestBusy()||_portal.otaActive()||_portal._rebootPending)return false;
-  _autoReconnect=false;closeMqtt("disconnected by API");_mqttState=MqttState::Disabled;return true;
+  _autoReconnect=false;closeMqtt(ARD_LANG_NATIVE_DISCONNECTED_BY_API);_mqttState=MqttState::Disabled;return true;
 }
 /** @brief Queue an unsubscribe packet with acknowledgement tracking. @param topic Filter. @return True when queued. */
 bool ArdMqtt::unsubscribe(const char* topic){

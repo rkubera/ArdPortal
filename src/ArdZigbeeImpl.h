@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "LanguageLiterals.h"
 #include "ArdZigbee.h"
 #include "ZigbeeConsolePayload.h"
 #include "ConsoleTimestamp.h"
@@ -29,28 +30,28 @@ ArdZigbee* ArdZigbee::_instance=nullptr;
 void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal){ArdZigbee::signal(signal);}
 /** @brief Allocate queues and start asynchronous native Zigbee initialization. @param options Operation limits. @return True when accepted; false on allocation or partition error. */
 bool ArdZigbee::begin(const Options& options){
-  if(!validOptions(options)){_error="Invalid Zigbee timeout/retry limits";setState(State::Failed);return false;}
+  if(!validOptions(options)){_error=ARD_LANG_NATIVE_INVALID_ZIGBEE_TIMEOUT_RETRY_LIMITS;setState(State::Failed);return false;}
   _options=options;
   if(_begun)return true;
-  if(_instance&&_instance!=this){_error="Only one Zigbee stack is supported";return false;}
+  if(_instance&&_instance!=this){_error=ARD_LANG_NATIVE_ONLY_ONE_ZIGBEE_STACK_IS_SUPPORTED;return false;}
   if(!esp_partition_find_first(ESP_PARTITION_TYPE_DATA,ESP_PARTITION_SUBTYPE_ANY,"zb_storage")||
      !esp_partition_find_first(ESP_PARTITION_TYPE_DATA,ESP_PARTITION_SUBTYPE_ANY,"zb_fct")){
-    _error="Select a Zigbee partition scheme (zb_storage and zb_fct required)";setState(State::Failed);return false;
+    _error=ARD_LANG_NATIVE_SELECT_A_ZIGBEE_PARTITION_SCHEME_ZB_STORAGE_AND_ZB_FCT_R;setState(State::Failed);return false;
   }
   _events=xQueueCreate(16,sizeof(Event));
-  if(!_events){_error="Cannot allocate Zigbee event queue";setState(State::Failed);return false;}
+  if(!_events){_error=ARD_LANG_NATIVE_CANNOT_ALLOCATE_ZIGBEE_EVENT_QUEUE;setState(State::Failed);return false;}
   _traffic=xQueueCreate(16,128);
-  if(!_traffic){vQueueDelete(_events);_events=nullptr;_error="Cannot allocate Zigbee traffic queue";setState(State::Failed);return false;}
+  if(!_traffic){vQueueDelete(_events);_events=nullptr;_error=ARD_LANG_NATIVE_CANNOT_ALLOCATE_ZIGBEE_TRAFFIC_QUEUE;setState(State::Failed);return false;}
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  if(_controlCount){_commands=xQueueCreate(16,sizeof(ArdZigbeeFields::Command));if(!_commands){vQueueDelete(_events);vQueueDelete(_traffic);_events=nullptr;_traffic=nullptr;_error="Cannot allocate Zigbee command queue";setState(State::Failed);return false;}}
+  if(_controlCount){_commands=xQueueCreate(16,sizeof(ArdZigbeeFields::Command));if(!_commands){vQueueDelete(_events);vQueueDelete(_traffic);_events=nullptr;_traffic=nullptr;_error=ARD_LANG_NATIVE_CANNOT_ALLOCATE_ZIGBEE_COMMAND_QUEUE;setState(State::Failed);return false;}}
 #endif
   _instance=this;_begun=true;_operation=Operation::Pair;_since=millis();_retryAt=_since;
   if(xTaskCreate(task,"ArdZigbee",6144,this,5,nullptr)!=pdPASS){
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
     if(_commands){vQueueDelete(_commands);_commands=nullptr;}
 #endif
-_instance=nullptr;_begun=false;vQueueDelete(_events);vQueueDelete(_traffic);_events=nullptr;_traffic=nullptr;_operation=Operation::None;_error="Cannot allocate Zigbee task";setState(State::Failed);return false;}
-  log("Zigbee stack starting; automatic pair/rejoin enabled");return true;
+_instance=nullptr;_begun=false;vQueueDelete(_events);vQueueDelete(_traffic);_events=nullptr;_traffic=nullptr;_operation=Operation::None;_error=ARD_LANG_NATIVE_CANNOT_ALLOCATE_ZIGBEE_TASK;setState(State::Failed);return false;}
+  log(ARD_LANG_NATIVE_ZIGBEE_STACK_STARTING_AUTOMATIC_PAIR_REJOIN_ENABLED);return true;
 }
 /** @brief Initialize the native stack and run its scheduler. @param arg Owning module. @return No value. */
 void ArdZigbee::task(void* arg){
@@ -65,14 +66,14 @@ void ArdZigbee::task(void* arg){
   config.nwk_cfg.zed_cfg.ed_timeout=ESP_ZB_ED_AGING_TIMEOUT_64MIN;config.nwk_cfg.zed_cfg.keep_alive=3000;
 #endif
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  if(!ArdHeap::permits(8192+size_t(self._controlCount)*512,4096)){self.traffic("Insufficient heap8/DMA reserve for native Zigbee endpoints");self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
+  if(!ArdHeap::permits(8192+size_t(self._controlCount)*512,4096)){self.traffic(ARD_LANG_NATIVE_INSUFFICIENT_HEAP8_DMA_RESERVE_FOR_NATIVE_ZIGBEE_ENDPOIN);self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
 #endif
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   // Each reportable attribute can retain both an interval timer and pending
   // reporting work. Keep the SDK's default capacity for network commissioning.
   uint16_t schedulerSlots=80;
   for(auto* entry=self._controls.get();entry;entry=entry->next.get())schedulerSlots+=uint16_t(entry->initialCount)*2;
-  if(esp_zb_scheduler_queue_size_set(schedulerSlots)!=ESP_OK){snprintf(self._startupError,sizeof(self._startupError),"Cannot size Zigbee reporting scheduler");self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
+  if(esp_zb_scheduler_queue_size_set(schedulerSlots)!=ESP_OK){snprintf(self._startupError,sizeof(self._startupError),ARD_LANG_NATIVE_CANNOT_SIZE_ZIGBEE_REPORTING_SCHEDULER);self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
 #endif
 #if !ARDPORTAL_ZIGBEE_ROUTER
   // The SDK ignores RxOnWhenIdle changes after joining. Select the network
@@ -82,11 +83,11 @@ void ArdZigbee::task(void* arg){
   esp_zb_init(&config);
 #if !ARDPORTAL_ZIGBEE_ROUTER
   esp_zb_set_rx_on_when_idle(!self._sleepyProfile);
-  self.traffic(self._sleepyProfile?"Zigbee sleepy end-device profile selected":"Zigbee end-device receiver enabled while idle");
+  self.traffic(self._sleepyProfile?ARD_LANG_NATIVE_ZIGBEE_SLEEPY_END_DEVICE_PROFILE_SELECTED:ARD_LANG_NATIVE_ZIGBEE_END_DEVICE_RECEIVER_ENABLED_WHILE_IDLE);
 #endif
 #if ARDPORTAL_ENABLE_WIFI && CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_SOC_IEEE802154_SUPPORTED
-  if(esp_coex_wifi_i154_enable()!=ESP_OK){snprintf(self._startupError,sizeof(self._startupError),"Could not enable Wi-Fi/Zigbee radio coexistence");self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
-  self.traffic("Wi-Fi/IEEE 802.15.4 radio coexistence enabled");
+  if(esp_coex_wifi_i154_enable()!=ESP_OK){snprintf(self._startupError,sizeof(self._startupError),ARD_LANG_NATIVE_COULD_NOT_ENABLE_WI_FI_ZIGBEE_RADIO_COEXISTENCE);self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
+  self.traffic(ARD_LANG_NATIVE_WI_FI_IEEE_802_15_4_RADIO_COEXISTENCE_ENABLED);
 #endif
   esp_zb_aps_data_indication_handler_register(received);
   esp_zb_configuration_tool_cfg_t epConfig=ESP_ZB_DEFAULT_CONFIGURATION_TOOL_CONFIG();
@@ -104,7 +105,7 @@ void ArdZigbee::task(void* arg){
   if(!endpoints||esp_zb_ep_list_add_ep(endpoints,clusters,endpoint)!=ESP_OK){self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   if(!self.createControls(endpoints)){self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
-  if(!ArdHeap::permits(4096+size_t(self._controlCount)*128,1024)){self.traffic("Insufficient network reserve before Zigbee device registration");self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
+  if(!ArdHeap::permits(4096+size_t(self._controlCount)*128,1024)){self.traffic(ARD_LANG_NATIVE_INSUFFICIENT_NETWORK_RESERVE_BEFORE_ZIGBEE_DEVICE_REGIST);self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
   esp_zb_core_action_handler_register(action);
 #endif
   if(!endpoints||esp_zb_device_register(endpoints)!=ESP_OK){self.event(4,ESP_FAIL);vTaskDelete(nullptr);return;}
@@ -201,7 +202,7 @@ void ArdZigbee::signal(esp_zb_app_signal_t* signal){
   }
 #endif
   _instance->_powerIdleAt.store(0);
-  char message[128];snprintf(message,sizeof(message),"SIGNAL %s status=0x%lx",esp_zb_zdo_signal_to_string(type),(unsigned long)status);_instance->traffic(message);
+  char message[128];snprintf(message,sizeof(message),ARD_LANG_NATIVE_SIGNAL_S_STATUS_0X_LX,esp_zb_zdo_signal_to_string(type),(unsigned long)status);_instance->traffic(message);
   switch(type){
     case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
       if(esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION)!=ESP_OK)_instance->event(4,ESP_FAIL);
@@ -237,7 +238,7 @@ void ArdZigbee::log(const String& text,bool lifecycle){
 void ArdZigbee::logText(const char* text,size_t bytes){
   bytes=std::min(bytes,size_t(220));
   char timestamp[32];const time_t current=time(nullptr);
-  if(current<1704067200||!ArdConsoleTime::utcTimestamp(current,timestamp,sizeof(timestamp)))snprintf(timestamp,sizeof(timestamp),"%lu ms",(unsigned long)millis());
+  if(current<1704067200||!ArdConsoleTime::utcTimestamp(current,timestamp,sizeof(timestamp)))snprintf(timestamp,sizeof(timestamp),ARD_LANG_NATIVE_LU_MS,(unsigned long)millis());
   auto& line=_history[_lineId%HistoryCapacity];
   const size_t timestampBytes=strlen(timestamp);
   if(!line.text.reserve(timestampBytes+bytes+3))return;
@@ -257,20 +258,20 @@ const ArdZigbee::Line* ArdZigbee::nextLine(uint32_t cursor)const{const Line* nex
 /** @brief Complete an accepted operation once. @param ok Success. @param reason Result detail. @param stopped User cancellation flag. @return No value. */
 void ArdZigbee::finish(bool ok,const char* reason,bool stopped){
   String result=reason;auto op=_operation;_operation=Operation::None;_waiting=false;_resetPending=false;_cancelRequested=false;_resetCancelPending=false;_resetWaitingCancel=false;_error=reason;
-  log(ok?(op==Operation::Rejoin?"Zigbee rejoined saved network":op==Operation::FactoryReset?"Zigbee network reset completed":"Zigbee paired and connected"):"Zigbee operation failed: "+_error);setState(ok?(op==Operation::FactoryReset?State::Idle:State::Connected):(stopped?State::Idle:State::Failed));
+  log(ok?(op==Operation::Rejoin?ARD_LANG_NATIVE_ZIGBEE_REJOINED_SAVED_NETWORK:op==Operation::FactoryReset?ARD_LANG_NATIVE_ZIGBEE_NETWORK_RESET_COMPLETED:ARD_LANG_NATIVE_ZIGBEE_PAIRED_AND_CONNECTED):ARD_LANG_NATIVE_ZIGBEE_OPERATION_FAILED+_error);setState(ok?(op==Operation::FactoryReset?State::Idle:State::Connected):(stopped?State::Idle:State::Failed));
   auto cb=_finished;if(op!=Operation::None&&cb)cb(op,ok,result);
 }
 /** @brief Queue an operation and establish its total deadline. @param op Operation. @param options Retry limits. @return True on acceptance. */
 bool ArdZigbee::request(Operation op,const Options& options){
   if(op==Operation::FactoryReset&&busy()){_resetCancelPending=_waiting;_cancelledOperation=_operation;_operation=Operation::None;_waiting=false;}
   if(!_begun||(!_ready&&_state==State::Failed)||busy()||op==Operation::None||!validOptions(options))return false;
-  if(op==Operation::Rejoin&&(!_ready||!_known)){_error="No saved Zigbee network; use Pair";return false;}
-  if(op==Operation::Pair&&_known){_error="Already paired; use Rejoin or Reset pairing";return false;}
+  if(op==Operation::Rejoin&&(!_ready||!_known)){_error=ARD_LANG_NATIVE_NO_SAVED_ZIGBEE_NETWORK_USE_PAIR;return false;}
+  if(op==Operation::Pair&&_known){_error=ARD_LANG_NATIVE_ALREADY_PAIRED_USE_REJOIN_OR_RESET_PAIRING;return false;}
   _reconnectPending=false;
   _autoConnect=op!=Operation::FactoryReset;
   _options=options;_operation=op;_since=millis();_retryAt=_since;_attempts=0;_waiting=false;_cancelRequested=false;_resetPending=op==Operation::ResetPairing||op==Operation::FactoryReset;_error="";
   setState(_resetPending?State::Resetting:op==Operation::Rejoin?State::Rejoining:State::Pairing);
-  log(op==Operation::Pair?"Pairing requested; enable joining on coordinator":op==Operation::Rejoin?"Rejoin requested; preserving Zigbee identity":"Reset pairing requested; Wi-Fi and AppConfig are preserved");return true;
+  log(op==Operation::Pair?ARD_LANG_NATIVE_PAIRING_REQUESTED_ENABLE_JOINING_ON_COORDINATOR:op==Operation::Rejoin?ARD_LANG_NATIVE_REJOIN_REQUESTED_PRESERVING_ZIGBEE_IDENTITY:ARD_LANG_NATIVE_RESET_PAIRING_REQUESTED_WI_FI_AND_APPCONFIG_ARE_PRESERVE);return true;
 }
 /** @brief Drain native results and advance bounded retry work. @param now Milliseconds. @return No value. */
 void ArdZigbee::loop(uint32_t now){
@@ -279,46 +280,46 @@ void ArdZigbee::loop(uint32_t now){
   // The SDK task can refresh activity after `now` was sampled by the caller.
   // A slightly newer activity tick is not an elapsed timeout, including wrap.
   if(_otaActive&&int32_t(now-_otaLastActivity.load())>=60000&&esp_zb_lock_acquire(0)){
-    if(_otaHandle){esp_ota_abort(_otaHandle);_otaHandle=0;}_otaActive=false;esp_zb_lock_release();log("Zigbee OTA timed out; current firmware retained");
+    if(_otaHandle){esp_ota_abort(_otaHandle);_otaHandle=0;}_otaActive=false;esp_zb_lock_release();log(ARD_LANG_NATIVE_ZIGBEE_OTA_TIMED_OUT_CURRENT_FIRMWARE_RETAINED);
   }
 #endif
-  if(_cancelledOperation!=Operation::None){auto op=_cancelledOperation;_cancelledOperation=Operation::None;auto cb=_finished;if(cb)cb(op,false,String(F("Cancelled by factory reset")));}
+  if(_cancelledOperation!=Operation::None){auto op=_cancelledOperation;_cancelledOperation=Operation::None;auto cb=_finished;if(cb)cb(op,false,String(F(ARD_LANG_NATIVE_CANCELLED_BY_FACTORY_RESET)));}
   Event e;for(unsigned budget=0;budget<8&&xQueueReceive(_events,&e,0)==pdTRUE;++budget){
 
     if(e.type==2&&_resetWaitingCancel){_resetWaitingCancel=false;_retryAt=now;}
-    if(e.type==4){_ready=false;finish(false,_startupError[0]?_startupError:"Stack initialization failed");continue;}
+    if(e.type==4){_ready=false;finish(false,_startupError[0]?_startupError:ARD_LANG_NATIVE_STACK_INITIALIZATION_FAILED);continue;}
     if(e.type==1){_ready=true;_known=!e.factoryNew;if(!_bootPairHandled){_bootPairHandled=true;if(_known&&_operation==Operation::Pair)_operation=Operation::Rejoin;}if(!_known&&!busy())setState(State::Idle);if(_state==State::Starting&&busy())setState(_operation==Operation::Rejoin?State::Rejoining:State::Pairing);}
-    if(e.type==6){setState(State::Failed);log("Zigbee link lost");}
-    if((e.type==1||e.type==2)&&e.status==ESP_OK&&!e.factoryNew){_known=true;_channel=e.channel;_pan=e.pan;if(busy()&&!_resetPending)finish(true,"");else if(!busy()){const bool restored=_state!=State::Connected;setState(State::Connected);if(restored)log("Zigbee connected to saved network");}}
+    if(e.type==6){setState(State::Failed);log(ARD_LANG_NATIVE_ZIGBEE_LINK_LOST);}
+    if((e.type==1||e.type==2)&&e.status==ESP_OK&&!e.factoryNew){_known=true;_channel=e.channel;_pan=e.pan;if(busy()&&!_resetPending)finish(true,"");else if(!busy()){const bool restored=_state!=State::Connected;setState(State::Connected);if(restored)log(ARD_LANG_NATIVE_ZIGBEE_CONNECTED_TO_SAVED_NETWORK);}}
     else if((e.type==1||e.type==2)&&e.status!=ESP_OK){_ready=true;_waiting=false;_retryAt=now+_options.retryMs;if(!busy())setState(State::Failed);}
     if(e.type==3&&e.status==ESP_OK){_known=!e.factoryNew;_channel=0;_pan=0;_waiting=false;if(_resetPending&&e.factoryNew){_resetPending=false;if(_operation==Operation::FactoryReset)finish(true,"");else {_retryAt=now;setState(State::Pairing);}}else if(!busy())setState(State::Idle);}
   }
   char message[128];for(unsigned budget=0;budget<4&&xQueueReceive(_traffic,message,0)==pdTRUE;++budget)logText(message,strlen(message));
   if(!busy()&&_reconnectPending&&_ready&&_autoConnect&&int32_t(now-_reconnectAt)>=0){
-    log(_known?"Automatic rejoin; preserving saved Zigbee network":"Automatic pairing retry; enable joining on coordinator");
+    log(_known?ARD_LANG_NATIVE_AUTOMATIC_REJOIN_PRESERVING_SAVED_ZIGBEE_NETWORK:ARD_LANG_NATIVE_AUTOMATIC_PAIRING_RETRY_ENABLE_JOINING_ON_COORDINATOR);
     request(_known?Operation::Rejoin:Operation::Pair,_options);
   }
   serviceTime(now);
   if(!busy())return;
-  if(_cancelRequested&&_ready){if(!esp_zb_lock_acquire(0))return;auto result=esp_zb_bdb_cancel_steering();esp_zb_lock_release();if(result!=ESP_OK){finish(false,"Could not stop pairing");return;}finish(false,"Pairing stopped",true);return;}
-  if(int32_t(now-_since)>=int32_t(_options.timeoutMs)){if(_ready&&esp_zb_lock_acquire(0)){esp_zb_bdb_cancel_steering();esp_zb_lock_release();}finish(false,"Operation timed out");return;}
+  if(_cancelRequested&&_ready){if(!esp_zb_lock_acquire(0))return;auto result=esp_zb_bdb_cancel_steering();esp_zb_lock_release();if(result!=ESP_OK){finish(false,ARD_LANG_NATIVE_COULD_NOT_STOP_PAIRING);return;}finish(false,ARD_LANG_NATIVE_PAIRING_STOPPED,true);return;}
+  if(int32_t(now-_since)>=int32_t(_options.timeoutMs)){if(_ready&&esp_zb_lock_acquire(0)){esp_zb_bdb_cancel_steering();esp_zb_lock_release();}finish(false,ARD_LANG_NATIVE_OPERATION_TIMED_OUT);return;}
   if(!_ready)return;
   if(_resetCancelPending){
     if(!esp_zb_lock_acquire(0))return;
     auto result=_known?ESP_FAIL:esp_zb_bdb_cancel_steering();esp_zb_lock_release();_resetCancelPending=false;
-    if(result==ESP_OK){_resetWaitingCancel=true;log("Cancelling active steering before factory reset");return;}
+    if(result==ESP_OK){_resetWaitingCancel=true;log(ARD_LANG_NATIVE_CANCELLING_ACTIVE_STEERING_BEFORE_FACTORY_RESET);return;}
   }
   if(_resetWaitingCancel)return;
-  if(_waiting){if(int32_t(now-_attemptSince)<int32_t(_options.attemptTimeoutMs))return;if(!esp_zb_lock_acquire(0))return;esp_zb_bdb_cancel_steering();esp_zb_lock_release();_waiting=false;_retryAt=now+_options.retryMs;log("Attempt timed out; retry scheduled");return;}
+  if(_waiting){if(int32_t(now-_attemptSince)<int32_t(_options.attemptTimeoutMs))return;if(!esp_zb_lock_acquire(0))return;esp_zb_bdb_cancel_steering();esp_zb_lock_release();_waiting=false;_retryAt=now+_options.retryMs;log(ARD_LANG_NATIVE_ATTEMPT_TIMED_OUT_RETRY_SCHEDULED);return;}
   if(int32_t(now-_retryAt)<0)return;
-  if(_attempts>=_options.maxAttempts){finish(false,"Retry limit reached");return;}
+  if(_attempts>=_options.maxAttempts){finish(false,ARD_LANG_NATIVE_RETRY_LIMIT_REACHED);return;}
   if(!esp_zb_lock_acquire(0))return;
   if(_resetPending&&_known){esp_zb_bdb_reset_via_local_action();_waiting=true;_attemptSince=now;esp_zb_lock_release();return;}
   _resetPending=false;
   if(_operation==Operation::FactoryReset){esp_zb_lock_release();finish(true,"");return;}
   auto result=esp_zb_bdb_start_top_level_commissioning(_operation==Operation::Rejoin?ESP_ZB_BDB_MODE_INITIALIZATION:ESP_ZB_BDB_MODE_NETWORK_STEERING);
   esp_zb_lock_release();++_attempts;_attemptSince=now;_waiting=result==ESP_OK;_retryAt=now+_options.retryMs;
-  log("TX commissioning attempt "+String(_attempts)+(result==ESP_OK?" started":" could not start"));
+  log(ARD_LANG_NATIVE_TX_COMMISSIONING_ATTEMPT+String(_attempts)+(result==ESP_OK?ARD_LANG_NATIVE_STARTED:ARD_LANG_NATIVE_COULD_NOT_START));
 }
 
 /** @brief Queue stack diagnostics without dynamic allocation. @param text Formatted message. @return No value. */
@@ -331,13 +332,13 @@ void ArdZigbee::traffic(const char* text){
 bool ArdZigbee::received(esp_zb_apsde_data_ind_t frame){
   if(_instance){
     _instance->_powerIdleAt.store(0);
-    char metadata[128];snprintf(metadata,sizeof(metadata),"RX payload={\"src\":%u,\"fromEp\":%u,\"ep\":%u,\"profile\":%u,\"cluster\":%u,\"LQI\":%d,\"status\":%u}",unsigned(frame.src_short_addr),unsigned(frame.src_endpoint),unsigned(frame.dst_endpoint),unsigned(frame.profile_id),unsigned(frame.cluster_id),frame.lqi,unsigned(frame.status));_instance->traffic(metadata);
-    if(frame.profile_id!=0x104){_instance->traffic("RX payload={\"decoded\":false,\"reason\":\"unsupported_profile\"}");return false;}
+    char metadata[128];snprintf(metadata,sizeof(metadata),ARD_LANG_NATIVE_RX_FRAME,unsigned(frame.src_short_addr),unsigned(frame.src_endpoint),unsigned(frame.dst_endpoint),unsigned(frame.profile_id),unsigned(frame.cluster_id),frame.lqi,unsigned(frame.status));_instance->traffic(metadata);
+    if(frame.profile_id!=0x104){_instance->traffic(ARD_LANG_NATIVE_RX_UNSUPPORTED_PROFILE);return false;}
     if(frame.cluster_id==0x000a&&frame.src_short_addr==0&&frame.src_endpoint==1&&frame.dst_endpoint==1&&frame.status==0){
       uint32_t utc;uint16_t sequence=_instance->_timeSequence.load();
       if(sequence<256&&ArdZigbeeTime::decode(static_cast<const uint8_t*>(frame.asdu),frame.asdu_length,uint8_t(sequence),utc))_instance->_timeReceived.store(utc);
     }
-    ArdZigbeeConsole::decode(static_cast<const uint8_t*>(frame.asdu),frame.asdu_length,frame.cluster_id,[&](const char* payload,uint8_t sequence){char message[128];snprintf(message,sizeof(message),"RX ep=%u seq=%u payload=%s",unsigned(frame.dst_endpoint),sequence,payload);_instance->traffic(message);});
+    ArdZigbeeConsole::decode(static_cast<const uint8_t*>(frame.asdu),frame.asdu_length,frame.cluster_id,[&](const char* payload,uint8_t sequence){char message[128];snprintf(message,sizeof(message),ARD_LANG_NATIVE_RX_EP_U_SEQ_U_PAYLOAD_S,unsigned(frame.dst_endpoint),sequence,payload);_instance->traffic(message);});
   }
   return false;
 }
@@ -358,13 +359,13 @@ void ArdZigbee::serviceTime(uint32_t now){
   uint32_t utc=_timeReceived.exchange(0);
   if(utc){
     _timeSequence=256;timeval clock={};clock.tv_sec=utc;
-    if(settimeofday(&clock,nullptr)==0){log("Zigbee time synchronized from coordinator");_timeProbeAt=now+21600000UL;}
-    else{log("Zigbee time: could not set system clock");_timeProbeAt=now+300000UL;}
+    if(settimeofday(&clock,nullptr)==0){log(ARD_LANG_NATIVE_ZIGBEE_TIME_SYNCHRONIZED_FROM_COORDINATOR);_timeProbeAt=now+21600000UL;}
+    else{log(ARD_LANG_NATIVE_ZIGBEE_TIME_COULD_NOT_SET_SYSTEM_CLOCK);_timeProbeAt=now+300000UL;}
   }
   if(_timeSequence.load()<256){
     if(int32_t(now-_timeProbeAt)<0)return;
     _timeSequence=256;_timeProbeAt=now+3600000UL;
-    log("Zigbee time: coordinator did not provide a valid Time response; synchronization deferred");return;
+    log(ARD_LANG_NATIVE_ZIGBEE_TIME_COORDINATOR_DID_NOT_PROVIDE_A_VALID_TIME_RES);return;
   }
   if(int32_t(now-_timeProbeAt)<0||!esp_zb_lock_acquire(0))return;
   uint16_t attributes[]={0,1};esp_zb_zcl_read_attr_cmd_t request={};
@@ -372,5 +373,5 @@ void ArdZigbee::serviceTime(uint32_t now){
   request.zcl_basic_cmd.dst_addr_u.addr_short=0;request.zcl_basic_cmd.dst_endpoint=1;request.zcl_basic_cmd.src_endpoint=1;
   request.clusterID=0x000a;request.attr_number=2;request.attr_field=attributes;
   _timeSequence=esp_zb_zcl_read_attr_cmd_req(&request);esp_zb_lock_release();
-  _timeProbeAt=now+10000UL;log("Zigbee time: probing coordinator Time cluster");
+  _timeProbeAt=now+10000UL;log(ARD_LANG_NATIVE_ZIGBEE_TIME_PROBING_COORDINATOR_TIME_CLUSTER);
 }

@@ -177,7 +177,7 @@ def generate(root):
         lines += emit_chunks('PORTAL_HTML_GZIP',segments(minimal),gzip_array)
         lines += ['#endif']
         lines += emit_profile_chunks('PORTAL_JS_GZIP', script, gzip_array)
-    lines += ['#else', '#error Invalid ArdPortal UI feature combination', '#endif']
+    lines += ['#else', 'ARD_LANG_COMPILE_ERROR(ARD_LANG_NATIVE_INVALID_UI_FEATURE_COMBINATION)', '#endif']
     return '\n'.join(lines) + '\n'
 
 
