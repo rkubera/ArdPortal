@@ -543,20 +543,20 @@ public:
   bool addEntity(const V& page) {
     error={};
     if(page.type()!=T::Object)return fail("page","",ARD_LANG_NATIVE_PAGE_MUST_BE_AN_OBJECT);
-    if(!identifier(page["id"].asString()))return fail("page","",ARD_LANG_NATIVE_INVALID_PAGE_ID);
-    if(!title(page))return fail("page","",ARD_LANG_NATIVE_INVALID_PAGE_NAME_NAMES_1_80_BYTES);
+    if(!identifier(page["id"].asString()))return fail("page","",ARD_LANG_NATIVE_INVALID_ID_USE_1_48_ASCII_LETTERS_DIGITS_OR);
+    if(!title(page))return fail("page","",ARD_LANG_NATIVE_INVALID_NAME_NAMES_1_80_BYTES);
     if(!page["order"].isInteger())return fail("page","",ARD_LANG_NATIVE_ORDER_MUST_BE_AN_INTEGER);
     if(page["fields"].type()!=T::Array||!page["fields"].length())return fail("page","",ARD_LANG_NATIVE_FIELDS_MUST_BE_A_NONEMPTY_ARRAY);
     if(count()+page["fields"].length()>ArdAppConfigMaxFields)return fail("limits","",ARD_LANG_NATIVE_FIELD_LIMIT_1024);
     const V& fields=page["fields"];
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-    if(page.hasOwnProperty("visibleWhen")&&!validCondition(page["visibleWhen"],fields))return fail("page","",ARD_LANG_NATIVE_INVALID_PAGE_VISIBLEWHEN_CONDITION);
+    if(page.hasOwnProperty("visibleWhen")&&!validCondition(page["visibleWhen"],fields))return fail("page","",ARD_LANG_NATIVE_INVALID_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD);
 #else
     if(page.hasOwnProperty("visibleWhen"))return fail("page","",ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED);
 #endif
     for(size_t i=0;i<fields.length();++i) {
       if(!validateField(fields[i],fields))return false;
-      for(size_t j=0;j<i;++j)if(fields[j]["id"].asString()==fields[i]["id"].asString())return fail("field",fields[i]["id"].asString(),ARD_LANG_NATIVE_DUPLICATE_FIELD_ID_IN_PAGE);
+      for(size_t j=0;j<i;++j)if(fields[j]["id"].asString()==fields[i]["id"].asString())return fail("field",fields[i]["id"].asString(),ARD_LANG_NATIVE_DUPLICATE_FIELD_ID);
     }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     for(size_t i=0;i<fields.length();++i) {

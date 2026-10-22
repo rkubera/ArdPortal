@@ -132,8 +132,8 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
       if(scanning){
         const V& header=work.header;
         if(!work.scanner.fieldsSeen||!work.scanner.fieldCount){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_FIELDS_MUST_BE_A_NONEMPTY_ARRAY));return;}
-        if(!ArdDynamicPages::identifier(header["id"].asString())){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_PAGE_ID));return;}
-        if(!ArdDynamicPages::title(header)){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_PAGE_NAME_NAMES_1_80_BYTES));return;}
+        if(!ArdDynamicPages::identifier(header["id"].asString())){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_ID_USE_1_48_ASCII_LETTERS_DIGITS_OR));return;}
+        if(!ArdDynamicPages::title(header)){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_NAME_NAMES_1_80_BYTES));return;}
         if(!header["order"].isInteger()){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_ORDER_MUST_BE_AN_INTEGER));return;}
         for(size_t i=0;i<_dynamic.pages.length();++i)if(_dynamic.pages.id(i)==header["id"].asString()){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_DUPLICATE_PAGE_ID));return;}
         _appConfigPageRegistrationTotal=work.scanner.fieldCount;
@@ -181,10 +181,10 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
       V resolved=value;if(!ArdHa::normalize(resolved,false,&reason)){failed("normalize",id,reason);return;}
       if(!value.hasOwnProperty("extended"))++work.nodes;
       value["extended"]=true;if(!value.hasOwnProperty("persist")){++work.nodes;value["persist"]=resolved["persist"];}
-      if(work.nodes>4096){failAppConfigPageRegistration("serialize",id,F(ARD_LANG_NATIVE_NORMALIZED_PAGE_NODE_LIMIT_4096));return;}
+      if(work.nodes>4096){failAppConfigPageRegistration("serialize",id,F(ARD_LANG_NATIVE_NODE_LIMIT_4096));return;}
     }
     if(!_dynamic.validateField(value,V::array(),false)){failed(_dynamic.error.stage,_dynamic.error.fieldId,_dynamic.error.reason);return;}
-    for(size_t i=0;i<index;++i)if(id==work.idAt(i)){failAppConfigPageRegistration("field",id,F(ARD_LANG_NATIVE_DUPLICATE_FIELD_ID_IN_PAGE));return;}
+    for(size_t i=0;i<index;++i)if(id==work.idAt(i)){failAppConfigPageRegistration("field",id,F(ARD_LANG_NATIVE_DUPLICATE_FIELD_ID));return;}
 #if ARDPORTAL_ENABLE_HA
     String discoveryError;String payload=_homeAssistant.discoveryConfig(value,&discoveryError);
     if(!payload.length()||payload.length()+400>ArdMqtt::PacketCapacity-5){failed("discovery",id,!payload.length()?discoveryError:String(F(ARD_LANG_NATIVE_DISCOVERY_PAYLOAD_EXCEEDS_MQTT_PACKET_CAPACITY_PAYLOAD))+String(payload.length())+ARD_LANG_NATIVE_RESERVE_400_CAPACITY+String(ArdMqtt::PacketCapacity-5));return;}
@@ -267,7 +267,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     const size_t count=work.first+work.entry->count;
     if(!work.cycleStack) {
       if(!conditionValid(static_cast<const V&>(work.header)["visibleWhen"])){
-        failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_PAGE_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD));return;
+        failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD));return;
       }
       work.checksMask=work.dependencyMask;
       if(work.checksMask) {
@@ -301,7 +301,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
   }
 #endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-  if(!conditionValid(static_cast<const V&>(work.header)["visibleWhen"])){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_PAGE_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD));return;}
+  if(!conditionValid(static_cast<const V&>(work.header)["visibleWhen"])){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_INVALID_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD));return;}
 #else
   if(work.header.hasOwnProperty("visibleWhen")){failAppConfigPageRegistration("page","",F(ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED));return;}
 #endif

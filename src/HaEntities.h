@@ -284,7 +284,7 @@ inline bool normalize(V& field,bool stateOnly=false,String* error=nullptr) {
     if(!c["command"].isUndefined()&&!string(c["command"],24)) return fail(ARD_LANG_NATIVE_INVALID_COMMAND_AT_CONTROLS+String(i)+ARD_LANG_NATIVE_MAXIMUM_24_BYTES);
     if(t=="slider"&&(!c["min"].isValid()||c["min"].asDouble()>=c["max"].asDouble()||c["step"].asDouble()<=0)) return fail(ARD_LANG_NATIVE_INVALID_SLIDER_MIN_MAX_STEP_AT_CONTROLS+String(i)+"]");
   }
-  return validValue(field,field["default"]) || fail(ARD_LANG_NATIVE_INVALID_DESCRIPTOR_DEFAULT_VALUE);
+  return validValue(field,field["default"]) || fail(ARD_LANG_NATIVE_INVALID_DEFAULT_VALUE_FOR_CONTROL);
 }
 #else
 /**
