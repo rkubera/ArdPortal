@@ -48,10 +48,15 @@ String ArdMqtt::mqttTopic(const char* kind, const char* command) const {
 bool ArdMqtt::validMqttTopic(const String& topic, bool subscription) const {
   int first = topic.indexOf('/'), second = topic.indexOf('/', first + 1);
   if (first < 0 || second < 0 || topic.indexOf('/', second + 1) >= 0) return false;
-  String kind = topic.substring(0, first), command = topic.substring(second + 1);
-  if ((!ardFlashEqual(kind,F("cmnd")) && !ardFlashEqual(kind,F("get")) && !ardFlashEqual(kind,F("stat"))) || topic.substring(first + 1, second) != ArdDeviceName::mqtt(_portal._config.deviceName) || !command.length()) return false;
-  if (subscription && (ardFlashEqual(command,F("+")) || ardFlashEqual(command,F("#")))) return true;
-  for (size_t i = 0; i < command.length(); ++i) if (uint8_t(command[i]) < 32 || command[i] == '#' || command[i] == '+') return false;
+  // Validate the slices in place: no prefix/command/device substrings and no
+  // normalized copy of the configured name are needed.
+  if(strncmp_P(topic.c_str(),PSTR("cmnd/"),5)&&strncmp_P(topic.c_str(),PSTR("get/"),4)&&strncmp_P(topic.c_str(),PSTR("stat/"),5))return false;
+  const String& name=_portal._config.deviceName;
+  if(size_t(second-first-1)!=name.length()||size_t(second+1)==topic.length())return false;
+  for(size_t i=0;i<name.length();++i)if(topic[first+1+i]!=(name[i]==' '?'-':name[i]))return false;
+  const size_t command=second+1;
+  if(subscription&&command+1==topic.length()&&(topic[command]=='+'||topic[command]=='#'))return true;
+  for(size_t i=command;i<topic.length();++i)if(uint8_t(topic[i])<32||topic[i]=='#'||topic[i]=='+')return false;
   return true;
 }
 
