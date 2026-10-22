@@ -5,6 +5,7 @@
 #include "ArdHomeAssistant.h"
 #include "ArdPortalDeclarations.h"
 #include "Language.h"
+#include "MqttFieldTopics.h"
 using V = ArdJSON::JSONVar;
 namespace {
 /**
@@ -141,7 +142,7 @@ String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) cons
     source=&resolved;
   }
   const V& f=*source;
-  String id=f["id"].asString(),type=f["type"].asString(),state=_portal._mqttClient.mqttTopic("stat",id.c_str()),command=_portal._mqttClient.mqttTopic("cmnd",id.c_str());
+  String id=f["id"].asString(),type=f["type"].asString(),state=ArdMqttFieldTopics::stateTopic(f,_portal._mqttClient.mqttTopic("stat",id.c_str())),command=_portal._mqttClient.mqttTopic("cmnd",id.c_str());
   V c=V::object(); c["unique_id"]="ardui_"+_portal.chipId()+"_"+id;
   c["name"]=discoveryLabel(f);
   if(f.hasOwnProperty("icon")) c["icon"]=f["icon"];
@@ -200,6 +201,7 @@ String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) cons
   for(size_t i=0;i<keys.length();++i) {
     String key=keys[i].asString(); if(key=="unique_id"||key=="device"||key=="name"||key=="availability_topic") continue;
     V value=extra[key]; if(value.type()==V::Type::String) {String token=value.asString(); if(token=="$state") value=state;else if(token=="$command") value=command;else if(token.indexOf("$command:")==0) value=command+"_"+token.substring(9);}
+    if(key==ArdMqttFieldTopics::discoveryStateKey(f)) value=state;
     c[key]=value;
   }
   String component=ArdHa::component(f);

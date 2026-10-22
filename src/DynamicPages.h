@@ -512,6 +512,8 @@ public:
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
       if(type=="text"&&ArdText::pattern(f).type==ArdText::Type::Invalid)return fail("field",id,"unsupported textType");
 #endif
+      if(f.hasOwnProperty("mqtt")&&f["mqtt"].type()!=T::Object) return fail("field",id,"mqtt must be an object");
+      if(f["mqtt"].hasOwnProperty("state_topic")&&f["mqtt"]["state_topic"].type()!=T::String) return fail("field",id,"mqtt.state_topic must be a string");
       if(f.hasOwnProperty("ha")&&f["ha"].type()!=T::Object) return fail("field",id,"ha must be an object");
       if(f.hasOwnProperty("icon")) { String icon=f["icon"].asString(); if(icon.indexOf("mdi:")!=0 || icon.length()>80 || icon.length()<5) return fail("field",id,"invalid icon: expected mdi: name, 5..80 bytes"); }
 #if (ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_CLIMATE)

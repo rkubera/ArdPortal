@@ -61,6 +61,10 @@ int main(){
    auto value=ArdDynamicPages::initial(f);assert(value["temperature_low"].asDouble()==10&&value["temperature_high"].asDouble()==35);
    value["mode"]="heat_cool";value["temperature_low"]=20;value["temperature_high"]=25;assert(ArdDynamicPages::validValue(f,value));
    auto discovery=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));assert(discovery["temperature_low_command_topic"].asString().indexOf("room_temperature_low")>=0);assert(discovery["temperature_high_state_template"].asString()=="{{ value_json.temperature_high }}");
+   f["mqtt"]["state_topic"]="custom/climate";
+   discovery=ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(f));
+   assert(discovery["temperature_low_state_topic"].asString()=="custom/climate");
+   assert(discovery["mode_state_topic"].asString()=="custom/climate");
    value["temperature_low"]=26;assert(!ArdDynamicPages::validValue(f,value));value["temperature_low"]=20.25;assert(!ArdDynamicPages::validValue(f,value));value.remove("temperature_low");assert(!ArdDynamicPages::validValue(f,value));value["mode"]="cool";assert(ArdDynamicPages::validValue(f,value));
   }
 
@@ -75,6 +79,16 @@ int main(){
     auto field=ArdJSON::JSON.parse(R"({"id":"toggle","name":"Toggle","type":"switch","default":false})");
     auto config=ArdJSON::JSON.parse(discovery._homeAssistant.discoveryConfig(field));
     assert(config.isValid()&&!config.hasOwnProperty("optimistic"));
+    field["mqtt"]["state_topic"]="custom/mqtt/toggle";
+    field["ha"]["state_topic"]="legacy/toggle";
+    config=ArdJSON::JSON.parse(discovery._homeAssistant.discoveryConfig(field));
+    assert(config["state_topic"].asString()=="custom/mqtt/toggle");
+    field["mqtt"]["state_topic"]="";
+    config=ArdJSON::JSON.parse(discovery._homeAssistant.discoveryConfig(field));
+    assert(config["state_topic"].asString()==discovery._mqttClient.mqttTopic("stat","toggle"));
+    field.remove("mqtt");
+    config=ArdJSON::JSON.parse(discovery._homeAssistant.discoveryConfig(field));
+    assert(config["state_topic"].asString()=="legacy/toggle");
     field["ha"]["optimistic"]=true;
     config=ArdJSON::JSON.parse(discovery._homeAssistant.discoveryConfig(field));
     assert(config["optimistic"].asBool());

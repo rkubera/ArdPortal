@@ -3,12 +3,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 test_dir="$(mktemp -d "${TMPDIR:-/tmp}/ardportal-config-tests.XXXXXX")"
 trap 'rm -rf "$test_dir"' EXIT
-for test_name in json-patch journal-selection stream dynamic-patch no-dynamic no-www no-www-wifi messages-only; do
+for test_name in json-patch journal-selection stream dynamic-patch mqtt-state-topic mqtt-state-topic-no-ha no-dynamic no-www no-www-wifi messages-only; do
   source_name="$test_name"
   if [[ "$test_name" == no-www || "$test_name" == no-www-wifi || "$test_name" == messages-only ]]; then source_name=no-dynamic; fi
+  if [[ "$test_name" == mqtt-state-topic-no-ha ]]; then source_name=mqtt-state-topic; fi
   source_files=("tests/memory-host/$source_name.cpp")
   flags=(-Itests/memory-host -Isrc)
   if [[ "$test_name" == journal-selection ]]; then flags+=(-DARDPORTAL_TEST_ALLOCATE=testAllocate); fi
+  if [[ "$test_name" == mqtt-state-topic-no-ha ]]; then flags+=(-DARDPORTAL_ENABLE_HA=0); fi
   if [[ "$test_name" == no-www ]]; then flags+=(-DARDPORTAL_ENABLE_WIFI=0 -DARDPORTAL_ENABLE_WWW=0); fi
   if [[ "$test_name" == no-www-wifi ]]; then flags+=(-DARDPORTAL_ENABLE_WWW=0); fi
   if [[ "$test_name" == messages-only ]]; then flags+=(-DARDPORTAL_ENABLE_CONSOLE_MESSAGES=1); fi

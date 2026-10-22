@@ -158,6 +158,20 @@ JSON. `queueAppConfigStatePublish()` publishes one of these current values; use
 
 ## Registered field topics
 
+Use `mqtt.state_topic` to override a field's publication topic, with or without HA:
+
+```json
+{"id":"pump","name":"Pump","type":"switch","mqtt":{"state_topic":"stat/$device/pump_state"}}
+```
+
+The same topic is used for state updates, state reports after actions and event
+emissions, and is advertised by HA discovery when enabled. `mqtt.state_topic`
+takes precedence over legacy `ha.state_topic` (or `ha.topic` for tags/triggers
+and `ha.activity_state_topic` for lawn mowers). Missing, empty or `$state`
+values select the default ID-based topic; an explicitly empty MQTT setting also
+overrides a legacy HA setting. Command and acknowledgement topics remain unchanged.
+
+
 With at least one registered field, ArdPortal subscribes to `cmnd/<device>/+`,
 `get/<device>/+` and `homeassistant/status`. Retained commands are ignored;
 publish commands without retain. `get/<device>/<id>` queues fresh current state.
@@ -246,14 +260,14 @@ hardware confirmation must be reported explicitly.
 
 | Placeholder | Expanded value |
 | --- | --- |
-| `$state` | `stat/<device>/<fieldId>` |
+| `$state` | Selected MQTT state topic in HA discovery; default `stat/<device>/<fieldId>` |
 | `$command` | `cmnd/<device>/<fieldId>` |
 | `$command:<suffix>` | `cmnd/<device>/<fieldId>_<suffix>` |
-| `$device` | Current normalized MQTT device name, in `ha.topic` or properties ending `_topic` |
+| `$device` | Current normalized MQTT device name, in direct `mqtt` and `ha` topic properties |
 
 Expansion happens when reading a field, so immutable PROGMEM sources stay in
 flash. Payloads, names and Jinja templates are not modified by `$device`.
-Placeholders apply to direct string-valued Discovery properties, not arbitrary
+`$device` applies to direct string-valued MQTT/HA topic properties; HA discovery also resolves `$state` and `$command`. These do not apply to arbitrary
 nested JSON objects. IDs remain stable across changes of device name.
 
 ![MQTT Console example](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/Demo7.png)
