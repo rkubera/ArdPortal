@@ -141,7 +141,7 @@ String ArdHomeAssistant::discoveryConfig(const V& definition,String* error) cons
     source=&resolved;
   }
   const V& f=*source;
-  String id=f["id"].asString(),type=f["type"].asString(),state=_portal._mqttClient.mqttTopic("stat",id.c_str()),command=_portal._mqttClient.mqttTopic("cmnd",id.c_str());
+  String id=f["id"].asString(),type=f["type"].asString(),state=ArdHa::stateTopic(f,_portal._mqttClient.mqttTopic("stat",id.c_str())),command=_portal._mqttClient.mqttTopic("cmnd",id.c_str());
   V c=V::object(); c["unique_id"]="ardui_"+_portal.chipId()+"_"+id;
   c["name"]=discoveryLabel(f);
   if(f.hasOwnProperty("icon")) c["icon"]=f["icon"];

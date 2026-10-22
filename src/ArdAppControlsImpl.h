@@ -266,7 +266,7 @@ bool ArdAppControls::emitAppConfigEvent(const char* key,const V& value) {
   const V& f=_portal._dynamic.field(key);if((f["type"].asString()!="event"&&f["type"].asString()!="device_trigger"&&f["type"].asString()!="tag")||!ArdDynamicPages::validValue(f,value)) return false;
 #if ARDPORTAL_ENABLE_MQTT
   String payload=value.type()==V::Type::String?value.asString():_portal._json.stringify(value,false,nullptr,snapshotLimits());
-  if(!queueAppEmission(_portal._mqttClient.mqttTopic("stat",key),payload)) return false;
+  if(!queueAppEmission(ArdHa::stateTopic(f,_portal._mqttClient.mqttTopic("stat",key)),payload)) return false;
 #endif
   _appState[key]=value;++_portal._appRevision;
 #if ARDPORTAL_ENABLE_HA && ARDPORTAL_ENABLE_DEPENDENCIES
@@ -305,7 +305,7 @@ bool ArdAppControls::appControl(const V& definition,size_t index,const V& value,
     if(_portal.mqttConnected()) {
       V ack=V::object();ack["command"]=suffix;ack["value"]=value;ack["accepted"]=true;
       // The callback accepts an action; it must report actual hardware state separately.
-      if(!ArdHa::transient(f)) {V state=_portal.getAppConfigValue(key.c_str());String payload=state.type()==V::Type::String?state.asString():_portal._json.stringify(state);queueAppEmission(_portal._mqttClient.mqttTopic("stat",key.c_str()),payload);}
+      if(!ArdHa::transient(f)) {V state=_portal.getAppConfigValue(key.c_str());String payload=state.type()==V::Type::String?state.asString():_portal._json.stringify(state);queueAppEmission(ArdHa::stateTopic(f,_portal._mqttClient.mqttTopic("stat",key.c_str())),payload);}
       queueAppEmission(_portal._mqttClient.mqttTopic("stat",(key+(ArdHa::transient(f)?String():String(F("_ack")))).c_str()),_portal._json.stringify(ack));
     }
 #endif
@@ -514,7 +514,7 @@ bool ArdAppControls::publishCommands() {
 bool ArdAppControls::publishState() {
   size_t f=_stateDirty.firstSet();if(f>=_portal._dynamic.count())return false;
   {
-    const V& field=_portal._dynamic.at(f); String id=field["id"].asString(),topic=_portal._mqttClient.mqttTopic("stat",id.c_str()); V value=_portal.getAppConfigValue(id.c_str());
+    const V& field=_portal._dynamic.at(f); String id=field["id"].asString(),topic=ArdHa::stateTopic(field,_portal._mqttClient.mqttTopic("stat",id.c_str())); V value=_portal.getAppConfigValue(id.c_str());
     String payload;
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
     if(
