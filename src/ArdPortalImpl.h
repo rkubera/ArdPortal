@@ -431,7 +431,9 @@ void ArdPortal::loop() {
   serviceZigbeeControls(tick);
 #else
   if(_configurationReady&&!_zigbeeBeginTried&&!otaActive()){
+#if ARDPORTAL_ENABLE_POWER_MANAGEMENT
     prepareZigbeePower();
+#endif
     _zigbeeBeginTried=true;_zigbee.begin(_zigbeeOptions);
   }
 #endif
@@ -539,7 +541,9 @@ void ArdPortal::loop() {
   _mqttClient.serviceTrial();
 #endif
 
+#if ARDPORTAL_ENABLE_POWER_MANAGEMENT
   servicePower();
+#endif
 
 }
 /**

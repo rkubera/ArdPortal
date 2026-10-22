@@ -24,6 +24,7 @@ which defaults to `0`. All enable flags accept only `0` or `1`:
 | --- | --- |
 | `ARDPORTAL_ENABLE_WWW` | Defaults to `1`. Set `0` to stop HTTP/WWW and WebSockets, including HTTP API, web Console, uploads and HTTP converter downloads. Omits HTTP transport/buffers and captive DNS. Disables HTTP OTA; Zigbee OTA remains controlled by `ARDPORTAL_ENABLE_OTA`. Converter export through the C++ API remains available. Wi-Fi, AP, MQTT, Zigbee, storage and programmatic APIs remain available. |
 | `ARDPORTAL_ENABLE_WIFI` | Defaults to `1`. Set `0` to disable station Wi-Fi and AP; forces WWW and MQTT off, including MQTT TLS/HA. Zigbee, storage and local AppConfig APIs remain available. Wi-Fi/AP and MQTT public APIs are unavailable. |
+| `ARDPORTAL_ENABLE_POWER_MANAGEMENT` | Defaults to `1`. Set `0` to remove the power manager, GPIO/timer wake handling and `portal.power()` API. |
 | `ARDPORTAL_ENABLE_OTA` | Removes OTA implementation and Update page. |
 | `ARDPORTAL_ENABLE_MQTT` | Removes MQTT, MQTT Configuration, Console and HA. |
 | `ARDPORTAL_ENABLE_MQTT_TLS` | Removes secure MQTT transport and TLS/CA settings. Defaults to `1`; MQTT disabled forces it off. Stored TLS configurations require explicit reconfiguration, with no automatic plaintext fallback. |
