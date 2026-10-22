@@ -6,7 +6,7 @@ root=Path(__file__).resolve().parents[1]
 source=(root/'src/ArdZigbeeImpl.h').read_text()
 assert source.index('esp_zb_sleep_enable(self._sleepyProfile)') < source.index('esp_zb_init(&config)')
 assert source.index('esp_zb_set_rx_on_when_idle(!self._sleepyProfile)') < source.index('esp_zb_start(false)')
-assert source.index('esp_zb_start(false)') < source.index('zb_set_rx_on_when_idle(self._sleepyProfile?ZB_FALSE:ZB_TRUE)') < source.index('esp_zb_stack_main_loop()')
+assert source.index('esp_zb_start(false)') < source.index('zb_set_rx_on_when_idle(self._sleepyProfile ? ZB_FALSE : ZB_TRUE)') < source.index('esp_zb_stack_main_loop()')
 for name in ('ArdPortalImpl.h','ZigbeePortalImpl.h'):
     text=(root/'src'/name).read_text()
     assert text.index('prepareZigbeePower()') < text.index('_zigbee.begin(_zigbeeOptions)')
@@ -94,6 +94,7 @@ int main(){
 #endif
 }
 '''
+fixture = '#include "' + str(root / "src/LanguageLiterals.h") + '"\n' + fixture
 with tempfile.TemporaryDirectory(prefix='ardportal-zigbee-power-') as directory:
  d=Path(directory);cpp=d/'test.cpp';cpp.write_text(fixture+transition+signal+main)
  for router in (0,1):

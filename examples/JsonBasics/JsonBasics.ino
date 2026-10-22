@@ -26,11 +26,17 @@ void setup() {
 
   String error;
   String text = JSON.stringify(document, true, &error);
-  if (!text.length()) { Serial.println(error); return; }
+  if (!text.length()) {
+    Serial.println(error);
+    return;
+  }
   Serial.println(text);
 
   const JSONVar restored = JSON.parse(text, &error);
-  if (!restored.isValid()) { Serial.println(error); return; }
+  if (!restored.isValid()) {
+    Serial.println(error);
+    return;
+  }
   Serial.println(restored["device"].asString());
   Serial.println(int(restored["values"][0]));
 }

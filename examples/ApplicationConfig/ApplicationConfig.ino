@@ -25,7 +25,8 @@ void setup() {
   });
   portal.onPortalConfigChanged([](const ArdPortal::PortalConfig& config, ArdPortal::ChangeSource source) {
     if (source != ArdPortal::ChangeSource::Portal) return;
-    Serial.print("Portal change: "); Serial.println(config.deviceName);
+    Serial.print("Portal change: ");
+    Serial.println(config.deviceName);
   });
   portal.onPortalAndAppConfigSaved([](bool ok, const String& error) {
     Serial.println(ok ? "Configuration committed (or unchanged)." : error);
@@ -43,7 +44,8 @@ void loop() {
     if (portal.setAppConfigValue("reportInterval", reportInterval)) needsDefaults = false;
   }
   if (uint32_t(millis() - lastReport) >= reportInterval) {
-    lastReport = millis(); Serial.println("The application is still running.");
+    lastReport = millis();
+    Serial.println("The application is still running.");
   }
   // Setters accept data in RAM. Save completion is reported by onPortalAndAppConfigSaved.
   // To update portal settings: copy portal.getPortalConfig(), edit and call setPortalConfig().

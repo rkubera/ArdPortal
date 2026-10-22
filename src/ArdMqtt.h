@@ -56,18 +56,24 @@ public:
    * @brief Check whether the MQTT protocol session is connected.
    * @return True when the MQTT protocol session is connected.
    */
-  bool connected() const { return _mqttState == MqttState::Connected; }
+  bool connected() const {
+    return _mqttState == MqttState::Connected;
+  }
   /**
    * @brief Read the current connection or operation state.
    * @return The current MQTT connection state.
    */
-  MqttState state() const { return _mqttState; }
+  MqttState state() const {
+    return _mqttState;
+  }
   /**
    * @brief Install the callback for received MQTT application messages.
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onMessage(MessageCallback callback) { _message = std::move(callback); }
+  void onMessage(MessageCallback callback) {
+    _message = std::move(callback);
+  }
   /**
    * @brief Build an MQTT topic from its prefix, configured device name and suffix.
    * @param kind Topic prefix such as cmnd or stat.
@@ -96,36 +102,50 @@ public:
    * @return True if queued; false if disconnected or the topic/filter or packet is invalid.
    */
   bool subscribe(const char* topic);
-  using StateCallback=std::function<void(MqttState)>;
-  using TrialCallback=std::function<void(bool,const String&)>;
+  using StateCallback = std::function<void(MqttState)>;
+  using TrialCallback = std::function<void(bool, const String&)>;
   /** @brief Resume automatic MQTT connection using saved settings. @return False when not ready, busy or missing broker. */
   bool connect();
   /** @brief Close MQTT and suspend automatic reconnect. @return False during a configuration trial or OTA. */
   bool disconnect();
   /** @brief Set automatic retry permission. @param enabled Retry policy. @return No value. */
-  void setAutoReconnect(bool enabled){_autoReconnect=enabled;}
+  void setAutoReconnect(bool enabled) {
+    _autoReconnect = enabled;
+  }
   /** @brief Read retry permission. @return True when enabled. */
-  bool autoReconnect()const{return _autoReconnect;}
+  bool autoReconnect() const {
+    return _autoReconnect;
+  }
   /** @brief Queue an MQTT UNSUBSCRIBE. @param topic Valid subscription filter. @return True when queued; false when busy, disconnected or invalid. */
   bool unsubscribe(const char* topic);
   /** @brief Test and persist candidate settings on success, restoring old settings on failure. @param config Candidate configuration. @return True when queued. */
   bool testConnection(const PortalConfig& config);
   /** @brief Read whether a connection trial is pending. @return True until trial/save finishes. */
-  bool connectionTestBusy()const{return trialActive()||trialSavePending();}
+  bool connectionTestBusy() const {
+    return trialActive() || trialSavePending();
+  }
   /** @brief Read connection-test outcome. @return 0 pending, 1 success or 2 failure. */
-  uint8_t connectionTestResult()const{return trialResult();}
+  uint8_t connectionTestResult() const {
+    return trialResult();
+  }
   /** @brief Read connection-test explanation. @return Borrowed message. */
-  const String& connectionTestMessage()const{return trialMessage();}
+  const String& connectionTestMessage() const {
+    return trialMessage();
+  }
   /** @brief Install deferred MQTT state notifications. @param callback State handler. @return No value. */
-  void onStateChanged(StateCallback callback){_stateCallback=std::move(callback);}
+  void onStateChanged(StateCallback callback) {
+    _stateCallback = std::move(callback);
+  }
   /** @brief Install deferred connection-test completion notification. @param callback Success/error handler. @return No value. */
-  void onConnectionTestFinished(TrialCallback callback){_trialCallback=std::move(callback);}
+  void onConnectionTestFinished(TrialCallback callback) {
+    _trialCallback = std::move(callback);
+  }
 private:
-  bool _autoReconnect=true,_unsubscribePending=false;
+  bool _autoReconnect = true, _unsubscribePending = false;
   StateCallback _stateCallback;
   TrialCallback _trialCallback;
-  MqttState _apiState=MqttState::Disabled;
-  uint32_t _apiTrialRevision=0;
+  MqttState _apiState = MqttState::Disabled;
+  uint32_t _apiTrialRevision = 0;
   /** @brief Deliver deferred state/trial results from portal loop. @return No value. */
   void serviceApiCallbacks();
   friend class ArdPortal;
@@ -137,51 +157,68 @@ private:
    * @param portal Owning portal instance.
    * @return No value.
    */
-  explicit ArdMqtt(ArdPortal& portal) : _portal(portal) {}
+  explicit ArdMqtt(ArdPortal& portal)
+    : _portal(portal) {}
   ArdPortal& _portal;
   /**
    * @brief Check whether a connection trial or its pending save is active.
    * @return True while the corresponding trial state is pending; false otherwise.
    */
-  bool trialActive() const { return _mqttTrial || _mqttTrialStart; }
+  bool trialActive() const {
+    return _mqttTrial || _mqttTrialStart;
+  }
   /**
    * @brief Check whether a connection trial or its pending save is active.
    * @return True while the corresponding trial state is pending; false otherwise.
    */
-  bool trialSavePending() const { return _mqttSaveWaiting; }
+  bool trialSavePending() const {
+    return _mqttSaveWaiting;
+  }
 #if ARDPORTAL_ENABLE_MQTT_TLS
   /**
    * @brief Check whether the selected MQTT transport uses TLS.
    * @return True if the active MQTT transport uses TLS.
    */
-  bool tlsActive() const { return bool(_tls); }
+  bool tlsActive() const {
+    return bool(_tls);
+  }
 #else
   /**
    * @brief Check whether the selected MQTT transport uses TLS.
    * @return True if the active MQTT transport uses TLS.
    */
-  bool tlsActive() const { return false; }
+  bool tlsActive() const {
+    return false;
+  }
 #endif
   /**
    * @brief Return a busy response when the current operation prevents accepting a request.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool sendBusy() const { return _txSize || _subscriptionPending; }
+  bool sendBusy() const {
+    return _txSize || _subscriptionPending;
+  }
   /**
    * @brief Read the revision counter for completed connection trials.
    * @return Revision counter incremented on a completed trial.
    */
-  uint32_t trialRevision() const { return _mqttRevision; }
+  uint32_t trialRevision() const {
+    return _mqttRevision;
+  }
   /**
    * @brief Read the latest connection trial result code.
    * @return The latest trial result code.
    */
-  uint8_t trialResult() const { return _mqttResult; }
+  uint8_t trialResult() const {
+    return _mqttResult;
+  }
   /**
    * @brief Expose the latest connection trial result text.
    * @return Reference to the latest trial result message.
    */
-  const String& trialMessage() const { return _mqttResultMessage; }
+  const String& trialMessage() const {
+    return _mqttResultMessage;
+  }
   /**
    * @brief Notify MQTT of a change in station connectivity.
    * @param now Current time used to evaluate deadlines.
@@ -198,7 +235,9 @@ private:
    * @param name Fallback name or generated symbol name.
    * @return No value.
    */
-  void configureIdentity(const String& name) { _clientId = name; }
+  void configureIdentity(const String& name) {
+    _clientId = name;
+  }
   /**
    * @brief Prepare a temporary connection using proposed settings.
    * @param candidate Proposed portal settings to test.
@@ -229,13 +268,17 @@ private:
    * @brief Expose the selected plain or TLS MQTT client.
    * @return Reference to the requested stored value or component.
    */
-  WiFiClient& mqttTransport() { return _tls ? static_cast<WiFiClient&>(*_tls) : _mqtt; }
+  WiFiClient& mqttTransport() {
+    return _tls ? static_cast<WiFiClient&>(*_tls) : _mqtt;
+  }
 #else
   /**
    * @brief Expose the selected plain or TLS MQTT client.
    * @return Reference to the requested stored value or component.
    */
-  WiFiClient& mqttTransport() { return _mqtt; }
+  WiFiClient& mqttTransport() {
+    return _mqtt;
+  }
 #endif
   String _clientId;
   MqttState _mqttState = MqttState::Disabled;
@@ -246,10 +289,10 @@ private:
   uint8_t _mqttResult = 0;
   String _mqttResultMessage;
   uint32_t _mqttSince = 0, _lastTx = 0, _pingSince = 0, _txSince = 0;
-  uint32_t _lastServiceMs=0,_maxServiceGapMs=0;
+  uint32_t _lastServiceMs = 0, _maxServiceGapMs = 0;
   bool _pingPending = false;
   uint8_t _rx[PacketCapacity];
-  String _tx; // Own only the queued packet; release it after send/disconnect.
+  String _tx;  // Own only the queued packet; release it after send/disconnect.
   size_t _rxSize = 0, _txSize = 0, _txOffset = 0;
   uint16_t _packetId = 0, _subscriptionId = 0;
   bool _subscriptionPending = false;
@@ -265,7 +308,7 @@ private:
    * @param reason Restart or failure reason.
    * @return No value.
    */
-  void closeMqtt(const char* reason=nullptr);
+  void closeMqtt(const char* reason = nullptr);
   /**
    * @brief Queue a QoS 0 MQTT PUBLISH packet on the active transport.
    * @param topic MQTT topic to publish, subscribe or match.

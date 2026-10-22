@@ -13,7 +13,10 @@ inline bool utcTimestamp(time_t value, char* output, size_t capacity) {
   int length = snprintf(output, capacity, "%04d-%02d-%02dT%02d:%02d:%02dZ",
                         date.tm_year + 1900, date.tm_mon + 1, date.tm_mday,
                         date.tm_hour, date.tm_min, date.tm_sec);
-  if (length < 0 || size_t(length) >= capacity) { output[0] = 0; return false; }
+  if (length < 0 || size_t(length) >= capacity) {
+    output[0] = 0;
+    return false;
+  }
   return true;
 }
 }

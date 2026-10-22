@@ -8,6 +8,7 @@ import re
 from html.parser import HTMLParser
 from control_assets import segments, selected, emit_profile_chunks, emit_chunks, segments
 from pathlib import Path
+from cpp_format import format_cpp
 
 
 class PortalSections(HTMLParser):
@@ -177,7 +178,7 @@ def generate(root):
         lines += emit_chunks('PORTAL_HTML_GZIP',segments(minimal),gzip_array)
         lines += ['#endif']
         lines += emit_profile_chunks('PORTAL_JS_GZIP', script, gzip_array)
-    lines += ['#else', '#error Invalid ArdPortal UI feature combination', '#endif']
+    lines += ['#else', 'ARD_LANG_COMPILE_ERROR(ARD_LANG_NATIVE_INVALID_UI_FEATURE_COMBINATION)', '#endif']
     return '\n'.join(lines) + '\n'
 
 
@@ -189,7 +190,7 @@ def main():
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     target = root / 'PortalAssets.h'
-    output = generate(root)
+    output = format_cpp(generate(root), "PortalAssets.h")
     if args.check:
         if not target.exists() or target.read_text(encoding='utf-8') != output:
             raise SystemExit('PortalAssets.h is stale; run tools/generate_portal_assets.py')

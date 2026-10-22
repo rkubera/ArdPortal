@@ -78,10 +78,11 @@ void setup() {
       Serial.println(portal.appConfigRegistrationError().reason);
   });
   portal.onAppConfigValueChanged([](const String& key,
-                                   const ArdJSON::JSONVar& value,
-                                   ArdPortal::ChangeSource) {
+                                    const ArdJSON::JSONVar& value,
+                                    ArdPortal::ChangeSource) {
     // Apply user changes to hardware without blocking.
-    Serial.print(key); Serial.print(" = ");
+    Serial.print(key);
+    Serial.print(" = ");
     Serial.println(ArdJSON::JSON.stringify(value));
   });
   if (!portal.startAppConfigPageRegistration(FPSTR(CONTROL_PAGE)))
@@ -94,11 +95,12 @@ void setup() {
  * @return No value.
  */
 void loop() {
-  portal.loop(); // One registration unit; UART/application work can run next.
+  portal.loop();  // One registration unit; UART/application work can run next.
   if (!startupApplied && registeredPages == 2 && portal.portalAndAppConfigReady()) {
     startupApplied = true;
     // Config loading may finish before page registration. Wait for both.
     Serial.println(portal.getAppConfigValue("enabled").asBool()
-                   ? "Enabled at startup" : "Disabled at startup");
+                     ? "Enabled at startup"
+                     : "Disabled at startup");
   }
 }

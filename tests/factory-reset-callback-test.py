@@ -5,8 +5,8 @@ import tempfile
 
 root = Path(__file__).resolve().parents[1]
 source = (root / "src/ArdPortalImpl.h").read_text()
-start = source.index('  if (post && ardFlashEqual(path,F("/api/factory-reset"))) {')
-end = source.index('  if (post && ardFlashEqual(path,F("/api/storage/format"))) {', start)
+start = source.index('  if (post && ardFlashEqual(path, F("/api/factory-reset"))) {')
+end = source.index('  if (post && ardFlashEqual(path, F("/api/storage/format"))) {', start)
 branch = source[start:end]
 fixture = r'''
 #include <cassert>
@@ -69,6 +69,7 @@ int main(){
  puts("PASS: factory-reset callback ordering, unchanged defaults, guards, missing handler, save rejection and other routes");
 }
 '''
+fixture = '#include "' + str(root / "src/LanguageLiterals.h") + '"\n' + fixture
 with tempfile.TemporaryDirectory(prefix="ardportal-reset-test-") as tmp:
     tmp = Path(tmp)
     (tmp / "test.cpp").write_text(fixture + branch + main)

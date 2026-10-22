@@ -33,7 +33,7 @@ inline size_t writeChunk(WiFiClient& client, const uint8_t* data, size_t length)
  */
 inline void stopClient(WiFiClient& client) {
 #if defined(ESP8266)
-  client.abort(); // Avoid ESP8266 stop() waiting for graceful TCP shutdown.
+  client.abort();  // Avoid ESP8266 stop() waiting for graceful TCP shutdown.
 #else
   client.stop();
 #endif

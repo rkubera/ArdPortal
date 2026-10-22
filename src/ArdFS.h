@@ -54,8 +54,8 @@ public:
   bool write(const String& path, const String& json, Callback callback);
   // The source must be a validated JSON serialization and remain immutable until completion.
   // Each call returns exactly min(maximum,length-offset) bytes, or empty on failure.
-  using JsonSource = std::function<String(size_t offset,size_t maximum)>;
-  bool writeJson(const String& path,size_t length,JsonSource source,Callback callback);
+  using JsonSource = std::function<String(size_t offset, size_t maximum)>;
+  bool writeJson(const String& path, size_t length, JsonSource source, Callback callback);
 
   /**
    * @brief Queue formatting of the storage volume; existing records will be discarded.
@@ -67,40 +67,68 @@ public:
    * @brief Check whether initial storage mounting has completed.
    * @return True once initial mounting has finished, even if mounting failed.
    */
-  bool ready() const { return _mountDone; }
+  bool ready() const {
+    return _mountDone;
+  }
   /**
    * @brief Check whether the storage volume is mounted successfully.
    * @return True when the volume is mounted and available.
    */
-  bool mounted() const { return _mounted; }
+  bool mounted() const {
+    return _mounted;
+  }
   /**
    * @brief Check whether initialization or a queued operation still requires loop() work.
    * @return True while initialization or an operation is pending.
    */
-  bool busy() const { return !_mountDone || _phase != Phase::Idle; }
+  bool busy() const {
+    return !_mountDone || _phase != Phase::Idle;
+  }
   /**
    * @brief Expose the most recent error reported by this component.
    * @return Reference to the last error text; empty when no error is recorded.
    */
-  const String& error() const { return _error; }
+  const String& error() const {
+    return _error;
+  }
   /**
    * @brief Read the number of successful persistent commits.
    * @return Number of completed persistent commits.
    */
-  uint32_t commits() const { return _commits; }
+  uint32_t commits() const {
+    return _commits;
+  }
   /**
    * @brief Read the number of writes skipped because the saved document was unchanged.
    * @return Number of unchanged writes avoided.
    */
-  uint32_t skipped() const { return _skipped; }
+  uint32_t skipped() const {
+    return _skipped;
+  }
   static constexpr size_t MaxBytes = ArdFSMaxDocumentBytes;
 private:
-  enum class Phase { Mount, End, Format, Remount, Idle, OpenRead, Read, Validate,
-                     Prepare, RepairWait, SourceCrc, OpenWrite, Write, Flush, CloseWrite, OpenVerify, Verify, CloseVerify };
+  enum class Phase { Mount,
+                     End,
+                     Format,
+                     Remount,
+                     Idle,
+                     OpenRead,
+                     Read,
+                     Validate,
+                     Prepare,
+                     RepairWait,
+                     SourceCrc,
+                     OpenWrite,
+                     Write,
+                     Flush,
+                     CloseWrite,
+                     OpenVerify,
+                     Verify,
+                     CloseVerify };
   Phase _phase = Phase::Idle;
   bool _mountDone = false, _mounted = false, _writing = false, _formatRequested = false;
-  bool _valid[2] = {false, false}, _present[2] = {false, false}, _match[2] = {false, false};
-  uint32_t _generation[2] = {0, 0}, _commits = 0, _skipped = 0;
+  bool _valid[2] = { false, false }, _present[2] = { false, false }, _match[2] = { false, false };
+  uint32_t _generation[2] = { 0, 0 }, _commits = 0, _skipped = 0;
   int _slot = 0, _best = -1;
   size_t _offset = 0, _expected = 0;
   String _path, _input, _buffer, _bestData, _error;
@@ -110,15 +138,15 @@ private:
   Callback _callback;
   JsonSource _source;
   ArdJournalStream _journal;
-  bool _repairRequested=false,_repairing=false;
-  uint8_t _repairAttempts=0;
-  uint32_t _repairRetrySince=0;
-  bool _sourceLegacy=false,_sourceMatch=false,_sourceFailed=false;
-  size_t _sourceLength=0,_sourceAt=0,_sourceCompareAt=0,_escapedLength=0,_journalHeaderAt=0,_rawAt=0,_escapeAt=0,_escapeLength=0;
-  uint8_t _journalStage=0;
-  uint32_t _sourceCrc=0,_sourceGeneration=0;
-  String _sourceCompare,_raw,_journalHeader;
-  char _escape[6]={};
+  bool _repairRequested = false, _repairing = false;
+  uint8_t _repairAttempts = 0;
+  uint32_t _repairRetrySince = 0;
+  bool _sourceLegacy = false, _sourceMatch = false, _sourceFailed = false;
+  size_t _sourceLength = 0, _sourceAt = 0, _sourceCompareAt = 0, _escapedLength = 0, _journalHeaderAt = 0, _rawAt = 0, _escapeAt = 0, _escapeLength = 0;
+  uint8_t _journalStage = 0;
+  uint32_t _sourceCrc = 0, _sourceGeneration = 0;
+  String _sourceCompare, _raw, _journalHeader;
+  char _escape[6] = {};
   void resetJournalOutput();
   String journalOutput();
 
@@ -127,7 +155,9 @@ private:
    * @param slot Journal slot index: primary or alternate.
    * @return The resulting text; an empty value indicates no available text or failure where applicable.
    */
-  String slotPath(int slot) const { return slot ? _path + ".journal" : _path; }
+  String slotPath(int slot) const {
+    return slot ? _path + ".journal" : _path;
+  }
   /**
    * @brief Prepare a new operation after checking that the component is idle.
    * @param path Journal file path.

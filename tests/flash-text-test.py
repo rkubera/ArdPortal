@@ -18,6 +18,8 @@ class ArdPortal {public:
  void replyMessage(int,ArdUILanguageData::Key);
 };
 int main(){
+ static_assert(sizeof(ARD_LANG_NATIVE_OUT_OF_MEMORY)==14,"native diagnostics remain literals");
+ assert(String(F(ARD_LANG_NATIVE_OUT_OF_MEMORY))=="out of memory");
  String english="en",unknown="missing";
  const size_t before=String::cStringConstructionsForTest();
  assert(ArdUILanguage::find(english)==0&&ArdUILanguage::find(unknown)==-1);

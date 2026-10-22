@@ -85,10 +85,11 @@ void setup() {
     Serial.println(portal.appConfigRegistrationError().reason);
   }
   portal.onAppConfigValueChanged([](const String& key,
-                                   const ArdJSON::JSONVar& value,
-                                   ArdPortal::ChangeSource) {
+                                    const ArdJSON::JSONVar& value,
+                                    ArdPortal::ChangeSource) {
     // Apply the value to your hardware here without blocking.
-    Serial.print(key); Serial.print(" = ");
+    Serial.print(key);
+    Serial.print(" = ");
     Serial.println(ArdJSON::JSON.stringify(value));
   });
   portal.onPortalAndAppConfigReady([](bool loaded) {
@@ -103,10 +104,11 @@ void setup() {
  * @return No value.
  */
 void loop() {
-  portal.loop(); // Services registration, live controls, MQTT and storage.
+  portal.loop();  // Services registration, live controls, MQTT and storage.
   if (!startupApplied && pageRegistered && portal.portalAndAppConfigReady()) {
     startupApplied = true;
     Serial.println(portal.getAppConfigValue("enabled").asBool()
-                   ? "Enabled at startup" : "Disabled at startup");
+                     ? "Enabled at startup"
+                     : "Disabled at startup");
   }
 }

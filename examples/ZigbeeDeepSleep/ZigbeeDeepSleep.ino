@@ -8,14 +8,14 @@ ArdPortal portal;
 
 void setup() {
   ArdPower::Options options;
-  options.policy=ArdPower::Policy::EventDriven;
-  options.sleep=ArdPower::SleepType::DeepSleep;
-  options.deepSleepMs=60000;
-  options.sleepDelayMs=1000;
+  options.policy = ArdPower::Policy::EventDriven;
+  options.sleep = ArdPower::SleepType::DeepSleep;
+  options.deepSleepMs = 60000;
+  options.sleepDelayMs = 1000;
   portal.power().configure(options);
   // Read sensors/register application fields here. Submit network reports only
   // after the connection is restored; hold a power lock for required ACKs.
-  portal.begin(); // Initial pairing requires joining enabled on the coordinator.
+  portal.begin();  // Initial pairing requires joining enabled on the coordinator.
 }
 
 void loop() {

@@ -15,15 +15,18 @@ function node(id) {
   return nodes.get(id);
 }
 const requests = [], sockets = [];
+const translations=JSON.parse(fs.readFileSync(path.join(__dirname,"../src/languages/en.json"),"utf8")).strings;
+let confirmation;
 let state = {state:'pairing', pairing:true, busy:true, paired:false, role:'end-device', channel:0, panId:0, attempts:1, error:''};
 class Socket {
   constructor(url) {this.url=url;this.readyState=1;sockets.push(this);}
   close() {this.readyState=3;this.onclose?.();}
 }
 const context = vm.createContext({document:{querySelector:node, getElementById:id=>node('#'+id), createElement:()=>node(Symbol())},
-  location:{protocol:'http:',host:'device.local'}, currentPage:{id:'zigbee'}, WebSocket:Socket, confirm:()=>true,
+  location:{protocol:'http:',host:'device.local'}, currentPage:{id:'zigbee'}, WebSocket:Socket, confirm:text=>{confirmation=text;return true;},
   window:{addEventListener(){}}, setInterval(){}, setTimeout(){}, clearTimeout(){},
   fetch:async(url,options)=>{requests.push({url,options});return {ok:true,text:async()=> 'accepted',json:async()=>state};},
+  t:key=>translations[key],
   Date,JSON,Error,String});
 vm.runInContext(script,context);
 /** @brief Exercise switch commands and console deduplication. @return Promise resolving after assertions. */
@@ -48,7 +51,9 @@ async function test() {
   await vm.runInContext('refreshZigbee()',context);
   await vm.runInContext("operateZigbee('rejoin')",context);
   assert.equal(requests.at(-2).url,'/api/zigbee/rejoin');
+  translations.ui_220='Localized reset confirmation';
   await vm.runInContext("operateZigbee('reset')",context);
+  assert.equal(confirmation,'Localized reset confirmation');
   assert.equal(requests.at(-2).url,'/api/zigbee/reset');
   assert.equal(requests.at(-2).options.body,'confirm=RESET-ZIGBEE');
   console.log('PASS: automatic pairing UI, saved-network rejoin and reset confirmation');

@@ -35,7 +35,7 @@ for(const f of fields){
     const actionLabel=grouped&&separator>=0?label.slice(0,separator):label;
     extend.push({isModernExtend:true,exposes:[e.enum(name,a.SET,[...choices.keys()]).withEndpoint(endpointName).withLabel(actionLabel).withDescription('Select an action to execute immediately; no state is retained.')],
       toZigbee:[{key:[name],endpoints:endpointNames,convertSet:async(entity,key,value,meta)=>{
-        if(!choices.has(value))throw new Error('Unknown action');
+        if(!choices.has(value))throw new Error('@@export_unknown_action@@');
         const target=grouped?meta.device.getEndpoint(choices.get(value)):entity;
         await target.command('genOnOff','on',{},{});
         // Clear the transient selection; the same action can be sent again.
@@ -133,6 +133,6 @@ for(const f of fields){
 // Discovery uses it to distinguish repeated switches, measurements and numbers.
 export default {
   fingerprint:[{modelID:identity.model,manufacturerName:'ArdPortal'}],
-  model:identity.model,vendor:'ArdPortal',description:'ArdPortal registered controls',extend,
+  model:identity.model,vendor:'ArdPortal',description:'@@export_registered_controls@@',extend,
   ota:fields.some(field=>field.kind==='update'),
 };

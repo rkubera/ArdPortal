@@ -14,13 +14,17 @@ using V = ArdJSON::JSONVar;
  * @return True when the selected value matches the rule; false otherwise.
  */
 bool ArdAppControls::dependencyValueMatches(const V& rule) const {
-  auto match=[&](const V& leaf) {
-  V value=_portal.getAppConfigValue(leaf["field"].asString().c_str());
-  if(leaf.hasOwnProperty("property")) {V selected=value[leaf["property"].asString()];value=std::move(selected);}
-  if(value.isUndefined()||!value.isValid())return false;
-  String actual=_portal._json.stringify(value,false,nullptr,snapshotLimits()),expected=_portal._json.stringify(leaf["equals"]);return actual.length()&&expected.length()&&actual==expected;
+  auto match = [&](const V& leaf) {
+    V value = _portal.getAppConfigValue(leaf["field"].asString().c_str());
+    if (leaf.hasOwnProperty("property")) {
+      V selected = value[leaf["property"].asString()];
+      value = std::move(selected);
+    }
+    if (value.isUndefined() || !value.isValid()) return false;
+    String actual = _portal._json.stringify(value, false, nullptr, snapshotLimits()), expected = _portal._json.stringify(leaf["equals"]);
+    return actual.length() && expected.length() && actual == expected;
   };
-  return ArdDependencies::evaluate(rule,match);
+  return ArdDependencies::evaluate(rule, match);
 }
 
 // Walk the graph without recursive calls or retaining parsed ancestor pages.
@@ -30,20 +34,29 @@ bool ArdAppControls::dependencyValueMatches(const V& rule) const {
  * @return True when the complete dependency chain permits visibility; false otherwise.
  */
 bool ArdAppControls::dependencyFieldVisible(size_t index) const {
-  if(index>=_portal._dynamic.count())return false;
-  if(!_portal._dynamic.dependentAt(index))return true;
-  const size_t count=_portal._dynamic.count();
+  if (index >= _portal._dynamic.count()) return false;
+  if (!_portal._dynamic.dependentAt(index)) return true;
+  const size_t count = _portal._dynamic.count();
   ArdDependencies::Stack stack;
-  if(!stack.reserve(1,count))return false;
-  size_t depth=1;stack[0]={uint16_t(index),0,0};
-  ArdAppConfigFieldMask active=ArdAppConfigFieldMask::forField(index),complete=0,visible=0;
-  auto load=[&](size_t i){return _portal._dynamic.at(i);};
-  auto indexOf=[&](const String& id){return _portal._dynamic.indexOf(id);};
-  auto dependent=[&](size_t i){return _portal._dynamic.dependentAt(i);};
-  auto match=[&](const V& leaf){return dependencyValueMatches(leaf);};
-  while(depth){
-    auto result=ArdDependencies::step(stack,depth,active,complete,visible,count,load,indexOf,dependent,match);
-    if(result!=ArdDependencies::Result::Running)return result==ArdDependencies::Result::Visible;
+  if (!stack.reserve(1, count)) return false;
+  size_t depth = 1;
+  stack[0] = { uint16_t(index), 0, 0 };
+  ArdAppConfigFieldMask active = ArdAppConfigFieldMask::forField(index), complete = 0, visible = 0;
+  auto load = [&](size_t i) {
+    return _portal._dynamic.at(i);
+  };
+  auto indexOf = [&](const String& id) {
+    return _portal._dynamic.indexOf(id);
+  };
+  auto dependent = [&](size_t i) {
+    return _portal._dynamic.dependentAt(i);
+  };
+  auto match = [&](const V& leaf) {
+    return dependencyValueMatches(leaf);
+  };
+  while (depth) {
+    auto result = ArdDependencies::step(stack, depth, active, complete, visible, count, load, indexOf, dependent, match);
+    if (result != ArdDependencies::Result::Running) return result == ArdDependencies::Result::Visible;
     yield();
   }
   return false;
@@ -54,12 +67,12 @@ bool ArdAppControls::dependencyFieldVisible(size_t index) const {
  * @return True when the referenced field is visible and its value matches the rule.
  */
 bool ArdAppControls::dependencyMatches(const V& rule) const {
-  auto match=[&](const V& leaf) {
-    if(!dependencyValueMatches(leaf))return false;
-    size_t index=_portal._dynamic.indexOf(leaf["field"].asString());
-    return index<_portal._dynamic.count()&&dependencyFieldVisible(index);
+  auto match = [&](const V& leaf) {
+    if (!dependencyValueMatches(leaf)) return false;
+    size_t index = _portal._dynamic.indexOf(leaf["field"].asString());
+    return index < _portal._dynamic.count() && dependencyFieldVisible(index);
   };
-  return ArdDependencies::evaluate(rule,match);
+  return ArdDependencies::evaluate(rule, match);
 }
 
 /**
@@ -67,14 +80,18 @@ bool ArdAppControls::dependencyMatches(const V& rule) const {
  * @param field Application field definition or identifier.
  * @return True when the field is visible; false when its dependency condition is not satisfied.
  */
-bool ArdAppControls::appFieldVisible(const V& field) const {return dependencyMatches(field["_pageVisibleWhen"])&&dependencyMatches(field["visibleWhen"]);}
+bool ArdAppControls::appFieldVisible(const V& field) const {
+  return dependencyMatches(field["_pageVisibleWhen"]) && dependencyMatches(field["visibleWhen"]);
+}
 #else
 /**
  * @brief Evaluate the field visibility condition against current application values.
  * Input: const V&.
  * @return True when the field is visible; false when its dependency condition is not satisfied.
  */
-bool ArdAppControls::appFieldVisible(const V&) const {return true;}
+bool ArdAppControls::appFieldVisible(const V&) const {
+  return true;
+}
 #endif
 
 #if ARDPORTAL_ENABLE_MQTT
@@ -86,45 +103,80 @@ bool ArdAppControls::appFieldVisible(const V&) const {return true;}
  * @param retained Whether the MQTT publication is retained.
  * @return No value.
  */
-void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t size,bool retained) {
-  String commandPrefix="cmnd/"+ArdDeviceName::mqtt(_portal._config.deviceName)+"/",getPrefix="get/"+ArdDeviceName::mqtt(_portal._config.deviceName)+"/";
-  if(topic.indexOf(getPrefix)==0) { String id=topic.substring(getPrefix.length()); for(size_t i=0;i<_portal._dynamic.count();++i) if(_portal._dynamic.idAt(i)==id) _stateDirty|=ArdAppConfigFieldMask::forField(i); return; }
-  if(topic.indexOf(commandPrefix)!=0||retained||size>ArdMqtt::PacketCapacity-5) return;
-  String command=topic.substring(commandPrefix.length()),payload; for(size_t i=0;i<size;++i) { if(!data[i]) return; payload+=char(data[i]); }
-  size_t exact=_portal._dynamic.indexOf(command);
-  for(size_t i=exact<_portal._dynamic.count()?exact:0;i<_portal._dynamic.count();++i) {
-    if(exact<_portal._dynamic.count()&&i!=exact)break;
-    String id=_portal._dynamic.idAt(i);if(command!=id&&command.indexOf(id+"_")!=0)continue;
-    const V& f=_portal._dynamic.at(i);String type=f["type"].asString();V value;
-    if(false) {}
+void ArdAppControls::dynamicMqtt(const String& topic, const uint8_t* data, size_t size, bool retained) {
+  String commandPrefix = "cmnd/" + ArdDeviceName::mqtt(_portal._config.deviceName) + "/", getPrefix = "get/" + ArdDeviceName::mqtt(_portal._config.deviceName) + "/";
+  if (topic.indexOf(getPrefix) == 0) {
+    String id = topic.substring(getPrefix.length());
+    for (size_t i = 0; i < _portal._dynamic.count(); ++i)
+      if (_portal._dynamic.idAt(i) == id) _stateDirty |= ArdAppConfigFieldMask::forField(i);
+    return;
+  }
+  if (topic.indexOf(commandPrefix) != 0 || retained || size > ArdMqtt::PacketCapacity - 5) return;
+  String command = topic.substring(commandPrefix.length()), payload;
+  for (size_t i = 0; i < size; ++i) {
+    if (!data[i]) return;
+    payload += char(data[i]);
+  }
+  size_t exact = _portal._dynamic.indexOf(command);
+  for (size_t i = exact < _portal._dynamic.count() ? exact : 0; i < _portal._dynamic.count(); ++i) {
+    if (exact < _portal._dynamic.count() && i != exact) break;
+    String id = _portal._dynamic.idAt(i);
+    if (command != id && command.indexOf(id + "_") != 0) continue;
+    const V& f = _portal._dynamic.at(i);
+    String type = f["type"].asString();
+    V value;
+    if (false) {
+    }
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
-    else if(ArdHa::extended(f)) {
-      if(command!=id&&command.indexOf(id+"_")!=0) continue;
-      V resolved=f;if(!ArdHa::normalize(resolved)) return;const V& entity=resolved;
-      for(size_t c=0;c<entity["controls"].length();++c) {
-        const V& control=entity["controls"][c]; String suffix=control["command"].asString();
-        if(command!=id+(suffix.length()?"_"+suffix:String())) continue;
-        if(!appFieldVisible(f)){
+    else if (ArdHa::extended(f)) {
+      if (command != id && command.indexOf(id + "_") != 0) continue;
+      V resolved = f;
+      if (!ArdHa::normalize(resolved)) return;
+      const V& entity = resolved;
+      for (size_t c = 0; c < entity["controls"].length(); ++c) {
+        const V& control = entity["controls"][c];
+        String suffix = control["command"].asString();
+        if (command != id + (suffix.length() ? "_" + suffix : String())) continue;
+        if (!appFieldVisible(f)) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
           _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_207));
 #endif
           return;
         }
-        V input=payload;
-        String kind=control["type"].asString();
-        if(kind=="action"&&payload!=control["payload"].asString()) continue;
-        if(kind=="slider"||kind=="action_json"||kind=="color"||entity["json_command"].asBool()) input=_portal._json.parse(payload,nullptr,[](){ArdJSON::Limits limits;limits.maxNodes=512;return limits;}());
-        if(kind=="switch"&&!control.hasOwnProperty("on")) {if(payload!="ON"&&payload!="OFF") return;input=payload=="ON";}
-        if(entity["json_command"].asBool()) {
-          if(input.type()!=V::Type::Object) return;
-          V next=_portal.getAppConfigValue(id.c_str());bool changed=false;
-          for(size_t j=0;j<entity["controls"].length();++j) {const V& part=entity["controls"][j];String key=part["key"].asString();if(input.hasOwnProperty(key)) {if(!ArdHa::validControl(part,input[key])) return;next[key]=input[key];changed=true;}}
-          if(!changed||!ArdDynamicPages::validValue(entity,next)) return;
-          if(!entity["persist"].asBool()) {if(applyAppState(id,next,ChangeSource::Mqtt)) _stateDirty|=ArdAppConfigFieldMask::forField(i);}
-          else {acceptMqttState(id,next);}
+        V input = payload;
+        String kind = control["type"].asString();
+        if (kind == "action" && payload != control["payload"].asString()) continue;
+        if (kind == "slider" || kind == "action_json" || kind == "color" || entity["json_command"].asBool()) input = _portal._json.parse(payload, nullptr, []() {
+          ArdJSON::Limits limits;
+          limits.maxNodes = 512;
+          return limits;
+        }());
+        if (kind == "switch" && !control.hasOwnProperty("on")) {
+          if (payload != "ON" && payload != "OFF") return;
+          input = payload == "ON";
+        }
+        if (entity["json_command"].asBool()) {
+          if (input.type() != V::Type::Object) return;
+          V next = _portal.getAppConfigValue(id.c_str());
+          bool changed = false;
+          for (size_t j = 0; j < entity["controls"].length(); ++j) {
+            const V& part = entity["controls"][j];
+            String key = part["key"].asString();
+            if (input.hasOwnProperty(key)) {
+              if (!ArdHa::validControl(part, input[key])) return;
+              next[key] = input[key];
+              changed = true;
+            }
+          }
+          if (!changed || !ArdDynamicPages::validValue(entity, next)) return;
+          if (!entity["persist"].asBool()) {
+            if (applyAppState(id, next, ChangeSource::Mqtt)) _stateDirty |= ArdAppConfigFieldMask::forField(i);
+          } else {
+            acceptMqttState(id, next);
+          }
           return;
         }
-        if(!appControl(f,c,input,ChangeSource::Mqtt)) {
+        if (!appControl(f, c, input, ChangeSource::Mqtt)) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
           _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177));
 #endif
@@ -135,41 +187,50 @@ void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t 
     }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
-    else if(type=="climate") {
-      value=_mqttAppQueue.hasOwnProperty(id)?_mqttAppQueue[id]:((_portal._savePending||_portal._saveQueued||_portal._pendingReady)&&_portal._pendingApp.hasOwnProperty(id)?_portal._pendingApp[id]:_portal.getAppConfigValue(id.c_str()));
-      if(command==id+"_temperature") value["temperature"]=_portal._json.parse(payload);
-      else if(command==id+"_temperature_low") value["temperature_low"]=_portal._json.parse(payload);
-      else if(command==id+"_temperature_high") value["temperature_high"]=_portal._json.parse(payload);
-      else if(command==id+"_mode"&&f.hasOwnProperty("modes")) value["mode"]=payload;
-      else if(command==id+"_fan"&&f.hasOwnProperty("fan_modes")) value["fan_mode"]=payload;
+    else if (type == "climate") {
+      value = _mqttAppQueue.hasOwnProperty(id) ? _mqttAppQueue[id] : ((_portal._savePending || _portal._saveQueued || _portal._pendingReady) && _portal._pendingApp.hasOwnProperty(id) ? _portal._pendingApp[id] : _portal.getAppConfigValue(id.c_str()));
+      if (command == id + "_temperature") value["temperature"] = _portal._json.parse(payload);
+      else if (command == id + "_temperature_low") value["temperature_low"] = _portal._json.parse(payload);
+      else if (command == id + "_temperature_high") value["temperature_high"] = _portal._json.parse(payload);
+      else if (command == id + "_mode" && f.hasOwnProperty("modes")) value["mode"] = payload;
+      else if (command == id + "_fan" && f.hasOwnProperty("fan_modes")) value["fan_mode"] = payload;
       else continue;
     }
 #endif
     else {
-      if(command!=id) continue;
+      if (command != id) continue;
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-      if(type=="text") continue;
+      if (type == "text") continue;
 #endif
-      if(false) {}
+      if (false) {
+      }
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
-      else if(type=="slider") value=_portal._json.parse(payload);
+      else if (type == "slider")
+        value = _portal._json.parse(payload);
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
-      else if(type=="switch") {if(payload!="ON"&&payload!="OFF")return;value=payload=="ON";}
+      else if (type == "switch") {
+        if (payload != "ON" && payload != "OFF") return;
+        value = payload == "ON";
+      }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EDIT || ARDPORTAL_ENABLE_CONTROL_SELECT
-      else value=payload;
+      else
+        value = payload;
 #endif
     }
-    if(!appFieldVisible(f)){
+    if (!appFieldVisible(f)) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
       _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_207));
 #endif
       return;
     }
-    if(ArdDynamicPages::validValue(f,value)) { acceptMqttState(id,value); }
+    if (ArdDynamicPages::validValue(f, value)) {
+      acceptMqttState(id, value);
+    }
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-    else _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177));
+    else
+      _portal.log(ArdUILanguage::text(ArdUILanguage::Key::s_177));
 #endif
     return;
   }
@@ -182,10 +243,13 @@ void ArdAppControls::dynamicMqtt(const String& topic,const uint8_t* data,size_t 
  * @return The field mask used for pending state publication.
  */
 ArdAppConfigFieldMask ArdAppControls::stateMask() const {
-  ArdAppConfigFieldMask mask=0;
-  const auto& definitions=_portal._dynamic;
-  for(size_t p=0;p<definitions.pages.length();++p)for(size_t f=0;f<definitions.pages.fields(p);++f)if(!definitions.pages.transient(p,f))mask|=ArdAppConfigFieldMask::forField(definitions.pages.fieldIndex(p,f));
-  for(const auto* entity=definitions.entities.get();entity;entity=entity->next.get())if(!entity->transient)mask|=ArdAppConfigFieldMask::forField(entity->index);
+  ArdAppConfigFieldMask mask = 0;
+  const auto& definitions = _portal._dynamic;
+  for (size_t p = 0; p < definitions.pages.length(); ++p)
+    for (size_t f = 0; f < definitions.pages.fields(p); ++f)
+      if (!definitions.pages.transient(p, f)) mask |= ArdAppConfigFieldMask::forField(definitions.pages.fieldIndex(p, f));
+  for (const auto* entity = definitions.entities.get(); entity; entity = entity->next.get())
+    if (!entity->transient) mask |= ArdAppConfigFieldMask::forField(entity->index);
   return mask;
 }
 #endif
@@ -197,12 +261,18 @@ ArdAppConfigFieldMask ArdAppControls::stateMask() const {
  * @param payload Message bytes or text to send or decode.
  * @return True if queued; false when MQTT is unavailable or the bounded queue cannot accept it.
  */
-bool ArdAppControls::queueAppEmission(const String& topic,const String& payload) {
+bool ArdAppControls::queueAppEmission(const String& topic, const String& payload) {
 #if ARDPORTAL_CONTROL_SUPPORT_EMISSIONS
-  if(!_portal.mqttConnected()||_emissionCount==8||topic.length()+payload.length()+2>ArdMqtt::PacketCapacity-5) return false;
-  AppEmission& e=_appEmissions[(_emissionHead+_emissionCount)%8];e.topic=topic;e.payload=payload;++_emissionCount;return true;
+  if (!_portal.mqttConnected() || _emissionCount == 8 || topic.length() + payload.length() + 2 > ArdMqtt::PacketCapacity - 5) return false;
+  AppEmission& e = _appEmissions[(_emissionHead + _emissionCount) % 8];
+  e.topic = topic;
+  e.payload = payload;
+  ++_emissionCount;
+  return true;
 #else
-  (void)topic;(void)payload;return false;
+  (void)topic;
+  (void)payload;
+  return false;
 #endif
 }
 #endif
@@ -215,34 +285,38 @@ bool ArdAppControls::queueAppEmission(const String& topic,const String& payload)
  * @param publishMqtt Whether to queue MQTT state publication for this update.
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
-bool ArdAppControls::applyAppState(const String& key,const V& value,ChangeSource source,bool publishMqtt) {
-  const V& f=_portal._dynamic.field(key);if(f.isUndefined()||ArdHa::transient(f)||!ArdDynamicPages::validValue(f,value)) return false;
-  V previous=_portal.getAppConfigValue(key.c_str());
-  String before=ArdJSON::JSON.stringify(previous,false,nullptr,snapshotLimits());
-  String after=ArdJSON::JSON.stringify(value,false,nullptr,snapshotLimits());
+bool ArdAppControls::applyAppState(const String& key, const V& value, ChangeSource source, bool publishMqtt) {
+  const V& f = _portal._dynamic.field(key);
+  if (f.isUndefined() || ArdHa::transient(f) || !ArdDynamicPages::validValue(f, value)) return false;
+  V previous = _portal.getAppConfigValue(key.c_str());
+  String before = ArdJSON::JSON.stringify(previous, false, nullptr, snapshotLimits());
+  String after = ArdJSON::JSON.stringify(value, false, nullptr, snapshotLimits());
   // An unchanged value can come from the persisted config or field default.
   // Do not materialize a second runtime member just to repeat that value.
   // Failed serialization must never be interpreted as equality.
-  if(!after.length()||(!previous.isUndefined()&&!before.length()))return false;
-  if(!previous.isUndefined()&&before==after){
+  if (!after.length() || (!previous.isUndefined() && !before.length())) return false;
+  if (!previous.isUndefined() && before == after) {
 #if ARDPORTAL_ENABLE_ZIGBEE
-    if(source!=ChangeSource::Zigbee)_portal._zigbeeAppQueue.remove(key);
+    if (source != ChangeSource::Zigbee) _portal._zigbeeAppQueue.remove(key);
 #endif
     return true;
   }
-  _appState[key]=value;if(!_appState.isValid()) return false;
+  _appState[key] = value;
+  if (!_appState.isValid()) return false;
 #if ARDPORTAL_ENABLE_ZIGBEE
-  if(source!=ChangeSource::Zigbee)_portal._zigbeeAppQueue.remove(key);
+  if (source != ChangeSource::Zigbee) _portal._zigbeeAppQueue.remove(key);
 #endif
-  {++_portal._appRevision;
+  {
+    ++_portal._appRevision;
 #if ARDPORTAL_ENABLE_HA && ARDPORTAL_ENABLE_DEPENDENCIES
     _portal._homeAssistant.dependencyChanged(key);
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE
     _portal.markZigbeeStateDirty(key);
 #endif
-    if(publishMqtt)markDirty(key);
-    if(_portal._appChanged) _portal._appChanged(key,value,source);}
+    if (publishMqtt) markDirty(key);
+    if (_portal._appChanged) _portal._appChanged(key, value, source);
+  }
   return true;
 }
 
@@ -253,7 +327,9 @@ bool ArdAppControls::applyAppState(const String& key,const V& value,ChangeSource
  * @param publishMqtt Whether to queue MQTT state publication for this update.
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
-bool ArdAppControls::setAppConfigStateValue(const char* key,const V& value,bool publishMqtt) {return key&&applyAppState(key,value,ChangeSource::Application,publishMqtt);}
+bool ArdAppControls::setAppConfigStateValue(const char* key, const V& value, bool publishMqtt) {
+  return key && applyAppState(key, value, ChangeSource::Application, publishMqtt);
+}
 
 /**
  * @brief Emit a transient application event through the field MQTT topic.
@@ -261,21 +337,25 @@ bool ArdAppControls::setAppConfigStateValue(const char* key,const V& value,bool 
  * @param value Input value, or output destination when passed by mutable reference.
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
-bool ArdAppControls::emitAppConfigEvent(const char* key,const V& value) {
+bool ArdAppControls::emitAppConfigEvent(const char* key, const V& value) {
 #if ARDPORTAL_CONTROL_SUPPORT_EVENTS
-  if(!key) return false;
-  const V& f=_portal._dynamic.field(key);if((f["type"].asString()!="event"&&f["type"].asString()!="device_trigger"&&f["type"].asString()!="tag")||!ArdDynamicPages::validValue(f,value)) return false;
+  if (!key) return false;
+  const V& f = _portal._dynamic.field(key);
+  if ((f["type"].asString() != "event" && f["type"].asString() != "device_trigger" && f["type"].asString() != "tag") || !ArdDynamicPages::validValue(f, value)) return false;
 #if ARDPORTAL_ENABLE_MQTT
-  String payload=value.type()==V::Type::String?value.asString():_portal._json.stringify(value,false,nullptr,snapshotLimits());
-  if(!queueAppEmission(ArdMqttFieldTopics::stateTopic(f,_portal._mqttClient.mqttTopic("stat",key)),payload)) return false;
+  String payload = value.type() == V::Type::String ? value.asString() : _portal._json.stringify(value, false, nullptr, snapshotLimits());
+  if (!queueAppEmission(ArdMqttFieldTopics::stateTopic(f, _portal._mqttClient.mqttTopic("stat", key)), payload)) return false;
 #endif
-  _appState[key]=value;++_portal._appRevision;
+  _appState[key] = value;
+  ++_portal._appRevision;
 #if ARDPORTAL_ENABLE_HA && ARDPORTAL_ENABLE_DEPENDENCIES
   _portal._homeAssistant.dependencyChanged(key);
 #endif
   return true;
 #else
-  (void)key;(void)value;return false;
+  (void)key;
+  (void)value;
+  return false;
 #endif
 }
 
@@ -287,54 +367,96 @@ bool ArdAppControls::emitAppConfigEvent(const char* key,const V& value) {
  * @param source Input source or origin of a configuration change, as indicated by its type.
  * @return True if the action was accepted; false for an invalid, hidden or unsupported action.
  */
-bool ArdAppControls::appControl(const V& definition,size_t index,const V& value,ChangeSource source) {
+bool ArdAppControls::appControl(const V& definition, size_t index, const V& value, ChangeSource source) {
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
-  _appControlStage=1;if(source!=ChangeSource::Zigbee&&!appFieldVisible(definition)) {_appControlStage=6;return false;}V resolved=definition;if(!ArdHa::normalize(resolved,true)) return false;const V& f=resolved;
-  _appControlStage=2;if(!ArdHa::extended(f)||index>=f["controls"].length()) return false;
-  const V& c=f["controls"][index];String kind=c["type"].asString(),key=f["id"].asString(),suffix=c["command"].asString();
+  _appControlStage = 1;
+  if (source != ChangeSource::Zigbee && !appFieldVisible(definition)) {
+    _appControlStage = 6;
+    return false;
+  }
+  V resolved = definition;
+  if (!ArdHa::normalize(resolved, true)) return false;
+  const V& f = resolved;
+  _appControlStage = 2;
+  if (!ArdHa::extended(f) || index >= f["controls"].length()) return false;
+  const V& c = f["controls"][index];
+  String kind = c["type"].asString(), key = f["id"].asString(), suffix = c["command"].asString();
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
-  if(kind.indexOf("action")==0) {
+  if (kind.indexOf("action") == 0) {
 #if ARDPORTAL_ZIGBEE_OTA_SUPPORT
-    if(f["type"].asString()=="update"&&value.asString()=="INSTALL"&&c["payload"].asString()=="INSTALL"&&_portal._zigbee.queryOta())return true;
+    if (f["type"].asString() == "update" && value.asString() == "INSTALL" && c["payload"].asString() == "INSTALL" && _portal._zigbee.queryOta()) return true;
 #endif
-    if(!_portal._appCommand){_appControlStage=7;return false;}
-    if(kind=="action" && _portal._json.stringify(value,false,nullptr,snapshotLimits())!=_portal._json.stringify(c["payload"])) return false;
-    if(kind=="action_text"&&!ArdHa::string(value)) return false;
-    if(kind=="action_json"&&(!value.isValid()||value.isUndefined()||_portal._json.stringify(value,false,nullptr,[](){ArdJSON::Limits limits;limits.maxNodes=512;return limits;}()).length()>1500)) return false;
-    if(!_portal._appCommand(key,suffix,value,source)){_appControlStage=8;return false;}
+    if (!_portal._appCommand) {
+      _appControlStage = 7;
+      return false;
+    }
+    if (kind == "action" && _portal._json.stringify(value, false, nullptr, snapshotLimits()) != _portal._json.stringify(c["payload"])) return false;
+    if (kind == "action_text" && !ArdHa::string(value)) return false;
+    if (kind == "action_json" && (!value.isValid() || value.isUndefined() || _portal._json.stringify(value, false, nullptr, []() {
+                                                                                            ArdJSON::Limits limits;
+                                                                                            limits.maxNodes = 512;
+                                                                                            return limits;
+                                                                                          }())
+                                                                                 .length()
+                                                                               > 1500)) return false;
+    if (!_portal._appCommand(key, suffix, value, source)) {
+      _appControlStage = 8;
+      return false;
+    }
 #if ARDPORTAL_ENABLE_MQTT
-    if(_portal.mqttConnected()) {
-      V ack=V::object();ack["command"]=suffix;ack["value"]=value;ack["accepted"]=true;
+    if (_portal.mqttConnected()) {
+      V ack = V::object();
+      ack["command"] = suffix;
+      ack["value"] = value;
+      ack["accepted"] = true;
       // The callback accepts an action; it must report actual hardware state separately.
-      if(!ArdHa::transient(f)) {V state=_portal.getAppConfigValue(key.c_str());String payload=state.type()==V::Type::String?state.asString():_portal._json.stringify(state);queueAppEmission(ArdMqttFieldTopics::stateTopic(f,_portal._mqttClient.mqttTopic("stat",key.c_str())),payload);}
-      queueAppEmission(_portal._mqttClient.mqttTopic("stat",(key+(ArdHa::transient(f)?String():String(F("_ack")))).c_str()),_portal._json.stringify(ack));
+      if (!ArdHa::transient(f)) {
+        V state = _portal.getAppConfigValue(key.c_str());
+        String payload = state.type() == V::Type::String ? state.asString() : _portal._json.stringify(state);
+        queueAppEmission(ArdMqttFieldTopics::stateTopic(f, _portal._mqttClient.mqttTopic("stat", key.c_str())), payload);
+      }
+      queueAppEmission(_portal._mqttClient.mqttTopic("stat", (key + (ArdHa::transient(f) ? String() : String(F("_ack")))).c_str()), _portal._json.stringify(ack));
     }
 #endif
     // Acceptance depends on the local callback, even if MQTT delivery is unavailable.
     return true;
   }
 #endif
-  _appControlStage=3;if(!ArdHa::validControl(c,value)) return false;
+  _appControlStage = 3;
+  if (!ArdHa::validControl(c, value)) return false;
   // Reuse the resolved schema instead of normalizing it again in getAppConfigValue.
-  const V& states=_appState;const V& saved=_portal._appConfig;
-  V next=states.hasOwnProperty(key)?states[key]:saved[key];
-  if(!ArdHa::validValue(f,next)) next=f["default"];
-  String property=c["key"].asString();if(property.length()) next[property]=value;else next=value;
-  _appControlStage=4;if(!ArdHa::validValue(f,next)) return false;
-  if(!f["persist"].asBool()) {if(!applyAppState(key,next,source)) return false;markDirty(key);return true;}
-  _appControlStage=5;
+  const V& states = _appState;
+  const V& saved = _portal._appConfig;
+  V next = states.hasOwnProperty(key) ? states[key] : saved[key];
+  if (!ArdHa::validValue(f, next)) next = f["default"];
+  String property = c["key"].asString();
+  if (property.length()) next[property] = value;
+  else next = value;
+  _appControlStage = 4;
+  if (!ArdHa::validValue(f, next)) return false;
+  if (!f["persist"].asBool()) {
+    if (!applyAppState(key, next, source)) return false;
+    markDirty(key);
+    return true;
+  }
+  _appControlStage = 5;
 #if ARDPORTAL_ENABLE_MQTT
-  if(source==ChangeSource::Mqtt) return acceptMqttState(key,next);
+  if (source == ChangeSource::Mqtt) return acceptMqttState(key, next);
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE
-  if(source==ChangeSource::Zigbee)return _portal.acceptZigbeeState(key,next);
+  if (source == ChangeSource::Zigbee) return _portal.acceptZigbeeState(key, next);
 #endif
-  V patch=V::object();patch[key]=next;
-  if(_portal._saveQueued||_portal._pendingReady||_portal._storage.busy()||_portal.mqttTrialActive()) return false;
-  if(!_portal.scheduleAppPatch(std::move(patch),source))return false;
-  return applyAppState(key,next,source);
+  V patch = V::object();
+  patch[key] = next;
+  if (_portal._saveQueued || _portal._pendingReady || _portal._storage.busy() || _portal.mqttTrialActive()) return false;
+  if (!_portal.scheduleAppPatch(std::move(patch), source)) return false;
+  return applyAppState(key, next, source);
 #else
-  (void)definition;(void)index;(void)value;(void)source;return false;
+  (void)definition;
+  (void)index;
+  (void)value;
+  (void)source;
+  return false;
 #endif
 }
 
@@ -357,7 +479,10 @@ void ArdAppControls::disconnected() {
  * @return No value.
  */
 void ArdAppControls::yieldAfterPublish() {
-  if (_yieldPending) { _yieldPending=false; yield(); }
+  if (_yieldPending) {
+    _yieldPending = false;
+    yield();
+  }
 }
 #endif
 
@@ -367,14 +492,19 @@ void ArdAppControls::yieldAfterPublish() {
  * @return No value.
  */
 void ArdAppControls::applyAppConfig(V app) {
-  ChangeSource source=_portal._saveSource; V previous=std::move(_portal._appConfig); _portal._appConfig=std::move(app); ++_portal._appRevision;
-  V keys=previous.keys(), next=_portal._appConfig.keys();
-  for(size_t i=0;i<next.length();++i) if(!previous.hasOwnProperty(next[i].asString())) keys.push(next[i]);
-  for(size_t i=0;i<keys.length();++i) {
-    String key=keys[i].asString(); V old=_appState.hasOwnProperty(key)?static_cast<const V&>(_appState)[key]:static_cast<const V&>(previous)[key];
-    if(_appState.hasOwnProperty(key)&&_portal._json.stringify(_appState[key],false,nullptr,snapshotLimits())==_portal._json.stringify(static_cast<const V&>(_portal._appConfig)[key],false,nullptr,snapshotLimits())) _appState.remove(key);
-    V value=_portal.getAppConfigValue(key.c_str());
-    if(ArdJSON::JSON.stringify(old,false,nullptr,snapshotLimits())==ArdJSON::JSON.stringify(value,false,nullptr,snapshotLimits())) continue;
+  ChangeSource source = _portal._saveSource;
+  V previous = std::move(_portal._appConfig);
+  _portal._appConfig = std::move(app);
+  ++_portal._appRevision;
+  V keys = previous.keys(), next = _portal._appConfig.keys();
+  for (size_t i = 0; i < next.length(); ++i)
+    if (!previous.hasOwnProperty(next[i].asString())) keys.push(next[i]);
+  for (size_t i = 0; i < keys.length(); ++i) {
+    String key = keys[i].asString();
+    V old = _appState.hasOwnProperty(key) ? static_cast<const V&>(_appState)[key] : static_cast<const V&>(previous)[key];
+    if (_appState.hasOwnProperty(key) && _portal._json.stringify(_appState[key], false, nullptr, snapshotLimits()) == _portal._json.stringify(static_cast<const V&>(_portal._appConfig)[key], false, nullptr, snapshotLimits())) _appState.remove(key);
+    V value = _portal.getAppConfigValue(key.c_str());
+    if (ArdJSON::JSON.stringify(old, false, nullptr, snapshotLimits()) == ArdJSON::JSON.stringify(value, false, nullptr, snapshotLimits())) continue;
 #if ARDPORTAL_ENABLE_HA && ARDPORTAL_ENABLE_DEPENDENCIES
     _portal._homeAssistant.dependencyChanged(key);
 #endif
@@ -383,27 +513,34 @@ void ArdAppControls::applyAppConfig(V app) {
 #endif
     markDirty(key);
     // MQTT intent was already dispatched on receipt. A flash commit is not a new command.
-    if(source!=ChangeSource::Mqtt && source!=ChangeSource::Zigbee && _portal._appChanged) { V copy=value; _portal._appChanged(key,copy,source); }
+    if (source != ChangeSource::Mqtt && source != ChangeSource::Zigbee && _portal._appChanged) {
+      V copy = value;
+      _portal._appChanged(key, copy, source);
+    }
   }
 }
 
 
-void ArdAppControls::applyAppPatch(V patch){
+void ArdAppControls::applyAppPatch(V patch) {
   // Snapshot only affected effective values, never every saved field/key.
-  V old=V::object(),keys=patch.keys();
-  patch.forEachObjectMember([&](const String& key,const V&){old[key]=_portal.getAppConfigValue(key.c_str());return old.isObjectPatchValid();});
-  if(!_portal._appConfig.applyObjectPatch(std::move(patch)))return;
+  V old = V::object(), keys = patch.keys();
+  patch.forEachObjectMember([&](const String& key, const V&) {
+    old[key] = _portal.getAppConfigValue(key.c_str());
+    return old.isObjectPatchValid();
+  });
+  if (!_portal._appConfig.applyObjectPatch(std::move(patch))) return;
   ++_portal._appRevision;
-  for(size_t i=0;i<keys.length();++i){String key=keys[i].asString();
-    const V& saved=_portal._appConfig;
-    if(_appState.hasOwnProperty(key)){
-      String runtime=_portal._json.stringify(_appState[key],false,nullptr,snapshotLimits()),stored=_portal._json.stringify(saved[key],false,nullptr,snapshotLimits());
-      if(runtime.length()&&stored.length()&&runtime==stored)_appState.remove(key);
+  for (size_t i = 0; i < keys.length(); ++i) {
+    String key = keys[i].asString();
+    const V& saved = _portal._appConfig;
+    if (_appState.hasOwnProperty(key)) {
+      String runtime = _portal._json.stringify(_appState[key], false, nullptr, snapshotLimits()), stored = _portal._json.stringify(saved[key], false, nullptr, snapshotLimits());
+      if (runtime.length() && stored.length() && runtime == stored) _appState.remove(key);
     }
-    V value=_portal.getAppConfigValue(key.c_str());
-    const V& previous=static_cast<const V&>(old)[key];
-    String before=_portal._json.stringify(previous,false,nullptr,snapshotLimits()),after=_portal._json.stringify(value,false,nullptr,snapshotLimits());
-    if((previous.isUndefined()&&value.isUndefined())||(before.length()&&after.length()&&before==after))continue;
+    V value = _portal.getAppConfigValue(key.c_str());
+    const V& previous = static_cast<const V&>(old)[key];
+    String before = _portal._json.stringify(previous, false, nullptr, snapshotLimits()), after = _portal._json.stringify(value, false, nullptr, snapshotLimits());
+    if ((previous.isUndefined() && value.isUndefined()) || (before.length() && after.length() && before == after)) continue;
 #if ARDPORTAL_ENABLE_HA && ARDPORTAL_ENABLE_DEPENDENCIES
     _portal._homeAssistant.dependencyChanged(key);
 #endif
@@ -411,7 +548,7 @@ void ArdAppControls::applyAppPatch(V patch){
     _portal.markZigbeeStateDirty(key);
 #endif
     markDirty(key);
-    if(_portal._saveSource!=ChangeSource::Mqtt&&_portal._saveSource!=ChangeSource::Zigbee&&_portal._appChanged)_portal._appChanged(key,value,_portal._saveSource);
+    if (_portal._saveSource != ChangeSource::Mqtt && _portal._saveSource != ChangeSource::Zigbee && _portal._appChanged) _portal._appChanged(key, value, _portal._saveSource);
   }
 }
 #if ARDPORTAL_ENABLE_MQTT
@@ -433,7 +570,8 @@ void ArdAppControls::acknowledgeSave(bool saved) {
  */
 void ArdAppControls::markDirty(const String& key) {
 #if ARDPORTAL_ENABLE_MQTT
-  size_t index=_portal._dynamic.indexOf(key);if(index<_portal._dynamic.count())_stateDirty|=ArdAppConfigFieldMask::forField(index);
+  size_t index = _portal._dynamic.indexOf(key);
+  if (index < _portal._dynamic.count()) _stateDirty |= ArdAppConfigFieldMask::forField(index);
 #else
   (void)key;
 #endif
@@ -451,7 +589,9 @@ bool ArdAppControls::canServiceMqtt() const {
  * @return No value.
  */
 void ArdAppControls::resetMqtt() {
-  _subscriptions=0; _stateDirty=stateMask(); _stateSince=millis();
+  _subscriptions = 0;
+  _stateDirty = stateMask();
+  _stateSince = millis();
 }
 /**
  * @brief Apply an incoming MQTT state value to its application field.
@@ -459,15 +599,16 @@ void ArdAppControls::resetMqtt() {
  * @param value Input value, or output destination when passed by mutable reference.
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
-bool ArdAppControls::acceptMqttState(const String& key,V value) {
+bool ArdAppControls::acceptMqttState(const String& key, V value) {
   // Own the command value: application callbacks can replace the reported state.
-  if(!applyAppState(key,value,ChangeSource::Mqtt)) return false;
+  if (!applyAppState(key, value, ChangeSource::Mqtt)) return false;
   markDirty(key);
-  const V& field=_portal._dynamic.field(key);
-  if(field.hasOwnProperty("persist")&&!field["persist"].asBool())return true;
-  _mqttAppQueue[key]=value;
-  if(!_mqttAppQueue.isValid()) return false;
-  size_t index=_portal._dynamic.indexOf(key);if(index<_portal._dynamic.count())_mqttAckPending|=ArdAppConfigFieldMask::forField(index);
+  const V& field = _portal._dynamic.field(key);
+  if (field.hasOwnProperty("persist") && !field["persist"].asBool()) return true;
+  _mqttAppQueue[key] = value;
+  if (!_mqttAppQueue.isValid()) return false;
+  size_t index = _portal._dynamic.indexOf(key);
+  if (index < _portal._dynamic.count()) _mqttAckPending |= ArdAppConfigFieldMask::forField(index);
   return true;
 }
 /**
@@ -477,14 +618,16 @@ bool ArdAppControls::acceptMqttState(const String& key,V value) {
  */
 void ArdAppControls::prepareMqtt(uint32_t now) {
   // Only persistence waits for flash. Accepted commands have already run.
-  if(_mqttAppQueue.length()&&!_portal.portalAndAppConfigBusy()&&!_portal._httpWaitingStorage) {
-    if(_portal.scheduleAppPatch(_mqttAppQueue,ChangeSource::Mqtt)) {
-      _mqttAckInFlight=_mqttAckPending; _mqttAckPending=0;
-      _mqttAppQueue=V::object();
+  if (_mqttAppQueue.length() && !_portal.portalAndAppConfigBusy() && !_portal._httpWaitingStorage) {
+    if (_portal.scheduleAppPatch(_mqttAppQueue, ChangeSource::Mqtt)) {
+      _mqttAckInFlight = _mqttAckPending;
+      _mqttAckPending = 0;
+      _mqttAppQueue = V::object();
     }
   }
-  if(_portal._options.appStateIntervalMs && uint32_t(now-_stateSince)>=_portal._options.appStateIntervalMs) {
-    _stateDirty=stateMask(); _stateSince=now;
+  if (_portal._options.appStateIntervalMs && uint32_t(now - _stateSince) >= _portal._options.appStateIntervalMs) {
+    _stateDirty = stateMask();
+    _stateSince = now;
   }
 }
 /**
@@ -493,17 +636,28 @@ void ArdAppControls::prepareMqtt(uint32_t now) {
  */
 bool ArdAppControls::publishCommands() {
 #if ARDPORTAL_CONTROL_SUPPORT_EMISSIONS
-  if(_emissionCount) { const AppEmission& e=_appEmissions[_emissionHead]; if(_portal._mqttClient.publishRaw(e.topic.c_str(),e.payload.c_str(),false)) { _appEmissions[_emissionHead]=AppEmission();_emissionHead=(_emissionHead+1)%8;--_emissionCount;_yieldPending=true; } return true; }
+  if (_emissionCount) {
+    const AppEmission& e = _appEmissions[_emissionHead];
+    if (_portal._mqttClient.publishRaw(e.topic.c_str(), e.payload.c_str(), false)) {
+      _appEmissions[_emissionHead] = AppEmission();
+      _emissionHead = (_emissionHead + 1) % 8;
+      --_emissionCount;
+      _yieldPending = true;
+    }
+    return true;
+  }
 #endif
-  if(_subscriptions<(ARDPORTAL_ENABLE_HA?3:2)) { String filter;
+  if (_subscriptions < (ARDPORTAL_ENABLE_HA ? 3 : 2)) {
+    String filter;
 #if ARDPORTAL_ENABLE_HA
-    if(_subscriptions==2) filter="homeassistant/status"; else {
+    if (_subscriptions == 2) filter = "homeassistant/status";
+    else {
 #endif
-    filter=_portal._mqttClient.mqttTopic(_subscriptions==0?"cmnd":"get","+");
+      filter = _portal._mqttClient.mqttTopic(_subscriptions == 0 ? "cmnd" : "get", "+");
 #if ARDPORTAL_ENABLE_HA
     }
 #endif
-    if(_portal._mqttClient.subscribeRaw(filter.c_str())) ++_subscriptions;
+    if (_portal._mqttClient.subscribeRaw(filter.c_str())) ++_subscriptions;
     return true;
   }
   return false;
@@ -513,23 +667,31 @@ bool ArdAppControls::publishCommands() {
  * @return True if publication work was performed or advanced; false if it could not proceed.
  */
 bool ArdAppControls::publishState() {
-  size_t f=_stateDirty.firstSet();if(f>=_portal._dynamic.count())return false;
+  size_t f = _stateDirty.firstSet();
+  if (f >= _portal._dynamic.count()) return false;
   {
-    const V& field=_portal._dynamic.at(f); String id=field["id"].asString(),topic=ArdMqttFieldTopics::stateTopic(field,_portal._mqttClient.mqttTopic("stat",id.c_str())); V value=_portal.getAppConfigValue(id.c_str());
+    const V& field = _portal._dynamic.at(f);
+    String id = field["id"].asString(), topic = ArdMqttFieldTopics::stateTopic(field, _portal._mqttClient.mqttTopic("stat", id.c_str()));
+    V value = _portal.getAppConfigValue(id.c_str());
     String payload;
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    if(
+    if (
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
-       field["type"].asString()=="switch" ||
+      field["type"].asString() == "switch" ||
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-       field["type"].asString()=="binary_sensor" ||
+      field["type"].asString() == "binary_sensor" ||
 #endif
-       false) payload=value.asBool()?"ON":"OFF";
+      false)
+      payload = value.asBool() ? "ON" : "OFF";
     else
 #endif
-      payload=value.type()==V::Type::String?value.asString():_portal._json.stringify(value,false,nullptr,snapshotLimits());
-    if(_portal._mqttClient.publishRaw(topic.c_str(),payload.c_str(),true)) { _stateDirty&=~(ArdAppConfigFieldMask::forField(f)); _yieldPending=true; } return true;
+      payload = value.type() == V::Type::String ? value.asString() : _portal._json.stringify(value, false, nullptr, snapshotLimits());
+    if (_portal._mqttClient.publishRaw(topic.c_str(), payload.c_str(), true)) {
+      _stateDirty &= ~(ArdAppConfigFieldMask::forField(f));
+      _yieldPending = true;
+    }
+    return true;
   }
   return false;
 }
@@ -539,9 +701,9 @@ bool ArdAppControls::publishState() {
  * @return No value.
  */
 void ArdAppControls::serviceMqttValues(uint32_t now) {
-  if(!canServiceMqtt()) return;
+  if (!canServiceMqtt()) return;
   prepareMqtt(now);
-  if(_portal._mqttClient.sendBusy() || publishCommands()) return;
+  if (_portal._mqttClient.sendBusy() || publishCommands()) return;
   publishState();
 }
 #endif

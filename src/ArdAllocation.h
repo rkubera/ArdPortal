@@ -28,12 +28,24 @@ inline void* allocate(size_t bytes) noexcept {
 // Class-local operators bypass embedded toolchains whose global nothrow new
 // delegates to throwing new and terminates when exceptions are disabled.
 #define ARDPORTAL_NO_THROW_ALLOCATION \
-  static void* operator new(size_t bytes, const std::nothrow_t&) noexcept { return ArdAllocation::allocate(bytes); } \
-  static void operator delete(void* p) noexcept { std::free(p); } \
-  static void operator delete(void* p, const std::nothrow_t&) noexcept { std::free(p); } \
-  static void* operator new[](size_t bytes, const std::nothrow_t&) noexcept { return ArdAllocation::allocate(bytes); } \
-  static void operator delete[](void* p) noexcept { std::free(p); } \
-  static void operator delete[](void* p, const std::nothrow_t&) noexcept { std::free(p); }
+  static void* operator new(size_t bytes, const std::nothrow_t&) noexcept { \
+    return ArdAllocation::allocate(bytes); \
+  } \
+  static void operator delete(void* p) noexcept { \
+    std::free(p); \
+  } \
+  static void operator delete(void* p, const std::nothrow_t&) noexcept { \
+    std::free(p); \
+  } \
+  static void* operator new[](size_t bytes, const std::nothrow_t&) noexcept { \
+    return ArdAllocation::allocate(bytes); \
+  } \
+  static void operator delete[](void* p) noexcept { \
+    std::free(p); \
+  } \
+  static void operator delete[](void* p, const std::nothrow_t&) noexcept { \
+    std::free(p); \
+  }
 
 namespace ArdAllocation {
 /**
@@ -47,21 +59,31 @@ template<class T> struct Deleter {
    * @param p Object to destroy; nullptr is allowed.
    * @return No value.
    */
-  void operator()(T* p) const noexcept { if(p){p->~T();std::free(p);} }
+  void operator()(T* p) const noexcept {
+    if (p) {
+      p->~T();
+      std::free(p);
+    }
+  }
 };
-template<class T> using Pointer=std::unique_ptr<T,Deleter<T>>;
+template<class T> using Pointer = std::unique_ptr<T, Deleter<T>>;
 /**
  * @brief Construct a foreign-library object without invoking global operator new.
  * @param args Constructor arguments forwarded to the object.
  * @return Object pointer, or nullptr on allocation/constructor failure.
  */
-template<class T,class... Args> T* create(Args&&... args) noexcept {
-  void* bytes=allocate(sizeof(T));if(!bytes)return nullptr;
+template<class T, class... Args> T* create(Args&&... args) noexcept {
+  void* bytes = allocate(sizeof(T));
+  if (!bytes) return nullptr;
 #if defined(__cpp_exceptions)
-  try {return ::new(bytes) T(std::forward<Args>(args)...);}
-  catch(...){std::free(bytes);return nullptr;}
+  try {
+    return ::new (bytes) T(std::forward<Args>(args)...);
+  } catch (...) {
+    std::free(bytes);
+    return nullptr;
+  }
 #else
-  return ::new(bytes) T(std::forward<Args>(args)...);
+  return ::new (bytes) T(std::forward<Args>(args)...);
 #endif
 }
 }

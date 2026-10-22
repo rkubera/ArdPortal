@@ -61,7 +61,7 @@ For grouped scene buttons, use `group.names` to translate the shared group title
 ## Languages and adding translations
 
 Translations are compiled according to the control flags and `ARDPORTAL_ENABLE_OTA`,
-`ARDPORTAL_ENABLE_MQTT` and `ARDPORTAL_ENABLE_CONSOLE`, using the same flags as
+`ARDPORTAL_ENABLE_MQTT`, `ARDPORTAL_ENABLE_CONSOLE` and `ARDPORTAL_ENABLE_ZIGBEE`, using the same flags as
 implementation and page assets. Disabled modules contribute neither their
 browser dictionary entries nor their native message entries. MQTT automatically
 disables Console and HA. Shared Info and dynamic-control translations remain
@@ -70,7 +70,7 @@ available when HA is off; they belong to the local portal, not discovery.
 All translations stay in `languages/<code>.json`. The module-to-key assignment
 is in `tools/language_features.json`; keys absent from this map are shared.
 When adding a module-specific key, add it to the corresponding assignment and
-regenerate `LanguageData.h`. Additional languages inherit the same assignments
+regenerate `LanguageData.h` and `LanguageLiterals.h`. Additional languages inherit the same assignments
 and the English fallback. ArdFS uses a separate storage-message table so its
 independent compilation cannot retain text from disabled portal modules.
 
@@ -96,8 +96,8 @@ and `navigator.language`, matching locale/code first and then the base language.
 An available saved preference takes priority; otherwise the default catalog is
 the final fallback. Automatic detection does not overwrite a manual preference. Changing language preserves unsaved form values and does not write
 flash. HTTP requests carry `X-ArdUI-Language`; future native messages use the
-language of the most recent portal request. Application-defined text and generic
-JSON parser error codes are outside this translation catalog.
+language of the most recent portal request. Application-defined text remains in its page definitions. Low-level diagnostics
+are also in the catalog, with the compile-time language selection described below.
 
 To add another language:
 
@@ -121,7 +121,20 @@ large enough.
 HTML. `s_*` keys are used by native messages. To add a description, add its
 key to the default catalog, provide translations and reference it from the code.
 Protocol routes, JSON field names, MQTT topics and device identity are not
-translated. Runtime JSON syntax diagnostics remain stable English error codes.
+translated. `native_*` entries generate `LanguageLiterals.h`. They cover JSON/AppConfig
+errors, native logs, Zigbee diagnostics and compile-time configuration errors.
+These remain C++ literals, so `const char*`, `F()`, printf formats and compile-time
+checks keep their existing storage and allocation behavior. They do not add a
+runtime pointer table. Their language is fixed when compiling:
+`ARDPORTAL_NATIVE_LANGUAGE=0` selects English; further indexes follow English
+first, then the other catalog filenames in sorted order. Missing entries fall
+back to English. Preserve printf conversion types/order, protocol fields in
+structured logs and diagnostic marker fragments such as `memory` when translating.
+The browser selector continues to select `ui_*` and `s_*` text at runtime.
+
+`export_*` entries supply descriptions in generated integration assets. After
+editing these, also run `python3 src/tools/generate_zigbee_converter.py`.
+Changes to portal HTML/JavaScript require `python3 src/tools/generate_portal_assets.py`.
 
 ---
 

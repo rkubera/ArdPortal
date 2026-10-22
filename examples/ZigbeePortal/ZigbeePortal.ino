@@ -24,30 +24,33 @@
 #include <ArdPortal.h>
 ArdPortal portal;
 /** @brief Install diagnostics and start portal. @return No value. */
-void setup(){
+void setup() {
   Serial.begin(115200);
-  portal.onZigbeeOperationFinished([](ArdPortal::ZigbeeOperation operation,bool success,const String& error){
-    Serial.printf("Zigbee operation=%u result=%s error=%s\n",unsigned(operation),success?"OK":"FAILED",error.c_str());
+  portal.onZigbeeOperationFinished([](ArdPortal::ZigbeeOperation operation, bool success, const String& error) {
+    Serial.printf("Zigbee operation=%u result=%s error=%s\n", unsigned(operation), success ? "OK" : "FAILED", error.c_str());
   });
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   // Register all pages before Zigbee freezes its endpoints. Use flash definitions.
-  portal.onAppConfigValueChanged([](const String& id,const ArdJSON::JSONVar& value,ArdPortal::ChangeSource source){
-    Serial.printf("Field %s source=%u value=%s\n",id.c_str(),unsigned(source),ArdJSON::JSON.stringify(value).c_str());
+  portal.onAppConfigValueChanged([](const String& id, const ArdJSON::JSONVar& value, ArdPortal::ChangeSource source) {
+    Serial.printf("Field %s source=%u value=%s\n", id.c_str(), unsigned(source), ArdJSON::JSON.stringify(value).c_str());
     // Drive real hardware here. Report actual sensor/actuator state with
     // portal.setAppConfigStateValue(id.c_str(), state).
   });
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
-  portal.onAppConfigCommand([](const String& id,const String&,const ArdJSON::JSONVar& value,ArdPortal::ChangeSource){
-    Serial.printf("Action %s: %s\n",id.c_str(),ArdJSON::JSON.stringify(value).c_str());
+  portal.onAppConfigCommand([](const String& id, const String&, const ArdJSON::JSONVar& value, ArdPortal::ChangeSource) {
+    Serial.printf("Action %s: %s\n", id.c_str(), ArdJSON::JSON.stringify(value).c_str());
     // This example has no lock/cover hardware, so do not acknowledge movement.
     return false;
   });
 #endif
-  portal.onAppConfigPageRegistrationFinished([](bool success){
-    if(success)Serial.println("Native page registered");
-    else {const auto& error=portal.appConfigRegistrationError();Serial.printf("Registration failed: stage=%s field=%s reason=%s\n",error.stage,error.fieldId.c_str(),error.reason.c_str());}
+  portal.onAppConfigPageRegistrationFinished([](bool success) {
+    if (success) Serial.println("Native page registered");
+    else {
+      const auto& error = portal.appConfigRegistrationError();
+      Serial.printf("Registration failed: stage=%s field=%s reason=%s\n", error.stage, error.fieldId.c_str(), error.reason.c_str());
+    }
   });
-  bool accepted=portal.startAppConfigPageRegistration(F(R"JSON({"id":"native","name":"Native Zigbee","order":0,"fields":[
+  bool accepted = portal.startAppConfigPageRegistration(F(R"JSON({"id":"native","name":"Native Zigbee","order":0,"fields":[
     {"id":"relay","type":"switch","name":"Relay","default":false},
     {"id":"setpoint","type":"slider","name":"Setpoint","min":0,"max":100,"step":1},
     {"id":"profile","type":"select","name":"Profile","options":[{"value":"normal","name":"Normal"},{"value":"eco","name":"Eco"}]},
@@ -71,9 +74,11 @@ void setup(){
     {"id":"presence","type":"device_tracker","name":"Presence"},
     {"id":"firmware","type":"update","name":"Firmware"}
   ]})JSON"));
-  if(!accepted)Serial.println(portal.appConfigRegistrationError().reason);
+  if (!accepted) Serial.println(portal.appConfigRegistrationError().reason);
 #endif
-  if(!portal.begin())Serial.println("Could not start portal");
+  if (!portal.begin()) Serial.println("Could not start portal");
 }
 /** @brief Advance networking and application callbacks. @return No value. */
-void loop(){portal.loop();}
+void loop() {
+  portal.loop();
+}

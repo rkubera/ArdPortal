@@ -4,6 +4,7 @@
 """Generate the common ZHA quirk tail stored in flash."""
 import argparse
 from pathlib import Path
+from cpp_format import format_cpp
 
 
 def main():
@@ -17,6 +18,7 @@ def main():
               '// SPDX-License-Identifier: MIT\n#pragma once\n'
               'static const char ARD_ZHA_QUIRK_TAIL[] PROGMEM=R"PY(' + source + ')PY";\n')
     destination = root / 'ZhaQuirkAssets.h'
+    result = format_cpp(result, destination.name)
     if args.check:
         if not destination.exists() or destination.read_text(encoding='utf-8') != result:
             raise SystemExit('ZHA quirk asset is stale')

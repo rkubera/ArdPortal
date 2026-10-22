@@ -22,12 +22,11 @@ void setup() {
   Serial.begin(115200);
   pinMode(IndicatorPin, OUTPUT);
   digitalWrite(IndicatorPin, LOW);
-  if (!portal.addAppConfigEntity(FPSTR(UPTIME_ENTITY)) ||
-      !portal.addAppConfigEntity(FPSTR(INDICATOR_ENTITY))) {
+  if (!portal.addAppConfigEntity(FPSTR(UPTIME_ENTITY)) || !portal.addAppConfigEntity(FPSTR(INDICATOR_ENTITY))) {
     Serial.println(F("Invalid HA entity definition."));
   }
   portal.onAppConfigValueChanged([](const String& key,
-      const ArdJSON::JSONVar& value, ArdPortal::ChangeSource) {
+                                    const ArdJSON::JSONVar& value, ArdPortal::ChangeSource) {
     if (key == "indicator") digitalWrite(IndicatorPin, value.asBool() ? HIGH : LOW);
   });
   portal.onPortalAndAppConfigReady([](bool) {
