@@ -7,15 +7,6 @@
 
 namespace ArdHa {
 using V=ArdJSON::JSONVar;
-// Match discovery's literal topic overrides and its $state placeholder.
-inline String stateTopic(const V& field,const String& fallback) {
-  String type=field["type"].asString();
-  const char* key=(type=="tag"||type=="device_trigger")?"topic":
-                  type=="lawn_mower"?"activity_state_topic":"state_topic";
-  String topic=field["ha"][key].asString();
-  return !topic.length()||topic=="$state"?fallback:topic;
-}
-
 /**
  * @brief Build a normalized Home Assistant entity descriptor.
  * @param type JSON, control or protocol type being examined.

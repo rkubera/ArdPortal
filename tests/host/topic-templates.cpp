@@ -16,7 +16,11 @@ int main(){
  V oom=ArdJSON::JSON.parse(R"({"ha":{"state_topic":"stat/$device/a"}})");
  allocationBudget=0;assert(!ArdTopicTemplates::resolve(oom,"test"));allocationBudget=-1;
  assert(ArdTopicTemplates::resolve(oom,"test"));
+ V mqtt=ArdJSON::JSON.parse(R"({"mqtt":{"state_topic":"stat/$device/state"}})");
+ assert(ArdTopicTemplates::resolve(mqtt,"unit-abc"));
+ assert(static_cast<const V&>(mqtt)["mqtt"]["state_topic"].asString()=="stat/unit-abc/state");
  const char* examples[]={
+ R"({"mqtt":{"state_topic":"stat/$device/state"},"ha":{"state_topic":"legacy/$device"}})",
  R"({"id":"x","name":"$device label","ha":{"state_topic":"stat/$device/x","command_topic":"cmnd/$device/$device","value_template":"{{ '$device' }}","payload_on":"$device","nested":{"topic":"$device"},"topic":123}})",
  R"({"ha":{"st\u0061te_topic":"$device\u002fxyz","topic":"$device"},"label":"escaped \"$device\""})",
  R"({"ha":null,"type":"text","default":"$device"})",

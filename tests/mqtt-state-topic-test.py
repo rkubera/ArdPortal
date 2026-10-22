@@ -2,13 +2,10 @@ from pathlib import Path
 import subprocess, tempfile
 
 root = Path(__file__).resolve().parents[1]
-source = (root / 'src/HaEntities.h').read_text()
-a = source.index('inline String stateTopic(')
-b = source.index('\n/**', a)
-helper = source[a:b]
 fixture = r'''
 #include <cassert>
-#include "ArdJSON.h"
+#include "MqttFieldTopics.h"
+using ArdMqttFieldTopics::stateTopic;
 uint32_t fakeMillis=0;
 using V=ArdJSON::JSONVar;
 '''
@@ -24,12 +21,21 @@ int main() {
   assert(stateTopic(f,"stat/device/reading")=="stat/device/reading");
   f["ha"][key]="custom/device/state";
   assert(stateTopic(f,"stat/device/reading")=="custom/device/state");
+  f["mqtt"]=V::object();f["mqtt"]["state_topic"]="mqtt/device/state";
+  assert(stateTopic(f,"stat/device/reading")=="mqtt/device/state");
+  f["mqtt"]["state_topic"]="$state";
+  assert(stateTopic(f,"stat/device/reading")=="stat/device/reading");
+  f["mqtt"]["state_topic"]="";
+  assert(stateTopic(f,"stat/device/reading")=="stat/device/reading");
+  f.remove("ha");f["mqtt"]["state_topic"]="mqtt/only";
+  assert(stateTopic(f,"stat/device/reading")=="mqtt/only");
  }
 }
 '''
 with tempfile.TemporaryDirectory(prefix='ardportal-state-topic-') as tmp:
     tmp=Path(tmp)
-    (tmp/'test.cpp').write_text(fixture+helper+main)
-    subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),'-o',str(tmp/'test')],check=True)
-    subprocess.run([str(tmp/'test')],check=True)
+    (tmp/'test.cpp').write_text(fixture+main)
+    for ha in (0, 1):
+        subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-DARDPORTAL_ENABLE_MQTT=1','-DARDPORTAL_ENABLE_HA='+str(ha),'-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),'-o',str(tmp/'test')],check=True)
+        subprocess.run([str(tmp/'test')],check=True)
 print('PASS: configured state and event topics, missing/empty/$state fallbacks across entity types')

@@ -88,6 +88,7 @@ Optional properties available across the catalogue:
 | `persist` | Optional | Storage policy. Omission uses the type policy; `false` keeps edits in RAM. See [Persistence and callbacks](#persistence-and-callbacks). |
 | `visibleWhen` | Optional | Visibility rule; without it, there is no field-specific condition. Page conditions still apply. See [Dependent fields](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields). |
 | `icon` | Optional | HA icon override. The preset/HA default is used when omitted. |
+| `mqtt` | Optional | `state_topic` selects the MQTT publication topic, also used by HA discovery. Works with HA disabled. |
 | `ha` | Optional | Overrides only supplied discovery properties. Omission uses automatic HA configuration, including topics and templates. |
 | `unit_of_measurement`, `device_class`, `state_class`, `entity_category` | Optional, where supported by the HA component | Measurement/classification metadata. Choose values appropriate for that component. |
 
@@ -271,3 +272,13 @@ and brightness, so HA can show its native light color picker. It is not a
 standalone HA `color` entity. A switch's `mdi:toggle-switch` icon does not change
 HA's assumed-state behavior: an explicit `ha.optimistic:true` can still make HA
 show two action buttons instead of one state toggle.
+
+### MQTT state topic
+
+Set the publication topic independently of Home Assistant:
+
+```json
+{"type":"switch","id":"pump","name":"Pump","mqtt":{"state_topic":"stat/$device/pump_state"}}
+```
+
+`$device` expands to the device identity. Missing, empty or `$state` topics use the normal ID-based topic. `mqtt.state_topic` takes precedence over the legacy `ha.state_topic` alias (including when explicitly empty). Existing `ha.topic` overrides for tags/device triggers and `ha.activity_state_topic` for lawn mowers remain supported. HA discovery follows the selected MQTT topic; its `$state` references use that same topic. Command and acknowledgement topics are unchanged.

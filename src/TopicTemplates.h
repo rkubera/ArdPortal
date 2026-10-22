@@ -4,34 +4,35 @@
 #include "ArdJSON.h"
 #include "JsonFieldSlices.h"
 namespace ArdTopicTemplates {
-// Resolve only HA topic strings. Labels, payloads and Jinja templates stay literal.
+// Resolve only MQTT and HA topic strings. Labels, payloads and Jinja templates stay literal.
 inline bool resolve(ArdJSON::JSONVar& field,const String& device) {
   using V=ArdJSON::JSONVar;
   const V& definition=field;
-  if(!definition.hasOwnProperty("ha"))return true;
-  const V& ha=definition["ha"];
-  if(ha.type()!=V::Type::Object)return true;
-  V keys=ha.keys();if(!keys.isValid())return false;
-  for(size_t i=0;i<keys.length();++i){
-    String key=keys[i].asString();
-    if(key!="topic"&&!(key.length()>=6&&!memcmp(key.c_str()+key.length()-6,"_topic",6)))continue;
-    if(ha[key].type()!=V::Type::String)continue;
-    String topic=ha[key].asString();int at=topic.indexOf("$device");if(at<0)continue;
-    if(!device.length())return false;
-    size_t count=0;for(int p=at;p>=0;p=topic.indexOf("$device",p+7))++count;
-    const size_t expected=topic.length()-count*7+count*device.length();
-    topic.replace("$device",device);if(topic.length()!=expected)return false;
-    field["ha"][key]=topic;if(!field.isValid())return false;
+  for(const char* section:{"ha","mqtt"}) {
+    const V& ha=definition[section];
+    if(ha.type()!=V::Type::Object)continue;
+    V keys=ha.keys();if(!keys.isValid())return false;
+    for(size_t i=0;i<keys.length();++i){
+      String key=keys[i].asString();
+      if(key!="topic"&&!(key.length()>=6&&!memcmp(key.c_str()+key.length()-6,"_topic",6)))continue;
+      if(ha[key].type()!=V::Type::String)continue;
+      String topic=ha[key].asString();int at=topic.indexOf("$device");if(at<0)continue;
+      if(!device.length())return false;
+      size_t count=0;for(int p=at;p>=0;p=topic.indexOf("$device",p+7))++count;
+      const size_t expected=topic.length()-count*7+count*device.length();
+      topic.replace("$device",device);if(topic.length()!=expected)return false;
+      field[section][key]=topic;if(!field.isValid())return false;
+    }
   }
   return true;
 }
 /** @brief Resolve topic strings in a validated basic definition without building its DOM.
- * Only direct members of the top-level HA object are expanded, matching resolve().
+ * Only direct members of the top-level MQTT and HA objects are expanded, matching resolve().
  * Preserve all other source bytes, including labels, payloads and escaped strings. */
 inline String resolveJson(const String& source,const String& device) {
   ArdJsonFieldSlices slices(source);String output;size_t cursor=0;bool changed=false;
   const bool ok=slices.members(0,source.length(),[&](const String& name,size_t start,size_t length){
-    if(name!="ha"||slices.character(start)!='{')return true;
+    if((name!="ha"&&name!="mqtt")||slices.character(start)!='{')return true;
     return slices.members(start,length,[&](const String& key,size_t value,size_t bytes){
       if(key!="topic"&&!(key.length()>=6&&!memcmp(key.c_str()+key.length()-6,"_topic",6)))return true;
       if(slices.character(value)!='"')return true;
