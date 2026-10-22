@@ -2,10 +2,31 @@
 
 ## Unreleased
 
-- Parse portal style/script elements with the standard HTML parser instead of tag regexes; preserve generated assets and validate mixed-case tags, attributes and feature variants.
+## 0.8.1 — 2026-10-22
 
+### Added
 
-- Add three PR checks: host regressions and gateway exporters, Arduino compilation across ESP8266/ESP32/C5/C6/H2 plus feature-switch API probes, and Arduino Lint/generated-asset verification. Pin action revisions and tool/core versions; run fork contributions with read-only permissions.
+- Add integrated power management through `portal.power()` with AlwaysOn, EventDriven, Periodic and Manual policies, configurable connected/light/deep sleep, admission blockers, wake deadlines and boot/wake-cause reporting. AlwaysOn remains the default.
+- Add GPIO/ISR signals, software timers, periodic application cycles and Wi-Fi/Zigbee sleep coordination, with examples and documentation for supported network combinations and platform limitations.
+- Add independent MQTT field publication settings through `mqtt.state_topic`, including `$device` expansion with HA enabled or disabled. Keep legacy HA topic overrides as backward-compatible aliases; explicit MQTT settings take precedence.
+- Add CI checks for host regressions, gateway exporter compatibility, Arduino compilation across ESP8266/ESP32/C5/C6/H2, feature-switch API probes, Arduino Lint and generated assets. Pin actions, tools and board cores.
+
+### Changed
+
+- Reduce RAM copies of flash strings, translation text and page definitions, and reduce optional networking memory overhead. Remove internal size-report and measurement tooling.
+- Parse portal style/script elements with the standard HTML parser, preserving generated assets and covering mixed-case tags, attributes and feature variants.
+- Expand power-management documentation with policy/sleep combinations, wake sources, application locks and Wi-Fi/Zigbee behavior.
+
+### Fixed
+
+- Publish application state, events and action-triggered state reports to the configured MQTT topic instead of always using the field ID. Keep HA discovery and its default secondary state topics aligned with publication; missing, empty or `$state` settings retain the ID-based default.
+- Correct generated ZHA quirks so default-entity filtering preserves explicitly exposed entities, metadata targets the intended platform and unknown thermostat temperatures do not appear as valid readings.
+- Avoid allocating runtime state and triggering callbacks or MQTT updates for unchanged application values, and preserve MQTT packet buffers across partial writes.
+- Clarify parser, JSON and Zigbee control flow for strict GCC warnings and retain the mocked clock in host tests.
+
+### Validation
+
+- Host regressions cover power policies, platform adapters, wake causes, GPIO/ISR events, timers, MQTT topic precedence and actual retained PUBLISH packets with HA enabled and disabled, streaming topic expansion, persistence and generated UI behavior.
 
 ## 0.8.0 — 2026-10-20
 
