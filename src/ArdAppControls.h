@@ -18,26 +18,33 @@ private:
    * @param portal Owning portal instance.
    * @return No value.
    */
-  explicit ArdAppControls(ArdPortal& portal) : _portal(portal) {}
+  explicit ArdAppControls(ArdPortal& portal)
+    : _portal(portal) {}
   ArdPortal& _portal;
   using ChangeSource = ArdPortalChangeSource;
   ArdJSON::JSONVar _appState = ArdJSON::JSONVar::object();
-  uint8_t _appControlStage=0;
+  uint8_t _appControlStage = 0;
   /**
    * @brief Expose the current runtime application values.
    * @return Reference to the requested stored value or component.
    */
-  const ArdJSON::JSONVar& stateValues() const { return _appState; }
+  const ArdJSON::JSONVar& stateValues() const {
+    return _appState;
+  }
   /**
    * @brief Resolve the action stage for an application control.
    * @return The action stage for an application control.
    */
-  uint8_t controlStage() const { return _appControlStage; }
+  uint8_t controlStage() const {
+    return _appControlStage;
+  }
   /**
    * @brief Discard the pending application action stage.
    * @return No value.
    */
-  void clearControlStage() { _appControlStage=0; }
+  void clearControlStage() {
+    _appControlStage = 0;
+  }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   /**
    * @brief Evaluate a visibility dependency against the current application values.
@@ -111,15 +118,17 @@ private:
    */
   void markDirty(const String& key);
 #if ARDPORTAL_ENABLE_MQTT
-  ArdAppConfigFieldMask _stateDirty=0, _mqttAckPending=0, _mqttAckInFlight=0;
-  uint32_t _stateSince=0;
-  uint8_t _subscriptions=0;
-  bool _yieldPending=false;
+  ArdAppConfigFieldMask _stateDirty = 0, _mqttAckPending = 0, _mqttAckInFlight = 0;
+  uint32_t _stateSince = 0;
+  uint8_t _subscriptions = 0;
+  bool _yieldPending = false;
   ArdJSON::JSONVar _mqttAppQueue = ArdJSON::JSONVar::object();
 #if ARDPORTAL_CONTROL_SUPPORT_EMISSIONS
-  struct AppEmission { String topic, payload; };
+  struct AppEmission {
+    String topic, payload;
+  };
   AppEmission _appEmissions[8];
-  uint8_t _emissionHead=0, _emissionCount=0;
+  uint8_t _emissionHead = 0, _emissionCount = 0;
 #endif
   /**
    * @brief Expose the field mask used for pending state publication.

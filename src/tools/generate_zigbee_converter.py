@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 from pathlib import Path
+from cpp_format import format_cpp
 
 
 def compact_js(source):
@@ -47,7 +48,7 @@ def main():
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     destination = root / 'ZigbeeConverterAssets.h'
-    output = generate(root)
+    output = format_cpp(generate(root), "ZigbeeConverterAssets.h")
     if args.check:
         if not destination.exists() or destination.read_text(encoding='utf-8') != output:
             raise SystemExit('Zigbee converter asset is stale')

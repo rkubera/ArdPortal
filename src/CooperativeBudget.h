@@ -12,8 +12,11 @@ public:
    * @return No value.
    */
   void checkpoint() {
-    if(uint32_t(millis()-_since)>=4) {yield();_since=millis();}
+    if (uint32_t(millis() - _since) >= 4) {
+      yield();
+      _since = millis();
+    }
   }
 private:
-  uint32_t _since=millis();
+  uint32_t _since = millis();
 };

@@ -87,6 +87,10 @@ jobs:
           properties = dict(line.split("=", 1) for line in Path("library.properties").read_text().splitlines() if "=" in line and not line.startswith("#"))
           assert properties["name"] == "ArdPortal", "Changing the registered library name requires an Arduino Registry maintenance request"
           PY
+      - name: Install Arduino IDE formatter
+        run: sudo apt-get update && sudo apt-get install --yes clang-format-14
+      - name: Check Arduino code formatting
+        run: python src/tools/format_code.py --check
       - name: Check generated resources without modifying files
         run: |
           python src/tools/generate_languages.py --check

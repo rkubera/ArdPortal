@@ -30,7 +30,7 @@ public:
    * @param error Output error text; populated when the operation fails.
    * @return The resulting text; an empty value indicates no available text or failure where applicable.
    */
-  String discoveryConfig(const ArdJSON::JSONVar& field,String* error=nullptr) const;
+  String discoveryConfig(const ArdJSON::JSONVar& field, String* error = nullptr) const;
 private:
   friend class ArdPortal;
   friend class ArdMqtt;
@@ -40,18 +40,19 @@ private:
    * @param portal Owning portal instance.
    * @return No value.
    */
-  explicit ArdHomeAssistant(ArdPortal& portal) : _portal(portal) {}
+  explicit ArdHomeAssistant(ArdPortal& portal)
+    : _portal(portal) {}
   ArdPortal& _portal;
-  uint32_t _haSince=0,_discoveryRetryAt=0;
-  bool _discoveryRetryPending=false;
+  uint32_t _haSince = 0, _discoveryRetryAt = 0;
+  bool _discoveryRetryPending = false;
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-  uint32_t _dependencyRevision=0;
+  uint32_t _dependencyRevision = 0;
 #endif
-  uint16_t _haDiscovery=0;
-  bool _haOnline=false;
-  uint8_t _serviceStage=0;
+  uint16_t _haDiscovery = 0;
+  bool _haOnline = false;
+  uint8_t _serviceStage = 0;
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-  ArdAppConfigFieldMask _dependencyMask=0, _dependencyDirty=0, _dependencyKnown=0, _dependencyVisible=0, _dependencyDiscovery=0;
+  ArdAppConfigFieldMask _dependencyMask = 0, _dependencyDirty = 0, _dependencyKnown = 0, _dependencyVisible = 0, _dependencyDiscovery = 0;
 #endif
   /**
    * @brief Restart the Home Assistant discovery publication cursor.
@@ -71,7 +72,7 @@ private:
    * @param dependencies Mask of dependency fields requiring work.
    * @return No value.
    */
-  void registered(size_t first,const ArdAppConfigFieldMask& states,const ArdAppConfigFieldMask& dependencies);
+  void registered(size_t first, const ArdAppConfigFieldMask& states, const ArdAppConfigFieldMask& dependencies);
   /**
    * @brief Perform one pending Home Assistant publication or dependency work unit.
    * @param now Current time used to evaluate deadlines.
@@ -85,12 +86,12 @@ private:
    * @return No value; unrelated telemetry does not disturb traversal.
    */
   void dependencyChanged(const String& key);
-  uint32_t _dependencyRetryAt=0;
-  bool _dependencyRetryPending=false;
+  uint32_t _dependencyRetryAt = 0;
+  bool _dependencyRetryPending = false;
   using DependencyFrame = ArdDependencies::Frame;
   ArdDependencies::Stack _walk;
-  size_t _walkDepth=0,_walkIndex=0;
-  ArdAppConfigFieldMask _walkActive=0,_walkComplete=0,_walkVisible=0;
+  size_t _walkDepth = 0, _walkIndex = 0;
+  ArdAppConfigFieldMask _walkActive = 0, _walkComplete = 0, _walkVisible = 0;
   /**
    * @brief Advance dependency-driven visibility and state changes.
    * @return True on success; false if validation, resource allocation or the operation fails.

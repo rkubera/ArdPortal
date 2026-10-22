@@ -37,17 +37,23 @@ public:
    * @brief Check whether the component currently has an active operation.
    * @return True if the component currently has an active operation; false otherwise.
    */
-  bool active() const { return _otaActive; }
+  bool active() const {
+    return _otaActive;
+  }
   /**
    * @brief Read the received firmware byte count.
    * @return Number of firmware bytes received so far.
    */
-  size_t received() const { return _otaReceived; }
+  size_t received() const {
+    return _otaReceived;
+  }
   /**
    * @brief Read the expected firmware upload byte count.
    * @return Number of firmware bytes expected for the current upload.
    */
-  size_t expected() const { return _otaExpected; }
+  size_t expected() const {
+    return _otaExpected;
+  }
 private:
   friend class ArdPortal;
   friend class ArdMqtt;
@@ -57,7 +63,8 @@ private:
    * @param portal Owning portal instance.
    * @return No value.
    */
-  explicit ArdOta(ArdPortal& portal) : _portal(portal) {}
+  explicit ArdOta(ArdPortal& portal)
+    : _portal(portal) {}
   ArdPortal& _portal;
   bool _otaActive = false;
   size_t _otaExpected = 0, _otaReceived = 0;

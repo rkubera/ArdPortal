@@ -7,6 +7,7 @@ import gzip
 import json
 import re
 from pathlib import Path
+from cpp_format import format_cpp
 from control_assets import emit_chunks, condition_enabled
 from generate_portal_assets import gzip_array
 
@@ -251,8 +252,8 @@ def main():
     parser.add_argument('--literals-output', type=Path, default=root / 'LanguageLiterals.h')
     parser.add_argument('--check', action='store_true', help='Fail if generated resources are stale')
     args = parser.parse_args()
-    output = generate(args.directory)
-    literals = native_literals(args.directory)
+    output = format_cpp(generate(args.directory), "LanguageData.h")
+    literals = format_cpp(native_literals(args.directory), "LanguageLiterals.h")
     if args.check:
         if not args.output.exists() or args.output.read_text(encoding='utf-8') != output:
             raise SystemExit('LanguageData.h is stale; run tools/generate_languages.py')

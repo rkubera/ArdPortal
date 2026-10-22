@@ -39,7 +39,9 @@ public:
    * @brief Release the resources owned by this instance.
    * @return No value.
    */
-  ~ArdFSFile() { close(); }
+  ~ArdFSFile() {
+    close();
+  }
   /**
    * @brief Check whether this journal file handle is open.
    * @return True if this file handle is open; false otherwise.
@@ -76,7 +78,12 @@ public:
   bool close();
 private:
   friend class ArdFSVolume;
-  struct Handle { ARDPORTAL_NO_THROW_ALLOCATION  ArdFSVolume* volume; String path; String data; size_t offset=0; bool writing=false, dirty=false;
+  struct Handle {
+    ARDPORTAL_NO_THROW_ALLOCATION ArdFSVolume* volume;
+    String path;
+    String data;
+    size_t offset = 0;
+    bool writing = false, dirty = false;
   };
   std::unique_ptr<Handle> _handle;
 };
@@ -104,7 +111,9 @@ public:
    * @brief Release the resources owned by this instance.
    * @return No value.
    */
-  ~ArdFSVolume() { end(); }
+  ~ArdFSVolume() {
+    end();
+  }
   /**
    * @brief Initialize the component and prepare its runtime state.
    * @return True on success; false if validation, resource allocation or the operation fails.
@@ -115,7 +124,8 @@ public:
    * @return No value.
    */
   void end() {
-    _mounted=false; _entries.clear();
+    _mounted = false;
+    _entries.clear();
   }
   /**
    * @brief Format the storage volume, discarding its existing records.
@@ -139,16 +149,21 @@ public:
    * @brief Read the last storage error code.
    * @return The last storage error code.
    */
-  int lastError() const { return _error; }
+  int lastError() const {
+    return _error;
+  }
 private:
   friend class ArdFSFile;
-  struct Entry { String path; uint32_t address, length; };
+  struct Entry {
+    String path;
+    uint32_t address, length;
+  };
   std::vector<Entry> _entries;
-  bool _mounted=false, _configured=false;
-  int _error=0;
-  uint32_t _address=0,_size=0,_bankSize=0,_active=0,_generation=0,_next=0;
+  bool _mounted = false, _configured = false;
+  int _error = 0;
+  uint32_t _address = 0, _size = 0, _bankSize = 0, _active = 0, _generation = 0, _next = 0;
 #if defined(ESP32)
-  const esp_partition_t* _partition=nullptr;
+  const esp_partition_t* _partition = nullptr;
 #endif
   /**
    * @brief Locate and validate the flash region used by the two-bank journal.
@@ -202,7 +217,7 @@ private:
    * Input: std::vector<Entry>&.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool append(uint32_t,uint32_t&,const String&,const String&,std::vector<Entry>&);
+  bool append(uint32_t, uint32_t&, const String&, const String&, std::vector<Entry>&);
   /**
    * @brief Copy live records to the alternate bank and atomically commit a new generation with the replacement file.
    * Input: const String&.
@@ -217,5 +232,5 @@ private:
    * Input: uint32_t address, the byte offset within the volume.
    * @return Updated CRC-32 accumulator; callers apply the final complement when committing a record.
    */
-  static uint32_t crc(const void*, size_t, uint32_t=0xffffffff);
+  static uint32_t crc(const void*, size_t, uint32_t = 0xffffffff);
 };

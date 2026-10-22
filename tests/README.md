@@ -58,3 +58,15 @@ changed assets locally and commit the generated headers with their sources.
 
 Hardware validation remains separate: host tests and compilation do not establish
 RF range, physical actuator behavior, radio coexistence or complete device OTA.
+
+## Arduino code formatting
+
+The root `.clang-format` is the default Arduino IDE 2 configuration. The source,
+example sketches and C++ test fixtures use clang-format 14, matching the IDE.
+Run `python3 src/tools/format_code.py` to format them, or add `--check` to verify
+formatting without modifying files. CI runs this check.
+
+The C++ resource generators apply the same formatter before writing or checking
+headers. Install `clang-format-14`, use the formatter bundled with Arduino IDE 2
+on macOS, or set `CLANG_FORMAT` to the formatter executable. The generated data
+and embedded HTML/JavaScript/Python strings retain their original bytes.

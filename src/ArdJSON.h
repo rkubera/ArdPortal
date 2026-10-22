@@ -22,15 +22,21 @@ struct Limits {
   size_t maxOutputBytes = 32768;
   size_t maxStringBytes = 8192;
   size_t maxNodes = 256;
-  bool escapeHtml = false; // Escape HTML delimiters when embedding JSON in a script element.
-  unsigned maxDepth = 16; // Parser and writer also enforce a hard ceiling of 32.
+  bool escapeHtml = false;  // Escape HTML delimiters when embedding JSON in a script element.
+  unsigned maxDepth = 16;   // Parser and writer also enforce a hard ceiling of 32.
 };
 class Parser;
 class Writer;
 class ObjectKey;
 class JSONVar {
 public:
-  enum class Type { Undefined, Null, Boolean, Number, String, Object, Array };
+  enum class Type { Undefined,
+                    Null,
+                    Boolean,
+                    Number,
+                    String,
+                    Object,
+                    Array };
   /**
    * @brief Initialize this instance and its owned state.
    * @return No value.
@@ -41,25 +47,33 @@ public:
    * Input: nullptr, producing a JSON null value.
    * @return No value.
    */
-  JSONVar(std::nullptr_t) : _type(Type::Null) {}
+  JSONVar(std::nullptr_t)
+    : _type(Type::Null) {}
   /**
    * @brief Initialize this instance and its owned state.
    * @param value Input value, or output destination when passed by mutable reference.
    * @return No value.
    */
-  JSONVar(bool value) : _type(Type::Boolean), _boolean(value) {}
+  JSONVar(bool value)
+    : _type(Type::Boolean), _boolean(value) {}
   /**
    * @brief Initialize this instance and its owned state.
    * @param value Input value, or output destination when passed by mutable reference.
    * @return No value.
    */
-  JSONVar(const char* value) : _type(value ? Type::String : Type::Null), _text(value ? value : "") { _failed=value && _text.length()!=strlen(value); }
+  JSONVar(const char* value)
+    : _type(value ? Type::String : Type::Null), _text(value ? value : "") {
+    _failed = value && _text.length() != strlen(value);
+  }
   /**
    * @brief Initialize this instance and its owned state.
    * @param value Input value, or output destination when passed by mutable reference.
    * @return No value.
    */
-  JSONVar(const String& value) : _type(Type::String), _text(value) { _failed=!equal(_text,value); }
+  JSONVar(const String& value)
+    : _type(Type::String), _text(value) {
+    _failed = !equal(_text, value);
+  }
   /**
    * @brief Initialize this instance and its owned state.
    * @param value Input value, or output destination when passed by mutable reference.
@@ -71,8 +85,9 @@ public:
    * @param value Input value, or output destination when passed by mutable reference.
    * @return No value.
    */
-  template<class T, typename std::enable_if<std::is_integral<T>::value && !std::is_same<T,bool>::value,int>::type = 0>
-  JSONVar(T value) : _type(Type::Number) {
+  template<class T, typename std::enable_if<std::is_integral<T>::value && !std::is_same<T, bool>::value, int>::type = 0>
+  JSONVar(T value)
+    : _type(Type::Number) {
     const bool negative = std::is_signed<T>::value && static_cast<int64_t>(value) < 0;
     const uint64_t bits = static_cast<uint64_t>(value);
     assignInteger(negative ? uint64_t(0) - bits : bits, negative);
@@ -99,7 +114,10 @@ public:
    * @param other Instance whose state is copied, moved or exchanged.
    * @return Reference to this instance after assignment; deleted overloads cannot be called.
    */
-  JSONVar& operator=(JSONVar other) { swap(other); return *this; }
+  JSONVar& operator=(JSONVar other) {
+    swap(other);
+    return *this;
+  }
   /**
    * @brief Exchange the stored state with another instance.
    * @param other Instance whose state is copied, moved or exchanged.
@@ -120,17 +138,23 @@ public:
    * @brief Read the stored JSON value type.
    * @return The stored JSON type.
    */
-  Type type() const { return _type; }
+  Type type() const {
+    return _type;
+  }
   /**
    * @brief Check whether the JSON value has the Undefined type.
    * @return True only for the Undefined JSON type.
    */
-  bool isUndefined() const { return _type == Type::Undefined; }
+  bool isUndefined() const {
+    return _type == Type::Undefined;
+  }
   /**
    * @brief Check whether the JSON value has the Null type.
    * @return True only for the Null JSON type.
    */
-  bool isNull() const { return _type == Type::Null; }
+  bool isNull() const {
+    return _type == Type::Null;
+  }
   /**
    * @brief Check whether the JSON value and its descendants were created without allocation failure.
    * @return True if this value and its descendants have no recorded allocation failure.
@@ -155,11 +179,13 @@ public:
   bool toUnsignedInteger(uint64_t& value) const {
     if (_type != Type::Number || !_text.length()) return false;
     uint64_t n = 0;
-    for (size_t i=0; i<_text.length(); ++i) {
-      char c=_text[i]; if (c<'0' || c>'9' || n>(UINT64_MAX-uint64_t(c-'0'))/10) return false;
-      n=n*10+uint64_t(c-'0');
+    for (size_t i = 0; i < _text.length(); ++i) {
+      char c = _text[i];
+      if (c < '0' || c > '9' || n > (UINT64_MAX - uint64_t(c - '0')) / 10) return false;
+      n = n * 10 + uint64_t(c - '0');
     }
-    value=n; return true;
+    value = n;
+    return true;
   }
   /**
    * @brief Convert a numeric lexeme to double with range and syntax checks.
@@ -171,37 +197,53 @@ public:
    * @brief Read a JSON string, returning an empty string for other types.
    * @return The stored JSON string, or an empty string for other types.
    */
-  String asString() const { return _type == Type::String ? _text : String(); }
+  String asString() const {
+    return _type == Type::String ? _text : String();
+  }
   /**
    * @brief Borrow the stored JSON string without allocating or copying it.
    * @return Pointer to the internal string, or nullptr for non-string values; valid until this value is changed or destroyed.
    */
-  const String* stringValue() const { return _type == Type::String ? &_text : nullptr; }
+  const String* stringValue() const {
+    return _type == Type::String ? &_text : nullptr;
+  }
   /**
    * @brief Read a JSON boolean, returning false for other types.
    * @return The stored boolean, or false when the value has a different type.
    */
-  bool asBool() const { return _type == Type::Boolean && _boolean; }
+  bool asBool() const {
+    return _type == Type::Boolean && _boolean;
+  }
   /**
    * @brief Convert a JSON number to double, returning zero when conversion fails.
    * @return The converted numeric value, or zero when conversion fails.
    */
-  double asDouble() const { double value = 0; toDouble(value); return value; }
+  double asDouble() const {
+    double value = 0;
+    toDouble(value);
+    return value;
+  }
   /**
    * @brief Convert the stored JSON value to String.
    * @return The converted String value; the component conversion defines its fallback for incompatible values.
    */
-  explicit operator String() const { return asString(); }
+  explicit operator String() const {
+    return asString();
+  }
   /**
    * @brief Convert the stored JSON value to bool.
    * @return The converted bool value; the component conversion defines its fallback for incompatible values.
    */
-  explicit operator bool() const { return asBool(); }
+  explicit operator bool() const {
+    return asBool();
+  }
   /**
    * @brief Convert the stored JSON value to double.
    * @return The converted double value; the component conversion defines its fallback for incompatible values.
    */
-  explicit operator double() const { return asDouble(); }
+  explicit operator double() const {
+    return asDouble();
+  }
   /**
    * @brief Convert the stored JSON value to int.
    * @return The converted int value; the component conversion defines its fallback for incompatible values.
@@ -214,7 +256,9 @@ public:
    * @brief Read the number of elements in this JSON container.
    * @return Number of members or elements in the JSON container.
    */
-  size_t length() const { return _size; }
+  size_t length() const {
+    return _size;
+  }
   /**
    * @brief Check whether this JSON object contains the supplied key.
    * @param key Configuration key or JSON object member name.
@@ -291,7 +335,7 @@ public:
    * @param value Input value, or output destination when passed by mutable reference.
    * @return True when appended; false if the value could not be copied or linked.
    */
-  bool tryPush(const JSONVar& value); // Transactional append: failure leaves the array intact.
+  bool tryPush(const JSONVar& value);  // Transactional append: failure leaves the array intact.
   /**
    * @brief Remove the selected JSON member or array element.
    * @param key Configuration key or JSON object member name.
@@ -309,14 +353,14 @@ public:
   // Iterate without constructing an array containing every object key.
   template<class Visitor> bool forEachObjectMember(Visitor&& visitor) const;
   // Undefined patch members delete keys; existing/new nodes are moved, never cloned.
-  bool applyObjectPatch(JSONVar&& patch, bool eraseUndefined=true);
+  bool applyObjectPatch(JSONVar&& patch, bool eraseUndefined = true);
   bool isObjectPatchValid() const;
 
 private:
   struct Member;
   Type _type = Type::Undefined;
   bool _boolean = false, _failed = false;
-  String _text; // Strings or exact number lexemes: large integers never lose precision.
+  String _text;  // Strings or exact number lexemes: large integers never lose precision.
   std::unique_ptr<Member> _children;
   size_t _size = 0;
   /**
@@ -325,7 +369,9 @@ private:
    * @param b Second value or byte range to compare.
    * @return True if the strings are byte-for-byte equal; false otherwise.
    */
-  static bool equal(const String& a,const String& b) { return a.length()==b.length() && !memcmp(a.c_str(),b.c_str(),a.length()); }
+  static bool equal(const String& a, const String& b) {
+    return a.length() == b.length() && !memcmp(a.c_str(), b.c_str(), a.length());
+  }
   /**
    * @brief Store an integer as an exact decimal lexeme without floating-point rounding.
    * @param magnitude Unsigned magnitude of the integer.
@@ -336,7 +382,8 @@ private:
 #if defined(__GNUC__)
   __attribute__((noinline))
 #endif
-  void assignInteger(uint64_t magnitude, bool negative);
+  void
+  assignInteger(uint64_t magnitude, bool negative);
   /**
    * @brief Expose the immutable Undefined value used for unsuccessful lookups.
    * @return Reference to the shared Undefined sentinel.
@@ -362,7 +409,8 @@ private:
 #if defined(__GNUC__)
   __attribute__((noinline))
 #endif
-  Member* findMember(const char* key) const;
+  Member*
+  findMember(const char* key) const;
   /**
    * @brief Allocate and link a member using an exact or flash-backed key.
    * @param key Key stored in the new member.
@@ -390,7 +438,9 @@ public:
    * @brief Release the resources owned by this instance.
    * @return No value.
    */
-  ~ObjectKey() { if(!flash()) std::free(const_cast<char*>(_bytes)); }
+  ~ObjectKey() {
+    if (!flash()) std::free(const_cast<char*>(_bytes));
+  }
   /**
    * @brief Disallow copying or moving this resource-owning instance.
    * Input: const ObjectKey&.
@@ -409,7 +459,7 @@ public:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool assign(const String& key) {
-    if(key.length()>=FlashFlag) return false;
+    if (key.length() >= FlashFlag) return false;
     static const char dictionary[] PROGMEM =
       "id\0type\0name\0names\0en\0pl\0order\0fields\0default\0persist\0extended\0readonly\0"
       "min\0max\0step\0options\0value\0icon\0modes\0fan_modes\0controls\0ha\0key\0command\0"
@@ -418,18 +468,31 @@ public:
       "oscillating\0direction\0position\0tilt\0tone\0duration\0volume_level\0fan_speed\0"
       "version\0ssid\0password\0host\0port\0user\0mqttPassword\0mqttTls\0caCert\0apName\0"
       "apPassword\0deviceName\0config\0app\0journal\0generation\0crc32\0data\0";
-    const char* selected=nullptr;
-    for(size_t offset=0;offset<sizeof(dictionary)-1;) {
-      const char* candidate=dictionary+offset;size_t length=strlen_P(candidate);
-      if(length==key.length() && strcmp_P(key.c_str(),candidate)==0) {selected=candidate;break;}
-      offset+=length+1;
+    const char* selected = nullptr;
+    for (size_t offset = 0; offset < sizeof(dictionary) - 1;) {
+      const char* candidate = dictionary + offset;
+      size_t length = strlen_P(candidate);
+      if (length == key.length() && strcmp_P(key.c_str(), candidate) == 0) {
+        selected = candidate;
+        break;
+      }
+      offset += length + 1;
     }
-    if(!flash()) std::free(const_cast<char*>(_bytes));
-    _bytes=nullptr;_size=0;
-    if(!key.length()) return true;
-    if(selected) {_bytes=selected;_size=key.length()|FlashFlag;return true;}
-    char* bytes=static_cast<char*>(ArdAllocation::allocate(key.length()+1));if(!bytes) return false;
-    memcpy(bytes,key.c_str(),key.length()+1);_bytes=bytes;_size=key.length();return true;
+    if (!flash()) std::free(const_cast<char*>(_bytes));
+    _bytes = nullptr;
+    _size = 0;
+    if (!key.length()) return true;
+    if (selected) {
+      _bytes = selected;
+      _size = key.length() | FlashFlag;
+      return true;
+    }
+    char* bytes = static_cast<char*>(ArdAllocation::allocate(key.length() + 1));
+    if (!bytes) return false;
+    memcpy(bytes, key.c_str(), key.length() + 1);
+    _bytes = bytes;
+    _size = key.length();
+    return true;
   }
   /**
    * @brief Assign a JSON object member through this key proxy.
@@ -437,34 +500,46 @@ public:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool assign(const ObjectKey& other) {
-    if(this==&other) return true;
-    if(!flash()) std::free(const_cast<char*>(_bytes));
-    _bytes=nullptr;_size=0;
-    if(other.flash()||!other.length()) {_bytes=other._bytes;_size=other._size;return true;}
-    char* bytes=static_cast<char*>(ArdAllocation::allocate(other.length()+1));if(!bytes) return false;
-    memcpy(bytes,other._bytes,other.length()+1);_bytes=bytes;_size=other._size;return true;
+    if (this == &other) return true;
+    if (!flash()) std::free(const_cast<char*>(_bytes));
+    _bytes = nullptr;
+    _size = 0;
+    if (other.flash() || !other.length()) {
+      _bytes = other._bytes;
+      _size = other._size;
+      return true;
+    }
+    char* bytes = static_cast<char*>(ArdAllocation::allocate(other.length() + 1));
+    if (!bytes) return false;
+    memcpy(bytes, other._bytes, other.length() + 1);
+    _bytes = bytes;
+    _size = other._size;
+    return true;
   }
   /**
    * @brief Read the number of elements in this JSON container.
    * @return Number of members or elements in the JSON container.
    */
-  size_t length() const {return _size&~FlashFlag;}
+  size_t length() const {
+    return _size & ~FlashFlag;
+  }
   /**
    * @brief Compare this object key with a supplied key, including its exact length.
    * @param key Configuration key or JSON object member name.
    * @return True if the key bytes and lengths match; false otherwise.
    */
   bool matches(const ObjectKey& other) const {
-    if(length()!=other.length())return false;
-    if(_bytes==other._bytes||!length())return true;
-    if(!flash()&&!other.flash())return !memcmp(_bytes,other._bytes,length());
-    for(size_t i=0;i<length();++i)if((flash()?pgm_read_byte(_bytes+i):uint8_t(_bytes[i]))!=(other.flash()?pgm_read_byte(other._bytes+i):uint8_t(other._bytes[i])))return false;
+    if (length() != other.length()) return false;
+    if (_bytes == other._bytes || !length()) return true;
+    if (!flash() && !other.flash()) return !memcmp(_bytes, other._bytes, length());
+    for (size_t i = 0; i < length(); ++i)
+      if ((flash() ? pgm_read_byte(_bytes + i) : uint8_t(_bytes[i])) != (other.flash() ? pgm_read_byte(other._bytes + i) : uint8_t(other._bytes[i]))) return false;
     return true;
   }
   bool matches(const String& key) const {
-    if(key.length()!=length()) return false;
-    if(!length()) return true;
-    return flash()?strcmp_P(key.c_str(),_bytes)==0:memcmp(key.c_str(),_bytes,length())==0;
+    if (key.length() != length()) return false;
+    if (!length()) return true;
+    return flash() ? strcmp_P(key.c_str(), _bytes) == 0 : memcmp(key.c_str(), _bytes, length()) == 0;
   }
   /**
    * @brief Compare this object key with a supplied key, including its exact length.
@@ -472,29 +547,33 @@ public:
    * @param size Number of bytes or elements.
    * @return True if the key bytes and lengths match; false otherwise.
    */
-  bool matches(const char* key,size_t size) const {
-    if(size!=length()) return false;
-    if(!length()) return true;
-    return flash()?strcmp_P(key,_bytes)==0:memcmp(key,_bytes,length())==0;
+  bool matches(const char* key, size_t size) const {
+    if (size != length()) return false;
+    if (!length()) return true;
+    return flash() ? strcmp_P(key, _bytes) == 0 : memcmp(key, _bytes, length()) == 0;
   }
   /**
    * @brief Read, decode or append text according to the component representation.
    * @return The resulting text; an empty value indicates no available text or failure where applicable.
    */
   String text() const {
-    if(flash()) return String(FPSTR(_bytes));
-    String result;if(!result.reserve(length())) return result;
-    for(size_t i=0;i<length();++i) result+=_bytes[i];
+    if (flash()) return String(FPSTR(_bytes));
+    String result;
+    if (!result.reserve(length())) return result;
+    for (size_t i = 0; i < length(); ++i) result += _bytes[i];
     return result;
   }
 private:
-  static constexpr size_t FlashFlag=size_t(1)<<(sizeof(size_t)*8-1);
-  const char* _bytes=nullptr;size_t _size=0;
+  static constexpr size_t FlashFlag = size_t(1) << (sizeof(size_t) * 8 - 1);
+  const char* _bytes = nullptr;
+  size_t _size = 0;
   /**
    * @brief Check whether the object key points to immutable program memory.
    * @return True for a flash-backed key; false for an owned RAM key.
    */
-  bool flash() const {return (_size&FlashFlag)!=0;}
+  bool flash() const {
+    return (_size & FlashFlag) != 0;
+  }
 };
 struct JSONVar::Member {
   ARDPORTAL_NO_THROW_ALLOCATION
@@ -502,37 +581,57 @@ struct JSONVar::Member {
   JSONVar value;
   std::unique_ptr<Member> next;
 };
-inline size_t JSONVar::memberAllocationBytes() { return sizeof(Member)+2*sizeof(void*); }
+inline size_t JSONVar::memberAllocationBytes() {
+  return sizeof(Member) + 2 * sizeof(void*);
+}
 
 template<class Visitor> inline bool JSONVar::forEachObjectMember(Visitor&& visitor) const {
-  if(_type!=Type::Object||_failed)return false;
-  for(const Member* item=_children.get();item;item=item->next.get()) {
-    String key=item->key.text();if(key.length()!=item->key.length()||!visitor(key,item->value))return false;
+  if (_type != Type::Object || _failed) return false;
+  for (const Member* item = _children.get(); item; item = item->next.get()) {
+    String key = item->key.text();
+    if (key.length() != item->key.length() || !visitor(key, item->value)) return false;
   }
   return true;
 }
 inline bool JSONVar::isObjectPatchValid() const {
-  if(_type!=Type::Object||_failed)return false;
-  for(const Member* item=_children.get();item;item=item->next.get())if(item->value._failed||(!item->value.isUndefined()&&!item->value.isValid()))return false;
+  if (_type != Type::Object || _failed) return false;
+  for (const Member* item = _children.get(); item; item = item->next.get())
+    if (item->value._failed || (!item->value.isUndefined() && !item->value.isValid())) return false;
   return true;
 }
 inline bool JSONVar::applyObjectPatch(JSONVar&& patch, bool eraseUndefined) {
-  if(this==&patch||_type!=Type::Object||patch._type!=Type::Object||_failed||!patch.isObjectPatchValid())return false;
+  if (this == &patch || _type != Type::Object || patch._type != Type::Object || _failed || !patch.isObjectPatchValid()) return false;
   // Validate the resulting size before changing either object.
-  size_t size=_size;
-  for(const Member* item=patch._children.get();item;item=item->next.get()) {
-    bool present=false;for(const Member* old=_children.get();old;old=old->next.get())if(old->key.matches(item->key)){present=true;break;}
-    if(eraseUndefined&&item->value.isUndefined()){if(present)--size;}else if(!present)++size;
+  size_t size = _size;
+  for (const Member* item = patch._children.get(); item; item = item->next.get()) {
+    bool present = false;
+    for (const Member* old = _children.get(); old; old = old->next.get())
+      if (old->key.matches(item->key)) {
+        present = true;
+        break;
+      }
+    if (eraseUndefined && item->value.isUndefined()) {
+      if (present) --size;
+    } else if (!present) ++size;
   }
-  if(size>MaxContainerElements)return false;
-  while(patch._children){
-    auto item=std::move(patch._children);patch._children=std::move(item->next);--patch._size;
-    std::unique_ptr<Member>* found=&_children;
-    while(*found&&!(*found)->key.matches(item->key))found=&(*found)->next;
-    if(eraseUndefined&&item->value.isUndefined()) {
-      if(*found){auto removed=std::move(*found);*found=std::move(removed->next);--_size;}
-    }else if(*found)(*found)->value=std::move(item->value);
-    else{*found=std::move(item);++_size;}
+  if (size > MaxContainerElements) return false;
+  while (patch._children) {
+    auto item = std::move(patch._children);
+    patch._children = std::move(item->next);
+    --patch._size;
+    std::unique_ptr<Member>* found = &_children;
+    while (*found && !(*found)->key.matches(item->key)) found = &(*found)->next;
+    if (eraseUndefined && item->value.isUndefined()) {
+      if (*found) {
+        auto removed = std::move(*found);
+        *found = std::move(removed->next);
+        --_size;
+      }
+    } else if (*found) (*found)->value = std::move(item->value);
+    else {
+      *found = std::move(item);
+      ++_size;
+    }
   }
   return true;
 }
@@ -545,105 +644,167 @@ inline bool JSONVar::applyObjectPatch(JSONVar&& patch, bool eraseUndefined) {
  */
 template<class Tag>
 void JSONVar::assignInteger(uint64_t magnitude, bool negative) {
-  char text[22]; char* cursor = text + sizeof(text) - 1; *cursor = 0;
-  do { *--cursor = char('0' + magnitude % 10); magnitude /= 10; } while (magnitude);
+  char text[22];
+  char* cursor = text + sizeof(text) - 1;
+  *cursor = 0;
+  do {
+    *--cursor = char('0' + magnitude % 10);
+    magnitude /= 10;
+  } while (magnitude);
   if (negative) *--cursor = '-';
-  _text = cursor; _failed = _text.length() != size_t(text + sizeof(text) - 1 - cursor);
+  _text = cursor;
+  _failed = _text.length() != size_t(text + sizeof(text) - 1 - cursor);
 }
 /**
  * @brief Initialize this instance and its owned state.
  * @param value Input value, or output destination when passed by mutable reference.
  * @return No value.
  */
-inline JSONVar::JSONVar(double value) : _type(Type::Number) {
-  if (!std::isfinite(value)) { _type=Type::Undefined; _failed=true; return; }
-  char text[32]; snprintf(text,sizeof(text),"%.17g",value); _text=text; _failed=!_text.length();
+inline JSONVar::JSONVar(double value)
+  : _type(Type::Number) {
+  if (!std::isfinite(value)) {
+    _type = Type::Undefined;
+    _failed = true;
+    return;
+  }
+  char text[32];
+  snprintf(text, sizeof(text), "%.17g", value);
+  _text = text;
+  _failed = !_text.length();
 }
 /**
  * @brief Create an empty JSON object.
  * @return An empty JSON object.
  */
-inline JSONVar JSONVar::object() { JSONVar value; value._type=Type::Object; return value; }
+inline JSONVar JSONVar::object() {
+  JSONVar value;
+  value._type = Type::Object;
+  return value;
+}
 /**
  * @brief Create an empty JSON array.
  * @return An empty JSON array.
  */
-inline JSONVar JSONVar::array() { JSONVar value; value._type=Type::Array; return value; }
+inline JSONVar JSONVar::array() {
+  JSONVar value;
+  value._type = Type::Array;
+  return value;
+}
 /**
  * @brief Exchange the stored state with another instance.
  * @param other Instance whose state is copied, moved or exchanged.
  * @return No value.
  */
 inline void JSONVar::swap(JSONVar& other) noexcept {
-  std::swap(_type,other._type);std::swap(_boolean,other._boolean);std::swap(_failed,other._failed);
-  std::swap(_text,other._text);_children.swap(other._children);std::swap(_size,other._size);
+  std::swap(_type, other._type);
+  std::swap(_boolean, other._boolean);
+  std::swap(_failed, other._failed);
+  std::swap(_text, other._text);
+  _children.swap(other._children);
+  std::swap(_size, other._size);
 }
 /**
  * @brief Initialize this instance and its owned state.
  * @param other Instance whose state is copied, moved or exchanged.
  * @return No value.
  */
-inline JSONVar::JSONVar(JSONVar&& other) noexcept { swap(other); }
+inline JSONVar::JSONVar(JSONVar&& other) noexcept {
+  swap(other);
+}
 /**
  * @brief Release JSON children and text, restoring an Undefined value.
  * @return No value.
  */
 inline void JSONVar::clear() {
-  while(_children) { Member* item=_children.release();_children=std::move(item->next);delete item; }
-  _size=0;
+  while (_children) {
+    Member* item = _children.release();
+    _children = std::move(item->next);
+    delete item;
+  }
+  _size = 0;
 }
 /**
  * @brief Release the resources owned by this instance.
  * @return No value.
  */
-inline JSONVar::~JSONVar() { clear(); }
+inline JSONVar::~JSONVar() {
+  clear();
+}
 /**
  * @brief Append the supplied data or journal record to the current destination.
  * @param key Configuration key or JSON object member name.
  * @return Pointer to the requested data, or nullptr when unavailable.
  */
-inline JSONVar::Member* JSONVar::append(const String& key) { return appendKey(key); }
+inline JSONVar::Member* JSONVar::append(const String& key) {
+  return appendKey(key);
+}
 /**
  * @brief Allocate and link an object member with an exact or flash-backed key.
  * @param key Configuration key or JSON object member name.
  * @return New member pointer, or nullptr on allocation failure.
  */
 template<class Key> inline JSONVar::Member* JSONVar::appendKey(const Key& key) {
-  if(_size>=MaxContainerElements || _failed) { _failed=true;return nullptr; }
-  std::unique_ptr<Member> item(new(std::nothrow) Member());
-  if(!item) { _failed=true;return nullptr; }
-  if(!item->key.assign(key)) { _failed=true;return nullptr; }
-  Member* result=item.get();auto* slot=&_children;while(*slot)slot=&(*slot)->next;
-  *slot=std::move(item);++_size;return result;
+  if (_size >= MaxContainerElements || _failed) {
+    _failed = true;
+    return nullptr;
+  }
+  std::unique_ptr<Member> item(new (std::nothrow) Member());
+  if (!item) {
+    _failed = true;
+    return nullptr;
+  }
+  if (!item->key.assign(key)) {
+    _failed = true;
+    return nullptr;
+  }
+  Member* result = item.get();
+  auto* slot = &_children;
+  while (*slot) slot = &(*slot)->next;
+  *slot = std::move(item);
+  ++_size;
+  return result;
 }
 /**
  * @brief Initialize this instance and its owned state.
  * @param other Instance whose state is copied, moved or exchanged.
  * @return No value.
  */
-inline JSONVar::JSONVar(const JSONVar& other) : _type(other._type),_boolean(other._boolean),_failed(other._failed),_text(other._text) {
-  if(!equal(_text,other._text)) _failed=true;
-  for(Member* item=other._children.get();item && !_failed;item=item->next.get()) {
-    Member* copy=appendKey(item->key);if(!copy)break;copy->value=item->value;if(copy->value._failed)_failed=true;
+inline JSONVar::JSONVar(const JSONVar& other)
+  : _type(other._type), _boolean(other._boolean), _failed(other._failed), _text(other._text) {
+  if (!equal(_text, other._text)) _failed = true;
+  for (Member* item = other._children.get(); item && !_failed; item = item->next.get()) {
+    Member* copy = appendKey(item->key);
+    if (!copy) break;
+    copy->value = item->value;
+    if (copy->value._failed) _failed = true;
   }
 }
 /**
  * @brief Expose the immutable Undefined value used for unsuccessful lookups.
  * @return Reference to the shared Undefined sentinel.
  */
-inline const JSONVar& JSONVar::missing() { static const JSONVar value;return value; }
+inline const JSONVar& JSONVar::missing() {
+  static const JSONVar value;
+  return value;
+}
 /**
  * @brief Mark this JSON value invalid after an allocation or type failure.
  * @return Reference to this now-invalid value.
  */
-inline JSONVar& JSONVar::failure() { _failed=true;static JSONVar sink;sink=JSONVar();return sink; }
+inline JSONVar& JSONVar::failure() {
+  _failed = true;
+  static JSONVar sink;
+  sink = JSONVar();
+  return sink;
+}
 /**
  * @brief Check whether the JSON value and its descendants were created without allocation failure.
  * @return True if this value and its descendants have no recorded allocation failure.
  */
 inline bool JSONVar::isValid() const {
-  if(_failed || isUndefined())return false;
-  for(Member* item=_children.get();item;item=item->next.get())if(!item->value.isValid())return false;
+  if (_failed || isUndefined()) return false;
+  for (Member* item = _children.get(); item; item = item->next.get())
+    if (!item->value.isValid()) return false;
   return true;
 }
 /**
@@ -651,7 +812,7 @@ inline bool JSONVar::isValid() const {
  * @return True only when the number can be represented as an exact signed integer.
  */
 inline bool JSONVar::isInteger() const {
-  return _type==Type::Number && _text.indexOf('.')<0 && _text.indexOf('e')<0 && _text.indexOf('E')<0;
+  return _type == Type::Number && _text.indexOf('.') < 0 && _text.indexOf('e') < 0 && _text.indexOf('E') < 0;
 }
 /**
  * @brief Convert a numeric lexeme to double with range and syntax checks.
@@ -659,10 +820,13 @@ inline bool JSONVar::isInteger() const {
  * @return True with value populated for a finite representable number; false otherwise.
  */
 inline bool JSONVar::toDouble(double& value) const {
-  if(_type!=Type::Number)return false;
-  errno=0;char* end=nullptr;double parsed=strtod(_text.c_str(),&end);
-  if(errno==ERANGE || !end || *end || !std::isfinite(parsed))return false;
-  value=parsed;return true;
+  if (_type != Type::Number) return false;
+  errno = 0;
+  char* end = nullptr;
+  double parsed = strtod(_text.c_str(), &end);
+  if (errno == ERANGE || !end || *end || !std::isfinite(parsed)) return false;
+  value = parsed;
+  return true;
 }
 /**
  * @brief Convert the exact numeric lexeme to a signed 64-bit integer.
@@ -690,8 +854,9 @@ inline bool JSONVar::toInteger(int64_t& value) const {
  * @return True if the object owns the key; false for missing keys or nonobject values.
  */
 inline bool JSONVar::hasOwnProperty(const String& key) const {
-  if(_type!=Type::Object)return false;
-  for(Member* item=_children.get();item;item=item->next.get())if(item->key.matches(key))return true;
+  if (_type != Type::Object) return false;
+  for (Member* item = _children.get(); item; item = item->next.get())
+    if (item->key.matches(key)) return true;
   return false;
 }
 // Template linkage keeps the shared lookup header-only without C++ inline.
@@ -705,10 +870,11 @@ inline bool JSONVar::hasOwnProperty(const String& key) const {
  */
 template<class Tag>
 JSONVar::Member* JSONVar::findMember(const char* key) const {
-  if(_type!=Type::Object)return nullptr;
-  if(!key)key="";
-  const size_t length=strlen(key);
-  for(Member* item=_children.get();item;item=item->next.get())if(item->key.matches(key,length))return item;
+  if (_type != Type::Object) return nullptr;
+  if (!key) key = "";
+  const size_t length = strlen(key);
+  for (Member* item = _children.get(); item; item = item->next.get())
+    if (item->key.matches(key, length)) return item;
   return nullptr;
 }
 /**
@@ -716,17 +882,20 @@ JSONVar::Member* JSONVar::findMember(const char* key) const {
  * @param key Configuration key or JSON object member name.
  * @return True if the object owns the key; false for missing keys or nonobject values.
  */
-inline bool JSONVar::hasOwnProperty(const char* key) const { return findMember(key)!=nullptr; }
+inline bool JSONVar::hasOwnProperty(const char* key) const {
+  return findMember(key) != nullptr;
+}
 /**
  * @brief Access a JSON member or element, creating missing members or extending arrays when allowed.
  * @param key Object member key.
  * @return Reference to the selected value, or this invalid value on type, index or allocation failure.
  */
 inline JSONVar& JSONVar::operator[](const char* key) {
-  if(_type==Type::Undefined && !_failed)_type=Type::Object;
-  if(_type!=Type::Object || _failed)return failure();
-  if(Member* item=findMember(key))return item->value;
-  Member* item=append(String(key));return item?item->value:failure();
+  if (_type == Type::Undefined && !_failed) _type = Type::Object;
+  if (_type != Type::Object || _failed) return failure();
+  if (Member* item = findMember(key)) return item->value;
+  Member* item = append(String(key));
+  return item ? item->value : failure();
 }
 /**
  * @brief Read an existing JSON member or array element.
@@ -734,7 +903,7 @@ inline JSONVar& JSONVar::operator[](const char* key) {
  * @return Reference to the matching value, or the shared Undefined sentinel when absent.
  */
 inline const JSONVar& JSONVar::operator[](const char* key) const {
-  if(Member* item=findMember(key))return item->value;
+  if (Member* item = findMember(key)) return item->value;
   return missing();
 }
 /**
@@ -743,10 +912,12 @@ inline const JSONVar& JSONVar::operator[](const char* key) const {
  * @return Reference to the selected value, or this invalid value on type, index or allocation failure.
  */
 inline JSONVar& JSONVar::operator[](const String& key) {
-  if(_type==Type::Undefined && !_failed)_type=Type::Object;
-  if(_type!=Type::Object || _failed)return failure();
-  for(Member* item=_children.get();item;item=item->next.get())if(item->key.matches(key))return item->value;
-  Member* item=append(key);return item?item->value:failure();
+  if (_type == Type::Undefined && !_failed) _type = Type::Object;
+  if (_type != Type::Object || _failed) return failure();
+  for (Member* item = _children.get(); item; item = item->next.get())
+    if (item->key.matches(key)) return item->value;
+  Member* item = append(key);
+  return item ? item->value : failure();
 }
 /**
  * @brief Read an existing JSON member or array element.
@@ -754,7 +925,9 @@ inline JSONVar& JSONVar::operator[](const String& key) {
  * @return Reference to the matching value, or the shared Undefined sentinel when absent.
  */
 inline const JSONVar& JSONVar::operator[](const String& key) const {
-  if(_type==Type::Object)for(Member* item=_children.get();item;item=item->next.get())if(item->key.matches(key))return item->value;
+  if (_type == Type::Object)
+    for (Member* item = _children.get(); item; item = item->next.get())
+      if (item->key.matches(key)) return item->value;
   return missing();
 }
 /**
@@ -763,10 +936,16 @@ inline const JSONVar& JSONVar::operator[](const String& key) const {
  * @return Reference to the selected value, or this invalid value on type, index or allocation failure.
  */
 inline JSONVar& JSONVar::operator[](size_t index) {
-  if(_type==Type::Undefined && !_failed)_type=Type::Array;
-  if(_type!=Type::Array || index>=MaxContainerElements || _failed)return failure();
-  while(_size<=index) { Member* item=append("");if(!item)return failure();item->value=nullptr; }
-  Member* item=_children.get();while(index--)item=item->next.get();return item->value;
+  if (_type == Type::Undefined && !_failed) _type = Type::Array;
+  if (_type != Type::Array || index >= MaxContainerElements || _failed) return failure();
+  while (_size <= index) {
+    Member* item = append("");
+    if (!item) return failure();
+    item->value = nullptr;
+  }
+  Member* item = _children.get();
+  while (index--) item = item->next.get();
+  return item->value;
 }
 /**
  * @brief Read an existing JSON member or array element.
@@ -774,21 +953,27 @@ inline JSONVar& JSONVar::operator[](size_t index) {
  * @return Reference to the matching value, or the shared Undefined sentinel when absent.
  */
 inline const JSONVar& JSONVar::operator[](size_t index) const {
-  if(_type!=Type::Array || index>=_size)return missing();
-  Member* item=_children.get();while(index--)item=item->next.get();return item->value;
+  if (_type != Type::Array || index >= _size) return missing();
+  Member* item = _children.get();
+  while (index--) item = item->next.get();
+  return item->value;
 }
 /**
  * @brief Access a JSON member or element, creating missing members or extending arrays when allowed.
  * @param index Zero-based array index; negative integer indexes are rejected.
  * @return Reference to the selected value, or this invalid value on type, index or allocation failure.
  */
-inline JSONVar& JSONVar::operator[](int index) { return index<0?failure():(*this)[static_cast<size_t>(index)]; }
+inline JSONVar& JSONVar::operator[](int index) {
+  return index < 0 ? failure() : (*this)[static_cast<size_t>(index)];
+}
 /**
  * @brief Read an existing JSON member or array element.
  * @param index Zero-based array index; negative integer indexes are rejected.
  * @return Reference to the matching value, or the shared Undefined sentinel when absent.
  */
-inline const JSONVar& JSONVar::operator[](int index) const { return index<0?missing():(*this)[static_cast<size_t>(index)]; }
+inline const JSONVar& JSONVar::operator[](int index) const {
+  return index < 0 ? missing() : (*this)[static_cast<size_t>(index)];
+}
 /**
  * @brief Append a copy of the supplied value to the JSON array.
  * @param value Input value, or output destination when passed by mutable reference.
@@ -796,8 +981,15 @@ inline const JSONVar& JSONVar::operator[](int index) const { return index<0?miss
  */
 inline bool JSONVar::push(const JSONVar& value) {
   // Copy before adding: also safe for array.push(array) and array.push(array[0]).
-  JSONVar copy(value);if(!copy.isValid()){_failed=true;return false;}
-  JSONVar& slot=(*this)[_size];if(_failed)return false;slot=std::move(copy);return true;
+  JSONVar copy(value);
+  if (!copy.isValid()) {
+    _failed = true;
+    return false;
+  }
+  JSONVar& slot = (*this)[_size];
+  if (_failed) return false;
+  slot = std::move(copy);
+  return true;
 }
 /**
  * @brief Append a value transactionally, preserving the array on failure.
@@ -805,18 +997,32 @@ inline bool JSONVar::push(const JSONVar& value) {
  * @return True when appended; false if the value could not be copied or linked.
  */
 inline bool JSONVar::tryPush(const JSONVar& value) {
-  if(_type!=Type::Array||_failed||_size>=MaxContainerElements) return false;
-  std::unique_ptr<Member> item(new(std::nothrow) Member());if(!item) return false;
-  item->value=value;if(!item->value.isValid()) return false;
-  auto* tail=&_children;while(*tail) tail=&(*tail)->next;*tail=std::move(item);++_size;return true;
+  if (_type != Type::Array || _failed || _size >= MaxContainerElements) return false;
+  std::unique_ptr<Member> item(new (std::nothrow) Member());
+  if (!item) return false;
+  item->value = value;
+  if (!item->value.isValid()) return false;
+  auto* tail = &_children;
+  while (*tail) tail = &(*tail)->next;
+  *tail = std::move(item);
+  ++_size;
+  return true;
 }
 /**
  * @brief Build an array of the keys in this JSON object.
  * @return An array of member names; an invalid value indicates allocation failure.
  */
 inline JSONVar JSONVar::keys() const {
-  JSONVar result=array();if(_type!=Type::Object)return result;
-  for(Member* item=_children.get();item;item=item->next.get()) {String key=item->key.text();if(key.length()!=item->key.length()) {result._failed=true;break;}if(!result.push(key))break;}
+  JSONVar result = array();
+  if (_type != Type::Object) return result;
+  for (Member* item = _children.get(); item; item = item->next.get()) {
+    String key = item->key.text();
+    if (key.length() != item->key.length()) {
+      result._failed = true;
+      break;
+    }
+    if (!result.push(key)) break;
+  }
   return result;
 }
 /**
@@ -825,10 +1031,14 @@ inline JSONVar JSONVar::keys() const {
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 inline bool JSONVar::remove(const String& key) {
-  if(_type!=Type::Object)return false;
-  auto* slot=&_children;while(*slot && !(*slot)->key.matches(key))slot=&(*slot)->next;
-  if(!*slot)return false;
-  auto removed=std::move(*slot);*slot=std::move(removed->next);--_size;return true;
+  if (_type != Type::Object) return false;
+  auto* slot = &_children;
+  while (*slot && !(*slot)->key.matches(key)) slot = &(*slot)->next;
+  if (!*slot) return false;
+  auto removed = std::move(*slot);
+  *slot = std::move(removed->next);
+  --_size;
+  return true;
 }
 /**
  * @brief Remove the selected JSON member or array element.
@@ -836,9 +1046,13 @@ inline bool JSONVar::remove(const String& key) {
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 inline bool JSONVar::remove(size_t index) {
-  if(_type!=Type::Array || index>=_size)return false;
-  auto* slot=&_children;while(index--)slot=&(*slot)->next;
-  auto removed=std::move(*slot);*slot=std::move(removed->next);--_size;return true;
+  if (_type != Type::Array || index >= _size) return false;
+  auto* slot = &_children;
+  while (index--) slot = &(*slot)->next;
+  auto removed = std::move(*slot);
+  *slot = std::move(removed->next);
+  --_size;
+  return true;
 }
 
 /**
@@ -847,15 +1061,31 @@ inline bool JSONVar::remove(size_t index) {
  * @return True for well-formed UTF-8; false for malformed or incomplete sequences.
  */
 inline bool validUtf8(const String& text) {
-  for(size_t i=0;i<text.length();) {
-    uint8_t first=text[i++];if(first<128)continue;
-    unsigned count;uint32_t code,minimum;
-    if(first>=0xc2 && first<=0xdf){count=1;code=first&31;minimum=0x80;}
-    else if(first>=0xe0 && first<=0xef){count=2;code=first&15;minimum=0x800;}
-    else if(first>=0xf0 && first<=0xf4){count=3;code=first&7;minimum=0x10000;}
-    else return false;
-    while(count--) {if(i==text.length())return false;uint8_t c=text[i++];if((c&0xc0)!=0x80)return false;code=(code<<6)|(c&63);}
-    if(code<minimum || code>0x10ffff || (code>=0xd800 && code<=0xdfff))return false;
+  for (size_t i = 0; i < text.length();) {
+    uint8_t first = text[i++];
+    if (first < 128) continue;
+    unsigned count;
+    uint32_t code, minimum;
+    if (first >= 0xc2 && first <= 0xdf) {
+      count = 1;
+      code = first & 31;
+      minimum = 0x80;
+    } else if (first >= 0xe0 && first <= 0xef) {
+      count = 2;
+      code = first & 15;
+      minimum = 0x800;
+    } else if (first >= 0xf0 && first <= 0xf4) {
+      count = 3;
+      code = first & 7;
+      minimum = 0x10000;
+    } else return false;
+    while (count--) {
+      if (i == text.length()) return false;
+      uint8_t c = text[i++];
+      if ((c & 0xc0) != 0x80) return false;
+      code = (code << 6) | (c & 63);
+    }
+    if (code < minimum || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return false;
   }
   return true;
 }
@@ -867,75 +1097,119 @@ public:
    * @param limits JSON parsing or serialization resource limits.
    * @return No value.
    */
-  Parser(const String& input,const Limits& limits):_input(input),_limits(limits){}
+  Parser(const String& input, const Limits& limits)
+    : _input(input), _limits(limits) {}
   /**
    * @brief Parse JSON text with the supplied resource limits.
    * @return Parsed JSON value, or Undefined with error text when input is invalid or a resource limit is exceeded.
    */
   JSONVar parse() {
     JSONVar value;
-    if(_input.length()>_limits.maxInputBytes){fail(ARD_LANG_NATIVE_INPUT_LIMIT);return value;}
-    if(!readValue(value,0))return JSONVar();
-    whitespace();if(_offset!=_input.length()){fail(ARD_LANG_NATIVE_TRAILING_DATA);return JSONVar();}
+    if (_input.length() > _limits.maxInputBytes) {
+      fail(ARD_LANG_NATIVE_INPUT_LIMIT);
+      return value;
+    }
+    if (!readValue(value, 0)) return JSONVar();
+    whitespace();
+    if (_offset != _input.length()) {
+      fail(ARD_LANG_NATIVE_TRAILING_DATA);
+      return JSONVar();
+    }
     return value;
   }
   /**
    * @brief Expose the most recent error reported by this component.
    * @return Reference to the last error text; empty when no error is recorded.
    */
-  const char* error()const{return _error;}
+  const char* error() const {
+    return _error;
+  }
   /**
    * @brief Read the current position in the source or output.
    * @return The current position in the source or output.
    */
-  size_t offset()const{return _offset;}
+  size_t offset() const {
+    return _offset;
+  }
   /**
    * @brief Read the number of JSON nodes consumed or required.
    * @return The number of JSON nodes consumed or required.
    */
-  size_t nodes()const{return _nodes;}
+  size_t nodes() const {
+    return _nodes;
+  }
 private:
   ArdCooperativeBudget _budget;
-  const String& _input;const Limits& _limits;size_t _offset=0,_nodes=0;const char* _error=nullptr;
+  const String& _input;
+  const Limits& _limits;
+  size_t _offset = 0, _nodes = 0;
+  const char* _error = nullptr;
   /**
    * @brief Record the parser or writer failure and stop further processing.
    * @param error Output error text; populated when the operation fails.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool fail(const char* error){if(!_error)_error=error;return false;}
+  bool fail(const char* error) {
+    if (!_error) _error = error;
+    return false;
+  }
   /**
    * @brief Read the current parser character without advancing its cursor.
    * @return Current character, or the parser end-of-input sentinel.
    */
-  char peek()const{return _offset<_input.length()?_input[_offset]:0;}
+  char peek() const {
+    return _offset < _input.length() ? _input[_offset] : 0;
+  }
   /**
    * @brief Skip JSON whitespace at the current input position.
    * @return No value.
    */
-  void whitespace(){while(peek()==' ' || peek()=='\t' || peek()=='\r' || peek()=='\n'){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
+  void whitespace() {
+    while (peek() == ' ' || peek() == '\t' || peek() == '\r' || peek() == '\n') {
+      ++_offset;
+      if ((_offset & 127) == 0) _budget.checkpoint();
+    }
+  }
   /**
    * @brief Check take.
    * @param c Current character or running CRC state, according to its type.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool take(char c){whitespace();if(_offset>=_input.length() || peek()!=c)return false;++_offset;return true;}
+  bool take(char c) {
+    whitespace();
+    if (_offset >= _input.length() || peek() != c) return false;
+    ++_offset;
+    return true;
+  }
   /**
    * @brief Append output bytes while enforcing the writer output budget.
    * @param out Output destination populated by this operation.
    * @param c Current character or running CRC state, according to its type.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool put(String& out,char c){size_t size=out.length();out+=c;return out.length()==size+1 || fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);}
+  bool put(String& out, char c) {
+    size_t size = out.length();
+    out += c;
+    return out.length() == size + 1 || fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
+  }
   /**
    * @brief Decode four hexadecimal digits from a JSON Unicode escape.
    * @param code Protocol, language or error code.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool hex4(uint32_t& code) {
-    code=0;for(unsigned i=0;i<4;++i){char c=peek();unsigned digit;
-      if(c>='0'&&c<='9')digit=c-'0';else if(c>='a'&&c<='f')digit=c-'a'+10;else if(c>='A'&&c<='F')digit=c-'A'+10;else return fail(ARD_LANG_NATIVE_INVALID_UNICODE_ESCAPE);
-      ++_offset;code=(code<<4)|digit;
-    }return true;
+    code = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+      char c = peek();
+      unsigned digit;
+      if (c >= '0' && c <= '9') digit = c - '0';
+      else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+      else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+      else return fail(ARD_LANG_NATIVE_INVALID_UNICODE_ESCAPE);
+      ++_offset;
+      code = (code << 4) | digit;
+    }
+    return true;
   }
   /**
    * @brief Encode a decoded Unicode code point into UTF-8.
@@ -943,19 +1217,21 @@ private:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool unicode(String& out) {
-    uint32_t code;if(!hex4(code))return false;
-    if(code>=0xd800 && code<=0xdbff){
-      if(peek()!='\\')return fail(ARD_LANG_NATIVE_MISSING_LOW_SURROGATE);
+    uint32_t code;
+    if (!hex4(code)) return false;
+    if (code >= 0xd800 && code <= 0xdbff) {
+      if (peek() != '\\') return fail(ARD_LANG_NATIVE_MISSING_LOW_SURROGATE);
       ++_offset;
-      if(peek()!='u')return fail(ARD_LANG_NATIVE_MISSING_LOW_SURROGATE);
+      if (peek() != 'u') return fail(ARD_LANG_NATIVE_MISSING_LOW_SURROGATE);
       ++_offset;
-      uint32_t low;if(!hex4(low) || low<0xdc00 || low>0xdfff)return fail(ARD_LANG_NATIVE_INVALID_LOW_SURROGATE);
-      code=0x10000+((code-0xd800)<<10)+low-0xdc00;
-    }else if(code>=0xdc00 && code<=0xdfff)return fail(ARD_LANG_NATIVE_UNPAIRED_SURROGATE);
-    if(code<0x80)return put(out,char(code));
-    if(code<0x800)return put(out,char(0xc0|(code>>6))) && put(out,char(0x80|(code&63)));
-    if(code<0x10000)return put(out,char(0xe0|(code>>12))) && put(out,char(0x80|((code>>6)&63))) && put(out,char(0x80|(code&63)));
-    return put(out,char(0xf0|(code>>18))) && put(out,char(0x80|((code>>12)&63))) && put(out,char(0x80|((code>>6)&63))) && put(out,char(0x80|(code&63)));
+      uint32_t low;
+      if (!hex4(low) || low < 0xdc00 || low > 0xdfff) return fail(ARD_LANG_NATIVE_INVALID_LOW_SURROGATE);
+      code = 0x10000 + ((code - 0xd800) << 10) + low - 0xdc00;
+    } else if (code >= 0xdc00 && code <= 0xdfff) return fail(ARD_LANG_NATIVE_UNPAIRED_SURROGATE);
+    if (code < 0x80) return put(out, char(code));
+    if (code < 0x800) return put(out, char(0xc0 | (code >> 6))) && put(out, char(0x80 | (code & 63)));
+    if (code < 0x10000) return put(out, char(0xe0 | (code >> 12))) && put(out, char(0x80 | ((code >> 6) & 63))) && put(out, char(0x80 | (code & 63)));
+    return put(out, char(0xf0 | (code >> 18))) && put(out, char(0x80 | ((code >> 12) & 63))) && put(out, char(0x80 | ((code >> 6) & 63))) && put(out, char(0x80 | (code & 63)));
   }
   /**
    * @brief Parse or serialize a JSON string and its escaping.
@@ -963,43 +1239,90 @@ private:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool string(String& out) {
-    if(!take('"'))return fail(ARD_LANG_NATIVE_EXPECTED_STRING);
-    out="";
-    while(_offset<_input.length()){
-      if((_offset&127)==0)_budget.checkpoint();
-      uint8_t c=_input[_offset++];if(c=='"')return validUtf8(out) || fail(ARD_LANG_NATIVE_INVALID_UTF_8);
-      if(c<32)return fail(ARD_LANG_NATIVE_UNESCAPED_CONTROL_CHARACTER);
-      if(c=='\\'){
-        if(_offset==_input.length())return fail(ARD_LANG_NATIVE_UNFINISHED_ESCAPE);
-        char escape=_input[_offset++];
-        switch(escape){
-          case '"':case '\\':case '/':if(!put(out,escape))return false;break;
-          case 'b':if(!put(out,'\b'))return false;break;case 'f':if(!put(out,'\f'))return false;break;
-          case 'n':if(!put(out,'\n'))return false;break;case 'r':if(!put(out,'\r'))return false;break;
-          case 't':if(!put(out,'\t'))return false;break;case 'u':if(!unicode(out))return false;break;
-          default:return fail(ARD_LANG_NATIVE_INVALID_ESCAPE);
+    if (!take('"')) return fail(ARD_LANG_NATIVE_EXPECTED_STRING);
+    out = "";
+    while (_offset < _input.length()) {
+      if ((_offset & 127) == 0) _budget.checkpoint();
+      uint8_t c = _input[_offset++];
+      if (c == '"') return validUtf8(out) || fail(ARD_LANG_NATIVE_INVALID_UTF_8);
+      if (c < 32) return fail(ARD_LANG_NATIVE_UNESCAPED_CONTROL_CHARACTER);
+      if (c == '\\') {
+        if (_offset == _input.length()) return fail(ARD_LANG_NATIVE_UNFINISHED_ESCAPE);
+        char escape = _input[_offset++];
+        switch (escape) {
+          case '"':
+          case '\\':
+          case '/':
+            if (!put(out, escape)) return false;
+            break;
+          case 'b':
+            if (!put(out, '\b')) return false;
+            break;
+          case 'f':
+            if (!put(out, '\f')) return false;
+            break;
+          case 'n':
+            if (!put(out, '\n')) return false;
+            break;
+          case 'r':
+            if (!put(out, '\r')) return false;
+            break;
+          case 't':
+            if (!put(out, '\t')) return false;
+            break;
+          case 'u':
+            if (!unicode(out)) return false;
+            break;
+          default: return fail(ARD_LANG_NATIVE_INVALID_ESCAPE);
         }
-      }else if(!put(out,char(c)))return false;
-      if(out.length()>_limits.maxStringBytes)return fail(ARD_LANG_NATIVE_STRING_LIMIT);
-    }return fail(ARD_LANG_NATIVE_UNTERMINATED_STRING);
+      } else if (!put(out, char(c))) return false;
+      if (out.length() > _limits.maxStringBytes) return fail(ARD_LANG_NATIVE_STRING_LIMIT);
+    }
+    return fail(ARD_LANG_NATIVE_UNTERMINATED_STRING);
   }
   /**
    * @brief Convert a decimal or hexadecimal digit to its numeric value.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool digit()const{return peek()>='0'&&peek()<='9';}
+  bool digit() const {
+    return peek() >= '0' && peek() <= '9';
+  }
   /**
    * @brief Parse or serialize a JSON number while preserving its numeric lexeme.
    * @param value Input value, or output destination when passed by mutable reference.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool number(JSONVar& value) {
-    size_t start=_offset;if(peek()=='-')++_offset;
-    if(peek()=='0')++_offset;else {if(peek()<'1'||peek()>'9')return fail(ARD_LANG_NATIVE_INVALID_NUMBER);while(digit()){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
-    if(peek()=='.'){++_offset;if(!digit())return fail(ARD_LANG_NATIVE_MISSING_FRACTION);while(digit()){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
-    if(peek()=='e'||peek()=='E'){++_offset;if(peek()=='+'||peek()=='-')++_offset;if(!digit())return fail(ARD_LANG_NATIVE_MISSING_EXPONENT);while(digit()){++_offset;if((_offset&127)==0)_budget.checkpoint();}}
-    value._type=JSONVar::Type::Number;value._text=_input.substring(start,_offset);
-    if(value._text.length()!=_offset-start)return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
+    size_t start = _offset;
+    if (peek() == '-') ++_offset;
+    if (peek() == '0') ++_offset;
+    else {
+      if (peek() < '1' || peek() > '9') return fail(ARD_LANG_NATIVE_INVALID_NUMBER);
+      while (digit()) {
+        ++_offset;
+        if ((_offset & 127) == 0) _budget.checkpoint();
+      }
+    }
+    if (peek() == '.') {
+      ++_offset;
+      if (!digit()) return fail(ARD_LANG_NATIVE_MISSING_FRACTION);
+      while (digit()) {
+        ++_offset;
+        if ((_offset & 127) == 0) _budget.checkpoint();
+      }
+    }
+    if (peek() == 'e' || peek() == 'E') {
+      ++_offset;
+      if (peek() == '+' || peek() == '-') ++_offset;
+      if (!digit()) return fail(ARD_LANG_NATIVE_MISSING_EXPONENT);
+      while (digit()) {
+        ++_offset;
+        if ((_offset & 127) == 0) _budget.checkpoint();
+      }
+    }
+    value._type = JSONVar::Type::Number;
+    value._text = _input.substring(start, _offset);
+    if (value._text.length() != _offset - start) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
     return true;
   }
   /**
@@ -1008,28 +1331,46 @@ private:
    * @param depth Current JSON nesting depth.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool readValue(JSONVar& value,unsigned depth) {
-    if(depth>_limits.maxDepth || depth>32)return fail(ARD_LANG_NATIVE_DEPTH_LIMIT);
-    if(++_nodes>_limits.maxNodes)return fail(ARD_LANG_NATIVE_NODE_LIMIT);
-    if((_nodes&31)==0)_budget.checkpoint();
-    whitespace();char c=peek();
-    if(c=='"'){value._type=JSONVar::Type::String;return string(value._text);}
-    if(c=='-' || digit())return number(value);
-    if(c=='{' || c=='['){
-      bool object=c=='{';++_offset;value=object?JSONVar::object():JSONVar::array();char end=object?'}':']';
-      if(take(end))return true;
-      do{
-        String key;if(object){if(!string(key) || !take(':'))return fail(ARD_LANG_NATIVE_EXPECTED_OBJECT_MEMBER);if(value.hasOwnProperty(key))return fail(ARD_LANG_NATIVE_DUPLICATE_KEY);}
-        if(value.length()>=MaxContainerElements)return fail(ARD_LANG_NATIVE_CONTAINER_LIMIT);
-        JSONVar::Member* item=value.append(key);if(!item)return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
-        if(!readValue(item->value,depth+1))return false;
-        if(take(end))return true;
-      }while(take(','));return fail(ARD_LANG_NATIVE_EXPECTED_COMMA_OR_CLOSING_BRACKET);
+  bool readValue(JSONVar& value, unsigned depth) {
+    if (depth > _limits.maxDepth || depth > 32) return fail(ARD_LANG_NATIVE_DEPTH_LIMIT);
+    if (++_nodes > _limits.maxNodes) return fail(ARD_LANG_NATIVE_NODE_LIMIT);
+    if ((_nodes & 31) == 0) _budget.checkpoint();
+    whitespace();
+    char c = peek();
+    if (c == '"') {
+      value._type = JSONVar::Type::String;
+      return string(value._text);
     }
-    const char* literal=c=='t'?"true":c=='f'?"false":c=='n'?"null":nullptr;
-    if(!literal)return fail(ARD_LANG_NATIVE_EXPECTED_VALUE);
-    size_t size=strlen(literal);if(_input.substring(_offset,_offset+size)!=literal)return fail(ARD_LANG_NATIVE_INVALID_LITERAL);
-    _offset+=size;value=c=='n'?JSONVar(nullptr):JSONVar(c=='t');return true;
+    if (c == '-' || digit()) return number(value);
+    if (c == '{' || c == '[') {
+      bool object = c == '{';
+      ++_offset;
+      value = object ? JSONVar::object() : JSONVar::array();
+      char end = object ? '}' : ']';
+      if (take(end)) return true;
+      do {
+        String key;
+        if (object) {
+          if (!string(key) || !take(':')) return fail(ARD_LANG_NATIVE_EXPECTED_OBJECT_MEMBER);
+          if (value.hasOwnProperty(key)) return fail(ARD_LANG_NATIVE_DUPLICATE_KEY);
+        }
+        if (value.length() >= MaxContainerElements) return fail(ARD_LANG_NATIVE_CONTAINER_LIMIT);
+        JSONVar::Member* item = value.append(key);
+        if (!item) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
+        if (!readValue(item->value, depth + 1)) return false;
+        if (take(end)) return true;
+      } while (take(','));
+      return fail(ARD_LANG_NATIVE_EXPECTED_COMMA_OR_CLOSING_BRACKET);
+    }
+    const char* literal = c == 't' ? "true" : c == 'f' ? "false"
+                                            : c == 'n' ? "null"
+                                                       : nullptr;
+    if (!literal) return fail(ARD_LANG_NATIVE_EXPECTED_VALUE);
+    size_t size = strlen(literal);
+    if (_input.substring(_offset, _offset + size) != literal) return fail(ARD_LANG_NATIVE_INVALID_LITERAL);
+    _offset += size;
+    value = c == 'n' ? JSONVar(nullptr) : JSONVar(c == 't');
+    return true;
   }
 };
 class Writer {
@@ -1040,19 +1381,26 @@ public:
    * @param pretty Whether to indent the serialized JSON.
    * @return No value.
    */
-  Writer(const Limits& limits,bool pretty):_limits(limits),_pretty(pretty){}
+  Writer(const Limits& limits, bool pretty)
+    : _limits(limits), _pretty(pretty) {}
   /**
    * @brief Serialize a JSON value with the supplied resource limits.
    * @param value Input value, or output destination when passed by mutable reference.
    * @return Serialized JSON text, or an empty string with error text on failure.
    */
-  String stringify(const JSONVar& value){if(!write(value,0))return "";return std::move(_output);}
+  String stringify(const JSONVar& value) {
+    if (!write(value, 0)) return "";
+    return std::move(_output);
+  }
   /**
    * @brief Measure the serialized value or response without retaining its output.
    * @param value Input value, or output destination when passed by mutable reference.
    * @return Required serialized byte count, or zero on failure with error text where supplied.
    */
-  size_t measure(const JSONVar& value){_measure=true;return write(value,0)?_bytes:0;}
+  size_t measure(const JSONVar& value) {
+    _measure = true;
+    return write(value, 0) ? _bytes : 0;
+  }
   /**
    * @brief Copy a bounded source slice into a RAM string.
    * @param value Input value, or output destination when passed by mutable reference.
@@ -1060,75 +1408,113 @@ public:
    * @param maximum Maximum permitted byte or element count.
    * @return The resulting text; an empty value indicates no available text or failure where applicable.
    */
-  String slice(const JSONVar& value,size_t offset,size_t maximum){_slice=true;_sliceOffset=offset;_sliceMaximum=maximum;return stringify(value);}
+  String slice(const JSONVar& value, size_t offset, size_t maximum) {
+    _slice = true;
+    _sliceOffset = offset;
+    _sliceMaximum = maximum;
+    return stringify(value);
+  }
   /**
    * @brief Expose the most recent error reported by this component.
    * @return Reference to the last error text; empty when no error is recorded.
    */
-  const char* error()const{return _error;}
-  size_t measureObjectPatch(const JSONVar& base,const JSONVar& patch){_measure=true;return writeObjectPatch(base,patch)?_bytes:0;}
-  String sliceObjectPatch(const JSONVar& base,const JSONVar& patch,size_t offset,size_t maximum){
-    _slice=true;_sliceOffset=offset;_sliceMaximum=maximum;
-    return writeObjectPatch(base,patch)?std::move(_output):String();
+  const char* error() const {
+    return _error;
+  }
+  size_t measureObjectPatch(const JSONVar& base, const JSONVar& patch) {
+    _measure = true;
+    return writeObjectPatch(base, patch) ? _bytes : 0;
+  }
+  String sliceObjectPatch(const JSONVar& base, const JSONVar& patch, size_t offset, size_t maximum) {
+    _slice = true;
+    _sliceOffset = offset;
+    _sliceMaximum = maximum;
+    return writeObjectPatch(base, patch) ? std::move(_output) : String();
   }
 
 private:
   ArdCooperativeBudget _budget;
-  const Limits& _limits;bool _pretty;String _output;const char* _error=nullptr;size_t _nodes=0,_bytes=0;
-  bool _measure=false,_slice=false;size_t _sliceOffset=0,_sliceMaximum=0;
+  const Limits& _limits;
+  bool _pretty;
+  String _output;
+  const char* _error = nullptr;
+  size_t _nodes = 0, _bytes = 0;
+  bool _measure = false, _slice = false;
+  size_t _sliceOffset = 0, _sliceMaximum = 0;
   /**
    * @brief Record the parser or writer failure and stop further processing.
    * @param error Output error text; populated when the operation fails.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool fail(const char* error){if(!_error)_error=error;return false;}
+  bool fail(const char* error) {
+    if (!_error) _error = error;
+    return false;
+  }
   /**
    * @brief Append the supplied data or journal record to the current destination.
    * @param text Text to read, encode or display.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool append(const char* text,size_t length){
-    const size_t before=_bytes;
-    if(length>_limits.maxOutputBytes||before>_limits.maxOutputBytes-length)return fail(ARD_LANG_NATIVE_OUTPUT_LIMIT);
-    _bytes+=length;if(_measure)return true;
-    size_t start=0,count=length;
-    if(_slice){
-      if(_bytes<=_sliceOffset||_output.length()>=_sliceMaximum)return true;
-      if(before<_sliceOffset)start=_sliceOffset-before;
-      count=length-start;
-      if(count>_sliceMaximum-_output.length())count=_sliceMaximum-_output.length();
+  bool append(const char* text, size_t length) {
+    const size_t before = _bytes;
+    if (length > _limits.maxOutputBytes || before > _limits.maxOutputBytes - length) return fail(ARD_LANG_NATIVE_OUTPUT_LIMIT);
+    _bytes += length;
+    if (_measure) return true;
+    size_t start = 0, count = length;
+    if (_slice) {
+      if (_bytes <= _sliceOffset || _output.length() >= _sliceMaximum) return true;
+      if (before < _sliceOffset) start = _sliceOffset - before;
+      count = length - start;
+      if (count > _sliceMaximum - _output.length()) count = _sliceMaximum - _output.length();
     }
-    if(!count)return true;
-    const size_t old=_output.length();
-    _output.concat(text+start,count);
-    return _output.length()==old+count||fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
+    if (!count) return true;
+    const size_t old = _output.length();
+    _output.concat(text + start, count);
+    return _output.length() == old + count || fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
   }
-  bool append(const String& text){return append(text.c_str(),text.length());}
-  bool append(const char* text){return append(text,strlen(text));}
+  bool append(const String& text) {
+    return append(text.c_str(), text.length());
+  }
+  bool append(const char* text) {
+    return append(text, strlen(text));
+  }
   /**
    * @brief Append the indentation required for pretty JSON output.
    * @param depth Current JSON nesting depth.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool indent(unsigned depth){if(!_pretty)return true;if(!append("\n"))return false;while(depth--)if(!append("  "))return false;return true;}
+  bool indent(unsigned depth) {
+    if (!_pretty) return true;
+    if (!append("\n")) return false;
+    while (depth--)
+      if (!append("  ")) return false;
+    return true;
+  }
   /**
    * @brief Parse or serialize a JSON string and its escaping.
    * @param text Text to read, encode or display.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool string(const String& text){
-    if(text.length()>_limits.maxStringBytes)return fail(ARD_LANG_NATIVE_STRING_LIMIT);
-    if(!validUtf8(text))return fail(ARD_LANG_NATIVE_INVALID_UTF_8);
-    if(!append("\""))return false;
-    for(size_t i=0;i<text.length();++i){if((i&127)==0)_budget.checkpoint();uint8_t c=text[i];
-      if(c<32||(_limits.escapeHtml&&(c=='<'||c=='>'||c=='&'))){
-        char escaped[7];snprintf(escaped,sizeof(escaped),"\\u%04x",c);if(!append(escaped,6))return false;
-      }else if(c=='"'||c=='\\'){
-        const char escaped[]={'\\',char(c)};if(!append(escaped,sizeof(escaped)))return false;
-      }else{
-        const char byte=char(c);if(!append(&byte,1))return false;
+  bool string(const String& text) {
+    if (text.length() > _limits.maxStringBytes) return fail(ARD_LANG_NATIVE_STRING_LIMIT);
+    if (!validUtf8(text)) return fail(ARD_LANG_NATIVE_INVALID_UTF_8);
+    if (!append("\"")) return false;
+    for (size_t i = 0; i < text.length(); ++i) {
+      if ((i & 127) == 0) _budget.checkpoint();
+      uint8_t c = text[i];
+      if (c < 32 || (_limits.escapeHtml && (c == '<' || c == '>' || c == '&'))) {
+        char escaped[7];
+        snprintf(escaped, sizeof(escaped), "\\u%04x", c);
+        if (!append(escaped, 6)) return false;
+      } else if (c == '"' || c == '\\') {
+        const char escaped[] = { '\\', char(c) };
+        if (!append(escaped, sizeof(escaped))) return false;
+      } else {
+        const char byte = char(c);
+        if (!append(&byte, 1)) return false;
       }
-    }return append("\"");
+    }
+    return append("\"");
   }
   /**
    * @brief Request or perform a write through the component API.
@@ -1137,52 +1523,63 @@ private:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
 
-  bool writeObjectPatch(const JSONVar& base,const JSONVar& patch){
-    if(base._type!=JSONVar::Type::Object||patch._type!=JSONVar::Type::Object||!base.isValid()||!patch.isObjectPatchValid())return fail(ARD_LANG_NATIVE_INVALID_OBJECT_PATCH);
-    if(++_nodes>_limits.maxNodes)return fail(ARD_LANG_NATIVE_NODE_LIMIT);
-    if(!append("{"))return false;
-    bool first=true;size_t members=0;
-    auto emit=[&](const JSONVar::Member* item,const JSONVar& value){
-      if(value.isUndefined())return true;
-      if(++members>MaxContainerElements)return fail(ARD_LANG_NATIVE_ELEMENT_LIMIT);
-      if(!first&&!append(","))return false;
-      first=false;
-      String key=item->key.text();if(key.length()!=item->key.length())return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
-      return string(key)&&append(":")&&write(value,1);
+  bool writeObjectPatch(const JSONVar& base, const JSONVar& patch) {
+    if (base._type != JSONVar::Type::Object || patch._type != JSONVar::Type::Object || !base.isValid() || !patch.isObjectPatchValid()) return fail(ARD_LANG_NATIVE_INVALID_OBJECT_PATCH);
+    if (++_nodes > _limits.maxNodes) return fail(ARD_LANG_NATIVE_NODE_LIMIT);
+    if (!append("{")) return false;
+    bool first = true;
+    size_t members = 0;
+    auto emit = [&](const JSONVar::Member* item, const JSONVar& value) {
+      if (value.isUndefined()) return true;
+      if (++members > MaxContainerElements) return fail(ARD_LANG_NATIVE_ELEMENT_LIMIT);
+      if (!first && !append(",")) return false;
+      first = false;
+      String key = item->key.text();
+      if (key.length() != item->key.length()) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
+      return string(key) && append(":") && write(value, 1);
     };
-    for(const JSONVar::Member* item=base._children.get();item;item=item->next.get()){
-      String key=item->key.text();if(key.length()!=item->key.length())return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
-      const auto& value=patch.hasOwnProperty(key)?patch[key]:item->value;if(!emit(item,value))return false;
+    for (const JSONVar::Member* item = base._children.get(); item; item = item->next.get()) {
+      String key = item->key.text();
+      if (key.length() != item->key.length()) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
+      const auto& value = patch.hasOwnProperty(key) ? patch[key] : item->value;
+      if (!emit(item, value)) return false;
     }
-    for(const JSONVar::Member* item=patch._children.get();item;item=item->next.get()){
-      String key=item->key.text();if(key.length()!=item->key.length())return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
-      if(!base.hasOwnProperty(key)&&!emit(item,item->value))return false;
+    for (const JSONVar::Member* item = patch._children.get(); item; item = item->next.get()) {
+      String key = item->key.text();
+      if (key.length() != item->key.length()) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
+      if (!base.hasOwnProperty(key) && !emit(item, item->value)) return false;
     }
     return append("}");
   }
-  bool write(const JSONVar& value,unsigned depth){
-    if(depth>_limits.maxDepth || depth>32)return fail(ARD_LANG_NATIVE_DEPTH_LIMIT);
-    if(++_nodes>_limits.maxNodes)return fail(ARD_LANG_NATIVE_NODE_LIMIT);
-    if((_nodes&31)==0)_budget.checkpoint();
-    if(value._failed)return fail(ARD_LANG_NATIVE_INVALID_VALUE_OR_OUT_OF_MEMORY);
-    switch(value._type){
-      case JSONVar::Type::Undefined:return fail(ARD_LANG_NATIVE_UNDEFINED_VALUE);
-      case JSONVar::Type::Null:return append("null");
-      case JSONVar::Type::Boolean:return append(value._boolean?"true":"false");
-      case JSONVar::Type::Number:return append(value._text);
-      case JSONVar::Type::String:return string(value._text);
-      default:break;
+  bool write(const JSONVar& value, unsigned depth) {
+    if (depth > _limits.maxDepth || depth > 32) return fail(ARD_LANG_NATIVE_DEPTH_LIMIT);
+    if (++_nodes > _limits.maxNodes) return fail(ARD_LANG_NATIVE_NODE_LIMIT);
+    if ((_nodes & 31) == 0) _budget.checkpoint();
+    if (value._failed) return fail(ARD_LANG_NATIVE_INVALID_VALUE_OR_OUT_OF_MEMORY);
+    switch (value._type) {
+      case JSONVar::Type::Undefined: return fail(ARD_LANG_NATIVE_UNDEFINED_VALUE);
+      case JSONVar::Type::Null: return append("null");
+      case JSONVar::Type::Boolean: return append(value._boolean ? "true" : "false");
+      case JSONVar::Type::Number: return append(value._text);
+      case JSONVar::Type::String: return string(value._text);
+      default: break;
     }
-    bool object=value._type==JSONVar::Type::Object;if(!append(object?"{":"["))return false;bool first=true;
-    for(JSONVar::Member* item=value._children.get();item;item=item->next.get()){
-      if(!first && !append(","))return false;
-      if(!indent(depth+1))return false;
-      first=false;
-      if(object) {String key=item->key.text();if(key.length()!=item->key.length())return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);if(!string(key) || !append(_pretty?": ":":"))return false;}
-      if(!write(item->value,depth+1))return false;
+    bool object = value._type == JSONVar::Type::Object;
+    if (!append(object ? "{" : "[")) return false;
+    bool first = true;
+    for (JSONVar::Member* item = value._children.get(); item; item = item->next.get()) {
+      if (!first && !append(",")) return false;
+      if (!indent(depth + 1)) return false;
+      first = false;
+      if (object) {
+        String key = item->key.text();
+        if (key.length() != item->key.length()) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
+        if (!string(key) || !append(_pretty ? ": " : ":")) return false;
+      }
+      if (!write(item->value, depth + 1)) return false;
     }
-    if(!first && !indent(depth))return false;
-    return append(object?"}":"]");
+    if (!first && !indent(depth)) return false;
+    return append(object ? "}" : "]");
   }
 };
 struct API {
@@ -1193,9 +1590,10 @@ struct API {
    * @param limits JSON parsing or serialization resource limits.
    * @return Parsed JSON value, or Undefined with error text when input is invalid or a resource limit is exceeded.
    */
-  JSONVar parse(const String& text,String* error=nullptr,const Limits& limits=Limits())const {
-    Parser parser(text,limits);JSONVar value=parser.parse();
-    if(error)*error=parser.error()?String(parser.error())+ARD_LANG_NATIVE_AT_BYTE+String(parser.offset()):String();
+  JSONVar parse(const String& text, String* error = nullptr, const Limits& limits = Limits()) const {
+    Parser parser(text, limits);
+    JSONVar value = parser.parse();
+    if (error) *error = parser.error() ? String(parser.error()) + ARD_LANG_NATIVE_AT_BYTE + String(parser.offset()) : String();
     return value;
   }
   /**
@@ -1206,8 +1604,11 @@ struct API {
    * @param limits JSON parsing or serialization resource limits.
    * @return Serialized JSON text, or an empty string with error text on failure.
    */
-  String stringify(const JSONVar& value,bool pretty=false,String* error=nullptr,const Limits& limits=Limits())const {
-    Writer writer(limits,pretty);String text=writer.stringify(value);if(error)*error=writer.error()?writer.error():"";return text;
+  String stringify(const JSONVar& value, bool pretty = false, String* error = nullptr, const Limits& limits = Limits()) const {
+    Writer writer(limits, pretty);
+    String text = writer.stringify(value);
+    if (error) *error = writer.error() ? writer.error() : "";
+    return text;
   }
   /**
    * @brief Measure the serialized value or response without retaining its output.
@@ -1216,8 +1617,11 @@ struct API {
    * @param limits JSON parsing or serialization resource limits.
    * @return Required serialized byte count, or zero on failure with error text where supplied.
    */
-  size_t measure(const JSONVar& value,String* error=nullptr,const Limits& limits=Limits())const {
-    Writer writer(limits,false);size_t bytes=writer.measure(value);if(error)*error=writer.error()?writer.error():"";return bytes;
+  size_t measure(const JSONVar& value, String* error = nullptr, const Limits& limits = Limits()) const {
+    Writer writer(limits, false);
+    size_t bytes = writer.measure(value);
+    if (error) *error = writer.error() ? writer.error() : "";
+    return bytes;
   }
   /**
    * @brief Serialize only the requested byte slice of a JSON value.
@@ -1229,25 +1633,38 @@ struct API {
    * @return The requested serialized byte range, or an empty string on failure.
    */
 
-  size_t measureObjectPatch(const JSONVar& base,const JSONVar& patch,String* error=nullptr,const Limits& limits=Limits())const {
-    Writer writer(limits,false);size_t bytes=writer.measureObjectPatch(base,patch);if(error)*error=writer.error()?writer.error():"";return bytes;
+  size_t measureObjectPatch(const JSONVar& base, const JSONVar& patch, String* error = nullptr, const Limits& limits = Limits()) const {
+    Writer writer(limits, false);
+    size_t bytes = writer.measureObjectPatch(base, patch);
+    if (error) *error = writer.error() ? writer.error() : "";
+    return bytes;
   }
-  String stringifyObjectPatchSlice(const JSONVar& base,const JSONVar& patch,size_t offset,size_t maximum,String* error=nullptr,const Limits& limits=Limits())const {
-    Writer writer(limits,false);String text=writer.sliceObjectPatch(base,patch,offset,maximum);if(error)*error=writer.error()?writer.error():"";return text;
+  String stringifyObjectPatchSlice(const JSONVar& base, const JSONVar& patch, size_t offset, size_t maximum, String* error = nullptr, const Limits& limits = Limits()) const {
+    Writer writer(limits, false);
+    String text = writer.sliceObjectPatch(base, patch, offset, maximum);
+    if (error) *error = writer.error() ? writer.error() : "";
+    return text;
   }
-  String stringifySlice(const JSONVar& value,size_t offset,size_t maximum,String* error=nullptr,const Limits& limits=Limits())const {
-    Writer writer(limits,false);String text=writer.slice(value,offset,maximum);if(error)*error=writer.error()?writer.error():"";return text;
+  String stringifySlice(const JSONVar& value, size_t offset, size_t maximum, String* error = nullptr, const Limits& limits = Limits()) const {
+    Writer writer(limits, false);
+    String text = writer.slice(value, offset, maximum);
+    if (error) *error = writer.error() ? writer.error() : "";
+    return text;
   }
   /**
    * @brief Return the JSON type name used by the compatibility helpers.
    * @param value Input value, or output destination when passed by mutable reference.
    * @return Pointer to the requested data, or nullptr when unavailable.
    */
-  const char* typeof_(const JSONVar& value)const {
-    switch(value.type()){
-      case JSONVar::Type::Null:return "null";case JSONVar::Type::Boolean:return "boolean";
-      case JSONVar::Type::Number:return "number";case JSONVar::Type::String:return "string";
-      case JSONVar::Type::Object:return "object";case JSONVar::Type::Array:return "array";default:return "undefined";
+  const char* typeof_(const JSONVar& value) const {
+    switch (value.type()) {
+      case JSONVar::Type::Null: return "null";
+      case JSONVar::Type::Boolean: return "boolean";
+      case JSONVar::Type::Number: return "number";
+      case JSONVar::Type::String: return "string";
+      case JSONVar::Type::Object: return "object";
+      case JSONVar::Type::Array: return "array";
+      default: return "undefined";
     }
   }
 };

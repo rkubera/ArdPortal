@@ -24,5 +24,5 @@ void setup() {
  * @return No value.
  */
 void loop() {
-  portal.loop(); // Also performs background storage and captive DNS work.
+  portal.loop();  // Also performs background storage and captive DNS work.
 }

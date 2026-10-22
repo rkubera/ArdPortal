@@ -10,7 +10,9 @@
 #include "ArdAsset.h"
 #include <Arduino.h>
 #include <IPAddress.h>
-namespace ArdUILanguageData { enum class Key : uint16_t; }
+namespace ArdUILanguageData {
+enum class Key : uint16_t;
+}
 #include <functional>
 #include <memory>
 #include <time.h>
@@ -87,37 +89,45 @@ public:
   ArdPortal& operator=(ArdPortal&&) = delete;
 #if ARDPORTAL_ENABLE_POWER_MANAGEMENT
   /** @brief Power policy; configure and call only from the Arduino task. */
-  ArdPower& power(){return _power;}
-  const ArdPower& power()const{return _power;}
+  ArdPower& power() {
+    return _power;
+  }
+  const ArdPower& power() const {
+    return _power;
+  }
 #endif
   using PortalConfig = ArdPortalConfig;
   static constexpr size_t MaxPortalConfigBytes = 5 * 1024;
   static constexpr size_t MaxAppConfigBytes = 8 * 1024;
   static constexpr size_t MaxConfigDocumentBytes = 13 * 1024 + 64;
   struct Options {
-    const char* deviceName = nullptr; // Default: ArdUI- + chip ID; also the AP SSID.
+    const char* deviceName = nullptr;  // Default: ArdUI- + chip ID; also the AP SSID.
     const char* apPassword = "1234567890";
     const char* ntpServer1 = "pool.ntp.org";
     const char* ntpServer2 = "time.cloudflare.com";
-    uint32_t appStateIntervalMs = 600000; // Retained application state refresh.
-    uint32_t discoveryIntervalMs = 0; // Retained Home Assistant discovery refresh.
-    uint32_t haWorkBudgetMs = 2; // Cooperative budget between HA work units.
-    uint32_t appConfigRegistrationWorkBudgetMs = 2; // Cooperative budget between registration units.
+    uint32_t appStateIntervalMs = 600000;            // Retained application state refresh.
+    uint32_t discoveryIntervalMs = 0;                // Retained Home Assistant discovery refresh.
+    uint32_t haWorkBudgetMs = 2;                     // Cooperative budget between HA work units.
+    uint32_t appConfigRegistrationWorkBudgetMs = 2;  // Cooperative budget between registration units.
     uint16_t appConfigRegistrationMaxOperationsPerLoop = 16;
-    uint16_t haMaxOperationsPerLoop = 1; // Return control between HA work units.
-    uint32_t appConfigSaveDelayMs = 750; // Coalesce application changes.
+    uint16_t haMaxOperationsPerLoop = 1;  // Return control between HA work units.
+    uint32_t appConfigSaveDelayMs = 750;  // Coalesce application changes.
     uint32_t appConfigMinWriteIntervalMs = 5000;
     uint32_t wifiTimeoutMs = 30000;
     uint32_t retryMs = 10000;
     uint32_t mqttTimeoutMs = 15000;
-    uint32_t tcpTimeoutMs = 250; // Synchronous connect; DNS has a separate core timeout.
+    uint32_t tcpTimeoutMs = 250;  // Synchronous connect; DNS has a separate core timeout.
     uint16_t keepAliveSeconds = 30;
-    uint16_t tlsHandshakeTimeoutSeconds = 5; // ESP32 only; ESP8266 uses BearSSL core defaults.
+    uint16_t tlsHandshakeTimeoutSeconds = 5;  // ESP32 only; ESP8266 uses BearSSL core defaults.
   };
-  #if !ARDPORTAL_ENABLE_WIFI
+#if !ARDPORTAL_ENABLE_WIFI
 private:
-  #endif
-  enum class WifiState { NoCredentials, Connecting, Connected, FallbackAP, Disconnected };
+#endif
+  enum class WifiState { NoCredentials,
+                         Connecting,
+                         Connected,
+                         FallbackAP,
+                         Disconnected };
 public:
 #if !ARDPORTAL_ENABLE_MQTT
 private:
@@ -139,29 +149,45 @@ public:
   /** @brief Clear Zigbee pairing only and join a new network. @return True if accepted. */
   bool resetZigbeePairing();
   /** @brief Set operation timeout/retry options. @param options Limits in milliseconds and maximum attempts. @return True for valid limits; false leaves existing options unchanged. */
-  bool setZigbeeOptions(const ZigbeeOptions& options){if(!ArdZigbee::validOptions(options))return false;_zigbeeOptions=options;return true;}
+  bool setZigbeeOptions(const ZigbeeOptions& options) {
+    if (!ArdZigbee::validOptions(options)) return false;
+    _zigbeeOptions = options;
+    return true;
+  }
   /** @brief Install operation result handler. @param callback Receives operation, success and error from loop(). @return No value. */
-  void onZigbeeOperationFinished(ArdZigbee::FinishedCallback callback){_zigbee.onFinished(std::move(callback));}
+  void onZigbeeOperationFinished(ArdZigbee::FinishedCallback callback) {
+    _zigbee.onFinished(std::move(callback));
+  }
   /** @brief Install Zigbee state handler. @param callback Receives cached state changes from loop(). @return No value. */
-  void onZigbeeStateChanged(ArdZigbee::StateCallback callback){_zigbee.onState(std::move(callback));}
+  void onZigbeeStateChanged(ArdZigbee::StateCallback callback) {
+    _zigbee.onState(std::move(callback));
+  }
   /** @brief Get Zigbee network state. @return Current state. */
-  ZigbeeState zigbeeState()const{return _zigbee.state();}
+  ZigbeeState zigbeeState() const {
+    return _zigbee.state();
+  }
 #if ARDPORTAL_ZIGBEE_EXPORT_SUPPORT
-  using ZigbeeExportWriter=std::function<bool(const char*,size_t)>;
-  using ZigbeeExportFinished=std::function<void(bool,const String&)>;
+  using ZigbeeExportWriter = std::function<bool(const char*, size_t)>;
+  using ZigbeeExportFinished = std::function<void(bool, const String&)>;
   /** @brief Check that frozen endpoint metadata is ready for export. @return True after successful registration/native startup. */
-  bool zigbeeConverterExportReady()const;
+  bool zigbeeConverterExportReady() const;
   /** @brief Check an API export job. @return True until completion/cancellation is delivered from loop. */
-  bool zigbeeConverterExportBusy()const{return _apiExportStage!=0;}
+  bool zigbeeConverterExportBusy() const {
+    return _apiExportStage != 0;
+  }
   /** @brief Request cancellation; completion arrives from loop. @return True if a job exists. */
-  bool cancelZigbeeConverterExport(){if(!zigbeeConverterExportBusy())return false;_apiExportCancel=true;return true;}
+  bool cancelZigbeeConverterExport() {
+    if (!zigbeeConverterExportBusy()) return false;
+    _apiExportCancel = true;
+    return true;
+  }
 #if ARDPORTAL_ZIGBEE_CONVERTER_SUPPORT
   /** @brief Queue streamed Zigbee2MQTT export without HTTP. @param writer Accept a complete borrowed fragment (max 256 bytes) or return false without consuming it. @param finished Completion/error callback. @return True if accepted; continue loop. */
-  bool startZigbee2MqttConverterExport(ZigbeeExportWriter writer,ZigbeeExportFinished finished=nullptr);
+  bool startZigbee2MqttConverterExport(ZigbeeExportWriter writer, ZigbeeExportFinished finished = nullptr);
 #endif
 #if ARDPORTAL_ZHA_QUIRK_SUPPORT
   /** @brief Queue streamed ZHA Python export without HTTP. @param writer Accept a complete borrowed fragment (max 256 bytes) or return false without consuming it. @param finished Completion/error callback. @return True if accepted; continue loop. */
-  bool startZhaQuirkExport(ZigbeeExportWriter writer,ZigbeeExportFinished finished=nullptr);
+  bool startZhaQuirkExport(ZigbeeExportWriter writer, ZigbeeExportFinished finished = nullptr);
 #endif
 #endif
 
@@ -169,47 +195,73 @@ public:
 #if !ARDPORTAL_ENABLE_WIFI
 private:
 #endif
-  enum class ApPolicy { Automatic, AlwaysOn, Disabled };
+  enum class ApPolicy { Automatic,
+                        AlwaysOn,
+                        Disabled };
 public:
 #if ARDPORTAL_ENABLE_WIFI
-  using WifiStateCallback=std::function<void(WifiState)>;
-  using ApStateCallback=std::function<void(bool)>;
-  using WifiScanCallback=std::function<void(bool,const String&)>;
+  using WifiStateCallback = std::function<void(WifiState)>;
+  using ApStateCallback = std::function<void(bool)>;
+  using WifiScanCallback = std::function<void(bool, const String&)>;
   /** @brief Connect using saved credentials and resume retries. @return False when not ready, busy or missing credentials. */
   bool connectWifiStation();
   /** @brief Disconnect station and suspend retries. @return False during an active configuration/OTA operation. */
   bool disconnectWifiStation();
   /** @brief Set automatic station retry policy. @param enabled Retry permission. @return No value. */
-  void setWifiAutoReconnect(bool enabled){_wifiAutoReconnect=ARDPORTAL_ENABLE_WIFI&&enabled;}
+  void setWifiAutoReconnect(bool enabled) {
+    _wifiAutoReconnect = ARDPORTAL_ENABLE_WIFI && enabled;
+  }
   /** @brief Read station retry policy. @return True when automatic retries are enabled. */
-  bool wifiAutoReconnect()const{return _wifiAutoReconnect;}
+  bool wifiAutoReconnect() const {
+    return _wifiAutoReconnect;
+  }
   /** @brief Install loop-owned station state notifications. @param callback State handler. @return No value. */
-  void onWifiStateChanged(WifiStateCallback callback){_wifiStateCallback=std::move(callback);}
+  void onWifiStateChanged(WifiStateCallback callback) {
+    _wifiStateCallback = std::move(callback);
+  }
   /** @brief Queue an asynchronous Wi-Fi scan. @return False when busy or not ready. */
   bool scanWifiNetworks();
   /** @brief Check scan activity. @return True while queued or running. */
-  bool wifiScanBusy()const{return _scanRequested||_scanning;}
+  bool wifiScanBusy() const {
+    return _scanRequested || _scanning;
+  }
   /** @brief Read last scan JSON. @return Borrowed array of SSID/RSSI/channel/security objects. */
-  const String& wifiNetworksJson()const{return _networks;}
+  const String& wifiNetworksJson() const {
+    return _networks;
+  }
   /** @brief Install scan completion handler. @param callback Receives success and borrowed results. @return No value. */
-  void onWifiScanFinished(WifiScanCallback callback){_wifiScanCallback=std::move(callback);}
+  void onWifiScanFinished(WifiScanCallback callback) {
+    _wifiScanCallback = std::move(callback);
+  }
   /** @brief Install loop-owned AP start/stop notifications. @param callback Receives active state. @return No value. */
-  void onApStateChanged(ApStateCallback callback){_apStateCallback=std::move(callback);}
+  void onApStateChanged(ApStateCallback callback) {
+    _apStateCallback = std::move(callback);
+  }
   /** @brief Configure AP lifetime policy. @param policy Automatic fallback, forced on or disabled. @return False while configuration/OTA work prevents changes. */
   bool setApPolicy(ApPolicy policy);
   /** @brief Read AP lifetime policy. @return Current policy. */
-  ApPolicy apPolicy()const{return _apPolicy;}
+  ApPolicy apPolicy() const {
+    return _apPolicy;
+  }
   /** @brief Start AP and keep it enabled. @return True when active. */
-  bool startAccessPoint(){return setApPolicy(ApPolicy::AlwaysOn);}
+  bool startAccessPoint() {
+    return setApPolicy(ApPolicy::AlwaysOn);
+  }
   /** @brief Stop AP and disable automatic fallback. @return True when stopped. */
-  bool stopAccessPoint(){return setApPolicy(ApPolicy::Disabled);}
+  bool stopAccessPoint() {
+    return setApPolicy(ApPolicy::Disabled);
+  }
 #endif
 public:
 #if ARDPORTAL_ENABLE_ZIGBEE
   /** @brief Expose native Zigbee status and policy API. @return Owned component reference. */
-  ArdZigbee& zigbee(){return _zigbee;}
+  ArdZigbee& zigbee() {
+    return _zigbee;
+  }
   /** @brief Read native Zigbee status. @return Owned immutable component reference. */
-  const ArdZigbee& zigbee()const{return _zigbee;}
+  const ArdZigbee& zigbee() const {
+    return _zigbee;
+  }
 #endif
   using RestartCallback = std::function<void(RestartReason)>;
   using BeforeFactoryResetCallback = std::function<void()>;
@@ -225,49 +277,67 @@ public:
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onPortalConfigChanged(PortalConfigChangedCallback callback) { _changed = std::move(callback); }
+  void onPortalConfigChanged(PortalConfigChangedCallback callback) {
+    _changed = std::move(callback);
+  }
   /**
    * @brief Install the callback run before manual or OTA restarts; factory reset and storage formatting bypass it.
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onBeforeRestart(RestartCallback callback) { _beforeRestart = std::move(callback); }
+  void onBeforeRestart(RestartCallback callback) {
+    _beforeRestart = std::move(callback);
+  }
   /**
    * @brief Install the callback run before a confirmed factory reset, even if settings are already default.
    * @param callback Synchronous handler called once before default settings are scheduled for storage. An empty handler disables it.
    * @return No value. Ordinary restarts and storage formatting do not invoke this callback.
    */
-  void onBeforeFactoryReset(BeforeFactoryResetCallback callback) { _beforeFactoryReset = std::move(callback); }
+  void onBeforeFactoryReset(BeforeFactoryResetCallback callback) {
+    _beforeFactoryReset = std::move(callback);
+  }
   /**
    * @brief Install the callback reporting completion of a persistent configuration save.
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onPortalAndAppConfigSaved(PortalAndAppConfigSavedCallback callback) { _saved = std::move(callback); }
+  void onPortalAndAppConfigSaved(PortalAndAppConfigSavedCallback callback) {
+    _saved = std::move(callback);
+  }
   /**
    * @brief Report each application value whose batch exhausted its three save attempts.
    * @param callback Receives key, attempted value (Undefined for deletion), attempt count and error. References are valid only during the call.
    * @return No value.
    */
-  void onAppConfigValueSaveFailed(AppConfigValueSaveFailedCallback callback) { _valueSaveFailed = std::move(callback); }
+  void onAppConfigValueSaveFailed(AppConfigValueSaveFailedCallback callback) {
+    _valueSaveFailed = std::move(callback);
+  }
   /** @brief Read attempts made for the current or most recently completed save batch. @return Zero before any attempt, otherwise 1 to 3. */
-  uint8_t portalAndAppConfigSaveAttempts() const { return _saveAttempts; }
+  uint8_t portalAndAppConfigSaveAttempts() const {
+    return _saveAttempts;
+  }
   /**
    * @brief Install the callback reporting completion of initial configuration loading.
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onPortalAndAppConfigReady(PortalAndAppConfigReadyCallback callback) { _readyCallback = std::move(callback); }
+  void onPortalAndAppConfigReady(PortalAndAppConfigReadyCallback callback) {
+    _readyCallback = std::move(callback);
+  }
   /**
    * @brief Check whether initial portal and application configuration loading has completed.
    * @return True once initial configuration loading has completed, including a failed load.
    */
-  bool portalAndAppConfigReady() const { return _configurationReady; }
+  bool portalAndAppConfigReady() const {
+    return _configurationReady;
+  }
   /**
    * @brief Check for active storage work, a pending save or a pending ready notification.
    * @return True if storage work, a scheduled save or a ready notification is pending.
    */
-  bool portalAndAppConfigBusy() const { return _storage.busy() || _savePending || _pendingReady || _deferredApp.length(); }
+  bool portalAndAppConfigBusy() const {
+    return _storage.busy() || _savePending || _pendingReady || _deferredApp.length();
+  }
   // true = accepted in RAM; onPortalAndAppConfigSaved signals durable completion.
   /**
    * @brief Validate and apply portal settings in RAM, then schedule persistent storage.
@@ -311,35 +381,50 @@ public:
    * @return Reference to the last registration error, including stage, fieldId and reason.
    */
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  const ArdAppConfigRegistrationError& appConfigRegistrationError() const { return _appConfigRegistrationError; }
-  enum class AppConfigPageRegistrationState { Idle, Pending, Succeeded, Failed };
-  using AppConfigPageRegistrationFinishedCallback=std::function<void(bool)>;
+  const ArdAppConfigRegistrationError& appConfigRegistrationError() const {
+    return _appConfigRegistrationError;
+  }
+  enum class AppConfigPageRegistrationState { Idle,
+                                              Pending,
+                                              Succeeded,
+                                              Failed };
+  using AppConfigPageRegistrationFinishedCallback = std::function<void(bool)>;
   /**
    * @brief Install the completion callback for accepted AppConfig page registration jobs.
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onAppConfigPageRegistrationFinished(AppConfigPageRegistrationFinishedCallback callback) { _appConfigPageRegistrationFinished=std::move(callback); }
+  void onAppConfigPageRegistrationFinished(AppConfigPageRegistrationFinishedCallback callback) {
+    _appConfigPageRegistrationFinished = std::move(callback);
+  }
   /**
    * @brief Read the current page registration job state.
    * @return Idle, Pending, Succeeded or Failed for the current or most recent registration.
    */
-  AppConfigPageRegistrationState appConfigPageRegistrationState() const {return _appConfigPageRegistrationState;}
+  AppConfigPageRegistrationState appConfigPageRegistrationState() const {
+    return _appConfigPageRegistrationState;
+  }
   /**
    * @brief Check whether a page registration job is pending.
    * @return True while registration state is Pending.
    */
-  bool appConfigPageRegistrationBusy() const {return _appConfigPageRegistrationState==AppConfigPageRegistrationState::Pending;}
+  bool appConfigPageRegistrationBusy() const {
+    return _appConfigPageRegistrationState == AppConfigPageRegistrationState::Pending;
+  }
   /**
    * @brief Read how many fields the current registration job has processed.
    * @return Number of fields already processed by the registration job.
    */
-  size_t appConfigPageRegistrationProcessedFields() const {return _appConfigPageRegistrationProcessed;}
+  size_t appConfigPageRegistrationProcessedFields() const {
+    return _appConfigPageRegistrationProcessed;
+  }
   /**
    * @brief Read the total field count discovered for the current registration job.
    * @return Number of fields discovered so far in the registration source.
    */
-  size_t appConfigPageRegistrationTotalFields() const {return _appConfigPageRegistrationTotal;}
+  size_t appConfigPageRegistrationTotalFields() const {
+    return _appConfigPageRegistrationTotal;
+  }
   // All accepted jobs finish through loop(); small pages take one pass.
   /**
    * @brief Accept an AppConfig page registration job; complete accepted jobs from loop(), including small pages.
@@ -352,13 +437,13 @@ public:
    * @param definition JSON definition to register; flash sources must remain valid for the portal lifetime.
    * @return True if accepted; loop() later delivers the completion callback. False rejects the job without a callback.
    */
-  bool startAppConfigPageRegistration(String&& definition); // Transfers the source on acceptance.
+  bool startAppConfigPageRegistration(String&& definition);  // Transfers the source on acceptance.
   /**
    * @brief Accept an AppConfig page registration job; complete accepted jobs from loop(), including small pages.
    * @param definition JSON definition to register; flash sources must remain valid for the portal lifetime.
    * @return True if accepted; loop() later delivers the completion callback. False rejects the job without a callback.
    */
-  bool startAppConfigPageRegistration(const __FlashStringHelper* definition); // Immutable source must outlive the portal.
+  bool startAppConfigPageRegistration(const __FlashStringHelper* definition);  // Immutable source must outlive the portal.
   /**
    * @brief Register a Home Assistant entity without adding a page to the portal navigation.
    * @param definition JSON definition to register; flash sources must remain valid for the portal lifetime.
@@ -382,19 +467,19 @@ public:
    */
   void onAppConfigCommand(AppConfigCommandCallback callback) {
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
-    _appCommand=std::move(callback);
+    _appCommand = std::move(callback);
 #else
     (void)callback;
 #endif
   }
-  /**
+/**
    * @brief Update a runtime application value and optionally queue its MQTT state.
    * @param key Configuration key or JSON object member name.
    * @param value Input value, or output destination when passed by mutable reference.
    * @param publishMqtt Whether to queue MQTT state publication for this update.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  #endif
+#endif
   bool setAppConfigStateValue(const char* key, const ArdJSON::JSONVar& value, bool publishMqtt = true);
   /**
    * @brief Mark an application field for MQTT state publication.
@@ -420,12 +505,14 @@ public:
    * @param callback Completion or event handler supplied to this operation.
    * @return No value.
    */
-  void onAppConfigValueChanged(AppConfigValueChangedCallback callback) { _appChanged = std::move(callback); }
+  void onAppConfigValueChanged(AppConfigValueChangedCallback callback) {
+    _appChanged = std::move(callback);
+  }
   /**
    * @brief Request a configuration save without debounce; flash work continues through loop().
    * @return True if accepted in RAM; persistent completion is reported through onPortalAndAppConfigSaved().
    */
-  bool flushPortalAndAppConfig(); // Skip debounce, never perform flash I/O here.
+  bool flushPortalAndAppConfig();  // Skip debounce, never perform flash I/O here.
   /**
    * @brief Append a diagnostic message to Console Messages when console messages are enabled.
    * @param message Diagnostic text to append.
@@ -434,19 +521,23 @@ public:
 #if !ARDPORTAL_ENABLE_CONSOLE_MESSAGES
 private:
 #endif
-  void log(const String& message); // Diagnostic messages in Console > Messages.
+  void log(const String& message);  // Diagnostic messages in Console > Messages.
   /**
    * @brief Append a diagnostic message to Console Messages when console messages are enabled.
    * @param message Diagnostic text to append.
    * @return No value.
    */
-  void logMessage(const String& message) { log(message); } // Explicit diagnostic logging; no Serial interception.
+  void logMessage(const String& message) {
+    log(message);
+  }  // Explicit diagnostic logging; no Serial interception.
   /**
    * @brief Expose the last portal/application configuration storage error.
    * @return Reference to the latest storage error text; empty when no error is recorded.
    */
 public:
-  const String& portalAndAppConfigError() const { return _storageError; }
+  const String& portalAndAppConfigError() const {
+    return _storageError;
+  }
   /**
    * @brief Build a stable hexadecimal identifier from the device hardware.
    * @return Stable hardware identifier encoded in hexadecimal.
@@ -456,7 +547,9 @@ public:
    * @brief Build the default device name from the ArdUI prefix and hardware identifier.
    * @return ArdUI- followed by the hexadecimal hardware identifier.
    */
-  static String defaultDeviceName() { return "ArdUI-" + chipId(); }
+  static String defaultDeviceName() {
+    return "ArdUI-" + chipId();
+  }
   /**
    * @brief Install the callback for MQTT messages not handled by application controls.
    * @param callback Completion or event handler supplied to this operation.
@@ -476,36 +569,48 @@ public:
    * @brief Expose the MQTT component owned by this portal.
    * @return Reference to the portal MQTT component.
    */
-  ArdMqtt& mqtt() { return _mqttClient; }
+  ArdMqtt& mqtt() {
+    return _mqttClient;
+  }
   /**
    * @brief Expose the MQTT component owned by this portal.
    * @return Reference to the portal MQTT component.
    */
-  const ArdMqtt& mqtt() const { return _mqttClient; }
+  const ArdMqtt& mqtt() const {
+    return _mqttClient;
+  }
 #endif
 #if ARDPORTAL_ENABLE_HA
   /**
    * @brief Expose the Home Assistant discovery component owned by this portal.
    * @return Reference to the portal Home Assistant component.
    */
-  ArdHomeAssistant& homeAssistant() { return _homeAssistant; }
+  ArdHomeAssistant& homeAssistant() {
+    return _homeAssistant;
+  }
   /**
    * @brief Expose the Home Assistant discovery component owned by this portal.
    * @return Reference to the portal Home Assistant component.
    */
-  const ArdHomeAssistant& homeAssistant() const { return _homeAssistant; }
+  const ArdHomeAssistant& homeAssistant() const {
+    return _homeAssistant;
+  }
 #endif
 #if ARDPORTAL_HTTP_OTA_SUPPORT
   /**
    * @brief Expose the OTA component owned by this portal.
    * @return Reference to the portal OTA component.
    */
-  ArdOta& ota() { return _ota; }
+  ArdOta& ota() {
+    return _ota;
+  }
   /**
    * @brief Expose the OTA component owned by this portal.
    * @return Reference to the portal OTA component.
    */
-  const ArdOta& ota() const { return _ota; }
+  const ArdOta& ota() const {
+    return _ota;
+  }
 #endif
   /**
    * @brief Initialize networking, storage and portal services using default or supplied options.
@@ -517,7 +622,9 @@ public:
    * @return False for invalid input or when initialization has already started. */
   bool setFirmwareVersion(const char* version);
   /** @brief Read application firmware version. @return Borrowed string owned by the portal. */
-  const char* getFirmwareVersion() const { return _firmwareVersion+1; }
+  const char* getFirmwareVersion() const {
+    return _firmwareVersion + 1;
+  }
 
   /**
    * @brief Initialize networking, storage and portal services using default or supplied options.
@@ -539,11 +646,11 @@ private:
 #endif
   bool wifiConnected() const {
 #if ARDPORTAL_ENABLE_WIFI
-return WiFi.status() == WL_CONNECTED;
+    return WiFi.status() == WL_CONNECTED;
 #else
-return false;
+    return false;
 #endif
-}
+  }
 public:
 
   /**
@@ -569,7 +676,9 @@ public:
 #if !ARDPORTAL_ENABLE_WIFI
 private:
 #endif
-  WifiState wifiState() const { return _wifiState; }
+  WifiState wifiState() const {
+    return _wifiState;
+  }
 public:
 
   /**
@@ -595,7 +704,9 @@ public:
 #if !ARDPORTAL_ENABLE_WIFI
 private:
 #endif
-  bool apActive() const { return _apActive; }
+  bool apActive() const {
+    return _apActive;
+  }
 public:
 
   /**
@@ -605,14 +716,18 @@ public:
 #if !ARDPORTAL_ENABLE_MQTT_TLS
 private:
 #endif
-  bool tlsClockReady() const { return time(nullptr) >= 1704067200; }
+  bool tlsClockReady() const {
+    return time(nullptr) >= 1704067200;
+  }
 public:
- // 2024-01-01
+  // 2024-01-01
   /**
    * @brief Check portal and app config storage ok.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool portalAndAppConfigStorageOK() const { return _storageOK; }
+  bool portalAndAppConfigStorageOK() const {
+    return _storageOK;
+  }
   /**
    * @brief Read the Wi-Fi station IP address.
    * @return The Wi-Fi station IP address.
@@ -622,11 +737,11 @@ private:
 #endif
   IPAddress localIP() const {
 #if ARDPORTAL_ENABLE_WIFI
-return WiFi.localIP();
+    return WiFi.localIP();
 #else
-return IPAddress();
+    return IPAddress();
 #endif
-}
+  }
 public:
 
   /**
@@ -638,18 +753,20 @@ private:
 #endif
   IPAddress apIP() const {
 #if ARDPORTAL_ENABLE_WIFI
-return WiFi.softAPIP();
+    return WiFi.softAPIP();
 #else
-return IPAddress();
+    return IPAddress();
 #endif
-}
+  }
 public:
 
   /**
    * @brief Expose the current portal configuration.
    * @return Reference to the current portal settings.
    */
-  const PortalConfig& getPortalConfig() const { return _config; }
+  const PortalConfig& getPortalConfig() const {
+    return _config;
+  }
   // QoS 0; false means disconnected, invalid arguments or a busy send buffer.
   /**
    * @brief Build an MQTT topic from its prefix, configured device name and suffix.
@@ -696,24 +813,24 @@ private:
 #endif
 #endif
 #if ARDPORTAL_ENABLE_WIFI
-  bool _wifiAutoReconnect=ARDPORTAL_ENABLE_WIFI;
-  ApPolicy _apPolicy=ApPolicy::Automatic;
+  bool _wifiAutoReconnect = ARDPORTAL_ENABLE_WIFI;
+  ApPolicy _apPolicy = ApPolicy::Automatic;
   WifiStateCallback _wifiStateCallback;
   WifiScanCallback _wifiScanCallback;
   ApStateCallback _apStateCallback;
-  bool _apiApActive=false;
-  WifiState _apiWifiState=WifiState::NoCredentials;
-  uint32_t _apiScanCompletedId=0;
-  bool _scanSucceeded=false;
+  bool _apiApActive = false;
+  WifiState _apiWifiState = WifiState::NoCredentials;
+  uint32_t _apiScanCompletedId = 0;
+  bool _scanSucceeded = false;
 #endif
-  uint32_t _portalConfigRevision=0;
+  uint32_t _portalConfigRevision = 0;
   /** @brief Deliver deferred network callbacks from loop. @return No value. */
   void serviceNetworkApi();
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   ArdAppConfigRegistrationError _appConfigRegistrationError;
   AppConfigPageRegistrationFinishedCallback _appConfigPageRegistrationFinished;
-  AppConfigPageRegistrationState _appConfigPageRegistrationState=AppConfigPageRegistrationState::Idle;
-  size_t _appConfigPageRegistrationProcessed=0,_appConfigPageRegistrationTotal=0;
+  AppConfigPageRegistrationState _appConfigPageRegistrationState = AppConfigPageRegistrationState::Idle;
+  size_t _appConfigPageRegistrationProcessed = 0, _appConfigPageRegistrationTotal = 0;
   std::unique_ptr<ArdAppConfigPageRegistration> _appConfigPageRegistration;
   /**
    * @brief Prepare the source and staging state for an atomic page registration.
@@ -722,7 +839,7 @@ private:
    * @param owned Optional RAM string whose ownership is transferred on acceptance.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool beginAppConfigPageRegistration(const String* source,const __FlashStringHelper* flash,String* owned=nullptr);
+  bool beginAppConfigPageRegistration(const String* source, const __FlashStringHelper* flash, String* owned = nullptr);
   /**
    * @brief Advance page registration within the configured cooperative work budget.
    * @return No value.
@@ -733,8 +850,8 @@ private:
    * @return No value.
    */
   void serviceAppConfigPageRegistrationUnit();
-  bool _appConfigPageRegistrationDriving=false;
-  uint32_t _appConfigPageRegistrationGeneration=0;
+  bool _appConfigPageRegistrationDriving = false;
+  uint32_t _appConfigPageRegistrationGeneration = 0;
   /**
    * @brief Commit the completed page and arrange delivery of its completion callback.
    * @param success Whether registration completed successfully.
@@ -748,7 +865,7 @@ private:
    * @param reason Restart or failure reason.
    * @return No value.
    */
-  __attribute__((noinline)) void failAppConfigPageRegistration(const char* stage,const String& field,const __FlashStringHelper* reason);
+  __attribute__((noinline)) void failAppConfigPageRegistration(const char* stage, const String& field, const __FlashStringHelper* reason);
 #endif
   /**
    * @brief Check app config registration failed.
@@ -758,10 +875,10 @@ private:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  bool appConfigRegistrationFailed(const char* stage,const String& field,const String& reason) {
-    _appConfigRegistrationError={stage,field,reason};
+  bool appConfigRegistrationFailed(const char* stage, const String& field, const String& reason) {
+    _appConfigRegistrationError = { stage, field, reason };
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
-    log(String(F(ARD_LANG_NATIVE_APPCONFIG_REGISTRATION_STAGE))+stage+ARD_LANG_NATIVE_FIELD+field+ARD_LANG_NATIVE_REASON+reason);
+    log(String(F(ARD_LANG_NATIVE_APPCONFIG_REGISTRATION_STAGE)) + stage + ARD_LANG_NATIVE_FIELD + field + ARD_LANG_NATIVE_REASON + reason);
 #endif
     return false;
   }
@@ -806,7 +923,7 @@ private:
    */
   bool otaActive() const {
 #if ARDPORTAL_ZIGBEE_OTA_SUPPORT
-    if(_zigbee.otaActive())return true;
+    if (_zigbee.otaActive()) return true;
 #endif
 #if ARDPORTAL_HTTP_OTA_SUPPORT
     return _ota.active();
@@ -856,48 +973,49 @@ private:
     return String();
 #endif
   }
-  char _firmwareVersion[18]="\x03" "1.0"; // ZCL length prefix plus bounded text and terminator.
+  char _firmwareVersion[18] = "\x03"
+                              "1.0";  // ZCL length prefix plus bounded text and terminator.
   Options _options;
 #if ARDPORTAL_ENABLE_ZIGBEE
   ArdZigbee _zigbee;
   ZigbeeOptions _zigbeeOptions;
-  bool _zigbeeBeginTried=false;
+  bool _zigbeeBeginTried = false;
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  size_t _zigbeeBuildIndex=0,_zigbeeSeenFields=0;
-  uint8_t _zigbeeReportEndpoint=0;
-  uint16_t _zigbeeBuildPart=0;
-  uint32_t _zigbeeRegistrationSince=0,_zigbeeRetryAt=0,_zigbeeReportReadyAt=0;
-  bool _zigbeeWasConnected=false,_zigbeeMappingFailed=false,_zigbeeRetryPending=false;
+  size_t _zigbeeBuildIndex = 0, _zigbeeSeenFields = 0;
+  uint8_t _zigbeeReportEndpoint = 0;
+  uint16_t _zigbeeBuildPart = 0;
+  uint32_t _zigbeeRegistrationSince = 0, _zigbeeRetryAt = 0, _zigbeeReportReadyAt = 0;
+  bool _zigbeeWasConnected = false, _zigbeeMappingFailed = false, _zigbeeRetryPending = false;
   ArdZigbeeFields::Command _zigbeePendingCommand;
-  bool _zigbeeHasCommand=false,_zigbeeDrainingRestart=false;
+  bool _zigbeeHasCommand = false, _zigbeeDrainingRestart = false;
 #if ARDPORTAL_ZIGBEE_OTA_SUPPORT
-  bool _zigbeeOtaProgress=false;
+  bool _zigbeeOtaProgress = false;
   /** @brief Mirror native OTA progress into its AppConfig field without writing flash. @param active Reception is active. @return True when mirrored or no update field exists. */
   bool setZigbeeOtaProgress(bool active);
 #endif
-  ArdJSON::JSONVar _zigbeeAppQueue=ArdJSON::JSONVar::object();
+  ArdJSON::JSONVar _zigbeeAppQueue = ArdJSON::JSONVar::object();
   /** @brief Stage native endpoints, apply queued commands and report one field per loop. @param now Current milliseconds. @return No value. */
   void serviceZigbeeControls(uint32_t now);
   /** @brief Mark only the mapped endpoint of a changed AppConfig field. @param key Changed field ID. @return No value. */
   void markZigbeeStateDirty(const String& key);
   /** @brief Apply a Zigbee setting and queue its optional persistent write. @param key Field ID. @param value Valid setting. @return True if accepted. */
-  bool acceptZigbeeState(const String& key,const ArdJSON::JSONVar& value);
+  bool acceptZigbeeState(const String& key, const ArdJSON::JSONVar& value);
 #endif
 #if ARDPORTAL_ENABLE_WWW
   /** @brief Handle Zigbee HTTP requests. @param method HTTP method. @param path Resource path. @return True if handled. */
-  bool handleZigbeeHttp(const String& method,const String& path);
+  bool handleZigbeeHttp(const String& method, const String& path);
   /** @brief Build Zigbee status. @return JSON status document. */
   String zigbeeStatusJson();
 #endif
 #if ARDPORTAL_ZIGBEE_LAYOUT_SUPPORT
 #if ARDPORTAL_ZIGBEE_HTTP_EXPORT_SUPPORT
-  const ArdZigbee::Control* _converterControl=nullptr;
-  bool _converterDownload=false,_converterPython=false;
-  uint8_t _converterStage=0;
+  const ArdZigbee::Control* _converterControl = nullptr;
+  bool _converterDownload = false, _converterPython = false;
+  uint8_t _converterStage = 0;
 #endif
-  const ArdZigbee::Control* _converterIdentityControl=nullptr;
-  uint32_t _converterHashA=2166136261UL,_converterHashB=0x9e3779b9UL;
-  bool _converterIdentityStarted=false,_converterLayoutReady=false;
+  const ArdZigbee::Control* _converterIdentityControl = nullptr;
+  uint32_t _converterHashA = 2166136261UL, _converterHashB = 0x9e3779b9UL;
+  bool _converterIdentityStarted = false, _converterLayoutReady = false;
   /** @brief Describe one endpoint for export and layout identity. @param control Registered endpoint. @return JSON or empty on allocation failure. */
   String zigbeeConverterControlJson(const ArdZigbee::Control& control);
   /** @brief Produce one converter fragment. @return False to retry after memory pressure. */
@@ -907,18 +1025,18 @@ private:
 #if ARDPORTAL_ZIGBEE_EXPORT_SUPPORT
   ZigbeeExportWriter _apiExportWriter;
   ZigbeeExportFinished _apiExportFinished;
-  const ArdZigbee::Control* _apiExportControl=nullptr;
+  const ArdZigbee::Control* _apiExportControl = nullptr;
   String _apiExportText;
-  size_t _apiExportOffset=0;
-  uint32_t _apiExportProgressAt=0;
-  uint8_t _apiExportStage=0;
-  bool _apiExportPython=false,_apiExportFirst=true,_apiExportCancel=false;
+  size_t _apiExportOffset = 0;
+  uint32_t _apiExportProgressAt = 0;
+  uint8_t _apiExportStage = 0;
+  bool _apiExportPython = false, _apiExportFirst = true, _apiExportCancel = false;
   /** @brief Initialize one API stream. @param python Format selector. @param writer Fragment consumer. @param finished Completion handler. @return True when accepted. */
-  bool beginZigbeeConverterExport(bool python,ZigbeeExportWriter writer,ZigbeeExportFinished finished);
+  bool beginZigbeeConverterExport(bool python, ZigbeeExportWriter writer, ZigbeeExportFinished finished);
   /** @brief Advance at most one output fragment in loop. @return No value. */
   void serviceZigbeeConverterExport();
   /** @brief Release stream state and deliver completion once. @param success Result. @param error Explanation. @return No value. */
-  void finishZigbeeConverterExport(bool success,const String& error);
+  void finishZigbeeConverterExport(bool success, const String& error);
 #endif
 #endif
 #endif
@@ -949,13 +1067,13 @@ private:
   ArdJSON::JSONVar _appConfig = ArdJSON::JSONVar::object(), _pendingApp = ArdJSON::JSONVar::object();
   // Latest application intent per key, isolated from the immutable active save.
   ArdJSON::JSONVar _deferredApp = ArdJSON::JSONVar::object();
-  bool _deferredAppForce=false;
-  bool _pendingAppPatch=false;
+  bool _deferredAppForce = false;
+  bool _pendingAppPatch = false;
   String _saveDocumentPrefix;
-  size_t _saveDocumentAppBytes=0;
-  bool scheduleAppPatch(ArdJSON::JSONVar patch,ChangeSource source,bool coalesceSource=false);
+  size_t _saveDocumentAppBytes = 0;
+  bool scheduleAppPatch(ArdJSON::JSONVar patch, ChangeSource source, bool coalesceSource = false);
   void applyPendingApp();
-  String saveDocumentSlice(size_t offset,size_t maximum) const;
+  String saveDocumentSlice(size_t offset, size_t maximum) const;
 
   PortalConfigChangedCallback _changed;
   PortalAndAppConfigSavedCallback _saved;
@@ -968,10 +1086,10 @@ private:
   bool _forceSave = false, _httpWaitingStorage = false, _resetAfterSave = false;
   bool _hasCommitted = false, _notifyPending = false, _saveHasChanges = false;
   uint32_t _dirtySince = 0, _lastCommit = 0;
-  uint32_t _saveRetrySince=0;
-  uint8_t _saveAttempts=0;
-  bool _saveRetryPending=false;
-  bool _configurationWritable=false;
+  uint32_t _saveRetrySince = 0;
+  uint8_t _saveAttempts = 0;
+  bool _saveRetryPending = false;
+  bool _configurationWritable = false;
   /**
    * @brief Advance pending storage operations and the restart save sequence.
    * @param now Current time used to evaluate deadlines.
@@ -1009,7 +1127,7 @@ private:
   String _storageError;
 
 #if ARDPORTAL_ENABLE_WWW
-  WiFiServer _server{80};
+  WiFiServer _server{ 80 };
   WiFiClient _http;
 #else
   static constexpr bool _http = false;
@@ -1018,42 +1136,51 @@ private:
   bool _httpDynamicPages = false, _httpDynamicPageStarted = false, _httpPortalTail = false;
   String _httpDynamicText;
   // 0: definition list, 1: selected definition, 2: selected state, 3: menu catalog.
-  uint8_t _httpDynamicMode=0, _httpDynamicStage=0;
-  size_t _httpDynamicField=0;
-  bool _httpDynamicConditionFirst=true;
-  uint32_t _httpDynamicRevision=0;
+  uint8_t _httpDynamicMode = 0, _httpDynamicStage = 0;
+  size_t _httpDynamicField = 0;
+  bool _httpDynamicConditionFirst = true;
+  uint32_t _httpDynamicRevision = 0;
   /**
    * @brief Build the next bounded fragment of a streamed dynamic-page response.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  enum class DynamicHttpPart { Ready, RetryLater, Finished, Failed };
+  enum class DynamicHttpPart { Ready,
+                               RetryLater,
+                               Finished,
+                               Failed };
   DynamicHttpPart prepareDynamicHttpPart();
   bool dynamicHttpMemoryReady();
-  bool reserveDynamicHttpMemory(size_t bytes,size_t block);
+  bool reserveDynamicHttpMemory(size_t bytes, size_t block);
   bool buildDynamicHttpPart();
   size_t _httpDynamicPageIndex = 0, _httpDynamicPageCount = 0, _httpDynamicPageOffset = 0, _httpDynamicPageLength = 0;
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE
-  struct ConsoleLine { uint32_t id = 0; bool mqtt = false; String text; };
+  struct ConsoleLine {
+    uint32_t id = 0;
+    bool mqtt = false;
+    String text;
+  };
   static constexpr size_t ConsoleCapacity = 16;
 #if ARDPORTAL_ENABLE_MQTT
-  ConsoleLine _console[ConsoleCapacity]; // MQTT history.
+  ConsoleLine _console[ConsoleCapacity];  // MQTT history.
   uint32_t _consoleMqttCount = 0;
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   ConsoleLine _consoleMessages[ConsoleCapacity];
   uint32_t _consoleMessagesCount = 0;
 #endif
-  size_t _consoleHistoryBudget = 4096; // Per channel, never shared.
+  size_t _consoleHistoryBudget = 4096;  // Per channel, never shared.
   uint32_t _consoleId = 0;
 #endif
 #if ARDPORTAL_SUPPORT_WEBSOCKET
   struct WebSocketState {
     WiFiClient client;
-    uint8_t* rx;size_t capacity,rxSize=0;
-    String tx,pong;size_t txOffset=0;
-    uint32_t since=0,frameSince=0,pingSince=0,statusSince=0,appRevision=0,cursor=0;
-    bool statusSent=false,mqtt=false,closing=false,pingPending=false,appSent=false,pongPending=false;
+    uint8_t* rx;
+    size_t capacity, rxSize = 0;
+    String tx, pong;
+    size_t txOffset = 0;
+    uint32_t since = 0, frameSince = 0, pingSince = 0, statusSince = 0, appRevision = 0, cursor = 0;
+    bool statusSent = false, mqtt = false, closing = false, pingPending = false, appSent = false, pongPending = false;
     const bool logs;
     /**
      * @brief Initialize this instance and its owned state.
@@ -1062,20 +1189,21 @@ private:
      * @param console Whether Console UI is included.
      * @return No value.
      */
-    WebSocketState(uint8_t* buffer,size_t size,bool console):rx(buffer),capacity(size),logs(console){}
+    WebSocketState(uint8_t* buffer, size_t size, bool console)
+      : rx(buffer), capacity(size), logs(console) {}
   };
   uint8_t _eventWsRx[136];
-  WebSocketState _eventWs{_eventWsRx,sizeof(_eventWsRx),false};
+  WebSocketState _eventWs{ _eventWsRx, sizeof(_eventWsRx), false };
 #if ARDPORTAL_ENABLE_CONSOLE
   uint8_t _consoleWsRx[1032];
-  WebSocketState _consoleWs{_consoleWsRx,sizeof(_consoleWsRx),true};
+  WebSocketState _consoleWs{ _consoleWsRx, sizeof(_consoleWsRx), true };
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE
   uint8_t _zigbeeWsRx[136];
-  WebSocketState _zigbeeWs{_zigbeeWsRx,sizeof(_zigbeeWsRx),false};
-  bool _wsUpgradeZigbee=false;
+  WebSocketState _zigbeeWs{ _zigbeeWsRx, sizeof(_zigbeeWsRx), false };
+  bool _wsUpgradeZigbee = false;
 #endif
-  bool _wsUpgrade=false,_wsUpgradeConsole=false;
+  bool _wsUpgrade = false, _wsUpgradeConsole = false;
   /**
    * @brief Validate the HTTP upgrade request and create a WebSocket session.
    * @return Reference to the requested stored value or component.
@@ -1087,7 +1215,7 @@ private:
    * @param now Current time used to evaluate deadlines.
    * @return No value.
    */
-  void serviceWebSocket(WebSocketState& ws,uint32_t now);
+  void serviceWebSocket(WebSocketState& ws, uint32_t now);
   /**
    * @brief Close the WebSocket client and clear its queued frames.
    * @param ws WebSocket session to service.
@@ -1101,7 +1229,7 @@ private:
    * @param payload Message bytes or text to send or decode.
    * @return No value.
    */
-  void queueWebSocket(WebSocketState& ws,uint8_t opcode,const String& payload);
+  void queueWebSocket(WebSocketState& ws, uint8_t opcode, const String& payload);
 #endif
   uint32_t _minimumFreeHeap = UINT32_MAX, _minimumFreeDma = UINT32_MAX;
   /**
@@ -1135,7 +1263,7 @@ private:
 #if ARDPORTAL_ENABLE_WIFI
   WifiState _wifiState = WifiState::NoCredentials;
 #else
-  static constexpr WifiState _wifiState=WifiState::Disconnected;
+  static constexpr WifiState _wifiState = WifiState::Disconnected;
 #endif
 
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
@@ -1146,16 +1274,16 @@ private:
   bool _apActive = false;
   bool _attempting = false, _wasConnected = false, _scanRequested = false, _scanning = false;
   uint32_t _wifiRevision = 0;
-  uint8_t _wifiResult = 0; // 0 pending, 1 connected, 2 failed; retained across retries.
+  uint8_t _wifiResult = 0;  // 0 pending, 1 connected, 2 failed; retained across retries.
   uint32_t _wifiSince = 0, _retrySince = 0;
 
   String _networks = "[]";
   uint32_t _scanId = 0, _scanCompletedId = 0;
 #else
-  static constexpr bool _scanning=false;
-  static constexpr bool _apActive=false;
+  static constexpr bool _scanning = false;
+  static constexpr bool _apActive = false;
 #endif
-  #if ARDPORTAL_ENABLE_WWW
+#if ARDPORTAL_ENABLE_WWW
   String _request, _response;
   const char* _page = nullptr;
   size_t _responseOffset = 0, _pageLength = 0, _pageOffset = 0;
@@ -1168,7 +1296,7 @@ private:
    * @param count Number of items or bytes to process.
    * @return Prepare a static asset for an HTTP response.
    */
-  size_t beginAsset(const ArdAssetChunk* chunks,size_t count);
+  size_t beginAsset(const ArdAssetChunk* chunks, size_t count);
   uint32_t _httpSince = 0;
   bool _httpConfigUpload = false;
 #else
@@ -1230,7 +1358,7 @@ private:
    */
   void serviceHttpIo(uint32_t now);
 #if ARDPORTAL_ENABLE_WWW
-  bool _httpRequestReady=false;
+  bool _httpRequestReady = false;
 #endif
   /**
    * @brief Route a completed HTTP request to its endpoint handler.
@@ -1243,7 +1371,7 @@ private:
    * @param path Journal file path.
    * @return No value.
    */
-  void handleBuiltinHttp(const String& method,const String& path);
+  void handleBuiltinHttp(const String& method, const String& path);
   /**
    * @brief Build the HTTP status and content headers for a response.
    * @param code Protocol, language or error code.

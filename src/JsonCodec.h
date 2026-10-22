@@ -14,7 +14,7 @@ public:
    * @return Parsed JSON value, or Undefined with error text when input is invalid or a resource limit is exceeded.
    */
   ArdJSON::JSONVar parse(const String& input, String* error = nullptr,
-      const ArdJSON::Limits& limits = ArdJSON::Limits()) const {
+                         const ArdJSON::Limits& limits = ArdJSON::Limits()) const {
     return ArdJSON::JSON.parse(input, error, limits);
   }
   /**
@@ -26,7 +26,7 @@ public:
    * @return Serialized JSON text, or an empty string with error text on failure.
    */
   String stringify(const ArdJSON::JSONVar& value, bool pretty = false,
-      String* error = nullptr, const ArdJSON::Limits& limits = ArdJSON::Limits()) const {
+                   String* error = nullptr, const ArdJSON::Limits& limits = ArdJSON::Limits()) const {
     return ArdJSON::JSON.stringify(value, pretty, error, limits);
   }
 };

@@ -18,7 +18,7 @@ public:
    */
   void protectConnection() {
 #if ARDPORTAL_TCP_PRIORITY_AVAILABLE
-    if(_client&&_client->getPCB())tcp_setprio(_client->getPCB(),TCP_PRIO_MAX);
+    if (_client && _client->getPCB()) tcp_setprio(_client->getPCB(), TCP_PRIO_MAX);
 #endif
   }
 };

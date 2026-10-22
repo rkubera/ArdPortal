@@ -137,7 +137,7 @@ ARD_LANG_COMPILE_ERROR(ARD_LANG_NATIVE_BUILD_ARDPORTAL_ENABLE_CONSOLE_MESSAGES_M
 #ifndef ARDPORTAL_ENABLE_HA
 #define ARDPORTAL_ENABLE_HA 1
 #endif
-#if (ARDPORTAL_ENABLE_OTA != 0 && ARDPORTAL_ENABLE_OTA != 1) ||     (ARDPORTAL_ENABLE_MQTT != 0 && ARDPORTAL_ENABLE_MQTT != 1) ||     (ARDPORTAL_ENABLE_HA != 0 && ARDPORTAL_ENABLE_HA != 1) || (ARDPORTAL_ENABLE_CONSOLE != 0 && ARDPORTAL_ENABLE_CONSOLE != 1)
+#if (ARDPORTAL_ENABLE_OTA != 0 && ARDPORTAL_ENABLE_OTA != 1) || (ARDPORTAL_ENABLE_MQTT != 0 && ARDPORTAL_ENABLE_MQTT != 1) || (ARDPORTAL_ENABLE_HA != 0 && ARDPORTAL_ENABLE_HA != 1) || (ARDPORTAL_ENABLE_CONSOLE != 0 && ARDPORTAL_ENABLE_CONSOLE != 1)
 ARD_LANG_COMPILE_ERROR(ARD_LANG_NATIVE_BUILD_ARDPORTAL_FEATURE_FLAGS_MUST_BE_0_OR_1)
 #endif
 #if !ARDPORTAL_ENABLE_MQTT
@@ -428,24 +428,25 @@ ARD_LANG_COMPILE_ERROR(ARD_LANG_NATIVE_BUILD_ARDPORTAL_ENABLE_CONTROL_UPDATE_MUS
  */
 inline bool ardPortalBasicControl(const String& type) {
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
-  if(type=="slider") return true;
+  if (type == "slider") return true;
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-  if(type=="text") return true;
+  if (type == "text") return true;
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SELECT
-  if(type=="select") return true;
+  if (type == "select") return true;
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EDIT
-  if(type=="edit") return true;
+  if (type == "edit") return true;
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
-  if(type=="switch") return true;
+  if (type == "switch") return true;
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
-  if(type=="climate") return true;
+  if (type == "climate") return true;
 #endif
-  (void)type; return false;
+  (void)type;
+  return false;
 }
 
 // Include field selection in the cross-translation-unit settings check.

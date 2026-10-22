@@ -9,20 +9,20 @@ void performCycleWork() {
   // required asynchronous work or network acknowledgement has completed.
 }
 
-void onPowerEvent(const ArdPower::Event& event,void*) {
-  if(event.kind==ArdPower::EventKind::Periodic)performCycleWork();
+void onPowerEvent(const ArdPower::Event& event, void*) {
+  if (event.kind == ArdPower::EventKind::Periodic) performCycleWork();
 }
 
 void setup() {
   Serial.begin(115200);
   ArdPower::Options options;
-  options.policy=ArdPower::Policy::Periodic;
-  options.sleep=ArdPower::SleepType::ConnectedSleep;
-  options.periodic.intervalMs=60000;
-  options.sleepDelayMs=1000;
+  options.policy = ArdPower::Policy::Periodic;
+  options.sleep = ArdPower::SleepType::ConnectedSleep;
+  options.periodic.intervalMs = 60000;
+  options.sleepDelayMs = 1000;
   portal.power().configure(options);
   portal.power().onWake(onPowerEvent);
-  performCycleWork(); // First cycle now; later callbacks follow every minute.
+  performCycleWork();  // First cycle now; later callbacks follow every minute.
   portal.begin();
 }
 

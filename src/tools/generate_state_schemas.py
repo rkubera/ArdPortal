@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 from pathlib import Path
+from cpp_format import format_cpp
 p = Path(__file__).resolve().parents[1] / 'HaEntityData.h'
 s = p.read_text()
 s = re.sub(r'// BEGIN GENERATED STATE SCHEMAS.*?// END GENERATED STATE SCHEMAS', '// BEGIN GENERATED STATE SCHEMAS\n// END GENERATED STATE SCHEMAS', s, flags=re.S)
@@ -19,7 +20,8 @@ for index, raw in re.findall(r'ARD_HA_SPEC_(\d+)\[\] PROGMEM = R"SPEC\((.*?)\)SP
     lines.append(f'static const char ARD_HA_STATE_{index}[] PROGMEM = R"STATE({json.dumps(value, separators=(",", ":"))})STATE";')
     lines.append('#endif')
 s = s.replace('// BEGIN GENERATED STATE SCHEMAS\n// END GENERATED STATE SCHEMAS', '// BEGIN GENERATED STATE SCHEMAS\n' + '\n'.join(lines) + '\n// END GENERATED STATE SCHEMAS')
-s = re.sub(r'\{ARD_HA_NAME_(\d+),ARD_HA_SPEC_\1(?:,ARD_HA_STATE_\1)?\}', r'{ARD_HA_NAME_\1,ARD_HA_SPEC_\1,ARD_HA_STATE_\1}', s)
+s = re.sub(r'\{\s*ARD_HA_NAME_(\d+)\s*,\s*ARD_HA_SPEC_\1(?:\s*,\s*ARD_HA_STATE_\1)?\s*\}', r'{ARD_HA_NAME_\1,ARD_HA_SPEC_\1,ARD_HA_STATE_\1}', s)
+s = format_cpp(s, p.name)
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--check', action='store_true')
 if parser.parse_args().check:

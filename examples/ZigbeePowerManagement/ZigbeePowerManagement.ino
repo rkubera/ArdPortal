@@ -6,21 +6,21 @@
 
 ArdPortal portal;
 
-void onPowerEvent(const ArdPower::Event& event,void*) {
-  if(event.kind==ArdPower::EventKind::Timer) {
+void onPowerEvent(const ArdPower::Event& event, void*) {
+  if (event.kind == ArdPower::EventKind::Timer) {
     // Read sensors and queue application reports here, from the Arduino task.
   }
 }
 
 void setup() {
   ArdPower::Options options;
-  options.policy=ArdPower::Policy::EventDriven;
-  options.sleep=ArdPower::SleepType::LightSleep; // Native Zigbee sleep with RAM retained.
-  options.sleepDelayMs=0;
+  options.policy = ArdPower::Policy::EventDriven;
+  options.sleep = ArdPower::SleepType::LightSleep;  // Native Zigbee sleep with RAM retained.
+  options.sleepDelayMs = 0;
   portal.power().configure(options);
   portal.power().onWake(onPowerEvent);
-  portal.power().setTimer(1,10000,true);
-  portal.begin(); // Enable joining on the coordinator for the initial pairing.
+  portal.power().setTimer(1, 10000, true);
+  portal.begin();  // Enable joining on the coordinator for the initial pairing.
 }
 
 void loop() {
