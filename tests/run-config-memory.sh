@@ -24,7 +24,7 @@ done
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -Itests/memory-host -Isrc tests/memory-host/ardfs.cpp src/ArdFS.cpp src/ArdFSVolume.cpp -o "$test_dir/power-cut"
 "$test_dir/power-cut"
 for enabled in 0 1; do
-  "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DARDPORTAL_ENABLE_TEXT_TYPES="$enabled" -Itests/host -Isrc tests/text-types-test.cpp -o "$test_dir/text-types-$enabled"
-  "$test_dir/text-types-$enabled"
+  "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DARDPORTAL_ENABLE_CLASSES="$enabled" -Itests/host -Isrc tests/control-classes-test.cpp -o "$test_dir/control-classes-$enabled"
+  "$test_dir/control-classes-$enabled"
 done
 echo 'PASS: incremental settings, Portal/MQTT persistence, bounded journal writes and recovery'

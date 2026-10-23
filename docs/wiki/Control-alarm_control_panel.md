@@ -4,6 +4,8 @@
 
 ![Portal alarm_control_panel control](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/control-alarm_control_panel.jpg)
 
+`class` is always optional. See [the shared class catalogue](Control-Classes) for valid values, defaults and protocol mapping limits.
+
 **Minimal field JSON:**
 
 ```json

@@ -5,11 +5,11 @@
 #include "Updater.h"
 #include "WiFiClientSecure.h"
 #define ARDPORTAL_TEST_ALLOCATE testAllocate
-#define ARDPORTAL_DEFINE_HA_DATA
+#define ARDPORTAL_DEFINE_CONTROL_DATA
 #define private public
 #include "../../src/ArdPortalDeclarations.h"
 #undef private
-#undef ARDPORTAL_DEFINE_HA_DATA
+#undef ARDPORTAL_DEFINE_CONTROL_DATA
 #include "ArdPortal.h"
 #include "../../src/WebSocketAccept.h"
 #include "../../src/ConfigJson.h"
@@ -167,20 +167,46 @@ int main() {
     assert(!config.hasOwnProperty("device_class") && !config.hasOwnProperty("state_class"));
     for (auto type : { "number", "temperature", "humidity", "pressure", "illuminance", "flow", "carbon_dioxide", "pm25", "wind_speed", "voltage", "current", "power" }) {
       auto field = plain;
-      field["textType"] = type;
+      field["class"] = type;
       assert(ArdDynamicPages::initial(field).isNull());
       assert(ArdDynamicPages::validValue(field, nullptr) && ArdDynamicPages::validValue(field, 22.5) && !ArdDynamicPages::validValue(field, "22.5"));
       config = ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(field));
-      auto pattern = ArdText::pattern(field);
+      auto pattern = ArdControl::classInfo(ArdControl::classOf(field));
       assert(config["state_class"].asString() == "measurement");
-      assert(config["device_class"].asString() == pattern.device && config["unit_of_measurement"].asString() == pattern.unit);
+      assert(config["device_class"].asString() == String(FPSTR(ArdHa::className(ArdControl::describe(field)))) && config["unit_of_measurement"].asString() == String(FPSTR(pattern.unit)));
       field["ha"]["value_template"] = "{{ value | float * 2 }}";
       config = ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(field));
       assert(config["value_template"].asString() == "{{ value | float * 2 }}");
     }
-    plain["textType"] = "bogus";
+    plain["class"] = "bogus";
     assert(!p._dynamic.validateField(plain, ArdJSON::JSONVar::array(), false));
-    assert(String(p._dynamic.error.stage) == "field" && p._dynamic.error.fieldId == "reading" && p._dynamic.error.reason == "unsupported textType");
+    assert(String(p._dynamic.error.stage) == "field" && p._dynamic.error.fieldId == "reading" && p._dynamic.error.reason.indexOf("invalid class") == 0);
+  }
+  {
+    ArdPortal p;
+    auto discovery = [&](const char* json) {
+      return ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(ArdJSON::JSON.parse(json)));
+    };
+    auto config = discovery(R"({"id":"socket","name":"Socket","type":"switch","class":"outlet"})");
+    assert(config["device_class"].asString() == "outlet" && !config.hasOwnProperty("unit_of_measurement"));
+    config = discovery(R"({"id":"limit","name":"Limit","type":"slider","class":"power","min":0,"max":2000})");
+    assert(config["device_class"].asString() == "power" && config["unit_of_measurement"].asString() == "W");
+    config = discovery(R"({"id":"door","name":"Door","type":"binary_sensor","extended":true,"class":"door"})");
+    assert(config["device_class"].asString() == "door" && !config.hasOwnProperty("unit_of_measurement"));
+    config = discovery(R"({"id":"alarm","name":"Gas","type":"binary_sensor","extended":true,"class":"gas"})");
+    assert(config["device_class"].asString() == "gas" && !config.hasOwnProperty("unit_of_measurement"));
+    config = discovery(R"({"id":"dry","name":"Dry","type":"humidifier","extended":true,"class":"dehumidifier"})");
+    assert(config["device_class"].asString() == "dehumidifier");
+    config = discovery(R"({"id":"bell","name":"Bell","type":"event","extended":true,"class":"doorbell"})");
+    assert(config["device_class"].asString() == "doorbell" && config["event_types"][0].asString() == "ring");
+    config = discovery(R"({"id":"rx","name":"IR","type":"infrared","extended":true,"class":"receiver"})");
+    assert(config["schema"].asString() == "receiver" && config.hasOwnProperty("state_topic") && !config.hasOwnProperty("command_topic"));
+    config = discovery(R"({"id":"socket","name":"Socket","type":"switch","class":"outlet","ha":{"device_class":"switch"}})");
+    assert(config["device_class"].asString() == "switch");
+    auto model = ArdJSON::JSON.parse(R"({"type":"switch","class":"light"})");
+    assert(ArdHa::component(model) == "light");
+    model = ArdJSON::JSON.parse(R"({"type":"text","textType":"temperature"})");
+    assert(!ArdControl::validClass(model));
   }
   // Rapid edits across multiple keys must preserve the last accepted intent, including across reboot.
   {

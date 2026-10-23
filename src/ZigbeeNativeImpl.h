@@ -101,6 +101,9 @@ bool ArdZigbee::createControls(esp_zb_ep_list_t* endpoints) {
       case Kind::Action:
       case Kind::Switch:
         device = ESP_ZB_HA_ON_OFF_OUTPUT_DEVICE_ID;
+        // Standard HA profile identities; the wire command stays On/Off.
+        if (s.kind == Kind::Switch && s.classId == ArdControl::Class::Outlet) device = 0x0051;
+        else if (s.kind == Kind::Switch && s.classId == ArdControl::Class::Light) device = 0x0100;
         if (!add(esp_zb_on_off_cluster_create(nullptr), esp_zb_cluster_list_add_on_off_cluster)) return false;
         break;
       case Kind::Slider:
@@ -213,7 +216,14 @@ bool ArdZigbee::createControls(esp_zb_ep_list_t* endpoints) {
         {
           device = ESP_ZB_HA_WINDOW_COVERING_DEVICE_ID;
           esp_zb_window_covering_cluster_cfg_t cfg = {};
-          cfg.covering_type = 8;
+          cfg.covering_type = 8;  // Lift and tilt blind when no class refines the preset.
+          switch (s.classId) {
+            case ArdControl::Class::Awning: cfg.covering_type = 5; break;
+            case ArdControl::Class::Curtain: cfg.covering_type = 4; break;
+            case ArdControl::Class::Shutter: cfg.covering_type = 6; break;
+            case ArdControl::Class::Shade: cfg.covering_type = 0; break;
+            default: break;
+          }
           auto* list = esp_zb_window_covering_cluster_create(&cfg);
           uint8_t position = 100;
           if (!list || esp_zb_window_covering_cluster_add_attr(list, 8, &position) != ESP_OK || esp_zb_window_covering_cluster_add_attr(list, 9, &position) != ESP_OK || !add(list, esp_zb_cluster_list_add_window_covering_cluster)) return false;

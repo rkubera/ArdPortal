@@ -6,7 +6,7 @@ ArdPortal is a modular Arduino library for ESP8266 and ESP32: a device configura
 
 - Wi-Fi configuration, fallback access point and captive portal.
 - MQTT with optional verified TLS and automatic Home Assistant discovery.
-- JSON-defined pages with 30 control types, visibility conditions and live updates.
+- JSON-defined pages with 30 control types, optional shared semantic classes, visibility conditions and live updates.
 - Persistent settings through **ArdFS**, the included flash filesystem and journaled storage API.
 - JSON parsing and serialization through the standalone **ArdJSON** module.
 - OTA firmware upload, diagnostics console, device information and restart controls.

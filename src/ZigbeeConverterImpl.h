@@ -20,11 +20,24 @@ String ArdPortal::zigbeeConverterControlJson(const ArdZigbee::Control& c) {
   if (!ArdHeap::permits(_dynamic.fieldWork(spec.field) + 4096, _dynamic.fieldBlock(spec.field))) return String();
   V field = _dynamic.at(spec.field);
   if (!field.isValid() || field.isUndefined()) return String();
-  if (ArdZigbeeFields::composite(field) && !ArdHa::normalize(field, true)) return String();
+  if (ArdZigbeeFields::composite(field) && !ArdControl::normalize(field)) return String();
   const char* kinds[] = { "none", "switch", "slider", "select", "action", "state", "number", "temperature", "humidity", "pressure", "illuminance", "flow", "carbon_dioxide", "pm25", "wind_speed", "voltage", "current", "power", "binary", "light", "climate", "cover", "lock", "siren", "update" };
   V row = V::object();
-  row["schema"] = 1;
+  row["schema"] = 2;
+  const V& semantic = spec.part < 0xfffe ? static_cast<const V&>(field)["controls"][size_t(spec.part)] : static_cast<const V&>(field);
+  if (spec.part == 0xffff || spec.part < 0xfffe) {
+    auto info = ArdControl::classInfo(ArdControl::classOf(semantic));
+    if (info.name) {
+      row["class"] = String(FPSTR(info.name));
+      row["type"] = semantic["type"];
+    }
+    bool numericValue = spec.kind == Kind::Slider || spec.kind == Kind::Number;
+    if (numericValue && info.name) row["measurement"] = info.measurement;
+    if (numericValue && info.unit && strlen_P(info.unit)) row["unit"] = String(FPSTR(info.unit));
+  }
+  if ((spec.kind == Kind::Slider || spec.kind == Kind::Number) && semantic["unit_of_measurement"].type() == V::Type::String) row["unit"] = semantic["unit_of_measurement"];
   row["kind"] = kinds[unsigned(spec.kind)];
+  row["mapping"] = ArdZigbeeFields::mapping(spec) == ArdZigbeeFields::Mapping::Native ? "native" : "generic";
   row["ep"] = int(spec.endpoint);
   String endpoint = field["id"].asString() + "_ep" + String(spec.endpoint);
   row["endpoint"] = endpoint;

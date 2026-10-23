@@ -52,3 +52,5 @@
 - [Languages and translations](https://github.com/rkubera/ArdPortal/wiki/Languages)
 - [Troubleshooting](https://github.com/rkubera/ArdPortal/wiki/Troubleshooting)
 - [Portal screenshots](https://github.com/rkubera/ArdPortal/wiki/Screenshots)
+
+* [Control classes / shared model](Control-Classes)

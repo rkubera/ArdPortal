@@ -15,8 +15,16 @@ for(const f of fields){
   const endpointNames=[f.endpoint], endpointName=f.endpoint;
   const description=f.label, label=f.label;
   const reporting={min:1,max:3600,change:1};
+  const haClass={flow:'volume_flow_rate',wind_speed:'speed',battery_low:'battery',irrigation:'water'}[f.class]??f.class;
+  const classified=['binary','cover','number','slider'].includes(f.kind)||(f.kind==='switch'&&['outlet','switch'].includes(f.class));
+  const customClasses=['number','text','percentage','wind_direction','brightness','position','tilt','fan_speed','volume_level','color_temperature','angle','uptime','pump'];
+  const homeassistant=classified&&haClass&&!customClasses.includes(f.class)?{deviceClass:haClass}:{};
   const attribute={ID:0x55,type:0x21};
-  if(f.kind==='switch')extend.push(m.onOff({endpointNames,powerOnBehavior:false}));
+  if(f.kind==='switch'){
+    const extension=m.onOff({endpointNames,powerOnBehavior:false,homeassistant});
+    if(f.class==='light')extension.exposes=[e.light().withEndpoint(endpointName)];
+    extend.push(extension);
+  }
   else if(f.kind==='action'){
     const group=f.endpoint.slice(0,f.endpoint.lastIndexOf('_ep'));
     const actions=actionGroups.get(group);
@@ -44,7 +52,7 @@ for(const f of fields){
   }else if(f.kind==='slider'||f.kind==='number'){
     extend.push(m.numeric({name:'value',label,description,cluster:f.kind==='slider'?'genAnalogOutput':'genAnalogInput',
       attribute:{ID:0x55,type:0x39},access:f.kind==='slider'?'ALL':'STATE_GET',endpointNames,
-      ...(f.kind==='slider'?{valueMin:f.min,valueMax:f.max,valueStep:f.step}:{}),reporting}));
+      ...(f.unit?{unit:f.unit}:{}),homeassistant,...(f.kind==='slider'?{valueMin:f.min,valueMax:f.max,valueStep:f.step}:{}),reporting}));
   }else if(f.kind==='select'||f.kind==='state'){
     const lookup=Object.fromEntries(f.options.map((value,index)=>[value,index+1]));
     extend.push(m.enumLookup({name:'value',label,description,lookup,attribute,
@@ -52,7 +60,7 @@ for(const f of fields){
       access:f.kind==='select'?'ALL':'STATE_GET',endpointName,reporting}));
   }else if(f.kind==='binary'){
     extend.push(m.binary({name:'value',label,description,cluster:'genBinaryInput',attribute:{ID:0x55,type:0x10},
-      valueOn:['ON',1],valueOff:['OFF',0],access:'STATE_GET',endpointName,reporting}));
+      valueOn:['ON',1],valueOff:['OFF',0],access:'STATE_GET',endpointName,reporting,homeassistant}));
   }else if(f.kind==='light')extend.push(m.light({endpointNames,color:{modes:['xy','hs']},powerOnBehavior:false,effect:false}));
   else if(f.kind==='cover')extend.push(m.windowCovering({endpointNames,controls:['lift','tilt']}));
   else if(f.kind==='climate'){
@@ -96,7 +104,7 @@ for(const f of fields){
     for(const expose of extension.exposes??[]){
       if(f.kind!=='action')expose.label=label;
       // Discovery needs explicit names even for primary/device-class entities.
-      expose.homeassistant={...expose.homeassistant,name:expose.label};
+      expose.homeassistant={...expose.homeassistant,...homeassistant,name:expose.label};
       if(expose.features)for(const feature of expose.features){
         const detail=feature.label||feature.name;
         feature.label=feature.name==='state'?(f.kind==='cover'||f.kind==='lock'?'State':label):label+' / '+detail;

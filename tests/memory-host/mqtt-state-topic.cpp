@@ -5,11 +5,11 @@
 #include "Updater.h"
 #include "WiFiClientSecure.h"
 #define ARDPORTAL_TEST_ALLOCATE testAllocate
-#define ARDPORTAL_DEFINE_HA_DATA
+#define ARDPORTAL_DEFINE_CONTROL_DATA
 #define private public
 #include "../../src/ArdPortalDeclarations.h"
 #undef private
-#undef ARDPORTAL_DEFINE_HA_DATA
+#undef ARDPORTAL_DEFINE_CONTROL_DATA
 #include "ArdPortal.h"
 #include "../../src/WebSocketAccept.h"
 #include "../../src/ConfigJson.h"

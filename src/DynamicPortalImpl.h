@@ -37,7 +37,7 @@ bool ArdPortal::addAppConfigEntity(const String& definition) {
   if (field.type() != V::Type::Object || !ArdTopicTemplates::resolve(field, _dynamic.pages.topicDevice)) return false;
   if (!ardPortalBasicControl(field["type"].asString())) {
     V resolved = field;
-    if (!ArdHa::normalize(resolved)) return false;
+    if (!ArdControl::normalize(resolved)) return false;
     field["extended"] = true;
     if (!field.hasOwnProperty("persist")) field["persist"] = resolved["persist"];
   }
@@ -77,10 +77,24 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
   }
   if (get && path.indexOf("/api/entity-type?type=") == 0) {
     String type = path.substring(strlen("/api/entity-type?type="));
+    int classAt = type.indexOf("&class=");
+    if (classAt >= 0) {
+      String className = type.substring(classAt + 7);
+      type = type.substring(0, classAt);
+      V model = V::object();
+      model["type"] = type;
+      model["class"] = className;
+      if (!ArdControl::normalize(model)) {
+        reply(400, "text/plain", F("invalid control class"));
+        return true;
+      }
+      reply(200, "application/json", _json.stringify(model));
+      return true;
+    }
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
-    for (size_t i = 0; i < ARD_HA_SPEC_COUNT; ++i) {
-      ArdHaSpec spec;
-      memcpy_P(&spec, &ARD_HA_SPECS[i], sizeof(spec));
+    for (size_t i = 0; i < ARD_CONTROL_SPEC_COUNT; ++i) {
+      ArdControlSpec spec;
+      memcpy_P(&spec, &ARD_CONTROL_SPECS[i], sizeof(spec));
       if (ardFlashEqual(type, spec.name)) {
         _page = spec.json;
         _pageLength = strlen_P(_page);
@@ -287,7 +301,7 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
       replyMessage(400, ArdUILanguage::Key::s_207);
       return true;
     }
-    if (!belongs || ArdHa::readonly(f) || ArdHa::extended(f) || !ArdDynamicPages::validValue(f, values[key])) {
+    if (!belongs || ArdControl::readonly(f) || ArdControl::extended(f) || !ArdDynamicPages::validValue(f, values[key])) {
       replyMessage(400, ArdUILanguage::Key::s_177);
       return true;
     }
@@ -494,7 +508,7 @@ bool ArdPortal::queueAppConfigStatePublish(const char* key) {
 #if ARDPORTAL_ENABLE_MQTT
   if (!key) return false;
   const auto& field = _dynamic.field(key);
-  if (field.isUndefined() || ArdHa::transient(field)) return false;
+  if (field.isUndefined() || ArdControl::transient(field)) return false;
   _appControls.markDirty(key);
   return true;
 #else

@@ -4,6 +4,7 @@
 #include "ArdPortalFeatures.h"
 #if ARDPORTAL_ENABLE_HA
 #include "ArdHomeAssistant.h"
+#include "HaEntities.h"
 #include "ArdPortalDeclarations.h"
 #include "Language.h"
 #include "MqttFieldTopics.h"
@@ -197,9 +198,9 @@ String ArdHomeAssistant::discoveryConfig(const V& definition, String* error) con
     if (error) *error = ARD_LANG_NATIVE_INVALID_DISCOVERY_DEFINITION;
     return String();
   }
-  if (ArdHa::extended(definition)) {
+  if (ArdControl::extended(definition)) {
     resolved = definition;
-    if (!resolved.isValid() || !ArdHa::normalize(resolved) || !resolved.isValid()) {
+    if (!resolved.isValid() || !ArdControl::normalize(resolved) || !resolved.isValid()) {
       if (error) *error = ARD_LANG_NATIVE_DESCRIPTOR_NORMALIZATION_FAILED;
       return String();
     }
@@ -220,7 +221,7 @@ String ArdHomeAssistant::discoveryConfig(const V& definition, String* error) con
   device["model"] = _portal._config.deviceDescription;
   device["sw_version"] = _portal.getFirmwareVersion();
   c["device"] = device;
-  if (!ArdHa::extended(f)) {
+  if (!ArdControl::extended(f)) {
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
     if (type == "climate") {
       c["temperature_command_topic"] = command + "_temperature";
@@ -298,10 +299,31 @@ String ArdHomeAssistant::discoveryConfig(const V& definition, String* error) con
 #endif
     }
   }
-#if ARDPORTAL_ENABLE_CONTROL_TEXT
-  if (type == "text") ArdText::haPattern(f, c);
+  ArdHa::classification(f, c);
+  V extra = ArdHa::defaults(type);
+  const V& overrides = f["ha"];
+  V overrideKeys = overrides.keys();
+  for (size_t i = 0; i < overrideKeys.length(); ++i) {
+    String key = overrideKeys[i].asString();
+    extra[key] = overrides[key];
+  }
+#if ARDPORTAL_ENABLE_CONTROL_EVENT
+  if (type == "event") extra["event_types"] = f["event_types"];
 #endif
-  const V& extra = f["ha"];
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
+  if (type == "device_trigger" && (ArdControl::classOf(f) == ArdControl::Class::Doorbell || ArdControl::classOf(f) == ArdControl::Class::Motion)) {
+    if (!overrides.hasOwnProperty("payload")) extra["payload"] = f["default"];
+    if (!overrides.hasOwnProperty("type")) extra["type"] = ArdControl::classOf(f) == ArdControl::Class::Doorbell ? String(F("doorbell")) : String(F("motion"));
+    if (!overrides.hasOwnProperty("subtype")) extra["subtype"] = String(F("sensor"));
+  }
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_INFRARED
+  if (type == "infrared" && ArdControl::classOf(f) == ArdControl::Class::Receiver) {
+    extra["schema"] = "receiver";
+    extra.remove("command_topic");
+    extra["state_topic"] = "$state";
+  }
+#endif
   V keys = extra.keys();
   for (size_t i = 0; i < keys.length(); ++i) {
     String key = keys[i].asString();
@@ -321,7 +343,11 @@ String ArdHomeAssistant::discoveryConfig(const V& definition, String* error) con
   if (type == "switch") {
     // Keep HA mode defaults and explicit field options; choose a toggle icon.
     if (!c["state_topic"].asString().length()) c["state_topic"] = state;
-    if (!c.hasOwnProperty("icon")) c["icon"] = "mdi:toggle-switch";
+    if (ArdHa::component(f) == "light") {
+      c["payload_on"] = "ON";
+      c["payload_off"] = "OFF";
+    }
+    if (!c.hasOwnProperty("icon") && !f.hasOwnProperty("class")) c["icon"] = "mdi:toggle-switch";
   }
 #endif
   if (component == "device_automation" || component == "tag") {
@@ -418,7 +444,7 @@ bool ArdHomeAssistant::serviceOne(uint32_t now) {
             }
             if (_portal._mqttClient.publishRaw(topic.c_str(), payload.c_str(), true)) {
               _dependencyDiscovery &= ~bit;
-              if (_dependencyVisible.test(index) && !ArdHa::transient(field)) _portal._appControls._stateDirty |= bit;
+              if (_dependencyVisible.test(index) && !ArdControl::transient(field)) _portal._appControls._stateDirty |= bit;
               _portal._appControls._yieldPending = true;
             } else defer();
             return true;
@@ -466,7 +492,7 @@ bool ArdHomeAssistant::serviceOne(uint32_t now) {
             return true;
           }
           if (_portal._mqttClient.publishRaw(topic.c_str(), payload.c_str(), true)) {
-            if (visible && !ArdHa::transient(field)) _portal._appControls._stateDirty |= ArdAppConfigFieldMask::forField(_haDiscovery);
+            if (visible && !ArdControl::transient(field)) _portal._appControls._stateDirty |= ArdAppConfigFieldMask::forField(_haDiscovery);
             ++_haDiscovery;
             _portal._appControls._yieldPending = true;
           } else defer();

@@ -4,6 +4,8 @@
 
 ![Portal date control](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/control-date.jpg)
 
+`class` is always optional. See [the shared class catalogue](Control-Classes) for valid values, defaults and protocol mapping limits.
+
 **Minimal field JSON:**
 
 ```json

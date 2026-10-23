@@ -4,6 +4,8 @@
 
 ![Portal event control](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/control-event.jpg)
 
+`class` is always optional. See [the shared class catalogue](Control-Classes) for valid values, defaults and protocol mapping limits.
+
 **Minimal field JSON:**
 
 ```json
@@ -26,14 +28,8 @@
   },
   "readonly": true,
   "controls": [],
-  "ha": {
-    "state_topic": "$state",
-    "event_types": [
-      "press",
-      "double_press",
-      "long_press"
-    ]
-  }
+  "event_types": ["press", "double_press", "long_press"],
+  "ha": {"state_topic": "$state"}
 }
 ```
 
@@ -54,7 +50,7 @@
 
 **Default / example:** `{"event_type":"press"}`; preset types `press`, `double_press`, `long_press`
 
-Publish an object whose `event_type` belongs to `ha.event_types`. Additional event data may be included. See the C++ publication example below.
+Publish an object whose `event_type` belongs to `event_types`. Additional event data may be included. See the C++ publication example below.
 
 For `event`, a longer C++ example avoids confusing JSON quoting:
 
@@ -69,7 +65,7 @@ portal.emitAppConfigEvent("wall_button", event);
 
 **MQTT component:** `event`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
 
-**Supported by ArdPortal:** Transient event objects are published using `emitAppConfigEvent()`. The preset allows `press`, `double_press` and `long_press` in `event_type`; `ha.event_types` can supply a matching custom list.
+**Supported by ArdPortal:** Transient event objects are published using `emitAppConfigEvent()`. The preset allows `press`, `double_press` and `long_press` in `event_type`; `event_types` can supply a matching custom list.
 
 **Not provided by the built-in integration / limits:** Events are not retained configuration or editable HA state. ArdPortal does not detect hardware gestures or keep a durable event history; the application emits each occurrence.
 

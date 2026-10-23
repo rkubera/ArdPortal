@@ -500,7 +500,7 @@
     "native_unpaired_surrogate": "unpaired surrogate",
     "native_unsupported_climate_mode": "unsupported climate mode",
     "native_unsupported_or_disabled_control_type": "unsupported or disabled control type",
-    "native_unsupported_texttype": "unsupported textType",
+    "native_unsupported_class": "unsupported class",
     "native_unsupported_disabled_control_type_at_controls": "unsupported/disabled control type at controls[",
     "native_unsupported_disabled_descriptor_type": "unsupported/disabled descriptor type: ",
     "native_unterminated_string": "unterminated string",
@@ -577,7 +577,7 @@
     "native_build_ardportal_enable_control_lawn_mower_must_be_0_or_1": "ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER must be 0 or 1",
     "native_build_ardportal_enable_control_water_heater_must_be_0_or": "ARDPORTAL_ENABLE_CONTROL_WATER_HEATER must be 0 or 1",
     "native_build_ardportal_enable_control_update_must_be_0_or_1": "ARDPORTAL_ENABLE_CONTROL_UPDATE must be 0 or 1",
-    "native_build_ardportal_enable_text_types_must_be_0_or_1": "ARDPORTAL_ENABLE_TEXT_TYPES must be 0 or 1",
+    "native_build_ardportal_enable_classes_must_be_0_or_1": "ARDPORTAL_ENABLE_CLASSES must be 0 or 1",
     "native_build_ardportal_requires_an_esp8266_or_esp32_arduino_cor": "ArdPortal requires an ESP8266 or ESP32 Arduino core",
     "native_invalid_ui_feature_combination": "Invalid ArdPortal UI feature combination",
     "native_unsupported_native_language_index": "Unsupported ARDPORTAL_NATIVE_LANGUAGE index"

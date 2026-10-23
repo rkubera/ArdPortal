@@ -1,0 +1,1147 @@
+{
+  "text": {
+    "types": [
+      "text"
+    ],
+    "unit": "",
+    "ha": "",
+    "numeric": false,
+    "measurement": false
+  },
+  "number": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "",
+    "ha": "",
+    "numeric": true,
+    "measurement": true
+  },
+  "enum": {
+    "types": [
+      "text"
+    ],
+    "unit": "",
+    "ha": "enum",
+    "numeric": false,
+    "measurement": false
+  },
+  "temperature": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "°C",
+    "ha": "temperature",
+    "numeric": true,
+    "measurement": true
+  },
+  "temperature_delta": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "°C",
+    "ha": "temperature_delta",
+    "numeric": true,
+    "measurement": true
+  },
+  "humidity": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "%",
+    "ha": "humidity",
+    "numeric": true,
+    "measurement": true
+  },
+  "absolute_humidity": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "g/m³",
+    "ha": "absolute_humidity",
+    "numeric": true,
+    "measurement": true
+  },
+  "moisture": {
+    "types": [
+      "text",
+      "slider",
+      "binary_sensor"
+    ],
+    "unit": "%",
+    "ha": "moisture",
+    "numeric": true,
+    "measurement": true
+  },
+  "pressure": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "hPa",
+    "ha": "pressure",
+    "numeric": true,
+    "measurement": true
+  },
+  "atmospheric_pressure": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "hPa",
+    "ha": "atmospheric_pressure",
+    "numeric": true,
+    "measurement": true
+  },
+  "illuminance": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "lx",
+    "ha": "illuminance",
+    "numeric": true,
+    "measurement": true
+  },
+  "irradiance": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "W/m²",
+    "ha": "irradiance",
+    "numeric": true,
+    "measurement": true
+  },
+  "sound_pressure": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "dB",
+    "ha": "sound_pressure",
+    "numeric": true,
+    "measurement": true
+  },
+  "aqi": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "",
+    "ha": "aqi",
+    "numeric": true,
+    "measurement": true
+  },
+  "carbon_dioxide": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "ppm",
+    "ha": "carbon_dioxide",
+    "numeric": true,
+    "measurement": true
+  },
+  "carbon_monoxide": {
+    "types": [
+      "text",
+      "slider",
+      "binary_sensor"
+    ],
+    "unit": "ppm",
+    "ha": "carbon_monoxide",
+    "numeric": true,
+    "measurement": true
+  },
+  "nitrogen_dioxide": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "nitrogen_dioxide",
+    "numeric": true,
+    "measurement": true
+  },
+  "nitrogen_monoxide": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "nitrogen_monoxide",
+    "numeric": true,
+    "measurement": true
+  },
+  "nitrous_oxide": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "nitrous_oxide",
+    "numeric": true,
+    "measurement": true
+  },
+  "ozone": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "ozone",
+    "numeric": true,
+    "measurement": true
+  },
+  "sulphur_dioxide": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "sulphur_dioxide",
+    "numeric": true,
+    "measurement": true
+  },
+  "radon": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "Bq/m³",
+    "ha": "radon",
+    "numeric": true,
+    "measurement": true
+  },
+  "volatile_organic_compounds": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "volatile_organic_compounds",
+    "numeric": true,
+    "measurement": true
+  },
+  "volatile_organic_compounds_parts": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "ppm",
+    "ha": "volatile_organic_compounds_parts",
+    "numeric": true,
+    "measurement": true
+  },
+  "pm1": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "pm1",
+    "numeric": true,
+    "measurement": true
+  },
+  "pm25": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "pm25",
+    "numeric": true,
+    "measurement": true
+  },
+  "pm4": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "pm4",
+    "numeric": true,
+    "measurement": true
+  },
+  "pm10": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µg/m³",
+    "ha": "pm10",
+    "numeric": true,
+    "measurement": true
+  },
+  "voltage": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "V",
+    "ha": "voltage",
+    "numeric": true,
+    "measurement": true
+  },
+  "current": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "A",
+    "ha": "current",
+    "numeric": true,
+    "measurement": true
+  },
+  "power": {
+    "types": [
+      "text",
+      "slider",
+      "binary_sensor"
+    ],
+    "unit": "W",
+    "ha": "power",
+    "numeric": true,
+    "measurement": true
+  },
+  "apparent_power": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "VA",
+    "ha": "apparent_power",
+    "numeric": true,
+    "measurement": true
+  },
+  "reactive_power": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "var",
+    "ha": "reactive_power",
+    "numeric": true,
+    "measurement": true
+  },
+  "power_factor": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "",
+    "ha": "power_factor",
+    "numeric": true,
+    "measurement": true
+  },
+  "frequency": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "Hz",
+    "ha": "frequency",
+    "numeric": true,
+    "measurement": true
+  },
+  "energy": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "kWh",
+    "ha": "energy",
+    "numeric": true,
+    "measurement": false
+  },
+  "reactive_energy": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "varh",
+    "ha": "reactive_energy",
+    "numeric": true,
+    "measurement": false
+  },
+  "energy_storage": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "kWh",
+    "ha": "energy_storage",
+    "numeric": true,
+    "measurement": false
+  },
+  "energy_distance": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "kWh/100km",
+    "ha": "energy_distance",
+    "numeric": true,
+    "measurement": false
+  },
+  "battery": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "%",
+    "ha": "battery",
+    "numeric": true,
+    "measurement": true
+  },
+  "flow": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "m³/h",
+    "ha": "volume_flow_rate",
+    "numeric": true,
+    "measurement": true
+  },
+  "volume": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "m³",
+    "ha": "volume",
+    "numeric": true,
+    "measurement": false
+  },
+  "volume_storage": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "m³",
+    "ha": "volume_storage",
+    "numeric": true,
+    "measurement": false
+  },
+  "water": {
+    "types": [
+      "text",
+      "slider",
+      "valve"
+    ],
+    "unit": "m³",
+    "ha": "water",
+    "numeric": true,
+    "measurement": false
+  },
+  "gas": {
+    "types": [
+      "text",
+      "slider",
+      "binary_sensor",
+      "valve"
+    ],
+    "unit": "m³",
+    "ha": "gas",
+    "numeric": true,
+    "measurement": false
+  },
+  "speed": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "m/s",
+    "ha": "speed",
+    "numeric": true,
+    "measurement": true
+  },
+  "wind_speed": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "m/s",
+    "ha": "speed",
+    "numeric": true,
+    "measurement": true
+  },
+  "wind_direction": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "°",
+    "ha": "",
+    "numeric": true,
+    "measurement": false
+  },
+  "distance": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "m",
+    "ha": "distance",
+    "numeric": true,
+    "measurement": true
+  },
+  "area": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "m²",
+    "ha": "area",
+    "numeric": true,
+    "measurement": true
+  },
+  "precipitation": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "mm",
+    "ha": "precipitation",
+    "numeric": true,
+    "measurement": false
+  },
+  "precipitation_intensity": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "mm/h",
+    "ha": "precipitation_intensity",
+    "numeric": true,
+    "measurement": true
+  },
+  "weight": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "kg",
+    "ha": "weight",
+    "numeric": true,
+    "measurement": true
+  },
+  "conductivity": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "µS/cm",
+    "ha": "conductivity",
+    "numeric": true,
+    "measurement": true
+  },
+  "ph": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "",
+    "ha": "ph",
+    "numeric": true,
+    "measurement": true
+  },
+  "blood_glucose_concentration": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "mg/dL",
+    "ha": "blood_glucose_concentration",
+    "numeric": true,
+    "measurement": true
+  },
+  "duration": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "s",
+    "ha": "duration",
+    "numeric": true,
+    "measurement": true
+  },
+  "data_size": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "B",
+    "ha": "data_size",
+    "numeric": true,
+    "measurement": true
+  },
+  "data_rate": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "B/s",
+    "ha": "data_rate",
+    "numeric": true,
+    "measurement": true
+  },
+  "signal_strength": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "dBm",
+    "ha": "signal_strength",
+    "numeric": true,
+    "measurement": true
+  },
+  "percentage": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "%",
+    "ha": "",
+    "numeric": true,
+    "measurement": true
+  },
+  "monetary": {
+    "types": [
+      "text",
+      "slider"
+    ],
+    "unit": "",
+    "ha": "monetary",
+    "numeric": true,
+    "measurement": false
+  },
+  "date": {
+    "types": [
+      "text"
+    ],
+    "unit": "",
+    "ha": "date",
+    "numeric": false,
+    "measurement": false
+  },
+  "timestamp": {
+    "types": [
+      "text"
+    ],
+    "unit": "",
+    "ha": "timestamp",
+    "numeric": false,
+    "measurement": false
+  },
+  "uptime": {
+    "types": [
+      "text"
+    ],
+    "unit": "s",
+    "ha": "duration",
+    "numeric": true,
+    "measurement": false
+  },
+  "brightness": {
+    "types": [
+      "slider"
+    ],
+    "unit": "%",
+    "ha": "",
+    "numeric": true,
+    "measurement": false
+  },
+  "position": {
+    "types": [
+      "slider"
+    ],
+    "unit": "%",
+    "ha": "",
+    "numeric": true,
+    "measurement": false
+  },
+  "tilt": {
+    "types": [
+      "slider"
+    ],
+    "unit": "%",
+    "ha": "",
+    "numeric": true,
+    "measurement": false
+  },
+  "fan_speed": {
+    "types": [
+      "slider"
+    ],
+    "unit": "%",
+    "ha": "",
+    "numeric": true,
+    "measurement": false
+  },
+  "volume_level": {
+    "types": [
+      "slider"
+    ],
+    "unit": "%",
+    "ha": "",
+    "numeric": true,
+    "measurement": false
+  },
+  "color_temperature": {
+    "types": [
+      "slider"
+    ],
+    "unit": "K",
+    "ha": "",
+    "numeric": true,
+    "measurement": false
+  },
+  "angle": {
+    "types": [
+      "slider"
+    ],
+    "unit": "°",
+    "ha": "",
+    "numeric": true,
+    "measurement": false
+  },
+  "switch": {
+    "types": [
+      "switch"
+    ],
+    "unit": "",
+    "ha": "switch",
+    "numeric": false,
+    "measurement": false
+  },
+  "outlet": {
+    "types": [
+      "switch"
+    ],
+    "unit": "",
+    "ha": "outlet",
+    "numeric": false,
+    "measurement": false
+  },
+  "light": {
+    "types": [
+      "switch",
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "",
+    "numeric": false,
+    "measurement": false
+  },
+  "pump": {
+    "types": [
+      "switch"
+    ],
+    "unit": "",
+    "ha": "",
+    "numeric": false,
+    "measurement": false
+  },
+  "opening": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "opening",
+    "numeric": false,
+    "measurement": false
+  },
+  "door": {
+    "types": [
+      "binary_sensor",
+      "cover"
+    ],
+    "unit": "",
+    "ha": "door",
+    "numeric": false,
+    "measurement": false
+  },
+  "window": {
+    "types": [
+      "binary_sensor",
+      "cover"
+    ],
+    "unit": "",
+    "ha": "window",
+    "numeric": false,
+    "measurement": false
+  },
+  "garage_door": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "garage_door",
+    "numeric": false,
+    "measurement": false
+  },
+  "lock": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "lock",
+    "numeric": false,
+    "measurement": false
+  },
+  "tamper": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "tamper",
+    "numeric": false,
+    "measurement": false
+  },
+  "motion": {
+    "types": [
+      "binary_sensor",
+      "event",
+      "device_trigger"
+    ],
+    "unit": "",
+    "ha": "motion",
+    "numeric": false,
+    "measurement": false
+  },
+  "occupancy": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "occupancy",
+    "numeric": false,
+    "measurement": false
+  },
+  "presence": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "presence",
+    "numeric": false,
+    "measurement": false
+  },
+  "moving": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "moving",
+    "numeric": false,
+    "measurement": false
+  },
+  "smoke": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "smoke",
+    "numeric": false,
+    "measurement": false
+  },
+  "heat": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "heat",
+    "numeric": false,
+    "measurement": false
+  },
+  "cold": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "cold",
+    "numeric": false,
+    "measurement": false
+  },
+  "safety": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "safety",
+    "numeric": false,
+    "measurement": false
+  },
+  "problem": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "problem",
+    "numeric": false,
+    "measurement": false
+  },
+  "plug": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "plug",
+    "numeric": false,
+    "measurement": false
+  },
+  "battery_low": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "battery",
+    "numeric": false,
+    "measurement": false
+  },
+  "battery_charging": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "battery_charging",
+    "numeric": false,
+    "measurement": false
+  },
+  "connectivity": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "connectivity",
+    "numeric": false,
+    "measurement": false
+  },
+  "running": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "running",
+    "numeric": false,
+    "measurement": false
+  },
+  "update": {
+    "types": [
+      "binary_sensor",
+      "button"
+    ],
+    "unit": "",
+    "ha": "update",
+    "numeric": false,
+    "measurement": false
+  },
+  "sound": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "sound",
+    "numeric": false,
+    "measurement": false
+  },
+  "vibration": {
+    "types": [
+      "binary_sensor"
+    ],
+    "unit": "",
+    "ha": "vibration",
+    "numeric": false,
+    "measurement": false
+  },
+  "awning": {
+    "types": [
+      "cover"
+    ],
+    "unit": "",
+    "ha": "awning",
+    "numeric": false,
+    "measurement": false
+  },
+  "blind": {
+    "types": [
+      "cover"
+    ],
+    "unit": "",
+    "ha": "blind",
+    "numeric": false,
+    "measurement": false
+  },
+  "curtain": {
+    "types": [
+      "cover"
+    ],
+    "unit": "",
+    "ha": "curtain",
+    "numeric": false,
+    "measurement": false
+  },
+  "damper": {
+    "types": [
+      "cover"
+    ],
+    "unit": "",
+    "ha": "damper",
+    "numeric": false,
+    "measurement": false
+  },
+  "garage": {
+    "types": [
+      "cover"
+    ],
+    "unit": "",
+    "ha": "garage",
+    "numeric": false,
+    "measurement": false
+  },
+  "gate": {
+    "types": [
+      "cover"
+    ],
+    "unit": "",
+    "ha": "gate",
+    "numeric": false,
+    "measurement": false
+  },
+  "shade": {
+    "types": [
+      "cover"
+    ],
+    "unit": "",
+    "ha": "shade",
+    "numeric": false,
+    "measurement": false
+  },
+  "shutter": {
+    "types": [
+      "cover"
+    ],
+    "unit": "",
+    "ha": "shutter",
+    "numeric": false,
+    "measurement": false
+  },
+  "irrigation": {
+    "types": [
+      "valve"
+    ],
+    "unit": "",
+    "ha": "water",
+    "numeric": false,
+    "measurement": false
+  },
+  "humidifier": {
+    "types": [
+      "humidifier"
+    ],
+    "unit": "",
+    "ha": "humidifier",
+    "numeric": false,
+    "measurement": false
+  },
+  "dehumidifier": {
+    "types": [
+      "humidifier"
+    ],
+    "unit": "",
+    "ha": "dehumidifier",
+    "numeric": false,
+    "measurement": false
+  },
+  "identify": {
+    "types": [
+      "button"
+    ],
+    "unit": "",
+    "ha": "identify",
+    "numeric": false,
+    "measurement": false
+  },
+  "restart": {
+    "types": [
+      "button"
+    ],
+    "unit": "",
+    "ha": "restart",
+    "numeric": false,
+    "measurement": false
+  },
+  "button": {
+    "types": [
+      "event",
+      "device_trigger"
+    ],
+    "unit": "",
+    "ha": "button",
+    "numeric": false,
+    "measurement": false
+  },
+  "doorbell": {
+    "types": [
+      "event",
+      "device_trigger"
+    ],
+    "unit": "",
+    "ha": "doorbell",
+    "numeric": false,
+    "measurement": false
+  },
+  "firmware": {
+    "types": [
+      "update"
+    ],
+    "unit": "",
+    "ha": "firmware",
+    "numeric": false,
+    "measurement": false
+  },
+  "software": {
+    "types": [
+      "update"
+    ],
+    "unit": "",
+    "ha": "",
+    "numeric": false,
+    "measurement": false
+  },
+  "transmitter": {
+    "types": [
+      "infrared"
+    ],
+    "unit": "",
+    "ha": "",
+    "numeric": false,
+    "measurement": false
+  },
+  "receiver": {
+    "types": [
+      "infrared"
+    ],
+    "unit": "",
+    "ha": "",
+    "numeric": false,
+    "measurement": false
+  },
+  "transceiver": {
+    "types": [
+      "infrared"
+    ],
+    "unit": "",
+    "ha": "",
+    "numeric": false,
+    "measurement": false
+  }
+}

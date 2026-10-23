@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Breaking: replace `textType` and top-level `device_class` with optional, type-checked `class`; rename `ARDPORTAL_ENABLE_TEXT_TYPES` to `ARDPORTAL_ENABLE_CLASSES`. Move event vocabularies from `ha.event_types` to top-level `event_types`. No compatibility aliases are retained.
+- Separate protocol-independent control presets, value/command validation and compact capabilities from Home Assistant Discovery data. Add the full reading/setting/binary/device/action class catalogue with per-control compile guards and flash-resident metadata.
+- Propagate classes and units through HA, portal and schema 2 Z2M/ZHA exports; distinguish native versus generic Zigbee mappings. Add outlet/On-Off light endpoint identities, receiver IR events and class-aware presets. Matter remains outside this change.
+
+## Unreleased
+
 ## 0.8.1 — 2026-10-22
 
 ### Added

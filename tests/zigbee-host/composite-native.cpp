@@ -1,5 +1,3 @@
-#include "ZigbeeFields.h"
-#define private public
 #define ARDPORTAL_ENABLE_DYNAMIC_PAGES 1
 #define ARDPORTAL_ENABLE_CONTROL_TEXT 0
 #define ARDPORTAL_ENABLE_CONTROL_SWITCH 0
@@ -8,6 +6,8 @@
 #define ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER 1
 #define ARDPORTAL_ENABLE_CONTROL_WATER_HEATER 1
 #define ARDPORTAL_ZIGBEE_ROUTER 0
+#include "ZigbeeFields.h"
+#define private public
 #include "ArdZigbeeImpl.h"
 #undef private
 #include <cassert>

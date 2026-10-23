@@ -30,6 +30,7 @@ export function checkHomeAssistantDiscovery(exposes){
       const key=entry.type+'/'+entry.object_id;
       assert.ok(!ids.has(key),'Discovery collision: '+key);ids.add(key);
       assert.equal(entry.discovery_payload.name,expose.label,'Missing registered label for '+key);
+      if(expose.homeassistant?.deviceClass)assert.equal(entry.discovery_payload.device_class,expose.homeassistant.deviceClass);
     }
   }
   console.log('PASS: actual Zigbee2MQTT Home Assistant Discovery mapper, unique entity IDs and registered names');

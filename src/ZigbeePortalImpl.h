@@ -172,7 +172,7 @@ void ArdPortal::serviceZigbeeControls(uint32_t now) {
       }
       if (composite(field)) {
         V& normalized = field;
-        if (!ArdHa::normalize(normalized, true)) {
+        if (!ArdControl::normalize(normalized)) {
           _zigbeeRetryPending = true;
           _zigbeeRetryAt = now + 1000;
           return;
@@ -303,19 +303,19 @@ void ArdPortal::serviceZigbeeControls(uint32_t now) {
       if (entry->spec.endpoint == command.endpoint) {
         if (!ArdHeap::permits(_dynamic.fieldWork(entry->spec.field) + 2048, _dynamic.fieldBlock(entry->spec.field))) return;
         V f = _dynamic.at(entry->spec.field);
-        if (!f.isValid() || f.isUndefined() || (ArdHa::extended(f) && !ArdHa::normalize(f, true))) return;
+        if (!f.isValid() || f.isUndefined() || (ArdControl::extended(f) && !ArdControl::normalize(f))) return;
         String id = f["id"].asString();
         V current = getAppConfigValue(id.c_str()), next;
         if (!current.isValid()) return;
         _zigbeeHasCommand = false;
         String action, property;
         bool accepted = false;
-        if (f.isValid() && !ArdHa::readonly(f) && decode(entry->spec, f, current, command, next, action, property)) {
-          if (ArdHa::extended(f)) {
+        if (f.isValid() && !ArdControl::readonly(f) && decode(entry->spec, f, current, command, next, action, property)) {
+          if (ArdControl::extended(f)) {
             const V& normalized = f;
             {
               if (entry->spec.part != 0xffff && entry->spec.part < normalized["controls"].length()) accepted = _appControls.appControl(f, entry->spec.part, action.length() ? V(action) : next, ChangeSource::Zigbee);
-              else if ((entry->spec.kind == Kind::Siren || entry->spec.kind == Kind::Light) && !action.length() && !property.length()) accepted = ArdHa::validValue(normalized, next) && acceptZigbeeState(id, next);
+              else if ((entry->spec.kind == Kind::Siren || entry->spec.kind == Kind::Light) && !action.length() && !property.length()) accepted = ArdControl::validValue(normalized, next) && acceptZigbeeState(id, next);
               else
                 for (size_t i = 0; i < normalized["controls"].length(); ++i) {
                   const V& control = static_cast<const V&>(normalized)["controls"][i];
@@ -340,7 +340,7 @@ void ArdPortal::serviceZigbeeControls(uint32_t now) {
   size_t index = entry->spec.field;
   if (!ArdHeap::permits(_dynamic.fieldWork(index) + 1024, _dynamic.fieldBlock(index))) return;
   V f = _dynamic.at(index);
-  if (!f.isValid() || f.isUndefined() || (composite(f) && !ArdHa::normalize(f, true))) {
+  if (!f.isValid() || f.isUndefined() || (composite(f) && !ArdControl::normalize(f))) {
     _zigbee.finishReport(entry->spec.endpoint, false, now);
     return;
   }

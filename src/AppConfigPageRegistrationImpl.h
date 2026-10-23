@@ -279,7 +279,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     String reason;
     if (!ardPortalBasicControl(value["type"].asString())) {
       V resolved = value;
-      if (!ArdHa::normalize(resolved, false, &reason)) {
+      if (!ArdControl::normalize(resolved, &reason)) {
         failed("normalize", id, reason);
         return;
       }
@@ -334,7 +334,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     const V& read = value;
     meta.extended = read["extended"].asBool();
     meta.persist = read["persist"].asBool();
-    meta.transient = ArdHa::transient(value);
+    meta.transient = ArdControl::transient(value);
     if (!meta.transient) work.stateMask |= ArdAppConfigFieldMask::forField(meta.index);
     if (meta.extended || read["type"].asString() == "climate") {
       work.commandsMask |= ArdAppConfigFieldMask::forField(meta.index);
@@ -412,10 +412,10 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     if (field["type"].asString() == "climate")
       for (const char* suffix : { "temperature", "mode", "fan" }) suffixes.push(suffix);
 #endif
-    if (ArdHa::extended(field)) {
+    if (ArdControl::extended(field)) {
       String reason;
       V resolved = field;
-      if (!ArdHa::normalize(resolved, true, &reason)) {
+      if (!ArdControl::normalize(resolved, &reason)) {
         failed("commands", id, reason);
         return;
       }

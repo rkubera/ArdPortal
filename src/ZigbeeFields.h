@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "ArdJSON.h"
-#include "TextTypes.h"
+#include "ControlClasses.h"
 #include <cmath>
 #include <cstring>
 namespace ArdZigbeeFields {
@@ -36,11 +36,23 @@ struct Spec {
   uint16_t field = 0, part = 0xffff;
   uint8_t endpoint = 0;
   Kind kind = Kind::None;
+  ArdControl::Class classId = ArdControl::Class::None;
   float min = 0, max = 100, step = 1;
   uint16_t states = 0;
   bool fan = false;
   uint8_t sequence = 4;
 };
+static_assert(sizeof(Spec) <= 24, "Zigbee mapping must not grow per-endpoint RAM");
+enum class Mapping : uint8_t { Unsupported,
+                               Generic,
+                               Native };
+inline Mapping mapping(const Spec& spec) {
+  if (spec.kind == Kind::None) return Mapping::Unsupported;
+  if (spec.kind == Kind::Slider || spec.kind == Kind::Number || spec.kind == Kind::Binary || spec.kind == Kind::Select || spec.kind == Kind::State || spec.kind == Kind::Action) return Mapping::Generic;
+  if (spec.kind == Kind::Switch && spec.classId == ArdControl::Class::Pump) return Mapping::Generic;
+  if (spec.kind == Kind::Cover && (spec.classId == ArdControl::Class::Door || spec.classId == ArdControl::Class::Garage || spec.classId == ArdControl::Class::Gate || spec.classId == ArdControl::Class::Damper || spec.classId == ArdControl::Class::Window)) return Mapping::Generic;
+  return Mapping::Native;
+}
 struct Attribute {
   uint16_t cluster = 0, id = 0;
   uint8_t type = 0;
@@ -65,38 +77,43 @@ struct Command {
 /** @brief Convert a field definition to native Zigbee metadata. @param f Registered definition. @param value Effective state. @return None for unsupported fields. */
 inline Spec describe(const V& f, const V& value) {
   Spec s;
-  String t = f["type"].asString();
-  if (t == "switch") s.kind = Kind::Switch;
-  else if (t == "slider") {
+  auto model = ArdControl::describe(f);
+  if (!ArdControl::validClass(f)) return s;
+  s.classId = model.classId;
+  auto t = model.type;
+  if (t == ArdControl::Type::Switch) s.kind = Kind::Switch;
+  else if (t == ArdControl::Type::Slider) {
     s.kind = Kind::Slider;
     s.min = f["min"].asDouble();
     s.max = f["max"].asDouble();
     s.step = f.hasOwnProperty("step") ? f["step"].asDouble() : 1;
-  } else if (t == "select") {
+  } else if (t == ArdControl::Type::Select) {
     s.kind = Kind::Select;
     s.states = f["options"].length();
-  } else if (t == "text") {
+  } else if (t == ArdControl::Type::Text) {
     (void)value;
-#if ARDPORTAL_ENABLE_TEXT_TYPES
-    switch (ArdText::pattern(f).type) {
-      case ArdText::Type::Number: s.kind = Kind::Number; break;
-      case ArdText::Type::Temperature: s.kind = Kind::Temperature; break;
-      case ArdText::Type::Humidity: s.kind = Kind::Humidity; break;
-      case ArdText::Type::Pressure: s.kind = Kind::Pressure; break;
-      case ArdText::Type::Illuminance: s.kind = Kind::Illuminance; break;
-      case ArdText::Type::Flow: s.kind = Kind::Flow; break;
-      case ArdText::Type::CarbonDioxide: s.kind = Kind::CarbonDioxide; break;
-      case ArdText::Type::PM25: s.kind = Kind::PM25; break;
-      case ArdText::Type::WindSpeed: s.kind = Kind::WindSpeed; break;
-      case ArdText::Type::Voltage: s.kind = Kind::Voltage; break;
-      case ArdText::Type::Current: s.kind = Kind::Current; break;
-      case ArdText::Type::Power: s.kind = Kind::Power; break;
-      default: break;
+#if ARDPORTAL_ENABLE_CLASSES
+    switch (s.classId) {
+      case ArdControl::Class::Number: s.kind = Kind::Number; break;
+      case ArdControl::Class::Temperature: s.kind = Kind::Temperature; break;
+      case ArdControl::Class::Humidity: s.kind = Kind::Humidity; break;
+      case ArdControl::Class::Pressure: s.kind = Kind::Pressure; break;
+      case ArdControl::Class::Illuminance: s.kind = Kind::Illuminance; break;
+      case ArdControl::Class::Flow: s.kind = Kind::Flow; break;
+      case ArdControl::Class::CarbonDioxide: s.kind = Kind::CarbonDioxide; break;
+      case ArdControl::Class::Pm25: s.kind = Kind::PM25; break;
+      case ArdControl::Class::WindSpeed: s.kind = Kind::WindSpeed; break;
+      case ArdControl::Class::Voltage: s.kind = Kind::Voltage; break;
+      case ArdControl::Class::Current: s.kind = Kind::Current; break;
+      case ArdControl::Class::Power: s.kind = Kind::Power; break;
+      default:
+        if (ArdControl::numeric(s.classId)) s.kind = Kind::Number;
+        break;
     }
 #endif
-  } else if (t == "binary_sensor") s.kind = Kind::Binary;
-  else if (t == "light") s.kind = Kind::Light;
-  else if (t == "climate") {
+  } else if (t == ArdControl::Type::BinarySensor) s.kind = Kind::Binary;
+  else if (t == ArdControl::Type::Light) s.kind = Kind::Light;
+  else if (t == ArdControl::Type::Climate) {
     s.kind = Kind::Climate;
     s.min = f["min"].asDouble();
     s.max = f["max"].asDouble();
@@ -110,11 +127,11 @@ inline Spec describe(const V& f, const V& value) {
     }
     s.sequence = heat && cool ? 4 : heat ? 2
                                          : 0;
-  } else if (t == "cover") s.kind = Kind::Cover;
-  else if (t == "lock") s.kind = Kind::Lock;
-  else if (t == "siren") s.kind = Kind::Siren;
+  } else if (t == ArdControl::Type::Cover) s.kind = Kind::Cover;
+  else if (t == ArdControl::Type::Lock) s.kind = Kind::Lock;
+  else if (t == ArdControl::Type::Siren) s.kind = Kind::Siren;
 #if ARDPORTAL_ZIGBEE_OTA_SUPPORT
-  else if (t == "update") s.kind = Kind::Update;
+  else if (t == ArdControl::Type::Update) s.kind = Kind::Update;
 #endif
   if (s.kind == Kind::Slider && (!std::isfinite(s.min) || !std::isfinite(s.max) || !std::isfinite(s.step) || s.step <= 0)) s.kind = Kind::None;
   if (s.kind == Kind::Climate && (s.min < -273.15 || s.max > 327.67)) s.kind = Kind::None;
@@ -131,6 +148,7 @@ inline Spec describePart(const V& f, size_t part) {
   if (part >= f["controls"].length() || part >= 0xfffe) return s;
   s.part = part;
   const V& c = f["controls"][part];
+  s.classId = ArdControl::classOf(c);
   String t = c["type"].asString();
   if (t == "switch") s.kind = Kind::Switch;
   else if (t == "slider") {
