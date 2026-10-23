@@ -5,7 +5,7 @@
 | Sketch | What it demonstrates |
 | --- | --- |
 | `ESP01-1MB/ESP01-1MB.ino` | ESP-01 with MQTT, OTA and HA enabled; TLS and Console disabled in the sketch. Use Generic ESP8266 Module with the actual flash size and an ArdFS area. |
-| `DHT/DHT.ino` | DHT22 on GPIO2: temperature/humidity, C/F selection, calibration, MQTT/HA and OTA; three control types, no TLS/Console. |
+| `DHT/DHT.ino` | Configurable GPIO and DHT11/12/21/22 type (default GPIO2 / DHT22), temperature/humidity, C/F, calibration, MQTT/HA, Console and OTA; no TLS. |
 | `MinimalPortal/MinimalPortal.ino` | Portal with OTA enabled and MQTT disabled; HA and Console are disabled automatically. |
 | `BasicPortal/BasicPortal.ino` | Minimal portal; configuration, JSON and ArdFS journal are managed by the library. The loop only calls `portal.loop()`. |
 | `PowerManagement/PowerManagement.ino` | Independent power policy/sleep type, GPIO/ISR events and software timers. |
@@ -23,7 +23,7 @@
 Copy the complete `ArdPortal` library folder into your Arduino sketchbook’s
 `libraries` directory, then
 open the desired `.ino` file from this `examples` directory. Select a Wi-Fi
-capable ESP8266 or ESP32 board. Storage uses ArdFS and JSON uses ArdJSON. Only the DHT11 example needs external libraries: Adafruit DHT sensor library and its Adafruit Unified Sensor dependency.
+capable ESP8266 or ESP32 board. Storage uses ArdFS and JSON uses ArdJSON. Only the DHT example needs external libraries: Adafruit DHT sensor library and its Adafruit Unified Sensor dependency.
 
 For ESP-12F, choose its actual flash size and a layout with filesystem/OTA space.
 A typical 4 MB module can use 4 MB flash with a 1 MB filesystem. A failed
@@ -207,3 +207,21 @@ The DHT example currently selects DHT22 on GPIO2. It waits two seconds after
 configuration readiness before sampling, and reinitializes the sensor after
 three failed transactions with a two-second retry delay. Serial diagnostics
 distinguish failed sensor reads from rejected portal values.
+
+In `DHT`, choose **DHT data pin (GPIO)** and **DHT sensor type** under **Settings**.
+Changes are saved and applied without restarting; readings resume after two seconds.
+Use chip GPIO numbers rather than board labels (for example, ESP8266 D2 is GPIO4).
+The GPIO list excludes ESP8266 flash pins and ESP32 pins without output support;
+check your board pinout to avoid pins used by flash, PSRAM, USB or other peripherals.
+
+On ESP8266, the serial bootloader also outputs UART TX on GPIO2 during flashing.
+If a DHT connected there stops responding after a serial upload and restarting
+the ESP does not help, power-cycle both the ESP and sensor. `dht.begin()` only
+reinitializes the host driver and data pin; it does not reset the sensor's power.
+For boards with spare pins, consider a non-boot GPIO such as GPIO4 or GPIO5.
+See [Espressif boot mode documentation](https://docs.espressif.com/projects/esptool/en/latest/esp8266/advanced-topics/boot-mode-selection.html).
+
+DHT diagnostics are available remotely in **Console > Messages**, including the
+selected GPIO/type, read failures, driver reinitialization and the first valid
+reading after startup or recovery. The same messages are printed to Serial at
+115200 baud. Console history is bounded and stored in RAM, so it clears on restart.
