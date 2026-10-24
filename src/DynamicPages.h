@@ -434,8 +434,8 @@ public:
     if (v.type() != T::Object || !v.length()) return false;
     V keys = v.keys();
     for (size_t i = 0; i < keys.length(); ++i) {
-      const V& label = v[keys[i].asString()];
-      if (label.type() != T::String || !label.asString().length() || label.asString().length() > 80) return false;
+      const String* label = v[keys[i].asString()].stringValue();
+      if (!label || !label->length() || label->length() > 80) return false;
     }
     return true;
   }
@@ -445,7 +445,10 @@ public:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   static bool title(const V& v) {
-    if (v.hasOwnProperty("name") && (v["name"].type() != T::String || !v["name"].asString().length() || v["name"].asString().length() > 80)) return false;
+    if (v.hasOwnProperty("name")) {
+      const String* name = v["name"].stringValue();
+      if (!name || !name->length() || name->length() > 80) return false;
+    }
     if (v.hasOwnProperty("names") && !names(v["names"])) return false;
     return v.hasOwnProperty("name") || v.hasOwnProperty("names");
   }
@@ -750,7 +753,7 @@ public:
     if (type == "text") return ArdControl::validReading(f, v);
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EDIT
-    if (type == "edit") return v.type() == T::String && v.asString().length() <= 128 && strlen(v.asString().c_str()) == v.asString().length();
+    if (type == "edit") return ArdControl::string(v, 128);
 #endif
     return false;
   }
@@ -778,10 +781,12 @@ public:
       if (options.type() != T::Array || !options.length() || options.length() > 32) return fail("field", id, F("enum class requires 1-32 options"));
       for (size_t i = 0; i < options.length(); ++i) {
         const V& option = options[i].type() == T::String ? options[i] : options[i]["value"];
-        if (option.type() != T::String || !option.asString().length() || !ArdControl::string(option, 128)) return fail("field", id, F("invalid enum option"));
+        const String* optionText = option.stringValue();
+        if (!optionText || !optionText->length() || !ArdControl::string(option, 128)) return fail("field", id, F("invalid enum option"));
         for (size_t j = 0; j < i; ++j) {
           const V& previous = options[j].type() == T::String ? options[j] : options[j]["value"];
-          if (previous.asString() == option.asString()) return fail("field", id, F("duplicate enum option"));
+          const String* previousText = previous.stringValue();
+          if (previousText && *previousText == *optionText) return fail("field", id, F("duplicate enum option"));
         }
       }
     }
@@ -806,7 +811,7 @@ public:
       const V& o = f["options"];
       if (o.type() != T::Array || !o.length() || o.length() > 16) return fail("field", id, ARD_LANG_NATIVE_OPTIONS_MUST_CONTAIN_1_16_ENTRIES);
       for (size_t j = 0; j < o.length(); ++j) {
-        if (o[j]["value"].type() != T::String || o[j]["value"].asString().length() > 128 || strlen(o[j]["value"].asString().c_str()) != o[j]["value"].asString().length() || !title(o[j])) return fail("field", id, ARD_LANG_NATIVE_INVALID_OPTION_VALUE_TITLE);
+        if (!ArdControl::string(o[j]["value"], 128) || !title(o[j])) return fail("field", id, ARD_LANG_NATIVE_INVALID_OPTION_VALUE_TITLE);
         for (size_t k = 0; k < j; ++k)
           if (o[j]["value"].asString() == o[k]["value"].asString()) return fail("field", id, ARD_LANG_NATIVE_DUPLICATE_OPTION_VALUE);
       }

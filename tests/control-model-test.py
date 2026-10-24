@@ -23,7 +23,15 @@ def compile_run(work, name, body, flags=()):
 
 with tempfile.TemporaryDirectory(prefix='ardportal-control-model-') as directory:
     work = Path(directory)
-    lines = ['V field = V::object();']
+    lines = [r'''
+    V field = V::object();
+    assert(ArdControl::string(V(""), 0));
+    assert(ArdControl::string(V("abc"), 3));
+    assert(!ArdControl::string(V("abcd"), 3));
+    assert(!ArdControl::string(V(42), 128));
+    String embedded="a"; embedded+=char(0); embedded+='b';
+    assert(!ArdControl::string(V(embedded), 128));
+    ''']
     for control in TYPES:
         lines += ['field = V::object(); field["type"] = ' + json.dumps(control) + '; assert(ArdControl::validClass(field));']
         for name, spec in CLASSES.items():

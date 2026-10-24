@@ -102,8 +102,8 @@ inline bool readonly(const V& field) {
  * @return True for a string within the byte limit and without NULs; false otherwise.
  */
 inline bool string(const V& value, size_t max = 512) {
-  String s = value.asString();
-  return value.type() == V::Type::String && s.length() <= max && strlen(s.c_str()) == s.length();
+  const String* s = value.stringValue();
+  return s && s->length() <= max && strlen(s->c_str()) == s->length();
 }
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
 /**

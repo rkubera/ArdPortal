@@ -1367,7 +1367,7 @@ private:
                                                        : nullptr;
     if (!literal) return fail(ARD_LANG_NATIVE_EXPECTED_VALUE);
     size_t size = strlen(literal);
-    if (_input.substring(_offset, _offset + size) != literal) return fail(ARD_LANG_NATIVE_INVALID_LITERAL);
+    if (size > _input.length() - _offset || memcmp(_input.c_str() + _offset, literal, size) != 0) return fail(ARD_LANG_NATIVE_INVALID_LITERAL);
     _offset += size;
     value = c == 'n' ? JSONVar(nullptr) : JSONVar(c == 't');
     return true;
