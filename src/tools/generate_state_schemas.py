@@ -41,50 +41,86 @@ def generate():
         if part == 'ha': lines += ['#endif']
         lines += ['#endif']
         yield target, format_cpp('\n'.join(lines) + '\n', target)
-    lines = [prefix, '#include "ArdJSON.h"', 'namespace ArdControl {',
+    units = list(dict.fromkeys(spec['unit'] for spec in classes.values()))
+    unit_types = {unit: list(dict.fromkeys(t for spec in classes.values() if spec['unit'] == unit for t in spec['types'])) for unit in units}
+    lines = [prefix, '#include "ArdJSON.h"', '#include <stddef.h>', 'namespace ArdControl {',
              'enum class Type : uint8_t { Invalid, ' + ', '.join(enum(t) for t in types) + ' };',
              'enum class Class : uint8_t { None, Invalid, ' + ', '.join(enum(c) for c in classes) + ' };',
              'struct ClassInfo { const char* name; const char* unit; uint32_t types; Class id; bool numeric; bool measurement; };',
-             'inline Type typeOf(const ArdJSON::JSONVar& field) {',
-             'const String* name = field["type"].stringValue(); if (!name || strlen(name->c_str()) != name->length()) return Type::Invalid;']
+             'struct ClassRecord { const char* name; uint32_t types; Class id; uint8_t unitOffset; uint8_t flags; };',
+             'static_assert(sizeof(ClassRecord) <= sizeof(ClassInfo), "Class records must remain compact");',
+             'struct ClassUnits {']
+    for i, unit in enumerate(units):
+        lines += ['#if '+guard(unit_types[unit]), f'char u{i}[{len(unit.encode("utf-8"))+1}];', '#endif']
+    # Keep the struct valid even in builds without any controls.
+    lines += ['char end;', '};', 'static_assert(sizeof(ClassUnits) <= 256, "Class unit offsets must fit one byte");',
+              'inline const char* classUnits() {', '#if ARDPORTAL_ENABLE_CLASSES', 'static const ClassUnits units PROGMEM = {']
+    for unit in units:
+        lines += ['#if '+guard(unit_types[unit]), cpp(unit)+',', '#endif']
+    lines += ['0};', 'return reinterpret_cast<const char*>(&units);', '#else', 'return nullptr;', '#endif', '}',
+              'inline Type typeOf(const ArdJSON::JSONVar& field) {',
+              'const String* name = field["type"].stringValue(); if (!name || strlen(name->c_str()) != name->length()) return Type::Invalid;']
     for name in types:
         lines += ['#if ' + guard([name]), f'if (strcmp_P(name->c_str(), PSTR({cpp(name)})) == 0) return Type::{enum(name)};', '#endif']
-    lines += ['return Type::Invalid; }', 'inline const ClassInfo* classTable(size_t& count) {', '#if ARDPORTAL_ENABLE_CLASSES']
+    lines += ['return Type::Invalid; }', 'inline const ClassRecord* classTable(size_t& count) {', '#if ARDPORTAL_ENABLE_CLASSES']
     for name, spec in classes.items():
-        lines += ['#if ' + guard(spec['types']), f'static const char name_{name}[] PROGMEM = {cpp(name)};',
-                  f'static const char unit_{name}[] PROGMEM = {cpp(spec["unit"])};', '#endif']
-    lines += ['static const ClassInfo rows[] PROGMEM = {']
+        lines += ['#if ' + guard(spec['types']), f'static const char name_{name}[] PROGMEM = {cpp(name)};', '#endif']
+    lines += ['static const ClassRecord rows[] PROGMEM = {']
     for name, spec in classes.items():
         mask = ' | '.join(f'(uint32_t(1) << {types.index(t)})' for t in spec['types'])
-        lines += ['#if ' + guard(spec['types']), f'{{ name_{name}, unit_{name}, {mask}, Class::{enum(name)}, {str(spec["numeric"]).lower()}, {str(spec["measurement"]).lower()} }},', '#endif']
-    lines += ['{nullptr, nullptr, 0, Class::None, false, false}};', 'count = sizeof(rows) / sizeof(rows[0]) - 1; return rows;',
+        flags = int(spec['numeric']) | (int(spec['measurement']) << 1)
+        offset = f'uint8_t(offsetof(ClassUnits, u{units.index(spec["unit"])}))'
+        lines += ['#if ' + guard(spec['types']), f'{{ name_{name}, {mask}, Class::{enum(name)}, {offset}, {flags} }},', '#endif']
+    lines += ['{nullptr, 0, Class::None, 0, 0}};', 'count = sizeof(rows) / sizeof(rows[0]) - 1; return rows;',
               '#else', 'count = 0; return nullptr;', '#endif', '}',
-              'inline ClassInfo classInfo(Class id) {', 'if (id == Class::None || id == Class::Invalid) return {nullptr, nullptr, 0, Class::None, false, false}; size_t count; const ClassInfo* rows = classTable(count);',
-              'for (size_t i = 0; i < count; ++i) { ClassInfo row; memcpy_P(&row, rows + i, sizeof(row)); if (row.id == id) return row; }',
-              'return {nullptr, nullptr, 0, Class::None, false, false}; }',
-              'inline Class classOf(const ArdJSON::JSONVar& field) {', 'const auto& value = field["class"]; if (value.isUndefined()) return Class::None;',
-              'const String* name = value.stringValue(); if (!name || !name->length() || strlen(name->c_str()) != name->length()) return Class::Invalid;',
-              'size_t count; const ClassInfo* rows = classTable(count);',
-              'for (size_t i = 0; i < count; ++i) { ClassInfo row; memcpy_P(&row, rows + i, sizeof(row)); if (strcmp_P(name->c_str(), row.name) == 0) return row.id; }',
-              'return Class::Invalid; }', 'inline bool numeric(Class id) { return classInfo(id).numeric; }',
+              'inline ClassInfo readClass(const ClassRecord* record) {',
+              'if (!record) return {nullptr, nullptr, 0, Class::None, false, false};',
+              'ClassRecord row; memcpy_P(&row,record,sizeof(row));',
+              'return {row.name, classUnits()+row.unitOffset, row.types, row.id, bool(row.flags & 1), bool(row.flags & 2)}; }',
+              'inline ClassInfo classInfo(Class id) {',
+              'if (id != Class::None && id != Class::Invalid) { size_t count; const ClassRecord* rows=classTable(count);',
+              'for (size_t i=0;i<count;++i) if (pgm_read_byte(&rows[i].id)==unsigned(id)) return readClass(rows+i); }',
+              'return readClass(nullptr); }',
+              'inline const ClassRecord* findClass(const String& name) {',
+              'if (!name.length() || strlen(name.c_str()) != name.length()) return nullptr;',
+              'size_t count; const ClassRecord* rows=classTable(count);',
+              'for (size_t i=0;i<count;++i) { const char* text; memcpy_P(&text,&rows[i].name,sizeof(text)); if (!strcmp_P(name.c_str(),text)) return rows+i; }',
+              'return nullptr; }',
+              'inline ClassInfo classInfo(const String& name) { return readClass(findClass(name)); }',
+              'inline Class classOf(const ArdJSON::JSONVar& field) {',
+              'const auto& value=field["class"]; if (value.isUndefined()) return Class::None;',
+              'const String* name=value.stringValue(); const ClassRecord* row=name?findClass(*name):nullptr;',
+              'return row?Class(pgm_read_byte(&row->id)):Class::Invalid; }',
+              'inline bool numeric(Class id) { return classInfo(id).numeric; }',
               'inline bool validClass(const ArdJSON::JSONVar& field) {',
               'if (field.hasOwnProperty("textType") || field.hasOwnProperty("device_class")) return false;',
               'Type type = typeOf(field); Class id = classOf(field); if(type == Type::Invalid || id == Class::Invalid) return false;',
               'return id == Class::None || (classInfo(id).types & (uint32_t(1) << (unsigned(type) - 1))); }', '}']
     yield 'ControlClassData.h', format_cpp('\n'.join(lines)+'\n', 'ControlClassData.h')
-    # HA terminology is an adapter concern. No HA names in the core catalogue.
+    # Reuse the shared name when HA uses identical terminology. Only aliases
+    # need their own strings; the bitset never retains names of disabled classes.
+    identical = [0] * ((len(classes)+2+7)//8)
+    for i, (name, spec) in enumerate(classes.items(), 2):
+        if spec['ha'] == name:
+            identical[i//8] |= 1 << (i%8)
     lines = [prefix, '#include "ControlClasses.h"', 'namespace ArdHa {',
-             'inline const char* className(const ArdControl::Model& model) {', '#if ARDPORTAL_ENABLE_CLASSES',
+             'inline const char* className(const ArdControl::Model& model, const ArdControl::ClassInfo& metadata) {', '#if ARDPORTAL_ENABLE_CLASSES',
              'using Type = ArdControl::Type; using Class = ArdControl::Class;',
              'if (model.type == Type::DeviceTrigger || model.type == Type::Infrared) return nullptr;',
              'if (model.type == Type::Switch && model.classId != Class::Switch && model.classId != Class::Outlet) return nullptr;',
-             '#if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR', 'if (model.classId == Class::Light && model.type == Type::BinarySensor) return PSTR("light");',
-             'if (model.classId == Class::BatteryLow) return PSTR("battery");',
-             '#endif', '#if ARDPORTAL_ENABLE_CONTROL_VALVE', 'if (model.classId == Class::Irrigation) return PSTR("water");', '#endif', 'switch(model.classId) {']
+             '#if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR', 'if (model.classId == Class::Light && model.type == Type::BinarySensor) return PSTR("light");', '#endif',
+             'switch(model.classId) {']
     for name, spec in classes.items():
-        if spec['ha']:
+        if spec['ha'] and spec['ha'] != name:
             lines += ['#if ' + guard(spec['types']), f'case Class::{enum(name)}: return PSTR({cpp(spec["ha"])});', '#endif']
-    lines += ['default: return nullptr; }', '#else', '(void)model; return nullptr;', '#endif', '}', '}']
+    lines += ['default: break; }',
+              'static const uint8_t identical[] PROGMEM = {'+', '.join(map(str,identical))+'};',
+              'unsigned id=unsigned(model.classId);',
+              'return id<sizeof(identical)*8 && (pgm_read_byte(identical+id/8) & (1U << (id%8))) ? metadata.name : nullptr;',
+              '#else', '(void)model; (void)metadata; return nullptr;', '#endif', '}',
+              'inline const char* className(const ArdControl::Model& model) {',
+              '#if ARDPORTAL_ENABLE_CLASSES', 'return className(model,ArdControl::classInfo(model.classId));',
+              '#else', '(void)model; return nullptr;', '#endif', '}', '}']
     yield 'HaClassData.h', format_cpp('\n'.join(lines)+'\n', 'HaClassData.h')
 
 if __name__ == '__main__':

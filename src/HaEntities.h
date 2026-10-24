@@ -7,7 +7,7 @@
 namespace ArdHa {
 using V = ArdJSON::JSONVar;
 inline String component(const V& field) {
-  auto model = ArdControl::describe(field);
+  ArdControl::Model model{ ArdControl::typeOf(field), ArdControl::classOf(field), 0 };
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
   if (model.type == ArdControl::Type::Switch && model.classId == ArdControl::Class::Light) return "light";
 #endif
@@ -40,11 +40,11 @@ inline V defaults(const String& type) {
   return V::object();
 }
 inline void classification(const V& field, V& out) {
-  auto model = ArdControl::describe(field);
+  ArdControl::Model model{ ArdControl::typeOf(field), ArdControl::classOf(field), 0 };
   auto metadata = ArdControl::classInfo(model.classId);
   bool numericValue = model.type == ArdControl::Type::Text || model.type == ArdControl::Type::Slider;
   if (numericValue && metadata.unit && strlen_P(metadata.unit)) out["unit_of_measurement"] = String(FPSTR(metadata.unit));
-  const char* name = className(model);
+  const char* name = className(model, metadata);
   if (name) out["device_class"] = String(FPSTR(name));
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
   if (model.type == ArdControl::Type::Text && model.classId == ArdControl::Class::Enum) {
@@ -55,7 +55,7 @@ inline void classification(const V& field, V& out) {
     }
     out["options"] = std::move(options);
   }
-  if (model.type == ArdControl::Type::Text && ArdControl::numeric(model.classId)) {
+  if (model.type == ArdControl::Type::Text && metadata.numeric) {
     out["value_template"] = "{{ value if is_number(value) else 'None' }}";
     if (metadata.measurement) out["state_class"] = "measurement";
   }

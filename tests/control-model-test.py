@@ -14,7 +14,7 @@ CLASSES = json.loads((ROOT / 'src/tools/control_classes.json').read_text())
 def compile_run(work, name, body, flags=()):
     source = work / (name + '.cpp')
     target = work / name
-    source.write_text('#include <cassert>\n#define ARDPORTAL_DEFINE_CONTROL_DATA\n#include "ControlModel.h"\nuint32_t fakeMillis=0;\nusing V=ArdJSON::JSONVar;\nint main(){\n' + body + '\n}\n')
+    source.write_text('#include <cassert>\n#define ARDPORTAL_DEFINE_CONTROL_DATA\n#include "ControlModel.h"\n#include "HaEntities.h"\nuint32_t fakeMillis=0;\nusing V=ArdJSON::JSONVar;\nint main(){\n' + body + '\n}\n')
     subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-Wall', '-Wextra', '-Werror', '-Os',
                     '-fsanitize=address,undefined', '-I'+str(ROOT/'tests/host'), '-I'+str(ROOT/'src'),
                     *flags, str(source), '-o', str(target)], check=True)
@@ -28,6 +28,14 @@ with tempfile.TemporaryDirectory(prefix='ardportal-control-model-') as directory
         lines += ['field = V::object(); field["type"] = ' + json.dumps(control) + '; assert(ArdControl::validClass(field));']
         for name, spec in CLASSES.items():
             lines += ['field["class"] = ' + json.dumps(name) + '; assert(ArdControl::validClass(field) == ' + str(control in spec['types']).lower() + ');']
+            if control in spec['types']:
+                expected = spec['ha']
+                if control in ('device_trigger', 'infrared') or (control == 'switch' and name not in ('switch','outlet')):
+                    expected = ''
+                elif control == 'binary_sensor' and name == 'light':
+                    expected = 'light'
+                lines += ['{auto id=ArdControl::classOf(field); auto info=ArdControl::classInfo(id); assert(info.name && String(FPSTR(info.name))==' + json.dumps(name) + '); assert(String(FPSTR(info.unit))==' + json.dumps(spec['unit'],ensure_ascii=False) + '); assert(info.numeric==' + str(spec['numeric']).lower() + ' && info.measurement==' + str(spec['measurement']).lower() + '); auto ha=ArdHa::className(ArdControl::describe(field)); ' + ('assert(ha && String(FPSTR(ha))=='+json.dumps(expected)+');' if expected else 'assert(ha==nullptr);') + '}']
+
         if control not in TYPES[:6]:
             lines += ['field.remove("class"); assert(ArdControl::normalize(field)); assert(!field.hasOwnProperty("ha"));']
     lines += [r'''

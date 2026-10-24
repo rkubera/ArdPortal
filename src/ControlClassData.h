@@ -6,6 +6,7 @@
 #include "ArdPortalFeatures.h"
 
 #include "ArdJSON.h"
+#include <stddef.h>
 namespace ArdControl {
 enum class Type : uint8_t { Invalid,
                             Slider,
@@ -167,6 +168,244 @@ struct ClassInfo {
   bool numeric;
   bool measurement;
 };
+struct ClassRecord {
+  const char* name;
+  uint32_t types;
+  Class id;
+  uint8_t unitOffset;
+  uint8_t flags;
+};
+static_assert(sizeof(ClassRecord) <= sizeof(ClassInfo), "Class records must remain compact");
+struct ClassUnits {
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_SWITCH || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_COVER || ARDPORTAL_ENABLE_CONTROL_EVENT || ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER || ARDPORTAL_ENABLE_CONTROL_BUTTON || ARDPORTAL_ENABLE_CONTROL_VALVE || ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER || ARDPORTAL_ENABLE_CONTROL_UPDATE || ARDPORTAL_ENABLE_CONTROL_INFRARED
+  char u0[1];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u1[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+  char u2[2];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u3[6];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u4[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u5[3];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u6[6];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u7[3];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+  char u8[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u9[8];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u10[7];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u11[2];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u12[2];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+  char u13[2];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u14[3];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u15[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u16[3];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u17[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u18[5];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u19[10];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u20[6];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_VALVE || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+  char u21[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u22[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u23[3];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u24[2];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u25[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u26[3];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u27[5];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u28[3];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u29[7];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u30[6];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u31[2];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u32[2];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u33[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u34[4];
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SLIDER
+  char u35[2];
+#endif
+  char end;
+};
+static_assert(sizeof(ClassUnits) <= 256, "Class unit offsets must fit one byte");
+inline const char* classUnits() {
+#if ARDPORTAL_ENABLE_CLASSES
+  static const ClassUnits units PROGMEM = {
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_SWITCH || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_COVER || ARDPORTAL_ENABLE_CONTROL_EVENT || ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER || ARDPORTAL_ENABLE_CONTROL_BUTTON || ARDPORTAL_ENABLE_CONTROL_VALVE || ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER || ARDPORTAL_ENABLE_CONTROL_UPDATE || ARDPORTAL_ENABLE_CONTROL_INFRARED
+    "",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "°C",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+    "%",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "g/m³",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "hPa",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "lx",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "W/m²",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "dB",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+    "ppm",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "µg/m³",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "Bq/m³",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "V",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "A",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+    "W",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "VA",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "var",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "Hz",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "kWh",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "varh",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "kWh/100km",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "m³/h",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_VALVE || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+    "m³",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "m/s",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "°",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "m",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "m²",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "mm",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "mm/h",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "kg",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "µS/cm",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "mg/dL",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "s",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "B",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "B/s",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "dBm",
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SLIDER
+    "K",
+#endif
+    0
+  };
+  return reinterpret_cast<const char*>(&units);
+#else
+  return nullptr;
+#endif
+}
 inline Type typeOf(const ArdJSON::JSONVar& field) {
   const String* name = field["type"].stringValue();
   if (!name || strlen(name->c_str()) != name->length()) return Type::Invalid;
@@ -262,843 +501,724 @@ inline Type typeOf(const ArdJSON::JSONVar& field) {
 #endif
   return Type::Invalid;
 }
-inline const ClassInfo* classTable(size_t& count) {
+inline const ClassRecord* classTable(size_t& count) {
 #if ARDPORTAL_ENABLE_CLASSES
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
   static const char name_text[] PROGMEM = "text";
-  static const char unit_text[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_number[] PROGMEM = "number";
-  static const char unit_number[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
   static const char name_enum[] PROGMEM = "enum";
-  static const char unit_enum[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_temperature[] PROGMEM = "temperature";
-  static const char unit_temperature[] PROGMEM = "°C";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_temperature_delta[] PROGMEM = "temperature_delta";
-  static const char unit_temperature_delta[] PROGMEM = "°C";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_humidity[] PROGMEM = "humidity";
-  static const char unit_humidity[] PROGMEM = "%";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_absolute_humidity[] PROGMEM = "absolute_humidity";
-  static const char unit_absolute_humidity[] PROGMEM = "g/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_moisture[] PROGMEM = "moisture";
-  static const char unit_moisture[] PROGMEM = "%";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_pressure[] PROGMEM = "pressure";
-  static const char unit_pressure[] PROGMEM = "hPa";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_atmospheric_pressure[] PROGMEM = "atmospheric_pressure";
-  static const char unit_atmospheric_pressure[] PROGMEM = "hPa";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_illuminance[] PROGMEM = "illuminance";
-  static const char unit_illuminance[] PROGMEM = "lx";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_irradiance[] PROGMEM = "irradiance";
-  static const char unit_irradiance[] PROGMEM = "W/m²";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_sound_pressure[] PROGMEM = "sound_pressure";
-  static const char unit_sound_pressure[] PROGMEM = "dB";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_aqi[] PROGMEM = "aqi";
-  static const char unit_aqi[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_carbon_dioxide[] PROGMEM = "carbon_dioxide";
-  static const char unit_carbon_dioxide[] PROGMEM = "ppm";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_carbon_monoxide[] PROGMEM = "carbon_monoxide";
-  static const char unit_carbon_monoxide[] PROGMEM = "ppm";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_nitrogen_dioxide[] PROGMEM = "nitrogen_dioxide";
-  static const char unit_nitrogen_dioxide[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_nitrogen_monoxide[] PROGMEM = "nitrogen_monoxide";
-  static const char unit_nitrogen_monoxide[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_nitrous_oxide[] PROGMEM = "nitrous_oxide";
-  static const char unit_nitrous_oxide[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_ozone[] PROGMEM = "ozone";
-  static const char unit_ozone[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_sulphur_dioxide[] PROGMEM = "sulphur_dioxide";
-  static const char unit_sulphur_dioxide[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_radon[] PROGMEM = "radon";
-  static const char unit_radon[] PROGMEM = "Bq/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_volatile_organic_compounds[] PROGMEM = "volatile_organic_compounds";
-  static const char unit_volatile_organic_compounds[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_volatile_organic_compounds_parts[] PROGMEM = "volatile_organic_compounds_parts";
-  static const char unit_volatile_organic_compounds_parts[] PROGMEM = "ppm";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_pm1[] PROGMEM = "pm1";
-  static const char unit_pm1[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_pm25[] PROGMEM = "pm25";
-  static const char unit_pm25[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_pm4[] PROGMEM = "pm4";
-  static const char unit_pm4[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_pm10[] PROGMEM = "pm10";
-  static const char unit_pm10[] PROGMEM = "µg/m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_voltage[] PROGMEM = "voltage";
-  static const char unit_voltage[] PROGMEM = "V";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_current[] PROGMEM = "current";
-  static const char unit_current[] PROGMEM = "A";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_power[] PROGMEM = "power";
-  static const char unit_power[] PROGMEM = "W";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_apparent_power[] PROGMEM = "apparent_power";
-  static const char unit_apparent_power[] PROGMEM = "VA";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_reactive_power[] PROGMEM = "reactive_power";
-  static const char unit_reactive_power[] PROGMEM = "var";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_power_factor[] PROGMEM = "power_factor";
-  static const char unit_power_factor[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_frequency[] PROGMEM = "frequency";
-  static const char unit_frequency[] PROGMEM = "Hz";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_energy[] PROGMEM = "energy";
-  static const char unit_energy[] PROGMEM = "kWh";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_reactive_energy[] PROGMEM = "reactive_energy";
-  static const char unit_reactive_energy[] PROGMEM = "varh";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_energy_storage[] PROGMEM = "energy_storage";
-  static const char unit_energy_storage[] PROGMEM = "kWh";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_energy_distance[] PROGMEM = "energy_distance";
-  static const char unit_energy_distance[] PROGMEM = "kWh/100km";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_battery[] PROGMEM = "battery";
-  static const char unit_battery[] PROGMEM = "%";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_flow[] PROGMEM = "flow";
-  static const char unit_flow[] PROGMEM = "m³/h";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_volume[] PROGMEM = "volume";
-  static const char unit_volume[] PROGMEM = "m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_volume_storage[] PROGMEM = "volume_storage";
-  static const char unit_volume_storage[] PROGMEM = "m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_VALVE
   static const char name_water[] PROGMEM = "water";
-  static const char unit_water[] PROGMEM = "m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_VALVE
   static const char name_gas[] PROGMEM = "gas";
-  static const char unit_gas[] PROGMEM = "m³";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_speed[] PROGMEM = "speed";
-  static const char unit_speed[] PROGMEM = "m/s";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_wind_speed[] PROGMEM = "wind_speed";
-  static const char unit_wind_speed[] PROGMEM = "m/s";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_wind_direction[] PROGMEM = "wind_direction";
-  static const char unit_wind_direction[] PROGMEM = "°";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_distance[] PROGMEM = "distance";
-  static const char unit_distance[] PROGMEM = "m";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_area[] PROGMEM = "area";
-  static const char unit_area[] PROGMEM = "m²";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_precipitation[] PROGMEM = "precipitation";
-  static const char unit_precipitation[] PROGMEM = "mm";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_precipitation_intensity[] PROGMEM = "precipitation_intensity";
-  static const char unit_precipitation_intensity[] PROGMEM = "mm/h";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_weight[] PROGMEM = "weight";
-  static const char unit_weight[] PROGMEM = "kg";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_conductivity[] PROGMEM = "conductivity";
-  static const char unit_conductivity[] PROGMEM = "µS/cm";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_ph[] PROGMEM = "ph";
-  static const char unit_ph[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_blood_glucose_concentration[] PROGMEM = "blood_glucose_concentration";
-  static const char unit_blood_glucose_concentration[] PROGMEM = "mg/dL";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_duration[] PROGMEM = "duration";
-  static const char unit_duration[] PROGMEM = "s";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_data_size[] PROGMEM = "data_size";
-  static const char unit_data_size[] PROGMEM = "B";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_data_rate[] PROGMEM = "data_rate";
-  static const char unit_data_rate[] PROGMEM = "B/s";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_signal_strength[] PROGMEM = "signal_strength";
-  static const char unit_signal_strength[] PROGMEM = "dBm";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_percentage[] PROGMEM = "percentage";
-  static const char unit_percentage[] PROGMEM = "%";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_monetary[] PROGMEM = "monetary";
-  static const char unit_monetary[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
   static const char name_date[] PROGMEM = "date";
-  static const char unit_date[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
   static const char name_timestamp[] PROGMEM = "timestamp";
-  static const char unit_timestamp[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
   static const char name_uptime[] PROGMEM = "uptime";
-  static const char unit_uptime[] PROGMEM = "s";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_brightness[] PROGMEM = "brightness";
-  static const char unit_brightness[] PROGMEM = "%";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_position[] PROGMEM = "position";
-  static const char unit_position[] PROGMEM = "%";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_tilt[] PROGMEM = "tilt";
-  static const char unit_tilt[] PROGMEM = "%";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_fan_speed[] PROGMEM = "fan_speed";
-  static const char unit_fan_speed[] PROGMEM = "%";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_volume_level[] PROGMEM = "volume_level";
-  static const char unit_volume_level[] PROGMEM = "%";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_color_temperature[] PROGMEM = "color_temperature";
-  static const char unit_color_temperature[] PROGMEM = "K";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
   static const char name_angle[] PROGMEM = "angle";
-  static const char unit_angle[] PROGMEM = "°";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
   static const char name_switch[] PROGMEM = "switch";
-  static const char unit_switch[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
   static const char name_outlet[] PROGMEM = "outlet";
-  static const char unit_outlet[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_light[] PROGMEM = "light";
-  static const char unit_light[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
   static const char name_pump[] PROGMEM = "pump";
-  static const char unit_pump[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_opening[] PROGMEM = "opening";
-  static const char unit_opening[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_door[] PROGMEM = "door";
-  static const char unit_door[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_window[] PROGMEM = "window";
-  static const char unit_window[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_garage_door[] PROGMEM = "garage_door";
-  static const char unit_garage_door[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_lock[] PROGMEM = "lock";
-  static const char unit_lock[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_tamper[] PROGMEM = "tamper";
-  static const char unit_tamper[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_EVENT || ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
   static const char name_motion[] PROGMEM = "motion";
-  static const char unit_motion[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_occupancy[] PROGMEM = "occupancy";
-  static const char unit_occupancy[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_presence[] PROGMEM = "presence";
-  static const char unit_presence[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_moving[] PROGMEM = "moving";
-  static const char unit_moving[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_smoke[] PROGMEM = "smoke";
-  static const char unit_smoke[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_heat[] PROGMEM = "heat";
-  static const char unit_heat[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_cold[] PROGMEM = "cold";
-  static const char unit_cold[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_safety[] PROGMEM = "safety";
-  static const char unit_safety[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_problem[] PROGMEM = "problem";
-  static const char unit_problem[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_plug[] PROGMEM = "plug";
-  static const char unit_plug[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_battery_low[] PROGMEM = "battery_low";
-  static const char unit_battery_low[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_battery_charging[] PROGMEM = "battery_charging";
-  static const char unit_battery_charging[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_connectivity[] PROGMEM = "connectivity";
-  static const char unit_connectivity[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_running[] PROGMEM = "running";
-  static const char unit_running[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_BUTTON
   static const char name_update[] PROGMEM = "update";
-  static const char unit_update[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_sound[] PROGMEM = "sound";
-  static const char unit_sound[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
   static const char name_vibration[] PROGMEM = "vibration";
-  static const char unit_vibration[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_awning[] PROGMEM = "awning";
-  static const char unit_awning[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_blind[] PROGMEM = "blind";
-  static const char unit_blind[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_curtain[] PROGMEM = "curtain";
-  static const char unit_curtain[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_damper[] PROGMEM = "damper";
-  static const char unit_damper[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_garage[] PROGMEM = "garage";
-  static const char unit_garage[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_gate[] PROGMEM = "gate";
-  static const char unit_gate[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_shade[] PROGMEM = "shade";
-  static const char unit_shade[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
   static const char name_shutter[] PROGMEM = "shutter";
-  static const char unit_shutter[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VALVE
   static const char name_irrigation[] PROGMEM = "irrigation";
-  static const char unit_irrigation[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
   static const char name_humidifier[] PROGMEM = "humidifier";
-  static const char unit_humidifier[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
   static const char name_dehumidifier[] PROGMEM = "dehumidifier";
-  static const char unit_dehumidifier[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BUTTON
   static const char name_identify[] PROGMEM = "identify";
-  static const char unit_identify[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BUTTON
   static const char name_restart[] PROGMEM = "restart";
-  static const char unit_restart[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EVENT || ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
   static const char name_button[] PROGMEM = "button";
-  static const char unit_button[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EVENT || ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
   static const char name_doorbell[] PROGMEM = "doorbell";
-  static const char unit_doorbell[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
   static const char name_firmware[] PROGMEM = "firmware";
-  static const char unit_firmware[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
   static const char name_software[] PROGMEM = "software";
-  static const char unit_software[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
   static const char name_transmitter[] PROGMEM = "transmitter";
-  static const char unit_transmitter[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
   static const char name_receiver[] PROGMEM = "receiver";
-  static const char unit_receiver[] PROGMEM = "";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
   static const char name_transceiver[] PROGMEM = "transceiver";
-  static const char unit_transceiver[] PROGMEM = "";
 #endif
-  static const ClassInfo rows[] PROGMEM = {
+  static const ClassRecord rows[] PROGMEM = {
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-    { name_text, unit_text, (uint32_t(1) << 1), Class::Text, false, false },
+    { name_text, (uint32_t(1) << 1), Class::Text, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_number, unit_number, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Number, true, true },
+    { name_number, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Number, uint8_t(offsetof(ClassUnits, u0)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-    { name_enum, unit_enum, (uint32_t(1) << 1), Class::Enum, false, false },
+    { name_enum, (uint32_t(1) << 1), Class::Enum, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_temperature, unit_temperature, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Temperature, true, true },
+    { name_temperature, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Temperature, uint8_t(offsetof(ClassUnits, u1)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_temperature_delta, unit_temperature_delta, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::TemperatureDelta, true, true },
+    { name_temperature_delta, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::TemperatureDelta, uint8_t(offsetof(ClassUnits, u1)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_humidity, unit_humidity, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Humidity, true, true },
+    { name_humidity, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Humidity, uint8_t(offsetof(ClassUnits, u2)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_absolute_humidity, unit_absolute_humidity, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::AbsoluteHumidity, true, true },
+    { name_absolute_humidity, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::AbsoluteHumidity, uint8_t(offsetof(ClassUnits, u3)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_moisture, unit_moisture, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 6), Class::Moisture, true, true },
+    { name_moisture, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 6), Class::Moisture, uint8_t(offsetof(ClassUnits, u2)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_pressure, unit_pressure, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pressure, true, true },
+    { name_pressure, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pressure, uint8_t(offsetof(ClassUnits, u4)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_atmospheric_pressure, unit_atmospheric_pressure, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::AtmosphericPressure, true, true },
+    { name_atmospheric_pressure, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::AtmosphericPressure, uint8_t(offsetof(ClassUnits, u4)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_illuminance, unit_illuminance, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Illuminance, true, true },
+    { name_illuminance, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Illuminance, uint8_t(offsetof(ClassUnits, u5)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_irradiance, unit_irradiance, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Irradiance, true, true },
+    { name_irradiance, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Irradiance, uint8_t(offsetof(ClassUnits, u6)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_sound_pressure, unit_sound_pressure, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::SoundPressure, true, true },
+    { name_sound_pressure, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::SoundPressure, uint8_t(offsetof(ClassUnits, u7)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_aqi, unit_aqi, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Aqi, true, true },
+    { name_aqi, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Aqi, uint8_t(offsetof(ClassUnits, u0)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_carbon_dioxide, unit_carbon_dioxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::CarbonDioxide, true, true },
+    { name_carbon_dioxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::CarbonDioxide, uint8_t(offsetof(ClassUnits, u8)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_carbon_monoxide, unit_carbon_monoxide, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 6), Class::CarbonMonoxide, true, true },
+    { name_carbon_monoxide, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 6), Class::CarbonMonoxide, uint8_t(offsetof(ClassUnits, u8)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_nitrogen_dioxide, unit_nitrogen_dioxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::NitrogenDioxide, true, true },
+    { name_nitrogen_dioxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::NitrogenDioxide, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_nitrogen_monoxide, unit_nitrogen_monoxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::NitrogenMonoxide, true, true },
+    { name_nitrogen_monoxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::NitrogenMonoxide, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_nitrous_oxide, unit_nitrous_oxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::NitrousOxide, true, true },
+    { name_nitrous_oxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::NitrousOxide, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_ozone, unit_ozone, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Ozone, true, true },
+    { name_ozone, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Ozone, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_sulphur_dioxide, unit_sulphur_dioxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::SulphurDioxide, true, true },
+    { name_sulphur_dioxide, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::SulphurDioxide, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_radon, unit_radon, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Radon, true, true },
+    { name_radon, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Radon, uint8_t(offsetof(ClassUnits, u10)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_volatile_organic_compounds, unit_volatile_organic_compounds, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::VolatileOrganicCompounds, true, true },
+    { name_volatile_organic_compounds, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::VolatileOrganicCompounds, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_volatile_organic_compounds_parts, unit_volatile_organic_compounds_parts, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::VolatileOrganicCompoundsParts, true, true },
+    { name_volatile_organic_compounds_parts, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::VolatileOrganicCompoundsParts, uint8_t(offsetof(ClassUnits, u8)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_pm1, unit_pm1, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pm1, true, true },
+    { name_pm1, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pm1, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_pm25, unit_pm25, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pm25, true, true },
+    { name_pm25, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pm25, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_pm4, unit_pm4, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pm4, true, true },
+    { name_pm4, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pm4, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_pm10, unit_pm10, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pm10, true, true },
+    { name_pm10, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Pm10, uint8_t(offsetof(ClassUnits, u9)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_voltage, unit_voltage, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Voltage, true, true },
+    { name_voltage, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Voltage, uint8_t(offsetof(ClassUnits, u11)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_current, unit_current, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Current, true, true },
+    { name_current, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Current, uint8_t(offsetof(ClassUnits, u12)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_power, unit_power, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 6), Class::Power, true, true },
+    { name_power, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 6), Class::Power, uint8_t(offsetof(ClassUnits, u13)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_apparent_power, unit_apparent_power, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::ApparentPower, true, true },
+    { name_apparent_power, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::ApparentPower, uint8_t(offsetof(ClassUnits, u14)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_reactive_power, unit_reactive_power, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::ReactivePower, true, true },
+    { name_reactive_power, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::ReactivePower, uint8_t(offsetof(ClassUnits, u15)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_power_factor, unit_power_factor, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::PowerFactor, true, true },
+    { name_power_factor, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::PowerFactor, uint8_t(offsetof(ClassUnits, u0)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_frequency, unit_frequency, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Frequency, true, true },
+    { name_frequency, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Frequency, uint8_t(offsetof(ClassUnits, u16)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_energy, unit_energy, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Energy, true, false },
+    { name_energy, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Energy, uint8_t(offsetof(ClassUnits, u17)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_reactive_energy, unit_reactive_energy, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::ReactiveEnergy, true, false },
+    { name_reactive_energy, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::ReactiveEnergy, uint8_t(offsetof(ClassUnits, u18)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_energy_storage, unit_energy_storage, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::EnergyStorage, true, false },
+    { name_energy_storage, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::EnergyStorage, uint8_t(offsetof(ClassUnits, u17)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_energy_distance, unit_energy_distance, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::EnergyDistance, true, false },
+    { name_energy_distance, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::EnergyDistance, uint8_t(offsetof(ClassUnits, u19)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_battery, unit_battery, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Battery, true, true },
+    { name_battery, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Battery, uint8_t(offsetof(ClassUnits, u2)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_flow, unit_flow, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Flow, true, true },
+    { name_flow, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Flow, uint8_t(offsetof(ClassUnits, u20)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_volume, unit_volume, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Volume, true, false },
+    { name_volume, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Volume, uint8_t(offsetof(ClassUnits, u21)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_volume_storage, unit_volume_storage, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::VolumeStorage, true, false },
+    { name_volume_storage, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::VolumeStorage, uint8_t(offsetof(ClassUnits, u21)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_VALVE
-    { name_water, unit_water, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 21), Class::Water, true, false },
+    { name_water, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 21), Class::Water, uint8_t(offsetof(ClassUnits, u21)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_VALVE
-    { name_gas, unit_gas, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 6) | (uint32_t(1) << 21), Class::Gas, true, false },
+    { name_gas, (uint32_t(1) << 1) | (uint32_t(1) << 0) | (uint32_t(1) << 6) | (uint32_t(1) << 21), Class::Gas, uint8_t(offsetof(ClassUnits, u21)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_speed, unit_speed, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Speed, true, true },
+    { name_speed, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Speed, uint8_t(offsetof(ClassUnits, u22)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_wind_speed, unit_wind_speed, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::WindSpeed, true, true },
+    { name_wind_speed, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::WindSpeed, uint8_t(offsetof(ClassUnits, u22)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_wind_direction, unit_wind_direction, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::WindDirection, true, false },
+    { name_wind_direction, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::WindDirection, uint8_t(offsetof(ClassUnits, u23)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_distance, unit_distance, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Distance, true, true },
+    { name_distance, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Distance, uint8_t(offsetof(ClassUnits, u24)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_area, unit_area, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Area, true, true },
+    { name_area, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Area, uint8_t(offsetof(ClassUnits, u25)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_precipitation, unit_precipitation, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Precipitation, true, false },
+    { name_precipitation, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Precipitation, uint8_t(offsetof(ClassUnits, u26)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_precipitation_intensity, unit_precipitation_intensity, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::PrecipitationIntensity, true, true },
+    { name_precipitation_intensity, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::PrecipitationIntensity, uint8_t(offsetof(ClassUnits, u27)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_weight, unit_weight, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Weight, true, true },
+    { name_weight, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Weight, uint8_t(offsetof(ClassUnits, u28)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_conductivity, unit_conductivity, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Conductivity, true, true },
+    { name_conductivity, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Conductivity, uint8_t(offsetof(ClassUnits, u29)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_ph, unit_ph, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Ph, true, true },
+    { name_ph, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Ph, uint8_t(offsetof(ClassUnits, u0)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_blood_glucose_concentration, unit_blood_glucose_concentration, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::BloodGlucoseConcentration, true, true },
+    { name_blood_glucose_concentration, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::BloodGlucoseConcentration, uint8_t(offsetof(ClassUnits, u30)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_duration, unit_duration, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Duration, true, true },
+    { name_duration, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Duration, uint8_t(offsetof(ClassUnits, u31)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_data_size, unit_data_size, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::DataSize, true, true },
+    { name_data_size, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::DataSize, uint8_t(offsetof(ClassUnits, u32)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_data_rate, unit_data_rate, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::DataRate, true, true },
+    { name_data_rate, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::DataRate, uint8_t(offsetof(ClassUnits, u33)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_signal_strength, unit_signal_strength, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::SignalStrength, true, true },
+    { name_signal_strength, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::SignalStrength, uint8_t(offsetof(ClassUnits, u34)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_percentage, unit_percentage, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Percentage, true, true },
+    { name_percentage, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Percentage, uint8_t(offsetof(ClassUnits, u2)), 3 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_monetary, unit_monetary, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Monetary, true, false },
+    { name_monetary, (uint32_t(1) << 1) | (uint32_t(1) << 0), Class::Monetary, uint8_t(offsetof(ClassUnits, u0)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-    { name_date, unit_date, (uint32_t(1) << 1), Class::Date, false, false },
+    { name_date, (uint32_t(1) << 1), Class::Date, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-    { name_timestamp, unit_timestamp, (uint32_t(1) << 1), Class::Timestamp, false, false },
+    { name_timestamp, (uint32_t(1) << 1), Class::Timestamp, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-    { name_uptime, unit_uptime, (uint32_t(1) << 1), Class::Uptime, true, false },
+    { name_uptime, (uint32_t(1) << 1), Class::Uptime, uint8_t(offsetof(ClassUnits, u31)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_brightness, unit_brightness, (uint32_t(1) << 0), Class::Brightness, true, false },
+    { name_brightness, (uint32_t(1) << 0), Class::Brightness, uint8_t(offsetof(ClassUnits, u2)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_position, unit_position, (uint32_t(1) << 0), Class::Position, true, false },
+    { name_position, (uint32_t(1) << 0), Class::Position, uint8_t(offsetof(ClassUnits, u2)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_tilt, unit_tilt, (uint32_t(1) << 0), Class::Tilt, true, false },
+    { name_tilt, (uint32_t(1) << 0), Class::Tilt, uint8_t(offsetof(ClassUnits, u2)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_fan_speed, unit_fan_speed, (uint32_t(1) << 0), Class::FanSpeed, true, false },
+    { name_fan_speed, (uint32_t(1) << 0), Class::FanSpeed, uint8_t(offsetof(ClassUnits, u2)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_volume_level, unit_volume_level, (uint32_t(1) << 0), Class::VolumeLevel, true, false },
+    { name_volume_level, (uint32_t(1) << 0), Class::VolumeLevel, uint8_t(offsetof(ClassUnits, u2)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_color_temperature, unit_color_temperature, (uint32_t(1) << 0), Class::ColorTemperature, true, false },
+    { name_color_temperature, (uint32_t(1) << 0), Class::ColorTemperature, uint8_t(offsetof(ClassUnits, u35)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
-    { name_angle, unit_angle, (uint32_t(1) << 0), Class::Angle, true, false },
+    { name_angle, (uint32_t(1) << 0), Class::Angle, uint8_t(offsetof(ClassUnits, u23)), 1 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
-    { name_switch, unit_switch, (uint32_t(1) << 4), Class::Switch, false, false },
+    { name_switch, (uint32_t(1) << 4), Class::Switch, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
-    { name_outlet, unit_outlet, (uint32_t(1) << 4), Class::Outlet, false, false },
+    { name_outlet, (uint32_t(1) << 4), Class::Outlet, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH || ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_light, unit_light, (uint32_t(1) << 4) | (uint32_t(1) << 6), Class::Light, false, false },
+    { name_light, (uint32_t(1) << 4) | (uint32_t(1) << 6), Class::Light, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
-    { name_pump, unit_pump, (uint32_t(1) << 4), Class::Pump, false, false },
+    { name_pump, (uint32_t(1) << 4), Class::Pump, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_opening, unit_opening, (uint32_t(1) << 6), Class::Opening, false, false },
+    { name_opening, (uint32_t(1) << 6), Class::Opening, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_door, unit_door, (uint32_t(1) << 6) | (uint32_t(1) << 20), Class::Door, false, false },
+    { name_door, (uint32_t(1) << 6) | (uint32_t(1) << 20), Class::Door, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_window, unit_window, (uint32_t(1) << 6) | (uint32_t(1) << 20), Class::Window, false, false },
+    { name_window, (uint32_t(1) << 6) | (uint32_t(1) << 20), Class::Window, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_garage_door, unit_garage_door, (uint32_t(1) << 6), Class::GarageDoor, false, false },
+    { name_garage_door, (uint32_t(1) << 6), Class::GarageDoor, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_lock, unit_lock, (uint32_t(1) << 6), Class::Lock, false, false },
+    { name_lock, (uint32_t(1) << 6), Class::Lock, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_tamper, unit_tamper, (uint32_t(1) << 6), Class::Tamper, false, false },
+    { name_tamper, (uint32_t(1) << 6), Class::Tamper, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_EVENT || ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
-    { name_motion, unit_motion, (uint32_t(1) << 6) | (uint32_t(1) << 14) | (uint32_t(1) << 15), Class::Motion, false, false },
+    { name_motion, (uint32_t(1) << 6) | (uint32_t(1) << 14) | (uint32_t(1) << 15), Class::Motion, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_occupancy, unit_occupancy, (uint32_t(1) << 6), Class::Occupancy, false, false },
+    { name_occupancy, (uint32_t(1) << 6), Class::Occupancy, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_presence, unit_presence, (uint32_t(1) << 6), Class::Presence, false, false },
+    { name_presence, (uint32_t(1) << 6), Class::Presence, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_moving, unit_moving, (uint32_t(1) << 6), Class::Moving, false, false },
+    { name_moving, (uint32_t(1) << 6), Class::Moving, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_smoke, unit_smoke, (uint32_t(1) << 6), Class::Smoke, false, false },
+    { name_smoke, (uint32_t(1) << 6), Class::Smoke, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_heat, unit_heat, (uint32_t(1) << 6), Class::Heat, false, false },
+    { name_heat, (uint32_t(1) << 6), Class::Heat, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_cold, unit_cold, (uint32_t(1) << 6), Class::Cold, false, false },
+    { name_cold, (uint32_t(1) << 6), Class::Cold, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_safety, unit_safety, (uint32_t(1) << 6), Class::Safety, false, false },
+    { name_safety, (uint32_t(1) << 6), Class::Safety, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_problem, unit_problem, (uint32_t(1) << 6), Class::Problem, false, false },
+    { name_problem, (uint32_t(1) << 6), Class::Problem, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_plug, unit_plug, (uint32_t(1) << 6), Class::Plug, false, false },
+    { name_plug, (uint32_t(1) << 6), Class::Plug, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_battery_low, unit_battery_low, (uint32_t(1) << 6), Class::BatteryLow, false, false },
+    { name_battery_low, (uint32_t(1) << 6), Class::BatteryLow, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_battery_charging, unit_battery_charging, (uint32_t(1) << 6), Class::BatteryCharging, false, false },
+    { name_battery_charging, (uint32_t(1) << 6), Class::BatteryCharging, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_connectivity, unit_connectivity, (uint32_t(1) << 6), Class::Connectivity, false, false },
+    { name_connectivity, (uint32_t(1) << 6), Class::Connectivity, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_running, unit_running, (uint32_t(1) << 6), Class::Running, false, false },
+    { name_running, (uint32_t(1) << 6), Class::Running, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR || ARDPORTAL_ENABLE_CONTROL_BUTTON
-    { name_update, unit_update, (uint32_t(1) << 6) | (uint32_t(1) << 10), Class::Update, false, false },
+    { name_update, (uint32_t(1) << 6) | (uint32_t(1) << 10), Class::Update, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_sound, unit_sound, (uint32_t(1) << 6), Class::Sound, false, false },
+    { name_sound, (uint32_t(1) << 6), Class::Sound, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-    { name_vibration, unit_vibration, (uint32_t(1) << 6), Class::Vibration, false, false },
+    { name_vibration, (uint32_t(1) << 6), Class::Vibration, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_awning, unit_awning, (uint32_t(1) << 20), Class::Awning, false, false },
+    { name_awning, (uint32_t(1) << 20), Class::Awning, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_blind, unit_blind, (uint32_t(1) << 20), Class::Blind, false, false },
+    { name_blind, (uint32_t(1) << 20), Class::Blind, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_curtain, unit_curtain, (uint32_t(1) << 20), Class::Curtain, false, false },
+    { name_curtain, (uint32_t(1) << 20), Class::Curtain, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_damper, unit_damper, (uint32_t(1) << 20), Class::Damper, false, false },
+    { name_damper, (uint32_t(1) << 20), Class::Damper, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_garage, unit_garage, (uint32_t(1) << 20), Class::Garage, false, false },
+    { name_garage, (uint32_t(1) << 20), Class::Garage, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_gate, unit_gate, (uint32_t(1) << 20), Class::Gate, false, false },
+    { name_gate, (uint32_t(1) << 20), Class::Gate, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_shade, unit_shade, (uint32_t(1) << 20), Class::Shade, false, false },
+    { name_shade, (uint32_t(1) << 20), Class::Shade, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-    { name_shutter, unit_shutter, (uint32_t(1) << 20), Class::Shutter, false, false },
+    { name_shutter, (uint32_t(1) << 20), Class::Shutter, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VALVE
-    { name_irrigation, unit_irrigation, (uint32_t(1) << 21), Class::Irrigation, false, false },
+    { name_irrigation, (uint32_t(1) << 21), Class::Irrigation, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
-    { name_humidifier, unit_humidifier, (uint32_t(1) << 24), Class::Humidifier, false, false },
+    { name_humidifier, (uint32_t(1) << 24), Class::Humidifier, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
-    { name_dehumidifier, unit_dehumidifier, (uint32_t(1) << 24), Class::Dehumidifier, false, false },
+    { name_dehumidifier, (uint32_t(1) << 24), Class::Dehumidifier, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BUTTON
-    { name_identify, unit_identify, (uint32_t(1) << 10), Class::Identify, false, false },
+    { name_identify, (uint32_t(1) << 10), Class::Identify, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BUTTON
-    { name_restart, unit_restart, (uint32_t(1) << 10), Class::Restart, false, false },
+    { name_restart, (uint32_t(1) << 10), Class::Restart, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EVENT || ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
-    { name_button, unit_button, (uint32_t(1) << 14) | (uint32_t(1) << 15), Class::Button, false, false },
+    { name_button, (uint32_t(1) << 14) | (uint32_t(1) << 15), Class::Button, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EVENT || ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
-    { name_doorbell, unit_doorbell, (uint32_t(1) << 14) | (uint32_t(1) << 15), Class::Doorbell, false, false },
+    { name_doorbell, (uint32_t(1) << 14) | (uint32_t(1) << 15), Class::Doorbell, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
-    { name_firmware, unit_firmware, (uint32_t(1) << 29), Class::Firmware, false, false },
+    { name_firmware, (uint32_t(1) << 29), Class::Firmware, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
-    { name_software, unit_software, (uint32_t(1) << 29), Class::Software, false, false },
+    { name_software, (uint32_t(1) << 29), Class::Software, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
-    { name_transmitter, unit_transmitter, (uint32_t(1) << 13), Class::Transmitter, false, false },
+    { name_transmitter, (uint32_t(1) << 13), Class::Transmitter, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
-    { name_receiver, unit_receiver, (uint32_t(1) << 13), Class::Receiver, false, false },
+    { name_receiver, (uint32_t(1) << 13), Class::Receiver, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
-    { name_transceiver, unit_transceiver, (uint32_t(1) << 13), Class::Transceiver, false, false },
+    { name_transceiver, (uint32_t(1) << 13), Class::Transceiver, uint8_t(offsetof(ClassUnits, u0)), 0 },
 #endif
-    { nullptr, nullptr, 0, Class::None, false, false }
+    { nullptr, 0, Class::None, 0, 0 }
   };
   count = sizeof(rows) / sizeof(rows[0]) - 1;
   return rows;
@@ -1107,30 +1227,41 @@ inline const ClassInfo* classTable(size_t& count) {
   return nullptr;
 #endif
 }
+inline ClassInfo readClass(const ClassRecord* record) {
+  if (!record) return { nullptr, nullptr, 0, Class::None, false, false };
+  ClassRecord row;
+  memcpy_P(&row, record, sizeof(row));
+  return { row.name, classUnits() + row.unitOffset, row.types, row.id, bool(row.flags & 1), bool(row.flags & 2) };
+}
 inline ClassInfo classInfo(Class id) {
-  if (id == Class::None || id == Class::Invalid) return { nullptr, nullptr, 0, Class::None, false, false };
-  size_t count;
-  const ClassInfo* rows = classTable(count);
-  for (size_t i = 0; i < count; ++i) {
-    ClassInfo row;
-    memcpy_P(&row, rows + i, sizeof(row));
-    if (row.id == id) return row;
+  if (id != Class::None && id != Class::Invalid) {
+    size_t count;
+    const ClassRecord* rows = classTable(count);
+    for (size_t i = 0; i < count; ++i)
+      if (pgm_read_byte(&rows[i].id) == unsigned(id)) return readClass(rows + i);
   }
-  return { nullptr, nullptr, 0, Class::None, false, false };
+  return readClass(nullptr);
+}
+inline const ClassRecord* findClass(const String& name) {
+  if (!name.length() || strlen(name.c_str()) != name.length()) return nullptr;
+  size_t count;
+  const ClassRecord* rows = classTable(count);
+  for (size_t i = 0; i < count; ++i) {
+    const char* text;
+    memcpy_P(&text, &rows[i].name, sizeof(text));
+    if (!strcmp_P(name.c_str(), text)) return rows + i;
+  }
+  return nullptr;
+}
+inline ClassInfo classInfo(const String& name) {
+  return readClass(findClass(name));
 }
 inline Class classOf(const ArdJSON::JSONVar& field) {
   const auto& value = field["class"];
   if (value.isUndefined()) return Class::None;
   const String* name = value.stringValue();
-  if (!name || !name->length() || strlen(name->c_str()) != name->length()) return Class::Invalid;
-  size_t count;
-  const ClassInfo* rows = classTable(count);
-  for (size_t i = 0; i < count; ++i) {
-    ClassInfo row;
-    memcpy_P(&row, rows + i, sizeof(row));
-    if (strcmp_P(name->c_str(), row.name) == 0) return row.id;
-  }
-  return Class::Invalid;
+  const ClassRecord* row = name ? findClass(*name) : nullptr;
+  return row ? Class(pgm_read_byte(&row->id)) : Class::Invalid;
 }
 inline bool numeric(Class id) {
   return classInfo(id).numeric;

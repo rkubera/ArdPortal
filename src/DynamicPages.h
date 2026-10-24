@@ -257,14 +257,7 @@ public:
       if (!classValue.isUndefined() && !explicitUnit && (typeValue.asString() == "text" || typeValue.asString() == "slider")) {
         // Parse only the scalar class; do not build or retain a second field DOM.
         const String* name = classValue.stringValue();
-        size_t count;
-        const auto* table = ArdControl::classTable(count);
-        ArdControl::ClassInfo info{};
-        for (size_t i = 0; i < count; ++i) {
-          memcpy_P(&info, table + i, sizeof(info));
-          if (name && strcmp_P(name->c_str(), info.name) == 0) break;
-          info.unit = nullptr;
-        }
+        const auto info = name ? ArdControl::classInfo(*name) : ArdControl::classInfo(ArdControl::Class::None);
         if (info.unit && strlen_P(info.unit)) {
           String unit = codec.stringify(V(String(FPSTR(info.unit))));
           if (!result.length() || !unit.length()) return String();
