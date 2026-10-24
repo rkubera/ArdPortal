@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Compress the Unicode device-name character table with indexed delta encoding, preserving the existing accepted characters and allocation-free validation. Make the character catalogue independent of the generator's Python Unicode version.
 - Reduce control metadata storage with shared unit strings and compact records; reuse common class names in HA and avoid computing unused control capabilities during Discovery.
 - Compact translated-message tables with 16-bit offsets and shared text pools; exclude unused diagnostics with their feature switches while preserving MQTT Serial diagnostics. Guard disabled control validation/capability branches and avoid computing unused capabilities in Zigbee mapping.
 - Breaking: replace `textType` and top-level `device_class` with optional, type-checked `class`; rename `ARDPORTAL_ENABLE_TEXT_TYPES` to `ARDPORTAL_ENABLE_CLASSES`. Move event vocabularies from `ha.event_types` to top-level `event_types`. No compatibility aliases are retained.
