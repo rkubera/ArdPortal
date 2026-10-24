@@ -15,10 +15,12 @@ using V = ArdJSON::JSONVar;
  */
 inline V descriptor(const String& type) {
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
+  const uint8_t id = uint8_t(ArdControl::typeOf(type));
   for (size_t i = 0; i < ARD_CONTROL_SPEC_COUNT; ++i) {
-    ArdControlSpec spec;
-    memcpy_P(&spec, &ARD_CONTROL_SPECS[i], sizeof(spec));
-    if (strcmp_P(type.c_str(), spec.name) == 0) return ArdJSON::JSON.parse(String(FPSTR(spec.json)));
+    if (pgm_read_byte(ARD_CONTROL_SPEC_TYPES + i) != id) continue;
+    const char* json;
+    memcpy_P(&json, ARD_CONTROL_SPECS + i, sizeof(json));
+    return ArdJSON::JSON.parse(String(FPSTR(json)));
   }
 #else
   (void)type;

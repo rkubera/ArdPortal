@@ -92,11 +92,10 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
       return true;
     }
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
+    const uint8_t id = uint8_t(ArdControl::typeOf(type));
     for (size_t i = 0; i < ARD_CONTROL_SPEC_COUNT; ++i) {
-      ArdControlSpec spec;
-      memcpy_P(&spec, &ARD_CONTROL_SPECS[i], sizeof(spec));
-      if (ardFlashEqual(type, spec.name)) {
-        _page = spec.json;
+      if (pgm_read_byte(ARD_CONTROL_SPEC_TYPES + i) == id) {
+        memcpy_P(&_page, ARD_CONTROL_SPECS + i, sizeof(_page));
         _pageLength = strlen_P(_page);
         _pageOffset = 0;
         responseHeader(200, "application/json", _pageLength, false, true);

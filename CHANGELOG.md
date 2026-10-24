@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Store control and HA preset identities as enum IDs in compact parallel tables, reusing the common type lookup and omitting duplicate type-name strings with per-control compile guards.
 - Avoid temporary string copies when validating control values, titles and enum/select options; compare JSON literals directly against the input instead of allocating substrings.
 - Compress the Unicode device-name character table with indexed delta encoding, preserving the existing accepted characters and allocation-free validation. Make the character catalogue independent of the generator's Python Unicode version.
 - Reduce control metadata storage with shared unit strings and compact records; reuse common class names in HA and avoid computing unused control capabilities during Discovery.

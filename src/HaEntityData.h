@@ -5,184 +5,232 @@
 #include <Arduino.h>
 #include "ArdPortalFeatures.h"
 
-struct ArdHaSpec {
-  const char* name;
-  const char* json;
-};
 static constexpr size_t ARD_HA_SPEC_COUNT = ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR + ARDPORTAL_ENABLE_CONTROL_DATE + ARDPORTAL_ENABLE_CONTROL_TIME + ARDPORTAL_ENABLE_CONTROL_DATETIME + ARDPORTAL_ENABLE_CONTROL_BUTTON + ARDPORTAL_ENABLE_CONTROL_SCENE + ARDPORTAL_ENABLE_CONTROL_NOTIFY + ARDPORTAL_ENABLE_CONTROL_INFRARED + ARDPORTAL_ENABLE_CONTROL_EVENT + ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER + ARDPORTAL_ENABLE_CONTROL_TAG + ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER + ARDPORTAL_ENABLE_CONTROL_LIGHT + ARDPORTAL_ENABLE_CONTROL_FAN + ARDPORTAL_ENABLE_CONTROL_COVER + ARDPORTAL_ENABLE_CONTROL_VALVE + ARDPORTAL_ENABLE_CONTROL_LOCK + ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL + ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER + ARDPORTAL_ENABLE_CONTROL_SIREN + ARDPORTAL_ENABLE_CONTROL_VACUUM + ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER + ARDPORTAL_ENABLE_CONTROL_WATER_HEATER + ARDPORTAL_ENABLE_CONTROL_UPDATE;
-extern const ArdHaSpec ARD_HA_SPECS[ARD_HA_SPEC_COUNT + 1] PROGMEM;
+extern const char* const ARD_HA_SPECS[ARD_HA_SPEC_COUNT + 1] PROGMEM;
+extern const uint8_t ARD_HA_SPEC_TYPES[ARD_HA_SPEC_COUNT + 1] PROGMEM;
 #ifdef ARDPORTAL_DEFINE_CONTROL_DATA
 #if ARDPORTAL_ENABLE_HA
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-static const char ARD_HA_NAME_binary_sensor[] PROGMEM = "binary_sensor";
 static const char ARD_HA_SPEC_binary_sensor[] PROGMEM = R"SPEC({"state_topic":"$state","payload_on":"ON","payload_off":"OFF"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DATE
-static const char ARD_HA_NAME_date[] PROGMEM = "date";
 static const char ARD_HA_SPEC_date[] PROGMEM = R"SPEC({"state_topic":"$state","command_topic":"$command"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TIME
-static const char ARD_HA_NAME_time[] PROGMEM = "time";
 static const char ARD_HA_SPEC_time[] PROGMEM = R"SPEC({"state_topic":"$state","command_topic":"$command"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DATETIME
-static const char ARD_HA_NAME_datetime[] PROGMEM = "datetime";
 static const char ARD_HA_SPEC_datetime[] PROGMEM = R"SPEC({"state_topic":"$state","command_topic":"$command"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BUTTON
-static const char ARD_HA_NAME_button[] PROGMEM = "button";
 static const char ARD_HA_SPEC_button[] PROGMEM = R"SPEC({"command_topic":"$command","payload_press":"PRESS"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SCENE
-static const char ARD_HA_NAME_scene[] PROGMEM = "scene";
 static const char ARD_HA_SPEC_scene[] PROGMEM = R"SPEC({"command_topic":"$command","payload_on":"ON"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_NOTIFY
-static const char ARD_HA_NAME_notify[] PROGMEM = "notify";
 static const char ARD_HA_SPEC_notify[] PROGMEM = R"SPEC({"command_topic":"$command"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
-static const char ARD_HA_NAME_infrared[] PROGMEM = "infrared";
 static const char ARD_HA_SPEC_infrared[] PROGMEM = R"SPEC({"schema":"emitter","command_topic":"$command"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EVENT
-static const char ARD_HA_NAME_event[] PROGMEM = "event";
 static const char ARD_HA_SPEC_event[] PROGMEM = R"SPEC({"state_topic":"$state"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
-static const char ARD_HA_NAME_device_trigger[] PROGMEM = "device_trigger";
 static const char ARD_HA_SPEC_device_trigger[] PROGMEM = R"SPEC({"automation_type":"trigger","topic":"$state","type":"button_short_press","subtype":"button_1","payload":"PRESS"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TAG
-static const char ARD_HA_NAME_tag[] PROGMEM = "tag";
 static const char ARD_HA_SPEC_tag[] PROGMEM = R"SPEC({"topic":"$state"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
-static const char ARD_HA_NAME_device_tracker[] PROGMEM = "device_tracker";
 static const char ARD_HA_SPEC_device_tracker[] PROGMEM = R"SPEC({"state_topic":"$state","payload_home":"home","payload_not_home":"not_home"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LIGHT
-static const char ARD_HA_NAME_light[] PROGMEM = "light";
 static const char ARD_HA_SPEC_light[] PROGMEM = R"SPEC({"schema":"json","command_topic":"$command","state_topic":"$state","brightness":true,"supported_color_modes":["rgb"]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_FAN
-static const char ARD_HA_NAME_fan[] PROGMEM = "fan";
 static const char ARD_HA_SPEC_fan[] PROGMEM = R"SPEC({"command_topic":"$command","state_topic":"$state","state_value_template":"{{ value_json.state }}","percentage_command_topic":"$command:percentage","percentage_state_topic":"$state","percentage_value_template":"{{ value_json.percentage }}","oscillation_command_topic":"$command:oscillation","oscillation_state_topic":"$state","oscillation_value_template":"{{ value_json.oscillation }}","direction_command_topic":"$command:direction","direction_state_topic":"$state","direction_value_template":"{{ value_json.direction }}"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-static const char ARD_HA_NAME_cover[] PROGMEM = "cover";
 static const char ARD_HA_SPEC_cover[] PROGMEM = R"SPEC({"command_topic":"$command","state_topic":"$state","value_template":"{{ value_json.state }}","position_topic":"$state","position_template":"{{ value_json.position }}","set_position_topic":"$command:position","tilt_command_topic":"$command:tilt","tilt_status_topic":"$state","tilt_status_template":"{{ value_json.tilt }}"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VALVE
-static const char ARD_HA_NAME_valve[] PROGMEM = "valve";
 static const char ARD_HA_SPEC_valve[] PROGMEM = R"SPEC({"command_topic":"$command","state_topic":"$state","reports_position":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LOCK
-static const char ARD_HA_NAME_lock[] PROGMEM = "lock";
 static const char ARD_HA_SPEC_lock[] PROGMEM = R"SPEC({"command_topic":"$command","state_topic":"$state","payload_lock":"LOCK","payload_unlock":"UNLOCK","payload_open":"OPEN"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
-static const char ARD_HA_NAME_alarm_control_panel[] PROGMEM = "alarm_control_panel";
 static const char ARD_HA_SPEC_alarm_control_panel[] PROGMEM = R"SPEC({"command_topic":"$command","state_topic":"$state","code_arm_required":false,"code_disarm_required":false,"code_trigger_required":false})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
-static const char ARD_HA_NAME_humidifier[] PROGMEM = "humidifier";
 static const char ARD_HA_SPEC_humidifier[] PROGMEM = R"SPEC({"command_topic":"$command","state_topic":"$state","state_value_template":"{{ value_json.state }}","target_humidity_command_topic":"$command:humidity","target_humidity_state_topic":"$state","target_humidity_state_template":"{{ value_json.humidity }}","current_humidity_topic":"$state","current_humidity_template":"{{ value_json.current_humidity | default('', true) }}","mode_command_topic":"$command:mode","mode_state_topic":"$state","mode_state_template":"{{ value_json.mode }}","modes":["normal","eco"]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SIREN
-static const char ARD_HA_NAME_siren[] PROGMEM = "siren";
 static const char ARD_HA_SPEC_siren[] PROGMEM = R"SPEC({"command_topic":"$command","state_topic":"$state","available_tones":["alarm","bell"],"support_duration":true,"support_volume_set":true,"support_turn_on":true,"support_turn_off":true,"support_tones":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VACUUM
-static const char ARD_HA_NAME_vacuum[] PROGMEM = "vacuum";
 static const char ARD_HA_SPEC_vacuum[] PROGMEM = R"SPEC({"command_topic":"$command","state_topic":"$state","supported_features":["start","stop","pause","return_home","status","locate","clean_spot","fan_speed","send_command"],"set_fan_speed_topic":"$command:fan","fan_speed_list":["quiet","normal","turbo"],"send_command_topic":"$command:custom"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
-static const char ARD_HA_NAME_lawn_mower[] PROGMEM = "lawn_mower";
 static const char ARD_HA_SPEC_lawn_mower[] PROGMEM = R"SPEC({"activity_state_topic":"$state","start_mowing_command_topic":"$command:start","pause_command_topic":"$command:pause","dock_command_topic":"$command:dock"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
-static const char ARD_HA_NAME_water_heater[] PROGMEM = "water_heater";
 static const char ARD_HA_SPEC_water_heater[] PROGMEM = R"SPEC({"temperature_command_topic":"$command:temperature","temperature_state_topic":"$state","temperature_state_template":"{{ value_json.temperature }}","current_temperature_topic":"$state","current_temperature_template":"{{ value_json.current_temperature | default('', true) }}","mode_command_topic":"$command:mode","mode_state_topic":"$state","mode_state_template":"{{ value_json.mode }}","modes":["off","eco","electric","performance","heat_pump","high_demand"],"min_temp":30,"max_temp":80,"temperature_unit":"C"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
-static const char ARD_HA_NAME_update[] PROGMEM = "update";
 static const char ARD_HA_SPEC_update[] PROGMEM = R"SPEC({"state_topic":"$state","command_topic":"$command","payload_install":"INSTALL"})SPEC";
 #endif
-const ArdHaSpec ARD_HA_SPECS[ARD_HA_SPEC_COUNT + 1] PROGMEM = {
+const char* const ARD_HA_SPECS[ARD_HA_SPEC_COUNT + 1] PROGMEM = {
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-  { ARD_HA_NAME_binary_sensor, ARD_HA_SPEC_binary_sensor },
+  ARD_HA_SPEC_binary_sensor,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DATE
-  { ARD_HA_NAME_date, ARD_HA_SPEC_date },
+  ARD_HA_SPEC_date,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TIME
-  { ARD_HA_NAME_time, ARD_HA_SPEC_time },
+  ARD_HA_SPEC_time,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DATETIME
-  { ARD_HA_NAME_datetime, ARD_HA_SPEC_datetime },
+  ARD_HA_SPEC_datetime,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BUTTON
-  { ARD_HA_NAME_button, ARD_HA_SPEC_button },
+  ARD_HA_SPEC_button,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SCENE
-  { ARD_HA_NAME_scene, ARD_HA_SPEC_scene },
+  ARD_HA_SPEC_scene,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_NOTIFY
-  { ARD_HA_NAME_notify, ARD_HA_SPEC_notify },
+  ARD_HA_SPEC_notify,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
-  { ARD_HA_NAME_infrared, ARD_HA_SPEC_infrared },
+  ARD_HA_SPEC_infrared,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EVENT
-  { ARD_HA_NAME_event, ARD_HA_SPEC_event },
+  ARD_HA_SPEC_event,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
-  { ARD_HA_NAME_device_trigger, ARD_HA_SPEC_device_trigger },
+  ARD_HA_SPEC_device_trigger,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TAG
-  { ARD_HA_NAME_tag, ARD_HA_SPEC_tag },
+  ARD_HA_SPEC_tag,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
-  { ARD_HA_NAME_device_tracker, ARD_HA_SPEC_device_tracker },
+  ARD_HA_SPEC_device_tracker,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LIGHT
-  { ARD_HA_NAME_light, ARD_HA_SPEC_light },
+  ARD_HA_SPEC_light,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_FAN
-  { ARD_HA_NAME_fan, ARD_HA_SPEC_fan },
+  ARD_HA_SPEC_fan,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-  { ARD_HA_NAME_cover, ARD_HA_SPEC_cover },
+  ARD_HA_SPEC_cover,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VALVE
-  { ARD_HA_NAME_valve, ARD_HA_SPEC_valve },
+  ARD_HA_SPEC_valve,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LOCK
-  { ARD_HA_NAME_lock, ARD_HA_SPEC_lock },
+  ARD_HA_SPEC_lock,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
-  { ARD_HA_NAME_alarm_control_panel, ARD_HA_SPEC_alarm_control_panel },
+  ARD_HA_SPEC_alarm_control_panel,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
-  { ARD_HA_NAME_humidifier, ARD_HA_SPEC_humidifier },
+  ARD_HA_SPEC_humidifier,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SIREN
-  { ARD_HA_NAME_siren, ARD_HA_SPEC_siren },
+  ARD_HA_SPEC_siren,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VACUUM
-  { ARD_HA_NAME_vacuum, ARD_HA_SPEC_vacuum },
+  ARD_HA_SPEC_vacuum,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
-  { ARD_HA_NAME_lawn_mower, ARD_HA_SPEC_lawn_mower },
+  ARD_HA_SPEC_lawn_mower,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
-  { ARD_HA_NAME_water_heater, ARD_HA_SPEC_water_heater },
+  ARD_HA_SPEC_water_heater,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
-  { ARD_HA_NAME_update, ARD_HA_SPEC_update },
+  ARD_HA_SPEC_update,
 #endif
-  { nullptr, nullptr }
+  nullptr
+};
+const uint8_t ARD_HA_SPEC_TYPES[ARD_HA_SPEC_COUNT + 1] PROGMEM = {
+#if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+  7,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DATE
+  8,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TIME
+  9,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DATETIME
+  10,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_BUTTON
+  11,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SCENE
+  12,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_NOTIFY
+  13,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_INFRARED
+  14,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_EVENT
+  15,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
+  16,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TAG
+  17,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
+  18,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LIGHT
+  19,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_FAN
+  20,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_COVER
+  21,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VALVE
+  22,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LOCK
+  23,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
+  24,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
+  25,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SIREN
+  26,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VACUUM
+  27,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
+  28,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
+  29,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_UPDATE
+  30,
+#endif
+  0
 };
 #endif
 #endif

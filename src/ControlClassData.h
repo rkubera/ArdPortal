@@ -406,8 +406,105 @@ inline const char* classUnits() {
   return nullptr;
 #endif
 }
+inline Type typeOf(const String& name) {
+  if (strlen(name.c_str()) != name.length()) return Type::Invalid;
+#if ARDPORTAL_ENABLE_CONTROL_SLIDER
+  if (strcmp_P(name.c_str(), PSTR("slider")) == 0) return Type::Slider;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT
+  if (strcmp_P(name.c_str(), PSTR("text")) == 0) return Type::Text;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SELECT
+  if (strcmp_P(name.c_str(), PSTR("select")) == 0) return Type::Select;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_EDIT
+  if (strcmp_P(name.c_str(), PSTR("edit")) == 0) return Type::Edit;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SWITCH
+  if (strcmp_P(name.c_str(), PSTR("switch")) == 0) return Type::Switch;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_CLIMATE
+  if (strcmp_P(name.c_str(), PSTR("climate")) == 0) return Type::Climate;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+  if (strcmp_P(name.c_str(), PSTR("binary_sensor")) == 0) return Type::BinarySensor;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DATE
+  if (strcmp_P(name.c_str(), PSTR("date")) == 0) return Type::Date;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TIME
+  if (strcmp_P(name.c_str(), PSTR("time")) == 0) return Type::Time;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DATETIME
+  if (strcmp_P(name.c_str(), PSTR("datetime")) == 0) return Type::Datetime;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_BUTTON
+  if (strcmp_P(name.c_str(), PSTR("button")) == 0) return Type::Button;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SCENE
+  if (strcmp_P(name.c_str(), PSTR("scene")) == 0) return Type::Scene;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_NOTIFY
+  if (strcmp_P(name.c_str(), PSTR("notify")) == 0) return Type::Notify;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_INFRARED
+  if (strcmp_P(name.c_str(), PSTR("infrared")) == 0) return Type::Infrared;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_EVENT
+  if (strcmp_P(name.c_str(), PSTR("event")) == 0) return Type::Event;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
+  if (strcmp_P(name.c_str(), PSTR("device_trigger")) == 0) return Type::DeviceTrigger;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TAG
+  if (strcmp_P(name.c_str(), PSTR("tag")) == 0) return Type::Tag;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
+  if (strcmp_P(name.c_str(), PSTR("device_tracker")) == 0) return Type::DeviceTracker;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LIGHT
+  if (strcmp_P(name.c_str(), PSTR("light")) == 0) return Type::Light;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_FAN
+  if (strcmp_P(name.c_str(), PSTR("fan")) == 0) return Type::Fan;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_COVER
+  if (strcmp_P(name.c_str(), PSTR("cover")) == 0) return Type::Cover;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VALVE
+  if (strcmp_P(name.c_str(), PSTR("valve")) == 0) return Type::Valve;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LOCK
+  if (strcmp_P(name.c_str(), PSTR("lock")) == 0) return Type::Lock;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
+  if (strcmp_P(name.c_str(), PSTR("alarm_control_panel")) == 0) return Type::AlarmControlPanel;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
+  if (strcmp_P(name.c_str(), PSTR("humidifier")) == 0) return Type::Humidifier;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SIREN
+  if (strcmp_P(name.c_str(), PSTR("siren")) == 0) return Type::Siren;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VACUUM
+  if (strcmp_P(name.c_str(), PSTR("vacuum")) == 0) return Type::Vacuum;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
+  if (strcmp_P(name.c_str(), PSTR("lawn_mower")) == 0) return Type::LawnMower;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
+  if (strcmp_P(name.c_str(), PSTR("water_heater")) == 0) return Type::WaterHeater;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_UPDATE
+  if (strcmp_P(name.c_str(), PSTR("update")) == 0) return Type::Update;
+#endif
+  return Type::Invalid;
+}
 inline Type typeOf(const ArdJSON::JSONVar& field) {
   const String* name = field["type"].stringValue();
+#if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
+  return name ? typeOf(*name) : Type::Invalid;
+#else
   if (!name || strlen(name->c_str()) != name->length()) return Type::Invalid;
 #if ARDPORTAL_ENABLE_CONTROL_SLIDER
   if (strcmp_P(name->c_str(), PSTR("slider")) == 0) return Type::Slider;
@@ -500,6 +597,7 @@ inline Type typeOf(const ArdJSON::JSONVar& field) {
   if (strcmp_P(name->c_str(), PSTR("update")) == 0) return Type::Update;
 #endif
   return Type::Invalid;
+#endif
 }
 inline const ClassRecord* classTable(size_t& count) {
 #if ARDPORTAL_ENABLE_CLASSES

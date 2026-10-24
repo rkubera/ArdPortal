@@ -5,182 +5,230 @@
 #include <Arduino.h>
 #include "ArdPortalFeatures.h"
 
-struct ArdControlSpec {
-  const char* name;
-  const char* json;
-};
 static constexpr size_t ARD_CONTROL_SPEC_COUNT = ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR + ARDPORTAL_ENABLE_CONTROL_DATE + ARDPORTAL_ENABLE_CONTROL_TIME + ARDPORTAL_ENABLE_CONTROL_DATETIME + ARDPORTAL_ENABLE_CONTROL_BUTTON + ARDPORTAL_ENABLE_CONTROL_SCENE + ARDPORTAL_ENABLE_CONTROL_NOTIFY + ARDPORTAL_ENABLE_CONTROL_INFRARED + ARDPORTAL_ENABLE_CONTROL_EVENT + ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER + ARDPORTAL_ENABLE_CONTROL_TAG + ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER + ARDPORTAL_ENABLE_CONTROL_LIGHT + ARDPORTAL_ENABLE_CONTROL_FAN + ARDPORTAL_ENABLE_CONTROL_COVER + ARDPORTAL_ENABLE_CONTROL_VALVE + ARDPORTAL_ENABLE_CONTROL_LOCK + ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL + ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER + ARDPORTAL_ENABLE_CONTROL_SIREN + ARDPORTAL_ENABLE_CONTROL_VACUUM + ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER + ARDPORTAL_ENABLE_CONTROL_WATER_HEATER + ARDPORTAL_ENABLE_CONTROL_UPDATE;
-extern const ArdControlSpec ARD_CONTROL_SPECS[ARD_CONTROL_SPEC_COUNT + 1] PROGMEM;
+extern const char* const ARD_CONTROL_SPECS[ARD_CONTROL_SPEC_COUNT + 1] PROGMEM;
+extern const uint8_t ARD_CONTROL_SPEC_TYPES[ARD_CONTROL_SPEC_COUNT + 1] PROGMEM;
 #ifdef ARDPORTAL_DEFINE_CONTROL_DATA
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-static const char ARD_CONTROL_NAME_binary_sensor[] PROGMEM = "binary_sensor";
 static const char ARD_CONTROL_SPEC_binary_sensor[] PROGMEM = R"SPEC({"default":false,"controls":[],"readonly":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DATE
-static const char ARD_CONTROL_NAME_date[] PROGMEM = "date";
 static const char ARD_CONTROL_SPEC_date[] PROGMEM = R"SPEC({"default":"2000-01-01","controls":[{"key":"","type":"date","label":"ui_049","command":""}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TIME
-static const char ARD_CONTROL_NAME_time[] PROGMEM = "time";
 static const char ARD_CONTROL_SPEC_time[] PROGMEM = R"SPEC({"default":"00:00:00","controls":[{"key":"","type":"time","label":"ui_049","command":""}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DATETIME
-static const char ARD_CONTROL_NAME_datetime[] PROGMEM = "datetime";
 static const char ARD_CONTROL_SPEC_datetime[] PROGMEM = R"SPEC({"default":"2000-01-01T00:00:00Z","controls":[{"key":"","type":"datetime","label":"ui_049","command":""}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BUTTON
-static const char ARD_CONTROL_NAME_button[] PROGMEM = "button";
 static const char ARD_CONTROL_SPEC_button[] PROGMEM = R"SPEC({"default":null,"controls":[{"key":"","type":"action","label":"ui_107","command":"","payload":"PRESS"}],"action_only":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SCENE
-static const char ARD_CONTROL_NAME_scene[] PROGMEM = "scene";
 static const char ARD_CONTROL_SPEC_scene[] PROGMEM = R"SPEC({"default":null,"controls":[{"key":"","type":"action","label":"ui_108","command":"","payload":"ON"}],"action_only":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_NOTIFY
-static const char ARD_CONTROL_NAME_notify[] PROGMEM = "notify";
 static const char ARD_CONTROL_SPEC_notify[] PROGMEM = R"SPEC({"default":null,"controls":[{"key":"","type":"action_text","label":"ui_109","command":""}],"action_only":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
-static const char ARD_CONTROL_NAME_infrared[] PROGMEM = "infrared";
 static const char ARD_CONTROL_SPEC_infrared[] PROGMEM = R"SPEC({"default":null,"controls":[{"key":"","type":"action_json","label":"ui_110","command":""}],"action_only":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EVENT
-static const char ARD_CONTROL_NAME_event[] PROGMEM = "event";
 static const char ARD_CONTROL_SPEC_event[] PROGMEM = R"SPEC({"default":{"event_type":"press"},"controls":[],"readonly":true,"event_only":true,"event_types":["press","double_press","long_press"]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
-static const char ARD_CONTROL_NAME_device_trigger[] PROGMEM = "device_trigger";
 static const char ARD_CONTROL_SPEC_device_trigger[] PROGMEM = R"SPEC({"default":"PRESS","controls":[],"readonly":true,"event_only":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TAG
-static const char ARD_CONTROL_NAME_tag[] PROGMEM = "tag";
 static const char ARD_CONTROL_SPEC_tag[] PROGMEM = R"SPEC({"default":"","controls":[],"readonly":true,"event_only":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
-static const char ARD_CONTROL_NAME_device_tracker[] PROGMEM = "device_tracker";
 static const char ARD_CONTROL_SPEC_device_tracker[] PROGMEM = R"SPEC({"default":"not_home","controls":[],"readonly":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LIGHT
-static const char ARD_CONTROL_NAME_light[] PROGMEM = "light";
 static const char ARD_CONTROL_SPEC_light[] PROGMEM = R"SPEC({"default":{"state":"OFF","brightness":128,"color":{"r":255,"g":255,"b":255},"color_mode":"rgb"},"controls":[{"key":"state","type":"switch","label":"ui_111","command":"","on":"ON","off":"OFF"},{"key":"brightness","type":"slider","label":"ui_112","command":"","min":0,"max":255,"step":1},{"key":"color","type":"color","label":"ui_113","command":""}],"json_command":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_FAN
-static const char ARD_CONTROL_NAME_fan[] PROGMEM = "fan";
 static const char ARD_CONTROL_SPEC_fan[] PROGMEM = R"SPEC({"default":{"state":"OFF","percentage":0,"oscillation":"oscillate_off","direction":"forward"},"controls":[{"key":"state","type":"switch","label":"ui_111","command":"","on":"ON","off":"OFF"},{"key":"percentage","type":"slider","label":"ui_114","command":"percentage","min":0,"max":100,"step":1},{"key":"oscillation","type":"switch","label":"ui_115","command":"oscillation","on":"oscillate_on","off":"oscillate_off"},{"key":"direction","type":"select","label":"ui_116","command":"direction","options":["forward","reverse"]}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-static const char ARD_CONTROL_NAME_cover[] PROGMEM = "cover";
 static const char ARD_CONTROL_SPEC_cover[] PROGMEM = R"SPEC({"default":{"state":"closed","position":0,"tilt":0},"controls":[{"key":"","type":"action","label":"ui_117","command":"","payload":"OPEN"},{"key":"","type":"action","label":"ui_118","command":"","payload":"CLOSE"},{"key":"","type":"action","label":"ui_119","command":"","payload":"STOP"},{"key":"position","type":"slider","label":"ui_120","command":"position","min":0,"max":100,"step":1},{"key":"tilt","type":"slider","label":"ui_121","command":"tilt","min":0,"max":100,"step":1}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VALVE
-static const char ARD_CONTROL_NAME_valve[] PROGMEM = "valve";
 static const char ARD_CONTROL_SPEC_valve[] PROGMEM = R"SPEC({"default":{"state":"closed","position":0},"controls":[{"key":"","type":"action","label":"ui_117","command":"","payload":"100"},{"key":"","type":"action","label":"ui_118","command":"","payload":"0"},{"key":"position","type":"slider","label":"ui_120","command":"","min":0,"max":100,"step":1}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LOCK
-static const char ARD_CONTROL_NAME_lock[] PROGMEM = "lock";
 static const char ARD_CONTROL_SPEC_lock[] PROGMEM = R"SPEC({"default":"LOCKED","controls":[{"key":"","type":"action","label":"ui_122","command":"","payload":"LOCK"},{"key":"","type":"action","label":"ui_123","command":"","payload":"UNLOCK"},{"key":"","type":"action","label":"ui_117","command":"","payload":"OPEN"}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
-static const char ARD_CONTROL_NAME_alarm_control_panel[] PROGMEM = "alarm_control_panel";
 static const char ARD_CONTROL_SPEC_alarm_control_panel[] PROGMEM = R"SPEC({"default":"disarmed","controls":[{"key":"","type":"action","label":"ui_124","command":"","payload":"ARM_HOME"},{"key":"","type":"action","label":"ui_125","command":"","payload":"ARM_AWAY"},{"key":"","type":"action","label":"ui_126","command":"","payload":"ARM_NIGHT"},{"key":"","type":"action","label":"ui_127","command":"","payload":"DISARM"},{"key":"","type":"action","label":"ui_128","command":"","payload":"TRIGGER"}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
-static const char ARD_CONTROL_NAME_humidifier[] PROGMEM = "humidifier";
 static const char ARD_CONTROL_SPEC_humidifier[] PROGMEM = R"SPEC({"default":{"state":"OFF","humidity":50,"current_humidity":null,"mode":"normal"},"controls":[{"key":"state","type":"switch","label":"ui_111","command":"","on":"ON","off":"OFF"},{"key":"humidity","type":"slider","label":"ui_129","command":"humidity","min":0,"max":100,"step":1},{"key":"mode","type":"select","label":"ui_103","command":"mode","options":["normal","eco"]}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SIREN
-static const char ARD_CONTROL_NAME_siren[] PROGMEM = "siren";
 static const char ARD_CONTROL_SPEC_siren[] PROGMEM = R"SPEC({"default":{"state":"OFF","tone":"alarm","duration":10,"volume_level":0.5},"controls":[{"key":"state","type":"switch","label":"ui_111","command":"","on":"ON","off":"OFF"},{"key":"tone","type":"select","label":"ui_130","command":"","options":["alarm","bell"]},{"key":"duration","type":"slider","label":"ui_131","command":"","min":1,"max":300,"step":1},{"key":"volume_level","type":"slider","label":"ui_132","command":"","min":0,"max":1,"step":0.1}],"json_command":true})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VACUUM
-static const char ARD_CONTROL_NAME_vacuum[] PROGMEM = "vacuum";
 static const char ARD_CONTROL_SPEC_vacuum[] PROGMEM = R"SPEC({"default":{"state":"docked","fan_speed":"normal"},"controls":[{"key":"","type":"action","label":"ui_133","command":"","payload":"start"},{"key":"","type":"action","label":"ui_119","command":"","payload":"stop"},{"key":"","type":"action","label":"ui_134","command":"","payload":"pause"},{"key":"","type":"action","label":"ui_135","command":"","payload":"return_to_base"},{"key":"","type":"action","label":"ui_136","command":"","payload":"locate"},{"key":"","type":"action","label":"ui_137","command":"","payload":"clean_spot"},{"key":"fan_speed","type":"select","label":"ui_104","command":"fan","options":["quiet","normal","turbo"]},{"key":"","type":"action_json","label":"ui_138","command":"custom"}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
-static const char ARD_CONTROL_NAME_lawn_mower[] PROGMEM = "lawn_mower";
 static const char ARD_CONTROL_SPEC_lawn_mower[] PROGMEM = R"SPEC({"default":"docked","controls":[{"key":"","type":"action","label":"ui_139","command":"start","payload":"START"},{"key":"","type":"action","label":"ui_134","command":"pause","payload":"PAUSE"},{"key":"","type":"action","label":"ui_135","command":"dock","payload":"DOCK"}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
-static const char ARD_CONTROL_NAME_water_heater[] PROGMEM = "water_heater";
 static const char ARD_CONTROL_SPEC_water_heater[] PROGMEM = R"SPEC({"default":{"temperature":50,"current_temperature":null,"mode":"off"},"controls":[{"key":"temperature","type":"slider","label":"ui_101","command":"temperature","min":30,"max":80,"step":1},{"key":"mode","type":"select","label":"ui_103","command":"mode","options":["off","eco","electric","performance","heat_pump","high_demand"]}]})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
-static const char ARD_CONTROL_NAME_update[] PROGMEM = "update";
 static const char ARD_CONTROL_SPEC_update[] PROGMEM = R"SPEC({"default":{"installed_version":"0.0.0","latest_version":"0.0.0","in_progress":false},"controls":[{"key":"","type":"action","label":"ui_140","command":"","payload":"INSTALL"}]})SPEC";
 #endif
-const ArdControlSpec ARD_CONTROL_SPECS[ARD_CONTROL_SPEC_COUNT + 1] PROGMEM = {
+const char* const ARD_CONTROL_SPECS[ARD_CONTROL_SPEC_COUNT + 1] PROGMEM = {
 #if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
-  { ARD_CONTROL_NAME_binary_sensor, ARD_CONTROL_SPEC_binary_sensor },
+  ARD_CONTROL_SPEC_binary_sensor,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DATE
-  { ARD_CONTROL_NAME_date, ARD_CONTROL_SPEC_date },
+  ARD_CONTROL_SPEC_date,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TIME
-  { ARD_CONTROL_NAME_time, ARD_CONTROL_SPEC_time },
+  ARD_CONTROL_SPEC_time,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DATETIME
-  { ARD_CONTROL_NAME_datetime, ARD_CONTROL_SPEC_datetime },
+  ARD_CONTROL_SPEC_datetime,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_BUTTON
-  { ARD_CONTROL_NAME_button, ARD_CONTROL_SPEC_button },
+  ARD_CONTROL_SPEC_button,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SCENE
-  { ARD_CONTROL_NAME_scene, ARD_CONTROL_SPEC_scene },
+  ARD_CONTROL_SPEC_scene,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_NOTIFY
-  { ARD_CONTROL_NAME_notify, ARD_CONTROL_SPEC_notify },
+  ARD_CONTROL_SPEC_notify,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
-  { ARD_CONTROL_NAME_infrared, ARD_CONTROL_SPEC_infrared },
+  ARD_CONTROL_SPEC_infrared,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EVENT
-  { ARD_CONTROL_NAME_event, ARD_CONTROL_SPEC_event },
+  ARD_CONTROL_SPEC_event,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
-  { ARD_CONTROL_NAME_device_trigger, ARD_CONTROL_SPEC_device_trigger },
+  ARD_CONTROL_SPEC_device_trigger,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TAG
-  { ARD_CONTROL_NAME_tag, ARD_CONTROL_SPEC_tag },
+  ARD_CONTROL_SPEC_tag,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
-  { ARD_CONTROL_NAME_device_tracker, ARD_CONTROL_SPEC_device_tracker },
+  ARD_CONTROL_SPEC_device_tracker,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LIGHT
-  { ARD_CONTROL_NAME_light, ARD_CONTROL_SPEC_light },
+  ARD_CONTROL_SPEC_light,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_FAN
-  { ARD_CONTROL_NAME_fan, ARD_CONTROL_SPEC_fan },
+  ARD_CONTROL_SPEC_fan,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_COVER
-  { ARD_CONTROL_NAME_cover, ARD_CONTROL_SPEC_cover },
+  ARD_CONTROL_SPEC_cover,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VALVE
-  { ARD_CONTROL_NAME_valve, ARD_CONTROL_SPEC_valve },
+  ARD_CONTROL_SPEC_valve,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LOCK
-  { ARD_CONTROL_NAME_lock, ARD_CONTROL_SPEC_lock },
+  ARD_CONTROL_SPEC_lock,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
-  { ARD_CONTROL_NAME_alarm_control_panel, ARD_CONTROL_SPEC_alarm_control_panel },
+  ARD_CONTROL_SPEC_alarm_control_panel,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
-  { ARD_CONTROL_NAME_humidifier, ARD_CONTROL_SPEC_humidifier },
+  ARD_CONTROL_SPEC_humidifier,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SIREN
-  { ARD_CONTROL_NAME_siren, ARD_CONTROL_SPEC_siren },
+  ARD_CONTROL_SPEC_siren,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_VACUUM
-  { ARD_CONTROL_NAME_vacuum, ARD_CONTROL_SPEC_vacuum },
+  ARD_CONTROL_SPEC_vacuum,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
-  { ARD_CONTROL_NAME_lawn_mower, ARD_CONTROL_SPEC_lawn_mower },
+  ARD_CONTROL_SPEC_lawn_mower,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
-  { ARD_CONTROL_NAME_water_heater, ARD_CONTROL_SPEC_water_heater },
+  ARD_CONTROL_SPEC_water_heater,
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
-  { ARD_CONTROL_NAME_update, ARD_CONTROL_SPEC_update },
+  ARD_CONTROL_SPEC_update,
 #endif
-  { nullptr, nullptr }
+  nullptr
+};
+const uint8_t ARD_CONTROL_SPEC_TYPES[ARD_CONTROL_SPEC_COUNT + 1] PROGMEM = {
+#if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+  7,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DATE
+  8,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TIME
+  9,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DATETIME
+  10,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_BUTTON
+  11,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SCENE
+  12,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_NOTIFY
+  13,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_INFRARED
+  14,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_EVENT
+  15,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
+  16,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TAG
+  17,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
+  18,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LIGHT
+  19,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_FAN
+  20,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_COVER
+  21,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VALVE
+  22,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LOCK
+  23,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
+  24,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
+  25,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SIREN
+  26,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VACUUM
+  27,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
+  28,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
+  29,
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_UPDATE
+  30,
+#endif
+  0
 };
 #endif

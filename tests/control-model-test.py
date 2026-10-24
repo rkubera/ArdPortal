@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TYPES = json.loads((ROOT / 'src/tools/control_types.json').read_text())
 CLASSES = json.loads((ROOT / 'src/tools/control_classes.json').read_text())
+MODELS = json.loads((ROOT / 'src/tools/control_models.json').read_text())
 
 def compile_run(work, name, body, flags=()):
     source = work / (name + '.cpp')
@@ -65,7 +66,15 @@ with tempfile.TemporaryDirectory(prefix='ardportal-control-model-') as directory
     assert(ArdControl::validValue(field,ArdJSON::JSON.parse(R"({"timings":[9000,-4500],"modulation":38000})")));
     assert(!ArdControl::validValue(field,ArdJSON::JSON.parse(R"({"timings":[0]})")));
     ''']
+    for name, spec in MODELS.items():
+        expected = json.dumps(spec['model'], separators=(',', ':'), ensure_ascii=False)
+        lines += ['assert(ArdJSON::JSON.stringify(ArdControl::descriptor(String('+json.dumps(name)+'))) == String(R"EXPECTED('+expected+')EXPECTED"));']
     compile_run(work, 'all', '\n'.join(lines), ['-DARDPORTAL_ENABLE_HA=0'])
+    ha_lines = []
+    for name, spec in MODELS.items():
+        expected = json.dumps(spec['ha'], separators=(',', ':'), ensure_ascii=False)
+        ha_lines += ['assert(ArdJSON::JSON.stringify(ArdHa::defaults(String('+json.dumps(name)+'))) == String(R"EXPECTED('+expected+')EXPECTED"));']
+    compile_run(work, 'ha-presets', '\n'.join(ha_lines))
     image = compile_run(work, 'switch', r'''
     V field=ArdJSON::JSON.parse(R"({"type":"switch","class":"outlet"})");
     assert(ArdControl::validClass(field));
