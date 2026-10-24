@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Generate one-character CSS classes and DOM IDs consistently across HTML, CSS, JavaScript, ARIA references and dynamic pages. Preserve semantic page IDs, form names and API operations; keep readable identifiers in the source.
+- Reduce portal HTML by translating text-only containers directly and omitting optional attribute quotes during generation. Exclude Console CSS when Console is disabled; apply asset optimizations independently of the selected control set.
 - Store control and HA preset identities as enum IDs in compact parallel tables, reusing the common type lookup and omitting duplicate type-name strings with per-control compile guards.
 - Avoid temporary string copies when validating control values, titles and enum/select options; compare JSON literals directly against the input instead of allocating substrings.
 - Compress the Unicode device-name character table with indexed delta encoding, preserving the existing accepted characters and allocation-free validation. Make the character catalogue independent of the generator's Python Unicode version.

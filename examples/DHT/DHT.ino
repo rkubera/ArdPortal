@@ -35,10 +35,9 @@ uint8_t failedReads = 0;
 
 static const char HOME_PAGE[] PROGMEM = R"JSON({
   "id":"home","name":"Home","order":0,"fields":[
-    {"id":"temperature","type":"text","name":"Temperature","default":"Unavailable","persist":false,
-     "ha":{"device_class":"temperature","unit_of_measurement":"°C","state_class":"measurement","value_template":"{% set n=value.split()[0]|float(none) %}{{ '' if n is none else ((n-32)*5/9)|round(1) if value.endswith('F') else n }}"}},
-    {"id":"humidity","type":"text","name":"Humidity (%)","default":"Unavailable","persist":false,
-     "ha":{"device_class":"humidity","unit_of_measurement":"%","state_class":"measurement"}}
+    {"id":"temperature","type":"text","class":"temperature","name":"Temperature","default":"Unavailable","persist":false,
+     "ha":{"value_template":"{% set n=value.split()[0]|float(none) %}{{ '' if n is none else ((n-32)*5/9)|round(1) if value.endswith('F') else n }}"}},
+    {"id":"humidity","type":"text","class":"humidity","name":"Humidity (%)","default":"Unavailable","persist":false}
   ]
 })JSON";
 

@@ -7,8 +7,7 @@ ArdPortal portal;
 constexpr uint8_t IndicatorPin = 2;
 uint32_t lastReport = 0;
 const char UPTIME_ENTITY[] PROGMEM = R"JSON({
-  "id":"uptime", "name":"Uptime", "type":"text", "default":0,
-  "unit_of_measurement":"s", "state_class":"measurement"
+  "id":"uptime", "name":"Uptime", "type":"text", "class":"duration", "default":0
 })JSON";
 const char INDICATOR_ENTITY[] PROGMEM = R"JSON({
   "id":"indicator", "name":"Indicator", "type":"switch", "default":false
