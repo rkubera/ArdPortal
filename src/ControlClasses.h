@@ -34,36 +34,96 @@ static_assert(sizeof(Model) <= 4, "Control model must stay compact");
 inline Model describe(const ArdJSON::JSONVar& field) {
   Model result{ typeOf(field), classOf(field), 0 };
   switch (result.type) {
+#if ARDPORTAL_ENABLE_CONTROL_SWITCH
     case Type::Switch: result.capabilities = OnOff; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SLIDER
     case Type::Slider: result.capabilities = Setpoint; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT
     case Type::Text: result.capabilities = numeric(result.classId) ? Measurement : Text; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SELECT
     case Type::Select: result.capabilities = Options; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LIGHT
     case Type::Light: result.capabilities = OnOff | Level | Color; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_COVER
     case Type::Cover: result.capabilities = Position | Tilt | Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_CLIMATE
     case Type::Climate: result.capabilities = Temperature | Setpoint | Options; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_FAN
     case Type::Fan: result.capabilities = OnOff | Speed | Options; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VALVE
     case Type::Valve: result.capabilities = Position | Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
     case Type::Humidifier: result.capabilities = OnOff | Setpoint | Options; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
     case Type::WaterHeater: result.capabilities = Temperature | Setpoint | Options; break;
-    case Type::BinarySensor:
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+    case Type::BinarySensor: result.capabilities = Measurement; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
     case Type::DeviceTracker: result.capabilities = Measurement; break;
-    case Type::Edit:
-    case Type::Date:
-    case Type::Time:
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_EDIT
+    case Type::Edit: result.capabilities = Text | Setpoint; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DATE
+    case Type::Date: result.capabilities = Text | Setpoint; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TIME
+    case Type::Time: result.capabilities = Text | Setpoint; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DATETIME
     case Type::Datetime: result.capabilities = Text | Setpoint; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SIREN
     case Type::Siren: result.capabilities = OnOff | Action | Options; break;
-    case Type::Event:
-    case Type::DeviceTrigger:
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_EVENT
+    case Type::Event: result.capabilities = Event; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
+    case Type::DeviceTrigger: result.capabilities = Event; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TAG
     case Type::Tag: result.capabilities = Event; break;
-    case Type::Button:
-    case Type::Scene:
-    case Type::Notify:
-    case Type::Infrared:
-    case Type::Lock:
-    case Type::AlarmControlPanel:
-    case Type::Vacuum:
-    case Type::LawnMower:
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_BUTTON
+    case Type::Button: result.capabilities = Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SCENE
+    case Type::Scene: result.capabilities = Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_NOTIFY
+    case Type::Notify: result.capabilities = Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_INFRARED
+    case Type::Infrared: result.capabilities = Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LOCK
+    case Type::Lock: result.capabilities = Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
+    case Type::AlarmControlPanel: result.capabilities = Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VACUUM
+    case Type::Vacuum: result.capabilities = Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
+    case Type::LawnMower: result.capabilities = Action; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_UPDATE
     case Type::Update: result.capabilities = Action; break;
+#endif
     default: break;
   }
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
@@ -121,6 +181,7 @@ inline bool validReading(const ArdJSON::JSONVar& field, const ArdJSON::JSONVar& 
   Class id = classOf(field);
   if (!validClass(field)) return false;
   if (value.isNull() && id != Class::None && id != Class::Text) return true;
+#if ARDPORTAL_ENABLE_CLASSES
   if (numeric(id)) {
     double n;
     return value.type() == V::Type::Number && value.toDouble(n) && std::isfinite(n) && std::isfinite(float(n)) && (id != Class::Uptime || n >= 0);
@@ -134,8 +195,9 @@ inline bool validReading(const ArdJSON::JSONVar& field, const ArdJSON::JSONVar& 
     }
     return false;
   }
+#endif
   const String* text = value.stringValue();
-#if ARDPORTAL_ENABLE_CLASSES
+#if ARDPORTAL_ENABLE_CLASSES && ARDPORTAL_ENABLE_CONTROL_TEXT
   if (id == Class::Date) return text && date(*text);
   if (id == Class::Timestamp) return text && datetime(*text);
 #endif

@@ -77,70 +77,127 @@ struct Command {
 /** @brief Convert a field definition to native Zigbee metadata. @param f Registered definition. @param value Effective state. @return None for unsupported fields. */
 inline Spec describe(const V& f, const V& value) {
   Spec s;
-  auto model = ArdControl::describe(f);
   if (!ArdControl::validClass(f)) return s;
-  s.classId = model.classId;
-  auto t = model.type;
-  if (t == ArdControl::Type::Switch) s.kind = Kind::Switch;
-  else if (t == ArdControl::Type::Slider) {
-    s.kind = Kind::Slider;
-    s.min = f["min"].asDouble();
-    s.max = f["max"].asDouble();
-    s.step = f.hasOwnProperty("step") ? f["step"].asDouble() : 1;
-  } else if (t == ArdControl::Type::Select) {
-    s.kind = Kind::Select;
-    s.states = f["options"].length();
-  } else if (t == ArdControl::Type::Text) {
-    (void)value;
-#if ARDPORTAL_ENABLE_CLASSES
-    switch (s.classId) {
-      case ArdControl::Class::Number: s.kind = Kind::Number; break;
-      case ArdControl::Class::Temperature: s.kind = Kind::Temperature; break;
-      case ArdControl::Class::Humidity: s.kind = Kind::Humidity; break;
-      case ArdControl::Class::Pressure: s.kind = Kind::Pressure; break;
-      case ArdControl::Class::Illuminance: s.kind = Kind::Illuminance; break;
-      case ArdControl::Class::Flow: s.kind = Kind::Flow; break;
-      case ArdControl::Class::CarbonDioxide: s.kind = Kind::CarbonDioxide; break;
-      case ArdControl::Class::Pm25: s.kind = Kind::PM25; break;
-      case ArdControl::Class::WindSpeed: s.kind = Kind::WindSpeed; break;
-      case ArdControl::Class::Voltage: s.kind = Kind::Voltage; break;
-      case ArdControl::Class::Current: s.kind = Kind::Current; break;
-      case ArdControl::Class::Power: s.kind = Kind::Power; break;
-      default:
-        if (ArdControl::numeric(s.classId)) s.kind = Kind::Number;
+  s.classId = ArdControl::classOf(f);
+  auto t = ArdControl::typeOf(f);
+  switch (t) {
+#if ARDPORTAL_ENABLE_CONTROL_SWITCH
+    case ArdControl::Type::Switch: s.kind = Kind::Switch; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SLIDER
+    case ArdControl::Type::Slider:
+      s.kind = Kind::Slider;
+      s.min = f["min"].asDouble();
+      s.max = f["max"].asDouble();
+      s.step = f.hasOwnProperty("step") ? f["step"].asDouble() : 1;
+      if (!std::isfinite(s.min) || !std::isfinite(s.max) || !std::isfinite(s.step) || s.step <= 0) s.kind = Kind::None;
+      break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SELECT
+    case ArdControl::Type::Select:
+      s.kind = Kind::Select;
+      s.states = f["options"].length();
+      break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_TEXT && ARDPORTAL_ENABLE_CLASSES
+    case ArdControl::Type::Text:
+      switch (s.classId) {
+        case ArdControl::Class::Number: s.kind = Kind::Number; break;
+        case ArdControl::Class::Temperature: s.kind = Kind::Temperature; break;
+        case ArdControl::Class::Humidity: s.kind = Kind::Humidity; break;
+        case ArdControl::Class::Pressure: s.kind = Kind::Pressure; break;
+        case ArdControl::Class::Illuminance: s.kind = Kind::Illuminance; break;
+        case ArdControl::Class::Flow: s.kind = Kind::Flow; break;
+        case ArdControl::Class::CarbonDioxide: s.kind = Kind::CarbonDioxide; break;
+        case ArdControl::Class::Pm25: s.kind = Kind::PM25; break;
+        case ArdControl::Class::WindSpeed: s.kind = Kind::WindSpeed; break;
+        case ArdControl::Class::Voltage: s.kind = Kind::Voltage; break;
+        case ArdControl::Class::Current: s.kind = Kind::Current; break;
+        case ArdControl::Class::Power: s.kind = Kind::Power; break;
+        default:
+          if (ArdControl::numeric(s.classId)) s.kind = Kind::Number;
+          break;
+      }
+      break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR
+    case ArdControl::Type::BinarySensor: s.kind = Kind::Binary; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LIGHT
+    case ArdControl::Type::Light: s.kind = Kind::Light; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_CLIMATE
+    case ArdControl::Type::Climate:
+      {
+        s.kind = Kind::Climate;
+        s.min = f["min"].asDouble();
+        s.max = f["max"].asDouble();
+        s.step = f.hasOwnProperty("step") ? f["step"].asDouble() : 0.5;
+        s.fan = f["fan_modes"].length();
+        bool heat = false, cool = false;
+        for (size_t i = 0; i < f["modes"].length(); ++i) {
+          String m = f["modes"][i].asString();
+          heat |= m == "heat" || m == "heat_cool";
+          cool |= m == "cool" || m == "heat_cool";
+        }
+        s.sequence = heat && cool ? 4 : heat ? 2
+                                             : 0;
+        if (s.min < -273.15 || s.max > 327.67) s.kind = Kind::None;
         break;
-    }
+      }
 #endif
-  } else if (t == ArdControl::Type::BinarySensor) s.kind = Kind::Binary;
-  else if (t == ArdControl::Type::Light) s.kind = Kind::Light;
-  else if (t == ArdControl::Type::Climate) {
-    s.kind = Kind::Climate;
-    s.min = f["min"].asDouble();
-    s.max = f["max"].asDouble();
-    s.step = f.hasOwnProperty("step") ? f["step"].asDouble() : 0.5;
-    s.fan = f["fan_modes"].length();
-    bool heat = false, cool = false;
-    for (size_t i = 0; i < f["modes"].length(); ++i) {
-      String m = f["modes"][i].asString();
-      heat |= m == "heat" || m == "heat_cool";
-      cool |= m == "cool" || m == "heat_cool";
-    }
-    s.sequence = heat && cool ? 4 : heat ? 2
-                                         : 0;
-  } else if (t == ArdControl::Type::Cover) s.kind = Kind::Cover;
-  else if (t == ArdControl::Type::Lock) s.kind = Kind::Lock;
-  else if (t == ArdControl::Type::Siren) s.kind = Kind::Siren;
+#if ARDPORTAL_ENABLE_CONTROL_COVER
+    case ArdControl::Type::Cover: s.kind = Kind::Cover; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LOCK
+    case ArdControl::Type::Lock: s.kind = Kind::Lock; break;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SIREN
+    case ArdControl::Type::Siren: s.kind = Kind::Siren; break;
+#endif
 #if ARDPORTAL_ZIGBEE_OTA_SUPPORT
-  else if (t == ArdControl::Type::Update) s.kind = Kind::Update;
+    case ArdControl::Type::Update: s.kind = Kind::Update; break;
 #endif
-  if (s.kind == Kind::Slider && (!std::isfinite(s.min) || !std::isfinite(s.max) || !std::isfinite(s.step) || s.step <= 0)) s.kind = Kind::None;
-  if (s.kind == Kind::Climate && (s.min < -273.15 || s.max > 327.67)) s.kind = Kind::None;
+    default: break;
+  }
+  (void)value;
   return s;
 }
 /** @brief Identify composites supported using separate standard endpoints. @param f Definition. @return True for supported presets; custom text/JSON actions remain excluded. */
 inline bool composite(const V& f) {
   String t = f["type"].asString();
-  return t == "fan" || t == "valve" || t == "humidifier" || t == "water_heater" || t == "alarm_control_panel" || t == "vacuum" || t == "lawn_mower" || t == "button" || t == "scene" || t == "device_tracker";
+  return false
+#if ARDPORTAL_ENABLE_CONTROL_FAN
+         || t == "fan"
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VALVE
+         || t == "valve"
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_HUMIDIFIER
+         || t == "humidifier"
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
+         || t == "water_heater"
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
+         || t == "alarm_control_panel"
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VACUUM
+         || t == "vacuum"
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
+         || t == "lawn_mower"
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_BUTTON
+         || t == "button"
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_SCENE
+         || t == "scene"
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
+         || t == "device_tracker"
+#endif
+    ;
 }
 /** @brief Describe one existing preset control as a standard endpoint. @param f Normalized field. @param part Control index. @return None for unsupported/custom payloads. */
 inline Spec describePart(const V& f, size_t part) {
@@ -165,11 +222,21 @@ inline Spec describePart(const V& f, size_t part) {
 /** @brief Resolve read-only compound state names. @param f Normalized definition. @return Stable names separated by commas, or empty for no discrete state. */
 inline const char* stateNames(const V& f) {
   String t = f["type"].asString();
+#if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRACKER
   if (t == "device_tracker") return "not_home,home";
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VALVE
   if (t == "valve") return "closed,opening,open,closing";
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_ALARM_CONTROL_PANEL
   if (t == "alarm_control_panel") return "disarmed,armed_home,armed_away,armed_night,pending,arming,triggered";
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_VACUUM
   if (t == "vacuum") return "idle,cleaning,docked,paused,returning,error";
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
   if (t == "lawn_mower") return "docked,mowing,paused,error";
+#endif
   return "";
 }
 /** @brief Look up a compound-state ordinal or its name without a retained JSON array. @param f Normalized field. @param state State name to find. @param wanted One-based ordinal to decode, or zero. @return Number for lookup or string for decoding; null for unknown. */

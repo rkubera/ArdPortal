@@ -153,7 +153,14 @@ inline bool validControl(const V& c, const V& value) {
     return string(value) && datetime(value.asString());
   }
 #endif
-  return (type == "edit" || type == "action_text") && string(value);
+  return false
+#if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
+         || (type == "edit" && string(value))
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_NOTIFY
+         || (type == "action_text" && string(value))
+#endif
+    ;
 }
 /**
  * @brief Validate a value against the application control type and constraints.
@@ -311,7 +318,9 @@ inline bool normalize(V& field, String* error = nullptr) {
     if (c.hasOwnProperty("class") && !validClass(c)) return fail(F("invalid class in controls"));
     if (!supported) return fail(ARD_LANG_NATIVE_UNSUPPORTED_DISABLED_CONTROL_TYPE_AT_CONTROLS + String(i) + "]: " + t);
     if (!c["command"].isUndefined() && !string(c["command"], 24)) return fail(ARD_LANG_NATIVE_INVALID_COMMAND_AT_CONTROLS + String(i) + ARD_LANG_NATIVE_MAXIMUM_24_BYTES);
+#if ARDPORTAL_CONTROL_SUPPORT_SLIDER
     if (t == "slider" && (!c["min"].isValid() || c["min"].asDouble() >= c["max"].asDouble() || c["step"].asDouble() <= 0)) return fail(ARD_LANG_NATIVE_INVALID_SLIDER_MIN_MAX_STEP_AT_CONTROLS + String(i) + "]");
+#endif
   }
   return validValue(field, field["default"]) || fail(ARD_LANG_NATIVE_INVALID_DEFAULT_VALUE_FOR_CONTROL);
 }

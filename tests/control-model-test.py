@@ -73,4 +73,15 @@ with tempfile.TemporaryDirectory(prefix='ardportal-control-model-') as directory
     assert(ArdControl::validClass(field));
     assert(ArdControl::classInfo(ArdControl::Class::Outlet).name==nullptr);
     ''', ['-DARDPORTAL_ENABLE_CONTROLS=0', '-DARDPORTAL_ENABLE_CONTROL_SLIDER=1'])
+    image = compile_run(work, 'text-no-classes', r'''
+    V field=ArdJSON::JSON.parse(R"({"type":"text"})");
+    assert(ArdControl::validReading(field,"value"));
+    assert(ArdControl::validReading(field,42));
+    assert(!ArdControl::validReading(field,V::object()));
+    assert(ArdControl::classInfo(ArdControl::Class::Temperature).name==nullptr);
+    field["class"]="temperature";
+    assert(!ArdControl::validReading(field,42));
+    ''', ['-DARDPORTAL_ENABLE_CONTROLS=0', '-DARDPORTAL_ENABLE_CONTROL_TEXT=1', '-DARDPORTAL_ENABLE_CLASSES=0'])
+    for symbol in (b'_ZN10ArdControl4date', b'_ZN10ArdControl8datetime', b'name_temperature'):
+        assert symbol not in image, 'Disabled class implementation retained: '+str(symbol)
 print('PASS: all 30 controls, every class/type pair, protocol-free defaults, capabilities, events, calendar/IR validation and excluded binary names')
