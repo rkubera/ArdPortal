@@ -59,7 +59,7 @@ Each control page also describes **Integration with Home Assistant** and
 remaining gaps. Possible future cluster combinations are clearly marked as
 unimplemented; see the [Zigbee feasibility table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#possible-mappings-not-yet-implemented).
 
-Every linked control page includes **minimal JSON** and **full JSON**, both ready to copy into a page's `fields` array. Minimal JSON contains only the properties needed to register the field. Full JSON makes the example configuration explicit, including defaults and the built-in `controls` and `ha` settings where applicable; it is not a requirement to supply every optional property. The property table on each control page identifies what can be omitted. `$state`, `$command` and `$command:<suffix>` are topic placeholders expanded by the library. Internal normalization properties are not needed in your JSON.
+Every linked control page includes **minimal JSON** and **full JSON**, both ready to copy into a page's `fields` array. Minimal JSON contains only the properties needed to register the field. Full JSON makes the protocol-independent configuration explicit, including defaults and built-in `controls` where applicable. HA topics, templates and capabilities are supplied by the adapter; do not repeat them in an ordinary field definition. The property table on each control page identifies what can be omitted. Internal normalization properties are not needed in your JSON.
 
 A page containing one or more of these objects has this structure:
 

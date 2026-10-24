@@ -232,19 +232,20 @@ inline bool normalize(V& field, String* error = nullptr) {
   };
   if (error) *error = String();
   if (!validClass(field)) return fail(F("invalid class for control type"));
+  const String& type = *static_cast<const V&>(field)["type"].stringValue();
   const bool suppliedEventTypes = field.hasOwnProperty("event_types");
 #if ARDPORTAL_ENABLE_CONTROL_EVENT || ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
   const bool suppliedDefault = field.hasOwnProperty("default");
 #endif
-  V spec = descriptor(field["type"].asString());
-  if (spec.isUndefined()) return fail(ARD_LANG_NATIVE_UNSUPPORTED_DISABLED_DESCRIPTOR_TYPE + field["type"].asString());
+  V spec = descriptor(type);
+  if (spec.isUndefined()) return fail(ARD_LANG_NATIVE_UNSUPPORTED_DISABLED_DESCRIPTOR_TYPE + type);
   V keys = spec.keys();
   for (size_t i = 0; i < keys.length(); ++i) {
     String key = keys[i].asString();
     if (!field.hasOwnProperty(key)) field[key] = std::move(spec[key]);
   }
 #if ARDPORTAL_ENABLE_CONTROL_INFRARED
-  if (field["type"].asString() == "infrared" && classOf(field) == Class::Receiver) {
+  if (type == "infrared" && classOf(field) == Class::Receiver) {
     field["controls"] = V::array();
     field["readonly"] = true;
     field["action_only"] = false;
@@ -252,7 +253,7 @@ inline bool normalize(V& field, String* error = nullptr) {
   }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EVENT
-  if (field["type"].asString() == "event" && !static_cast<const V&>(field)["class"].isUndefined()) {
+  if (type == "event" && !static_cast<const V&>(field)["class"].isUndefined()) {
     // Explicit user event definitions win; otherwise choose the class's event vocabulary.
     if ((classOf(field) == Class::Doorbell || classOf(field) == Class::Motion) && !suppliedEventTypes) {
       String event = classOf(field) == Class::Doorbell ? String(F("ring")) : String(F("motion"));
@@ -265,7 +266,7 @@ inline bool normalize(V& field, String* error = nullptr) {
   (void)suppliedEventTypes;
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_DEVICE_TRIGGER
-  if (field["type"].asString() == "device_trigger" && !suppliedDefault) {
+  if (type == "device_trigger" && !suppliedDefault) {
     if (classOf(field) == Class::Doorbell) field["default"] = String(F("ring"));
     else if (classOf(field) == Class::Motion) field["default"] = String(F("motion"));
   }
@@ -273,7 +274,7 @@ inline bool normalize(V& field, String* error = nullptr) {
   field["extended"] = true;
   if (!field.hasOwnProperty("persist")) field["persist"] = !readonly(field) && !transient(field);
 #if ARDPORTAL_ENABLE_CONTROL_EVENT
-  if (field["type"].asString() == "event") {
+  if (type == "event") {
     if (field["event_types"].type() != V::Type::Array || !field["event_types"].length() || field["event_types"].length() > 32) return fail(F("event_types must contain 1-32 strings"));
     for (size_t i = 0; i < field["event_types"].length(); ++i)
       if (!string(field["event_types"][i], 64)) return fail(F("invalid event type"));

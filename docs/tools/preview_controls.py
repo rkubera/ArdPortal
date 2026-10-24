@@ -3,15 +3,15 @@
 
 Run locally, then open http://127.0.0.1:8766/p/light. No hardware is contacted.
 """
-import json,re
+import json,re,sys
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from urllib.parse import urlparse,parse_qs
 ROOT=Path(__file__).resolve().parents[2]
 TYPES=json.loads((ROOT/'src/tools/control_types.json').read_text())
-source=(ROOT/'src/HaEntityData.h').read_text()
-names=dict(re.findall(r'ARD_HA_NAME_(\d+)\[\] PROGMEM = "([^"]+)"',source))
-specs={names[n]:json.loads(value) for n,value in re.findall(r'ARD_HA_SPEC_(\d+)\[\] PROGMEM = R"SPEC\((.*?)\)SPEC"',source,re.S)}
+sys.path.insert(0,str(ROOT/'src/tools'))
+from control_protocols import runtime_model
+specs={name:runtime_model(model) for name,model in json.loads((ROOT/'src/tools/control_models.json').read_text()).items()}
 def label(typ):return typ.replace('_',' ').capitalize()
 fields={typ:{'id':typ,'type':typ,'name':label(typ),'extended':typ in specs} for typ in TYPES}
 fields['slider'].update(min=0,max=100,step=1,default=65)

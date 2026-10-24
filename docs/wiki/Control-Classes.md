@@ -6,6 +6,39 @@
 
 Every control accepts omission of `class`. Unknown, empty, non-string and type-incompatible classes are registration errors. The class catalogue is removed with `ARDPORTAL_ENABLE_CLASSES=0`; ordinary controls continue to work. Class names, units and mapping metadata are compiled only when a corresponding `ARDPORTAL_ENABLE_CONTROL_*` is enabled.
 
+## Presets and protocol adapters
+
+Built-in descriptor presets have one protocol-independent authoring catalogue:
+`src/tools/control_models.json`. It defines initial state, named actions/properties,
+command suffixes, payloads, options and ranges. `class` remains an optional field
+property, selected by the application.
+
+`src/tools/generate_state_schemas.py` compiles that catalogue into the existing
+control arrays and HA Discovery defaults. The HA adapter in
+`src/tools/control_protocols.py` derives action payloads, topic suffixes, property
+templates, option lists and supported capabilities from the same preset. Semantic
+names used by the generator are removed before emitting firmware resources. No
+additional model is parsed on the microcontroller. Control and HA defines still
+exclude their corresponding resources.
+
+Presence vocabulary (`states.present` / `states.absent`) is compiler metadata,
+independent of the preset's initial `default`; it is omitted from runtime JSON.
+Fan power/oscillation and humidifier power payloads follow their shared `on`/`off`
+values. Default protocol payloads are omitted from Discovery to keep resources
+compact; customized payloads are emitted automatically.
+
+For example, the button's `press` action defines `payload: "PRESS"` once. The
+portal/Zigbee control descriptor receives that action, while the HA adapter emits
+`payload_press` and its command topic. A future Matter adapter can consume the same
+catalogue; Matter is not implemented by this change.
+
+This compilation applies to the library's built-in presets. An application's
+runtime JSON can still replace `controls`; it is not passed through the Python
+generator. If that customization changes the wire protocol, keep any explicit
+`ha` overrides consistent with it. HA-specific overrides remain available for
+external topics, custom templates or other integration-specific behavior. They
+are not required when using the standard presets.
+
 ## All 30 controls
 
 | Type | Optional classes | Without class |
@@ -131,7 +164,7 @@ All rows marked Yes above are supported numeric settings. Additional slider clas
 ## Protocol boundaries
 
 - **Shared model:** `ControlModel.h` owns presets, validation, persistence policy, actions and event vocabularies. `ControlClasses.h` exposes an allocation-free four-byte `Model` (type, class, capabilities). Values remain in the existing AppConfig state; adapters do not allocate parallel state trees. Custom control arrays replace preset capabilities.
-- **HA:** `HaEntities.h`, `HaClassData.h` and `HaEntityData.h` translate the model to Discovery. Protocol keys and topics are absent from shared presets. `ha` supplies explicit Discovery overrides. Units, `state_class` and `entity_category` remain separate; a measurement class cannot infer whether energy/volume values are totals or instantaneous readings.
+- **HA:** `control_protocols.py` compiles preset Discovery defaults; `HaEntities.h`, `HaClassData.h` and `HaEntityData.h` map classes and resolve runtime topics. Protocol keys and topics are absent from shared presets. `class` supplies default units and measurement metadata where applicable. `ha` supplies explicit Discovery overrides; a measurement class cannot infer whether energy/volume values are totals or instantaneous readings. Choose such statistical overrides deliberately; `entity_category` is independent of physical meaning.
 - **Zigbee:** `ZigbeeFields.h` owns native endpoint/cluster/wire conversion. `switch/outlet` uses the smart-plug endpoint identity; `switch/light` uses an On/Off light identity. Other scalar outputs remain On/Off. Cover classes select native awning/drapery/shutter/shade types where available; doors, gates, garage doors, dampers and windows use the general covering transport and are marked generic. Existing native measurements retain their canonical wire units. Additional numeric reading classes use generic Analog Input, settings use Analog Output, and binary classes use generic Binary Input.
 - **Gateway exports:** schema 2 metadata includes class, canonical unit and native/generic mapping. Z2M and ZHA classify generic readings/settings/binary sensors without claiming a native occupancy, contact or IAS cluster. Grouped children do not inherit the parent device class. Z2M forwards outlet and cover metadata; ZHA supports the class enums exposed by the pinned gateway API. Unsupported gateway classes remain generic.
 - **Matter:** no adapter is implemented in this change. A recognized class does not promise a Matter device type, native cluster, or certification.
@@ -152,6 +185,6 @@ IR `receiver` is read-only, has no send controls and accepts bounded signal obje
 
 ## Maintenance and validation
 
-`src/tools/control_models.json` is the source for separate shared presets and HA Discovery defaults; `src/tools/control_classes.json` defines semantic names, units and adapter mappings. Run `python3 src/tools/generate_state_schemas.py`, then the portal/language/gateway generators as applicable. `--check` verifies generated files without rewriting them.
+`src/tools/control_models.json` is the protocol-independent preset source; `src/tools/control_protocols.py` derives HA defaults from it. `src/tools/control_classes.json` defines semantic names, units and class mappings. Run `python3 src/tools/generate_state_schemas.py`, then the portal/language/gateway generators as applicable. `--check` verifies generated files without rewriting them.
 
 Run `bash tests/run-host.sh`. The model suite covers all 30 controls and every allowed/disallowed class pair, optional classes, calendar/IR/event values, capabilities, HA-independent defaults and absence of disabled class names from compiled profiles. Arduino builds and the external ZHA/Z2M tests are described in [test instructions](../../tests/README.md).

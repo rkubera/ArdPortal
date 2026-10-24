@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Reduce temporary JSON allocations during HA Discovery by visiting members directly and borrowing string values. Reuse the state-topic key, component mapping and normalized control type instead of rebuilding temporary strings and metadata.
+
+- Derive fan power/oscillation and humidifier power payloads from shared On/Off values. Keep device-tracker presence vocabulary independent of its initial state, without adding runtime metadata.
+
+- Compile HA Discovery presets from the shared, protocol-independent control catalogue: derive action payloads, command routes, property templates, options, ranges and capabilities before compilation. Keep the existing firmware resources and feature guards; remove repeated HA defaults from full control examples and use the shared model in the screenshot preview.
+- Fix DHT readings to use numeric Celsius/percent values and `null` for unavailable samples, matching their classes. Remove the C/F portal setting and HA text-conversion override; HA controls display unit conversion.
+- Derive lawn-mower HA command templates from the shared action payloads, so HA sends the accepted `START`/`PAUSE`/`DOCK` values instead of its default action names.
+
 - Generate one-character CSS classes and DOM IDs consistently across HTML, CSS, JavaScript, ARIA references and dynamic pages. Preserve semantic page IDs, form names and API operations; keep readable identifiers in the source.
 - Reduce portal HTML by translating text-only containers directly and omitting optional attribute quotes during generation. Exclude Console CSS when Console is disabled; apply asset optimizations independently of the selected control set.
 - Store control and HA preset identities as enum IDs in compact parallel tables, reusing the common type lookup and omitting duplicate type-name strings with per-control compile guards.

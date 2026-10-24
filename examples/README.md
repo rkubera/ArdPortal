@@ -5,7 +5,7 @@
 | Sketch | What it demonstrates |
 | --- | --- |
 | `ESP01-1MB/ESP01-1MB.ino` | ESP-01 with MQTT, OTA and HA enabled; TLS and Console disabled in the sketch. Use Generic ESP8266 Module with the actual flash size and an ArdFS area. |
-| `DHT/DHT.ino` | Configurable GPIO and DHT11/12/21/22 type (default GPIO2 / DHT22), temperature/humidity, C/F, calibration, MQTT/HA, Console and OTA; no TLS. |
+| `DHT/DHT.ino` | Configurable GPIO and DHT11/12/21/22 type (default GPIO2 / DHT22), numeric °C/% readings, calibration, MQTT/HA, Console and OTA; no TLS. |
 | `MinimalPortal/MinimalPortal.ino` | Portal with OTA enabled and MQTT disabled; HA and Console are disabled automatically. |
 | `BasicPortal/BasicPortal.ino` | Minimal portal; configuration, JSON and ArdFS journal are managed by the library. The loop only calls `portal.loop()`. |
 | `PowerManagement/PowerManagement.ino` | Independent power policy/sleep type, GPIO/ISR events and software timers. |
@@ -167,21 +167,22 @@ Install Adafruit's **DHT sensor library** (the Library Manager also installs
 ESP8266 this is GPIO2, not the NodeMCU D2 label (GPIO4); GPIO2 must be high
 during boot. Use a board/flash layout with space for ArdFS and OTA.
 
-The Home card on Start has two read-only measurements: temperature and humidity.
-Info appears below it in a separate card. The Settings page has a Celsius/
-Fahrenheit selector, a temperature offset (-10…10 °C, step 0.1), and a humidity
-offset (-20…20 percentage points, step 1), and MQTT update rate. Temperature correction is applied
-in Celsius before display conversion. Corrected humidity is clamped to 0…100%.
-Offsets, units and MQTT rate survive restart; measurements stay in RAM without flash writes.
-Changing units/calibration immediately updates the cached readings. Failed reads
-show Unavailable. Readings are sampled every two seconds and skipped during OTA.
+The Home card on Start has two read-only numeric measurements: temperature in
+Celsius and humidity in percent. Info appears below it in a separate card.
+Settings select the GPIO and DHT sensor type, temperature offset (-10…10 °C,
+step 0.1), humidity offset (-20…20 percentage points, step 1), and MQTT update
+rate. Corrected humidity is clamped to 0…100%. Settings survive restart;
+measurements stay in RAM without flash writes. Changing calibration immediately
+updates the cached readings. Failed reads publish `null` (unknown). Readings are
+sampled every two seconds and skipped during OTA.
 
-MQTT and HA discovery include all six fields. The portal/MQTT temperature
-contains the chosen unit; the HA template converts it to a numeric Celsius
-sensor, which Home Assistant can display in its own chosen unit. No extra unit
-or status field is needed. The three enabled control types are slider, text
-and select; MQTT TLS, dependencies and other types are excluded; Console is enabled.
-No special asset compression profile is added for this example.
+MQTT and HA discovery include the measurements and settings. Temperature and
+humidity use `class: "temperature"` and `class: "humidity"`; their unit and HA
+measurement metadata are inferred. No `ha` block or text-conversion template is
+needed. HA can display Celsius readings in the user's chosen unit. The three
+enabled control types are slider, text and select; MQTT TLS, dependencies and
+other types are excluded; Console is enabled. No special asset compression
+profile is added for this example.
 
 The sketch does not wait between samples. The DHT22 transaction itself is
 synchronous; sampling, MQTT publication and storage are scheduled through loop.
@@ -196,12 +197,12 @@ latest readings even if unchanged. Portal readings still update every two second
 settings acknowledge immediately in MQTT. Connecting/reconnecting and explicit
 `get` requests also return the current state. HA discovery is independent.
 
-DHT22 temperature and humidity are rounded to one decimal place after calibration
-and unit conversion, before portal updates and MQTT publishing.
+DHT temperature and humidity are rounded to one decimal place after calibration,
+before portal updates and MQTT publishing.
 
 The DHT example displays temperature and humidity in a separate Home card above
-Info. Its Settings page contains the four settings. Both measurements use fixed
-one-decimal MQTT text payloads; HA interprets humidity as a numeric sensor.
+Info. Both measurements use numeric values, rounded to one decimal place;
+HA receives numeric measurements or an unknown reading.
 
 The DHT example currently selects DHT22 on GPIO2. It waits two seconds after
 configuration readiness before sampling, and reinitializes the sensor after

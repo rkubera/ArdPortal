@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # Author: Radoslaw Kubera (rkubera on GitHub).
 # SPDX-License-Identifier: MIT
-"""Generate independent control models, class catalogue and HA discovery defaults."""
+"""Compile shared control presets, class catalogue and derived HA defaults."""
 import argparse
 import json
 from pathlib import Path
 from cpp_format import format_cpp
+from control_protocols import runtime_model, ha_defaults
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / 'tools'
 
@@ -32,8 +33,9 @@ def generate():
                  '#ifdef ARDPORTAL_DEFINE_CONTROL_DATA']
         if part == 'ha': lines += ['#if ARDPORTAL_ENABLE_HA']
         for name, spec in models.items():
+            data = runtime_model(spec) if part == 'model' else ha_defaults(name, spec)
             lines += ['#if ' + guard([name]),
-                      f'static const char ARD_{namespace}_SPEC_{name}[] PROGMEM = R"SPEC({json.dumps(spec[part], separators=(",", ":"), ensure_ascii=False)})SPEC";', '#endif']
+                      f'static const char ARD_{namespace}_SPEC_{name}[] PROGMEM = R"SPEC({json.dumps(data, separators=(",", ":"), ensure_ascii=False)})SPEC";', '#endif']
         # Parallel tables keep pointers naturally aligned without per-row padding.
         lines += [f'const char* const ARD_{namespace}_SPECS[ARD_{namespace}_SPEC_COUNT + 1] PROGMEM = {{']
         for name in models:

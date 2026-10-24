@@ -74,7 +74,7 @@ static const char ARD_HA_SPEC_siren[] PROGMEM = R"SPEC({"command_topic":"$comman
 static const char ARD_HA_SPEC_vacuum[] PROGMEM = R"SPEC({"command_topic":"$command","state_topic":"$state","supported_features":["start","stop","pause","return_home","status","locate","clean_spot","fan_speed","send_command"],"set_fan_speed_topic":"$command:fan","fan_speed_list":["quiet","normal","turbo"],"send_command_topic":"$command:custom"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_LAWN_MOWER
-static const char ARD_HA_SPEC_lawn_mower[] PROGMEM = R"SPEC({"activity_state_topic":"$state","start_mowing_command_topic":"$command:start","pause_command_topic":"$command:pause","dock_command_topic":"$command:dock"})SPEC";
+static const char ARD_HA_SPEC_lawn_mower[] PROGMEM = R"SPEC({"activity_state_topic":"$state","start_mowing_command_topic":"$command:start","start_mowing_command_template":"START","pause_command_topic":"$command:pause","pause_command_template":"PAUSE","dock_command_topic":"$command:dock","dock_command_template":"DOCK"})SPEC";
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_WATER_HEATER
 static const char ARD_HA_SPEC_water_heater[] PROGMEM = R"SPEC({"temperature_command_topic":"$command:temperature","temperature_state_topic":"$state","temperature_state_template":"{{ value_json.temperature }}","current_temperature_topic":"$state","current_temperature_template":"{{ value_json.current_temperature | default('', true) }}","mode_command_topic":"$command:mode","mode_state_topic":"$state","mode_state_template":"{{ value_json.mode }}","modes":["off","eco","electric","performance","heat_pump","high_demand"],"min_temp":30,"max_temp":80,"temperature_unit":"C"})SPEC";

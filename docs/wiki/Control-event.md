@@ -28,8 +28,11 @@
   },
   "readonly": true,
   "controls": [],
-  "event_types": ["press", "double_press", "long_press"],
-  "ha": {"state_topic": "$state"}
+  "event_types": [
+    "press",
+    "double_press",
+    "long_press"
+  ]
 }
 ```
 
@@ -43,7 +46,6 @@
 | `default` | **Optional** | Omit to use the built-in initial value. |
 | `readonly` | **Optional** | Omit to use the preset editability policy. |
 | `controls` | **Optional** | Omit to use the preset controls; supplying an array replaces them. |
-| `ha` | **Optional** | Omit to use automatic HA discovery; supplied properties override defaults. |
 
 ¹ `name` can be replaced by `names`. Other shared optional properties are listed [in the catalogue](https://github.com/rkubera/ArdPortal/wiki/Controls#required-and-optional-properties).
 

@@ -54,7 +54,7 @@ Examples are in `examples`:
 | Example | Purpose |
 | --- | --- |
 | `ESP01-1MB` | ESP-01 portal with MQTT, OTA and HA; without TLS or Console |
-| `DHT` | GPIO2 DHT22, C/F selection, calibration, MQTT/HA and OTA; requires Adafruit DHT sensor library |
+| `DHT` | Configurable GPIO and DHT type, numeric °C/% readings, calibration, MQTT/HA and OTA; requires Adafruit DHT sensor library |
 | `MinimalPortal` | Basic portal with OTA enabled; MQTT and dynamic forms disabled by sketch defines |
 | `DynamicPagesWithDependencies` | Dynamic fields with visibility dependencies |
 | `BasicPortal` | Minimal `begin()` / `loop()` portal with integrated storage |
@@ -82,17 +82,19 @@ with a DHT22 on GPIO2, OTA, MQTT, HA and Console enabled. TLS, dependencies and
 unused controls are excluded; slider, text and select are enabled. Use a pull-up
 from DATA to 3.3 V and ensure GPIO2 is high during ESP8266 boot.
 
-Home shows temperature and humidity; Settings contains C/F units, two calibration
-offsets and a persisted MQTT rate selector: on displayed-reading change, every
-10 seconds, minute, 10 minutes or hour. Corrected values use one decimal place.
-Changing calibration or C/F units immediately recalculates the last sensor sample
-and queues updated temperature/humidity for MQTT, bypassing the normal publishing
-interval. It does not trigger an extra DHT transaction.
-Temperature calibration is applied in Celsius before display conversion;
-humidity is clamped to 0–100%. HA's temperature template converts the selected
-unit back to Celsius. Live readings use RAM-only setters and their own MQTT
-schedule; settings use ArdFS. Reconnect/get snapshots and HA discovery remain
-independent of that schedule.
+Home shows numeric temperature in Celsius and humidity in percent. Settings
+select the GPIO, DHT sensor type, two calibration offsets and a persisted MQTT
+rate: on reading change, every 10 seconds, minute, 10 minutes or hour. Corrected
+values are rounded to one decimal place; humidity is clamped to 0–100%.
+Changing calibration immediately recalculates the last sensor sample and queues
+updated measurements for MQTT, bypassing the normal publishing interval without
+an extra DHT transaction.
+
+`class: "temperature"` and `class: "humidity"` provide units and HA measurement
+metadata. Readings are numbers or `null` when unknown; no HA text-conversion
+template is needed. HA handles display unit conversion. Live readings use
+RAM-only setters and their own MQTT schedule; settings use ArdFS. Reconnect/get
+snapshots and HA discovery remain independent of that schedule.
 
 Samples are scheduled every two seconds, starting two seconds after configuration
 readiness, and skipped during OTA. The DHT transaction itself is synchronous.
