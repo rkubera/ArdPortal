@@ -6,11 +6,21 @@ from enum import IntEnum
 import math
 from zhaquirks.builder import (
     QuirkBuilder, EntityPlatform, EntityType, ReportingConfig,
-    SensorDeviceClass, SensorStateClass,
+    SensorDeviceClass, SensorStateClass, BinarySensorDeviceClass, NumberDeviceClass,
 )
 from zhaquirks.clusters import CustomCluster
 from zigpy.zcl.clusters.hvac import Thermostat
 
+
+
+def _class(field, enum):
+    """Translate ArdPortal semantics without changing the native Zigbee mapping."""
+    name = field.get("class")
+    name = {"flow": "volume_flow_rate", "wind_speed": "speed", "battery_low": "battery"}.get(name, name)
+    try:
+        return enum(name) if name else None
+    except ValueError:
+        return None
 
 def _choices(field):
     """Return a one-based enum with unique display names for the field's options."""
@@ -89,7 +99,8 @@ for field in FIELDS:
         )
     if kind == "slider":
         builder.number("present_value", 0x000D, min_value=field["min"],
-                       max_value=field["max"], step=field["step"],
+                       max_value=field["max"], step=field["step"], unit=field.get("unit"),
+                       device_class=_class(field, NumberDeviceClass),
                        reporting_config=reporting, **common)
     elif kind in ("select", "state"):
         builder.enum("present_value", _choices(field),
@@ -97,14 +108,17 @@ for field in FIELDS:
                      entity_platform=EntityPlatform.SELECT if kind == "select" else EntityPlatform.SENSOR,
                      reporting_config=reporting, **common)
     elif kind == "binary":
-        builder.binary_sensor("present_value", 0x000F, reporting_config=reporting, **common)
+        builder.binary_sensor("present_value", 0x000F, device_class=_class(field, BinarySensorDeviceClass), reporting_config=reporting, **common)
     elif kind == "action":
         builder.command_button("on", 0x0006, **common)
     elif kind in measurements:
         cluster, attribute, unit, device_class = measurements[kind]
+        if kind == "number":
+            unit = field.get("unit")
+            device_class = _class(field, SensorDeviceClass)
         builder.sensor(attribute, cluster, unit=unit,
                        device_class=SensorDeviceClass(device_class) if device_class else None,
-                       state_class=SensorStateClass.MEASUREMENT,
+                       state_class=SensorStateClass.MEASUREMENT if field.get("measurement", True) else None,
                        attribute_converter=lambda value, kind=kind: _measurement(value, kind),
                        reporting_config=reporting, **common)
     else:

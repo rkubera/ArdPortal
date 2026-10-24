@@ -3,29 +3,46 @@
 #pragma once
 #include "DeviceNameCharacters.h"
 namespace ArdDeviceName {
-/**
- * @brief Read a packed Unicode range boundary from program memory.
- * @param index Zero-based element or field index.
- * @param edge Lower or upper packed Unicode range boundary.
- * @return A packed Unicode range boundary from program memory.
- */
-inline uint32_t characterBound(size_t index, size_t edge) {
-  const uint8_t* bytes = &Characters[index][edge * 3];
+/** @brief Read a block's first Unicode code point from flash. */
+inline uint32_t characterBlockStart(size_t index) {
+  const uint8_t* bytes = CharacterBlocks[index];
   return uint32_t(pgm_read_byte(bytes)) | (uint32_t(pgm_read_byte(bytes + 1)) << 8) | (uint32_t(pgm_read_byte(bytes + 2)) << 16);
 }
+/** @brief Decode one trusted, generated unsigned delta without allocating memory. */
+inline uint32_t characterDelta(size_t& cursor) {
+  uint32_t value = 0;
+  unsigned shift = 0;
+  uint8_t byte;
+  do {
+    byte = pgm_read_byte(Characters + cursor++);
+    value |= uint32_t(byte & 127) << shift;
+    shift += 7;
+  } while (byte & 128);
+  return value;
+}
 /**
- * @brief Check the Unicode letter and number ranges allowed in device names.
+ * @brief Check Unicode letter/number ranges using a block index and at most 16 ranges.
  * @param cp Unicode code point to validate.
- * @return True if the code point belongs to the allowed Unicode letter or number ranges.
+ * @return True for an allowed non-ASCII letter or number.
  */
 inline bool letterOrNumber(uint32_t cp) {
-  size_t lo = 0, hi = sizeof(Characters) / sizeof(Characters[0]);
+  size_t lo = 0, hi = sizeof(CharacterBlocks) / sizeof(CharacterBlocks[0]);
   while (lo < hi) {
     size_t mid = lo + (hi - lo) / 2;
-    uint32_t first = characterBound(mid, 0), last = characterBound(mid, 1);
-    if (cp < first) hi = mid;
-    else if (cp > last) lo = mid + 1;
-    else return true;
+    if (cp < characterBlockStart(mid)) hi = mid;
+    else lo = mid + 1;
+  }
+  if (!lo) return false;
+  const size_t block = lo - 1;
+  uint32_t first = characterBlockStart(block);
+  const uint8_t* offset = CharacterBlocks[block] + 3;
+  size_t cursor = size_t(pgm_read_byte(offset)) | (size_t(pgm_read_byte(offset + 1)) << 8);
+  for (size_t i = 0; i < CharacterBlockSize; ++i) {
+    uint32_t last = first + characterDelta(cursor);
+    if (cp <= last) return cp >= first;
+    if (i + 1 == CharacterBlockSize || cursor == sizeof(Characters)) break;
+    first = last + 1 + characterDelta(cursor);
+    if (cp < first) return false;
   }
   return false;
 }

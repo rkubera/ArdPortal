@@ -5,7 +5,7 @@
 #include "AppConfigFields.h"
 #include "AppConfigRegistrationError.h"
 #include "ArdJSON.h"
-#include "HaEntities.h"
+#include "ControlModel.h"
 #include "JsonCodec.h"
 #include "JsonFieldSlices.h"
 #include "DependencyConditions.h"
@@ -237,7 +237,37 @@ public:
       const Field& meta = entry.fields[f];
       String source = entry.flash ? ArdJsonFieldSlices(entry.flash, entry.sourceLength).slice(meta.offset, meta.length) : entry.source.substring(meta.offset, meta.offset + meta.length);
       if (source.length() != meta.length) return String();
-      return ArdTopicTemplates::fieldHttpJson(source, topicDevice, meta.extended, meta.persist);
+      String result = ArdTopicTemplates::fieldHttpJson(source, topicDevice, meta.extended, meta.persist);
+#if ARDPORTAL_ENABLE_CLASSES && (ARDPORTAL_ENABLE_CONTROL_TEXT || ARDPORTAL_ENABLE_CONTROL_SLIDER)
+      V typeValue, classValue;
+      bool explicitUnit = false;
+      ArdJsonFieldSlices slices(source);
+      if (!slices.members(0, source.length(), [&](const String& key, size_t start, size_t bytes) {
+            if (key == "type") {
+              typeValue = codec.parse(slices.slice(start, bytes));
+              return typeValue.isValid();
+            }
+            if (key == "class") {
+              classValue = codec.parse(slices.slice(start, bytes));
+              return classValue.isValid();
+            }
+            if (key == "unit_of_measurement") explicitUnit = true;
+            return true;
+          })) return String();
+      if (!classValue.isUndefined() && !explicitUnit && (typeValue.asString() == "text" || typeValue.asString() == "slider")) {
+        // Parse only the scalar class; do not build or retain a second field DOM.
+        const String* name = classValue.stringValue();
+        const auto info = name ? ArdControl::classInfo(*name) : ArdControl::classInfo(ArdControl::Class::None);
+        if (info.unit && strlen_P(info.unit)) {
+          String unit = codec.stringify(V(String(FPSTR(info.unit))));
+          if (!result.length() || !unit.length()) return String();
+          result.trim();
+          result.remove(result.length() - 1);
+          if (!result.concat(",\"unit_of_measurement\":", 23) || !result.concat(unit.c_str(), unit.length()) || !result.concat("}", 1)) return String();
+        }
+      }
+#endif
+      return result;
     }
     /** @brief Aggregate source/output buffers for definition streaming, without DOM nodes. */
     size_t fieldHttpWork(size_t index) const {
@@ -404,8 +434,8 @@ public:
     if (v.type() != T::Object || !v.length()) return false;
     V keys = v.keys();
     for (size_t i = 0; i < keys.length(); ++i) {
-      const V& label = v[keys[i].asString()];
-      if (label.type() != T::String || !label.asString().length() || label.asString().length() > 80) return false;
+      const String* label = v[keys[i].asString()].stringValue();
+      if (!label || !label->length() || label->length() > 80) return false;
     }
     return true;
   }
@@ -415,7 +445,10 @@ public:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   static bool title(const V& v) {
-    if (v.hasOwnProperty("name") && (v["name"].type() != T::String || !v["name"].asString().length() || v["name"].asString().length() > 80)) return false;
+    if (v.hasOwnProperty("name")) {
+      const String* name = v["name"].stringValue();
+      if (!name || !name->length() || name->length() > 80) return false;
+    }
     if (v.hasOwnProperty("names") && !names(v["names"])) return false;
     return v.hasOwnProperty("name") || v.hasOwnProperty("names");
   }
@@ -626,9 +659,9 @@ public:
    * @return Or read the initial field value.
    */
   static V initial(const V& f) {
-    if (ArdHa::extended(f)) {
+    if (ArdControl::extended(f)) {
       V resolved = f;
-      if (!ArdHa::normalize(resolved, true)) return V();
+      if (!ArdControl::normalize(resolved)) return V();
       return resolved["default"];
     }
     if (!f["default"].isUndefined()) return f["default"];
@@ -657,7 +690,7 @@ public:
     }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-    if (type == "text" && ArdText::pattern(f).type != ArdText::Type::Text) return V(nullptr);
+    if (type == "text" && ArdControl::classOf(f) != ArdControl::Class::None && ArdControl::classOf(f) != ArdControl::Class::Text) return V(nullptr);
 #endif
     return V("");
   }
@@ -669,9 +702,9 @@ public:
    */
   static bool validValue(const V& f, const V& v) {
     String type = f["type"].asString();
-    if (ArdHa::extended(f)) {
+    if (ArdControl::extended(f)) {
       V resolved = f;
-      return ArdHa::normalize(resolved, true) && ArdHa::validValue(resolved, v);
+      return ArdControl::normalize(resolved) && ArdControl::validValue(resolved, v);
     }
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
     if (type == "switch") return v.type() == T::Boolean;
@@ -717,10 +750,10 @@ public:
     }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
-    if (type == "text") return ArdText::validValue(f, v);
+    if (type == "text") return ArdControl::validReading(f, v);
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EDIT
-    if (type == "edit") return v.type() == T::String && v.asString().length() <= 128 && strlen(v.asString().c_str()) == v.asString().length();
+    if (type == "edit") return ArdControl::string(v, 128);
 #endif
     return false;
   }
@@ -740,12 +773,27 @@ public:
     if (indexOf(id) < count()) return fail("field", id, ARD_LANG_NATIVE_DUPLICATE_FIELD_ID);
     if (!title(f)) return fail("field", id, ARD_LANG_NATIVE_INVALID_NAME_NAMES_1_80_BYTES);
 
-    if (!ardPortalBasicControl(type) && (!ArdHa::extended(f) || ArdHa::descriptor(type, true).isUndefined())) return fail("field", id, ARD_LANG_NATIVE_UNSUPPORTED_OR_DISABLED_CONTROL_TYPE);
-#if ARDPORTAL_ENABLE_CONTROL_TEXT
-    if (type == "text" && ArdText::pattern(f).type == ArdText::Type::Invalid) return fail("field", id, ARD_LANG_NATIVE_UNSUPPORTED_TEXTTYPE);
+    if (!ardPortalBasicControl(type) && (!ArdControl::extended(f) || ArdControl::descriptor(type).isUndefined())) return fail("field", id, ARD_LANG_NATIVE_UNSUPPORTED_OR_DISABLED_CONTROL_TYPE);
+    if (!ArdControl::validClass(f)) return fail("field", id, F("invalid class for control type (use class, not textType/device_class)"));
+#if ARDPORTAL_ENABLE_CONTROL_TEXT && ARDPORTAL_ENABLE_CLASSES
+    if (type == "text" && ArdControl::classOf(f) == ArdControl::Class::Enum) {
+      const V& options = f["options"];
+      if (options.type() != T::Array || !options.length() || options.length() > 32) return fail("field", id, F("enum class requires 1-32 options"));
+      for (size_t i = 0; i < options.length(); ++i) {
+        const V& option = options[i].type() == T::String ? options[i] : options[i]["value"];
+        const String* optionText = option.stringValue();
+        if (!optionText || !optionText->length() || !ArdControl::string(option, 128)) return fail("field", id, F("invalid enum option"));
+        for (size_t j = 0; j < i; ++j) {
+          const V& previous = options[j].type() == T::String ? options[j] : options[j]["value"];
+          const String* previousText = previous.stringValue();
+          if (previousText && *previousText == *optionText) return fail("field", id, F("duplicate enum option"));
+        }
+      }
+    }
 #endif
     if (f.hasOwnProperty("mqtt") && f["mqtt"].type() != T::Object) return fail("field", id, ARD_LANG_NATIVE_MQTT_MUST_BE_AN_OBJECT);
     if (f["mqtt"].hasOwnProperty("state_topic") && f["mqtt"]["state_topic"].type() != T::String) return fail("field", id, ARD_LANG_NATIVE_MQTT_STATE_TOPIC_MUST_BE_A_STRING);
+    if (f["ha"].hasOwnProperty("event_types")) return fail("field", id, F("use top-level event_types"));
     if (f.hasOwnProperty("ha") && f["ha"].type() != T::Object) return fail("field", id, ARD_LANG_NATIVE_HA_MUST_BE_AN_OBJECT);
     if (f.hasOwnProperty("icon")) {
       String icon = f["icon"].asString();
@@ -763,7 +811,7 @@ public:
       const V& o = f["options"];
       if (o.type() != T::Array || !o.length() || o.length() > 16) return fail("field", id, ARD_LANG_NATIVE_OPTIONS_MUST_CONTAIN_1_16_ENTRIES);
       for (size_t j = 0; j < o.length(); ++j) {
-        if (o[j]["value"].type() != T::String || o[j]["value"].asString().length() > 128 || strlen(o[j]["value"].asString().c_str()) != o[j]["value"].asString().length() || !title(o[j])) return fail("field", id, ARD_LANG_NATIVE_INVALID_OPTION_VALUE_TITLE);
+        if (!ArdControl::string(o[j]["value"], 128) || !title(o[j])) return fail("field", id, ARD_LANG_NATIVE_INVALID_OPTION_VALUE_TITLE);
         for (size_t k = 0; k < j; ++k)
           if (o[j]["value"].asString() == o[k]["value"].asString()) return fail("field", id, ARD_LANG_NATIVE_DUPLICATE_OPTION_VALUE);
       }
@@ -843,7 +891,7 @@ public:
       entry->index = uint16_t(totalFields);
       entry->extended = fields[0]["extended"].asBool();
       entry->persist = fields[0]["persist"].asBool();
-      entry->transient = ArdHa::transient(fields[0]);
+      entry->transient = ArdControl::transient(fields[0]);
       entry->dependent = fields[0].hasOwnProperty("visibleWhen");
 #if ARDPORTAL_ENABLE_DEPENDENCIES
       auto resolve = [&](const String& id) {
@@ -882,9 +930,9 @@ public:
       if (f["type"].asString() == "climate")
         for (const char* suffix : { "temperature", "temperature_low", "temperature_high", "mode", "fan" }) suffixes.push(suffix);
 #endif
-      if (ArdHa::extended(f)) {
+      if (ArdControl::extended(f)) {
         V resolved = f;
-        if (!ArdHa::normalize(resolved, true)) return fail("commands", f["id"].asString(), ARD_LANG_NATIVE_DESCRIPTOR_NORMALIZATION_FAILED);
+        if (!ArdControl::normalize(resolved)) return fail("commands", f["id"].asString(), ARD_LANG_NATIVE_DESCRIPTOR_NORMALIZATION_FAILED);
         for (size_t c = 0; c < resolved["controls"].length(); ++c)
           if (resolved["controls"][c]["command"].asString().length()) suffixes.push(resolved["controls"][c]["command"]);
         suffixes.push("ack");

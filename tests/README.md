@@ -15,6 +15,8 @@ Install Python 3.12, Node.js 24, a C++17 compiler and `clang++`. Run:
 bash tests/run-host.sh
 ```
 
+The control model suite also checks all class/type combinations and verifies that disabled class names are absent from compiled profiles.
+
 This covers configuration persistence/recovery/retries, native Zigbee/OTA,
 MQTT/HA topics, networking, HTTP memory, runtime state, callbacks and frontend
 behavior. Native suites use AddressSanitizer and UndefinedBehaviorSanitizer;

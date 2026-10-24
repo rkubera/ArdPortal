@@ -308,9 +308,4 @@ support is available in End Device and Router roles.
 
 ## Typed text measurements
 
-`ARDPORTAL_ENABLE_TEXT_TYPES` defaults to `1`. Set it to `0` to omit numeric
-`textType` variants and their automatic HA sensor patterns while retaining plain
-`text` controls. Definitions with a numeric subtype are then rejected explicitly.
-This also removes native Zigbee measurement mappings provided by text subtypes;
-other controls are unaffected. Disabling `ARDPORTAL_ENABLE_CONTROL_TEXT` forces
-this option off.
+`ARDPORTAL_ENABLE_CLASSES` defaults to `1`. Set it to `0` to omit optional semantic class names, units and automatic classifications. All controls still work without `class`. Each catalogue entry also follows its applicable `ARDPORTAL_ENABLE_CONTROL_*` flags; slider classes remain available when text controls are disabled. See [Control classes](Control-Classes).

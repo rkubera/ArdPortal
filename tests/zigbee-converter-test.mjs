@@ -12,10 +12,10 @@ const modules=process.env.ZHC_NODE_MODULES;
 assert.ok(modules,'Set ZHC_NODE_MODULES to the test dependency directory');
 const destination=path.join(path.dirname(modules),'ardportal-generated-test.mjs');
 const fields=[
-  {kind:'switch',ep:2,endpoint:'relay_ep2',label:'Relay'},
+  {kind:'switch',ep:2,endpoint:'relay_ep2',label:'Relay',type:'switch',class:'outlet'},
   {kind:'select',ep:3,endpoint:'mode_ep3',label:'Mode',options:['off','eco','comfort']},
   {kind:'state',ep:4,endpoint:'state_ep4',label:'State',options:['not_home','home']},
-  {kind:'slider',ep:5,endpoint:'setpoint_ep5',label:'Setpoint',min:-10,max:80,step:0.25},
+  {kind:'slider',ep:5,endpoint:'setpoint_ep5',label:'Setpoint',min:-10,max:80,step:0.25,type:'slider',class:'temperature',unit:'°C'},
   {kind:'climate',ep:6,endpoint:'climate_ep6',label:'Climate',min:5,max:45,step:0.25,modes:['off','heat','cool','auto'],fanModes:['off','low','high','auto']},
   {kind:'cover',ep:7,endpoint:'blind_ep7',label:'Blind'},
   {kind:'light',ep:8,endpoint:'rgb_ep8',label:'RGB'},
@@ -23,7 +23,7 @@ const fields=[
   {kind:'lock',ep:10,endpoint:'lock_ep10',label:'Lock'},
   {kind:'siren',ep:11,endpoint:'siren_ep11',label:'Siren'},
   {kind:'update',ep:49,endpoint:'firmware_ep49',label:'Firmware'},
-  {kind:'switch',ep:50,endpoint:'relay_two_ep50',label:'Second relay'},
+  {kind:'switch',ep:50,endpoint:'relay_two_ep50',label:'Second relay',class:'light',type:'switch'},
   {kind:'slider',ep:51,endpoint:'target_two_ep51',label:'Second target',min:0,max:100,step:1},
   {kind:'temperature',ep:52,endpoint:'temperature_two_ep52',label:'Second temperature'},
   ...['number','temperature','humidity','pressure','illuminance','flow','carbon_dioxide','pm25','wind_speed','voltage','current','power','binary'].map((kind,index)=>({kind,ep:index+12,endpoint:kind+'_ep'+(index+12),label:kind})),
@@ -77,7 +77,11 @@ try{
   assert.ok(exposes.every(x=>typeof x.endpoint==='string'&&x.endpoint.length),exposes.filter(x=>!x.endpoint).map(x=>String(x)).join('\n'));
   assert.ok(exposes.every(x=>x.homeassistant?.name===x.label));
   assert.notEqual(relay.endpoint,exposes.find(x=>x.label==='Second relay').endpoint);
+  assert.equal(exposes.find(x=>x.label==='Second relay').type,'light');
   assert.equal(relay.homeassistant.name,'Relay');
+  assert.equal(relay.homeassistant.deviceClass,'outlet');
+  const numeric=exposes.find(x=>at(x,'setpoint_ep5'));
+  assert.equal(numeric.unit,'°C');assert.equal(numeric.homeassistant.deviceClass,'temperature');
   // A thermostat configReport rejection must not prevent later initial reads.
   const reads=[];
   const mockEndpoint={ID:6,inputClusters:[],supportsInputCluster:()=>true,

@@ -10,7 +10,7 @@ void* testAllocate(size_t bytes) noexcept {if(allocationBudget==0)return nullptr
 uint32_t fakeMillis=0;
 using V=ArdJSON::JSONVar;
 enum class ChangeSource{Application};
-namespace ArdHa{bool transient(const V& f){return f["transient"].asBool();}}
+namespace ArdControl{bool transient(const V& f){return f["transient"].asBool();}}
 struct ArdDynamicPages{static bool validValue(const V&,const V& v){return v.isValid();}};
 struct Dynamic{V f=V::object();bool missing=false;const V& field(const String&){static V empty;return missing?empty:f;}};
 struct Portal{

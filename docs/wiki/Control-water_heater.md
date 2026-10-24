@@ -4,6 +4,8 @@
 
 ![Portal water_heater control](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/control-water_heater.jpg)
 
+`class` is always optional. See [the shared class catalogue](Control-Classes) for valid values, defaults and protocol mapping limits.
+
 **Minimal field JSON:**
 
 ```json

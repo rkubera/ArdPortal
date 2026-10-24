@@ -12,6 +12,15 @@ void* testAllocate(size_t bytes) noexcept {
 uint32_t fakeMillis = 0;
 int main() {
   using namespace ArdJSON;
+  assert(JSON.parse("true").asBool());
+  assert(JSON.parse("false").type() == JSONVar::Type::Boolean && !JSON.parse("false").asBool());
+  assert(JSON.parse("null").isNull());
+  for (const char* literal : { "t", "tr", "tru", "f", "fa", "fal", "fals", "n", "nu", "nul", "trux", "truefalse", "false true" })
+    assert(JSON.parse(literal).isUndefined());
+  String embeddedLiteral = "tr";
+  embeddedLiteral += char(0);
+  embeddedLiteral += 'e';
+  assert(JSON.parse(embeddedLiteral).isUndefined());
   JSONVar base = JSONVar::object(), patch = JSONVar::object();
   for (int i = 0; i < 300; ++i) base[String("field") + String(i)] = i;
   patch["field3"] = 99;

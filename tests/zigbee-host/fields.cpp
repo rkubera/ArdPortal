@@ -1,5 +1,6 @@
 #include <cassert>
 #include "ZigbeeFields.h"
+#include "HaEntities.h"
 uint32_t fakeMillis = 0;
 using namespace ArdZigbeeFields;
 /** @brief Parse a small test definition. @param text JSON. @return Parsed object. */
@@ -44,13 +45,13 @@ int main() {
   assert(!decode(s, f, "b", c, next, action, property));
   c.value = 3;
   assert(!decode(s, f, "b", c, next, action, property));
-  f = json(R"({"type":"text","textType":"temperature","unit_of_measurement":"°C"})");
+  f = json(R"({"type":"text","class":"temperature","unit_of_measurement":"°C"})");
   s = describe(f, -12.34);
   out = encode(s, f, -12.34);
   assert(s.kind == Kind::Temperature && int16_t(out.attributes[0].data.u) == -1234);
   assert(describe(f, nullptr).kind == Kind::Temperature);
-  assert(!ArdText::validValue(f, "hello"));
-  f = json(R"({"type":"text","textType":"humidity"})");
+  assert(!ArdControl::validReading(f, "hello"));
+  f = json(R"({"type":"text","class":"humidity"})");
   s = describe(f, 50.5);
   out = encode(s, f, 50.5);
   assert(out.attributes[0].data.u == 5050);
@@ -58,56 +59,56 @@ int main() {
   assert(out.attributes[0].data.u == 65535);
   f = json(R"({"type":"text"})");
   assert(describe(f, 12).kind == Kind::None);
-  assert(ArdText::validValue(f, "Ready"));
-  f["textType"] = "text";
+  assert(ArdControl::validReading(f, "Ready"));
+  f["class"] = "text";
   assert(describe(f, 12).kind == Kind::None);
-  f["textType"] = "invalid";
-  assert(ArdText::pattern(f).type == ArdText::Type::Invalid);
-  f["textType"] = true;
-  assert(ArdText::pattern(f).type == ArdText::Type::Invalid);
+  f["class"] = "invalid";
+  assert(ArdControl::classOf(f) == ArdControl::Class::Invalid);
+  f["class"] = true;
+  assert(ArdControl::classOf(f) == ArdControl::Class::Invalid);
   for (auto type : { "number", "temperature", "humidity", "pressure", "illuminance", "flow", "wind_speed", "carbon_dioxide", "pm25", "voltage", "current", "power" }) {
     f = json(R"({"type":"text"})");
-    f["textType"] = type;
+    f["class"] = type;
     s = describe(f, nullptr);
     assert(s.kind != Kind::None);
-    assert(ArdText::validValue(f, nullptr) && ArdText::validValue(f, 12.5) && !ArdText::validValue(f, "12.5") && !ArdText::validValue(f, true));
+    assert(ArdControl::validReading(f, nullptr) && ArdControl::validReading(f, 12.5) && !ArdControl::validReading(f, "12.5") && !ArdControl::validReading(f, true));
     V ha = V::object();
-    ArdText::haPattern(f, ha);
+    ArdHa::classification(f, ha);
     assert(ha["state_class"].asString() == "measurement" && ha["value_template"].asString().length());
     out = encode(s, f, nullptr);
     assert(out.count);
   }
-  f["textType"] = "carbon_dioxide";
+  f["class"] = "carbon_dioxide";
   out = encode(describe(f, 0), f, 400);
   assert(out.attributes[0].cluster == 0x40d && fabs(out.attributes[0].data.f - 0.0004) < 1e-9);
   out = encode(describe(f, 0), f, nullptr);
   assert(std::isnan(out.attributes[0].data.f));
-  f["textType"] = "pm25";
+  f["class"] = "pm25";
   out = encode(describe(f, 0), f, 12.5);
   assert(out.attributes[0].cluster == 0x42a && out.attributes[0].data.f == 12.5);
-  f["textType"] = "illuminance";
+  f["class"] = "illuminance";
   out = encode(describe(f, 0), f, 100);
   assert(out.attributes[0].data.u == 20001);
   out = encode(describe(f, 0), f, 0);
   assert(out.attributes[0].data.u == 0);
   out = encode(describe(f, 0), f, -1);
   assert(out.attributes[0].data.u == 65535);
-  f["textType"] = "pressure";
+  f["class"] = "pressure";
   out = encode(describe(f, 0), f, 1013.25);
   assert(out.attributes[0].data.u == 1013);
-  f["textType"] = "flow";
+  f["class"] = "flow";
   out = encode(describe(f, 0), f, 12.3);
   assert(out.attributes[0].data.u == 123);
-  f["textType"] = "wind_speed";
+  f["class"] = "wind_speed";
   out = encode(describe(f, 0), f, 4.56);
   assert(out.attributes[0].data.u == 456);
-  f["textType"] = "voltage";
+  f["class"] = "voltage";
   out = encode(describe(f, 0), f, 230.1);
   assert(out.count == 4 && out.attributes[0].type == 0x1b && out.attributes[2].data.u == 10 && out.attributes[3].data.u == 2301);
-  f["textType"] = "current";
+  f["class"] = "current";
   out = encode(describe(f, 0), f, 1.234);
   assert(out.attributes[2].data.u == 1000 && out.attributes[3].data.u == 1234);
-  f["textType"] = "power";
+  f["class"] = "power";
   out = encode(describe(f, 0), f, -123);
   assert(int16_t(out.attributes[3].data.u) == -123);
   f = json(R"({"type":"binary_sensor"})");

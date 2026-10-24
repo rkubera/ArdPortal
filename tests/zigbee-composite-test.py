@@ -17,7 +17,7 @@ using V=ArdJSON::JSONVar;
 using namespace ArdZigbeeFields;
 enum class ChangeSource {Zigbee};
 namespace ArdHeap {bool allowed=true;bool permits(size_t,size_t){return allowed;}}
-namespace ArdHa {bool normalize(V& f,bool){if(f["type"].asString()=="fan"&&!f.hasOwnProperty("controls"))f["controls"]=ArdJSON::JSON.parse(R"([{"key":"state","type":"switch","on":"ON","off":"OFF"},{"key":"percentage","type":"slider","min":0,"max":100,"step":1},{"key":"oscillation","type":"switch","on":"oscillate_on","off":"oscillate_off"},{"key":"direction","type":"select","options":["forward","reverse"]}])");return true;}bool readonly(const V& f){return f["readonly"].asBool();}bool extended(const V&){return true;}bool validValue(const V&,const V&){return true;}}
+namespace ArdControl {bool normalize(V& f){if(f["type"].asString()=="fan"&&!f.hasOwnProperty("controls"))f["controls"]=ArdJSON::JSON.parse(R"([{"key":"state","type":"switch","on":"ON","off":"OFF"},{"key":"percentage","type":"slider","min":0,"max":100,"step":1},{"key":"oscillation","type":"switch","on":"oscillate_on","off":"oscillate_off"},{"key":"direction","type":"select","options":["forward","reverse"]}])");return true;}bool readonly(const V& f){return f["readonly"].asBool();}bool extended(const V&){return true;}bool validValue(const V&,const V&){return true;}}
 struct ArdDynamicPages {std::vector<V> fields;size_t count(){return fields.size();}size_t fieldWork(size_t){return 0;}size_t fieldBlock(size_t){return 0;}V at(size_t i){return fields[i];}size_t indexOf(const String& id){for(size_t i=0;i<fields.size();++i)if(fields[i]["id"].asString()==id)return i;return fields.size();}static bool validValue(const V&,const V&){return true;}};
 struct Native {
  enum class State {Connected};

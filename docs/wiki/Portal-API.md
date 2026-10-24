@@ -303,7 +303,7 @@ budgets cover both registries together. `ARDPORTAL_ENABLE_HA` and
 ```cpp
 const char TEMPERATURE_ENTITY[] PROGMEM = R"JSON({
   "id":"air_temperature", "name":"Air temperature", "type":"text",
-  "default":0, "unit_of_measurement":"°C", "device_class":"temperature",
+  "default":0, "class":"temperature",
   "state_class":"measurement"
 })JSON";
 

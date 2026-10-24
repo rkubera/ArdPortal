@@ -3,7 +3,6 @@
 #include "LanguageLiterals.h"
 #include "ArdPortalDeclarations.h"
 #include "Language.h"
-#include "PortalPage.h"
 #include "PortalAssets.h"
 #include "ConfigJson.h"
 #include "ConsoleTimestamp.h"
@@ -2334,10 +2333,10 @@ ArdJSON::JSONVar ArdPortal::getAppConfigValue(const char* key) const {
     if (_dynamic.pages.explicitInitial(key, initial)) return initial;
   }
   const auto& field = _dynamic.field(key);
-  if (ArdHa::extended(field)) {
+  if (ArdControl::extended(field)) {
     ArdJSON::JSONVar resolved = field;
-    if (!ArdHa::normalize(resolved, true)) return ArdJSON::JSONVar();
-    return ArdHa::validValue(resolved, value) ? value : resolved["default"];
+    if (!ArdControl::normalize(resolved)) return ArdJSON::JSONVar();
+    return ArdControl::validValue(resolved, value) ? value : resolved["default"];
   }
   return !field.isUndefined() && (value.isUndefined() || !ArdDynamicPages::validValue(field, value)) ? ArdDynamicPages::initial(field) : value;
 #else

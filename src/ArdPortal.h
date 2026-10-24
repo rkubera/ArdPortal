@@ -3,7 +3,10 @@
 #pragma once
 // Include this entry point once, in the main sketch. Feature defines placed
 // before this include configure both declarations and implementation.
-#define ARDPORTAL_DEFINE_HA_DATA
+#define ARDPORTAL_DEFINE_CONTROL_DATA
 #include "ArdPortalDeclarations.h"
-#undef ARDPORTAL_DEFINE_HA_DATA
+#if ARDPORTAL_ENABLE_HA
+#include "HaEntityData.h"
+#endif
+#undef ARDPORTAL_DEFINE_CONTROL_DATA
 #include "ArdPortalImplementation.h"

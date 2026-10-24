@@ -57,14 +57,16 @@ using Key = ArdUILanguageData::Key;
  * @return Localized text for the active language, or an empty string if the ID is absent.
  */
 template<size_t Size>
-inline const char* lookupFlash(uint16_t id, const ArdUILanguageData::Message (&messages)[Size]) {
+inline const char* lookupFlash(uint16_t id, const ArdUILanguageData::Message (&messages)[Size], const char* pool = reinterpret_cast<const char*>(&ArdUILanguageData::MessagesPool)) {
+  if (!id) return nullptr;
   for (size_t i = 0; i < Size; ++i) {
     uint16_t messageId;
     memcpy_P(&messageId, &messages[i].id, sizeof(messageId));
     if (id == messageId) {
-      const char* value;
+      uint16_t offset;
       const size_t index = active() < ArdUILanguageData::Count ? active() : 0;
-      memcpy_P(&value, &messages[i].values[index], sizeof(value));
+      memcpy_P(&offset, &messages[i].offsets[index], sizeof(offset));
+      const char* value = pool + offset;
       return value && pgm_read_byte(value) ? value : nullptr;
     }
   }
@@ -72,14 +74,14 @@ inline const char* lookupFlash(uint16_t id, const ArdUILanguageData::Message (&m
 }
 /** @brief Copy a selected flash message only when the caller needs owned text. */
 template<size_t Size>
-inline String lookup(uint16_t id, const ArdUILanguageData::Message (&messages)[Size]) {
-  const char* value = lookupFlash(id, messages);
+inline String lookup(uint16_t id, const ArdUILanguageData::Message (&messages)[Size], const char* pool = reinterpret_cast<const char*>(&ArdUILanguageData::MessagesPool)) {
+  const char* value = lookupFlash(id, messages, pool);
   return value ? String(FPSTR(value)) : String();
 }
 /** @brief Borrow a translated message in flash; nullptr requests the legacy key fallback. */
 inline const char* textFlash(Key key) {
   const char* value = lookupFlash(uint16_t(key), ArdUILanguageData::Messages);
-  return value ? value : lookupFlash(uint16_t(key), ArdUILanguageData::StorageMessages);
+  return value ? value : lookupFlash(uint16_t(key), ArdUILanguageData::StorageMessages, reinterpret_cast<const char*>(&ArdUILanguageData::StorageMessagesPool));
 }
 /**
  * @brief Decode a storage message key in the form s_<decimal ID>.
@@ -116,7 +118,7 @@ inline uint16_t messageId(const __FlashStringHelper* key) {
  * @return Localized storage message, or its s_<ID> key if no translation is present.
  */
 inline String storageText(Key key) {
-  String value = lookup(uint16_t(key), ArdUILanguageData::StorageMessages);
+  String value = lookup(uint16_t(key), ArdUILanguageData::StorageMessages, reinterpret_cast<const char*>(&ArdUILanguageData::StorageMessagesPool));
   return value.length() ? value : String(F("s_")) + String(uint16_t(key));
 }
 /**
@@ -134,7 +136,7 @@ inline String text(Key key) {
  * @return Localized storage message, or its s_<ID> key if no translation is present.
  */
 inline String storageText(const char* key) {
-  String value = lookup(messageId(key), ArdUILanguageData::StorageMessages);
+  String value = lookup(messageId(key), ArdUILanguageData::StorageMessages, reinterpret_cast<const char*>(&ArdUILanguageData::StorageMessagesPool));
   return value.length() ? value : String(key);
 }
 /**
@@ -145,7 +147,7 @@ inline String storageText(const char* key) {
 inline String text(const char* key) {
   uint16_t id = messageId(key);
   String value = lookup(id, ArdUILanguageData::Messages);
-  if (!value.length()) value = lookup(id, ArdUILanguageData::StorageMessages);
+  if (!value.length()) value = lookup(id, ArdUILanguageData::StorageMessages, reinterpret_cast<const char*>(&ArdUILanguageData::StorageMessagesPool));
   return value.length() ? value : String(key);
 }
 /**
@@ -154,7 +156,7 @@ inline String text(const char* key) {
  * @return Localized storage message, or its s_<ID> key if no translation is present.
  */
 inline String storageText(const __FlashStringHelper* key) {
-  const char* value = lookupFlash(messageId(key), ArdUILanguageData::StorageMessages);
+  const char* value = lookupFlash(messageId(key), ArdUILanguageData::StorageMessages, reinterpret_cast<const char*>(&ArdUILanguageData::StorageMessagesPool));
   return value ? String(FPSTR(value)) : String(key);
 }
 /**

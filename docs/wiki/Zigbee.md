@@ -249,9 +249,9 @@ needed. The implementation works with MQTT and HA disabled.
 | `switch` | On/Off | Read/write boolean state |
 | `slider` | Analog Output | Numeric setting, min/max/resolution |
 | `select` | Multistate Output | Write an option's one-based index; report selected index |
-| `text`, `textType: "number"` | Analog Input | Read-only numeric measurement |
-| `text`, `textType: "temperature"` | Temperature Measurement | Celsius in signed hundredths |
-| `text`, `textType: "humidity"` | Relative Humidity Measurement | Percent in hundredths |
+| `text`, `class: "number"` | Analog Input | Read-only numeric measurement |
+| `text`, `class: "temperature"` | Temperature Measurement | Celsius in signed hundredths |
+| `text`, `class: "humidity"` | Relative Humidity Measurement | Percent in hundredths |
 | Other measurement `text` subtypes | Standard measurement clusters | Pressure, illuminance, flow, CO₂, PM2.5, wind speed, AC voltage/current/power; see [text subtypes](https://github.com/rkubera/ArdPortal/wiki/Control-text#text-subtypes-and-automatic-patterns) |
 | `binary_sensor` | Binary Input | Read-only boolean measurement |
 | `light` | On/Off, Level Control, Color Control | Power, brightness and RGB via standard XY or hue/saturation |
@@ -261,7 +261,7 @@ needed. The implementation works with MQTT and HA disabled.
 | `siren` | IAS Warning Device | Start/stop warning, duration and four standard volume levels |
 | `update` | OTA Upgrade client | Receive and validate a matching Zigbee firmware image, then schedule portal restart |
 
-Plain `text` (omitted `textType` or `textType: "text"`) does not create a Zigbee
+Plain `text` (omitted `class` or `class: "text"`) does not create a Zigbee
 endpoint. Other supported text subtypes select a standard measurement explicitly,
 including when their initial reading is `null`. HA metadata does not select the
 Zigbee subtype. Other unsupported control types retain their portal/HA behavior.

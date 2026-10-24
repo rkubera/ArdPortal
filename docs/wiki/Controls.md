@@ -42,6 +42,8 @@ The [complete current Zigbee coverage table](https://github.com/rkubera/ArdPorta
 marks which fields are native, composite (several separate endpoints), generic
 single-endpoint controls, or unmapped. All 30 types remain documented individually.
 
+See [Control classes and shared model](Control-Classes) for the complete optional `class` catalogue and migration rules.
+
 ## Control catalogue
 
 Control types can be **enabled or disabled at compile time with defines**. `ARDPORTAL_ENABLE_CONTROLS` selects the default for optional types; an individual flag such as `ARDPORTAL_ENABLE_CONTROL_LIGHT` overrides that type. See [Defines → Optional field types](https://github.com/rkubera/ArdPortal/wiki/Defines#optional-field-types) for every flag and its default. Set the flags before `#include <ArdPortal.h>` in the main sketch, then rebuild/upload the firmware. Dynamic portal pages also require `ARDPORTAL_ENABLE_DYNAMIC_PAGES`.
@@ -89,8 +91,9 @@ Optional properties available across the catalogue:
 | `visibleWhen` | Optional | Visibility rule; without it, there is no field-specific condition. Page conditions still apply. See [Dependent fields](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields). |
 | `icon` | Optional | HA icon override. The preset/HA default is used when omitted. |
 | `mqtt` | Optional | `state_topic` selects the MQTT publication topic, also used by HA discovery. Works with HA disabled. |
+| `class` | Always optional | Protocol-independent meaning; compatible values depend on `type`. See [classes](Control-Classes). |
 | `ha` | Optional | Overrides only supplied discovery properties. Omission uses automatic HA configuration, including topics and templates. |
-| `unit_of_measurement`, `device_class`, `state_class`, `entity_category` | Optional, where supported by the HA component | Measurement/classification metadata. Choose values appropriate for that component. |
+| `unit_of_measurement`, `state_class`, `entity_category`, `ha.device_class` | Optional, where supported by the HA component | Measurement/classification metadata. Choose values appropriate for that component. |
 
 For fields with preset `controls`, the entire array is optional. If supplied, it **replaces** the preset array. Its entries must contain the properties required by their control type, such as a slider's range or an action's payload; see [Custom controls](#custom-controls). Optional `ha` overrides must remain consistent with those controls. For `select`, the `options` array is required, and each option requires `value` plus a title (`name` or `names`). For grouped scenes, `group` is optional; when supplied it needs `id` and a title. These are requirements inside an optional customization, not additional requirements for minimal field JSON.
 

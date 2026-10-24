@@ -12,8 +12,8 @@ bool permits(size_t, size_t) {
   return allowed;
 }
 }
-namespace ArdHa {
-bool normalize(V&, bool) {
+namespace ArdControl {
+bool normalize(V&) {
   return true;
 }
 }
@@ -47,8 +47,11 @@ struct ArdPortal {
   String zigbeeConverterControlJson(const ArdZigbee::Control&);
   bool prepareZigbeeConverterPart();
 };
+#undef ARDPORTAL_ZIGBEE_HTTP_EXPORT_SUPPORT
 #define ARDPORTAL_ZIGBEE_HTTP_EXPORT_SUPPORT 1
+#undef ARDPORTAL_ZIGBEE_CONVERTER_SUPPORT
 #define ARDPORTAL_ZIGBEE_CONVERTER_SUPPORT 1
+#undef ARDPORTAL_ZHA_QUIRK_SUPPORT
 #define ARDPORTAL_ZHA_QUIRK_SUPPORT 1
 #include "ZigbeeConverterImpl.h"
 /** @brief Verify generated metadata, deterministic layout identity and retry-safe output cursors. @return Zero on success. */

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Generate one-character CSS classes and DOM IDs consistently across HTML, CSS, JavaScript, ARIA references and dynamic pages. Preserve semantic page IDs, form names and API operations; keep readable identifiers in the source.
+- Reduce portal HTML by translating text-only containers directly and omitting optional attribute quotes during generation. Exclude Console CSS when Console is disabled; apply asset optimizations independently of the selected control set.
+- Store control and HA preset identities as enum IDs in compact parallel tables, reusing the common type lookup and omitting duplicate type-name strings with per-control compile guards.
+- Avoid temporary string copies when validating control values, titles and enum/select options; compare JSON literals directly against the input instead of allocating substrings.
+- Compress the Unicode device-name character table with indexed delta encoding, preserving the existing accepted characters and allocation-free validation. Make the character catalogue independent of the generator's Python Unicode version.
+- Reduce control metadata storage with shared unit strings and compact records; reuse common class names in HA and avoid computing unused control capabilities during Discovery.
+- Compact translated-message tables with 16-bit offsets and shared text pools; exclude unused diagnostics with their feature switches while preserving MQTT Serial diagnostics. Guard disabled control validation/capability branches and avoid computing unused capabilities in Zigbee mapping.
+- Breaking: replace `textType` and top-level `device_class` with optional, type-checked `class`; rename `ARDPORTAL_ENABLE_TEXT_TYPES` to `ARDPORTAL_ENABLE_CLASSES`. Move event vocabularies from `ha.event_types` to top-level `event_types`. No compatibility aliases are retained.
+- Separate protocol-independent control presets, value/command validation and compact capabilities from Home Assistant Discovery data. Add 119 classes across 12 control types: `text`, `slider`, `binary_sensor`, `switch`, `valve`, `cover`, `event`, `device_trigger`, `button`, `humidifier`, `update` and `infrared`. `class` is optional for every control; class names and metadata are included only when their control types are enabled at compile time.
+- Propagate classes and units through HA, portal and schema 2 Z2M/ZHA exports; distinguish native versus generic Zigbee mappings. Add outlet/On-Off light endpoint identities, receiver IR events and class-aware presets. Matter remains outside this change.
+
 ## 0.8.1 — 2026-10-22
 
 ### Added

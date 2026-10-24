@@ -128,10 +128,10 @@ void ArdAppControls::dynamicMqtt(const String& topic, const uint8_t* data, size_
     if (false) {
     }
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
-    else if (ArdHa::extended(f)) {
+    else if (ArdControl::extended(f)) {
       if (command != id && command.indexOf(id + "_") != 0) continue;
       V resolved = f;
-      if (!ArdHa::normalize(resolved)) return;
+      if (!ArdControl::normalize(resolved)) return;
       const V& entity = resolved;
       for (size_t c = 0; c < entity["controls"].length(); ++c) {
         const V& control = entity["controls"][c];
@@ -163,7 +163,7 @@ void ArdAppControls::dynamicMqtt(const String& topic, const uint8_t* data, size_
             const V& part = entity["controls"][j];
             String key = part["key"].asString();
             if (input.hasOwnProperty(key)) {
-              if (!ArdHa::validControl(part, input[key])) return;
+              if (!ArdControl::validControl(part, input[key])) return;
               next[key] = input[key];
               changed = true;
             }
@@ -287,7 +287,7 @@ bool ArdAppControls::queueAppEmission(const String& topic, const String& payload
  */
 bool ArdAppControls::applyAppState(const String& key, const V& value, ChangeSource source, bool publishMqtt) {
   const V& f = _portal._dynamic.field(key);
-  if (f.isUndefined() || ArdHa::transient(f) || !ArdDynamicPages::validValue(f, value)) return false;
+  if (f.isUndefined() || ArdControl::transient(f) || !ArdDynamicPages::validValue(f, value)) return false;
   V previous = _portal.getAppConfigValue(key.c_str());
   String before = ArdJSON::JSON.stringify(previous, false, nullptr, snapshotLimits());
   String after = ArdJSON::JSON.stringify(value, false, nullptr, snapshotLimits());
@@ -341,7 +341,12 @@ bool ArdAppControls::emitAppConfigEvent(const char* key, const V& value) {
 #if ARDPORTAL_CONTROL_SUPPORT_EVENTS
   if (!key) return false;
   const V& f = _portal._dynamic.field(key);
-  if ((f["type"].asString() != "event" && f["type"].asString() != "device_trigger" && f["type"].asString() != "tag") || !ArdDynamicPages::validValue(f, value)) return false;
+#if ARDPORTAL_ENABLE_CONTROL_INFRARED
+  const bool infraredInput = f["type"].asString() == "infrared" && (ArdControl::classOf(f) == ArdControl::Class::Receiver || ArdControl::classOf(f) == ArdControl::Class::Transceiver);
+#else
+  const bool infraredInput = false;
+#endif
+  if ((!infraredInput && f["type"].asString() != "event" && f["type"].asString() != "device_trigger" && f["type"].asString() != "tag") || !ArdDynamicPages::validValue(f, value)) return false;
 #if ARDPORTAL_ENABLE_MQTT
   String payload = value.type() == V::Type::String ? value.asString() : _portal._json.stringify(value, false, nullptr, snapshotLimits());
   if (!queueAppEmission(ArdMqttFieldTopics::stateTopic(f, _portal._mqttClient.mqttTopic("stat", key)), payload)) return false;
@@ -375,10 +380,10 @@ bool ArdAppControls::appControl(const V& definition, size_t index, const V& valu
     return false;
   }
   V resolved = definition;
-  if (!ArdHa::normalize(resolved, true)) return false;
+  if (!ArdControl::normalize(resolved)) return false;
   const V& f = resolved;
   _appControlStage = 2;
-  if (!ArdHa::extended(f) || index >= f["controls"].length()) return false;
+  if (!ArdControl::extended(f) || index >= f["controls"].length()) return false;
   const V& c = f["controls"][index];
   String kind = c["type"].asString(), key = f["id"].asString(), suffix = c["command"].asString();
 #if ARDPORTAL_CONTROL_SUPPORT_ACTIONS
@@ -391,7 +396,7 @@ bool ArdAppControls::appControl(const V& definition, size_t index, const V& valu
       return false;
     }
     if (kind == "action" && _portal._json.stringify(value, false, nullptr, snapshotLimits()) != _portal._json.stringify(c["payload"])) return false;
-    if (kind == "action_text" && !ArdHa::string(value)) return false;
+    if (kind == "action_text" && !ArdControl::string(value)) return false;
     if (kind == "action_json" && (!value.isValid() || value.isUndefined() || _portal._json.stringify(value, false, nullptr, []() {
                                                                                             ArdJSON::Limits limits;
                                                                                             limits.maxNodes = 512;
@@ -410,12 +415,12 @@ bool ArdAppControls::appControl(const V& definition, size_t index, const V& valu
       ack["value"] = value;
       ack["accepted"] = true;
       // The callback accepts an action; it must report actual hardware state separately.
-      if (!ArdHa::transient(f)) {
+      if (!ArdControl::transient(f)) {
         V state = _portal.getAppConfigValue(key.c_str());
         String payload = state.type() == V::Type::String ? state.asString() : _portal._json.stringify(state);
         queueAppEmission(ArdMqttFieldTopics::stateTopic(f, _portal._mqttClient.mqttTopic("stat", key.c_str())), payload);
       }
-      queueAppEmission(_portal._mqttClient.mqttTopic("stat", (key + (ArdHa::transient(f) ? String() : String(F("_ack")))).c_str()), _portal._json.stringify(ack));
+      queueAppEmission(_portal._mqttClient.mqttTopic("stat", (key + (ArdControl::transient(f) ? String() : String(F("_ack")))).c_str()), _portal._json.stringify(ack));
     }
 #endif
     // Acceptance depends on the local callback, even if MQTT delivery is unavailable.
@@ -423,17 +428,17 @@ bool ArdAppControls::appControl(const V& definition, size_t index, const V& valu
   }
 #endif
   _appControlStage = 3;
-  if (!ArdHa::validControl(c, value)) return false;
+  if (!ArdControl::validControl(c, value)) return false;
   // Reuse the resolved schema instead of normalizing it again in getAppConfigValue.
   const V& states = _appState;
   const V& saved = _portal._appConfig;
   V next = states.hasOwnProperty(key) ? states[key] : saved[key];
-  if (!ArdHa::validValue(f, next)) next = f["default"];
+  if (!ArdControl::validValue(f, next)) next = f["default"];
   String property = c["key"].asString();
   if (property.length()) next[property] = value;
   else next = value;
   _appControlStage = 4;
-  if (!ArdHa::validValue(f, next)) return false;
+  if (!ArdControl::validValue(f, next)) return false;
   if (!f["persist"].asBool()) {
     if (!applyAppState(key, next, source)) return false;
     markDirty(key);

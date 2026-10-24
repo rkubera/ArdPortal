@@ -5,6 +5,7 @@ s=(root/'src/DynamicPages.h').read_text();a=s.index('    bool explicitInitial(')
 fixture=r'''
 #include <cassert>
 #include "TopicTemplates.h"
+#include "ControlClasses.h"
 #include "JsonCodec.h"
 uint32_t fakeMillis=0;
 struct Pages {
@@ -30,6 +31,10 @@ int main(){
  p.entry.fields[0].extended=false;p.entry.source=R"({"id":"x","type":"text"})";p.entry.fields[0].length=p.entry.source.length();assert(!p.explicitInitial("x",initial));
  p.entry.source=R"({"default":true})";p.entry.fields[0].length=p.entry.source.length();assert(p.explicitInitial("x",initial)&&initial.asBool());
  p.entry.source=R"({"default":"Pump"})";p.entry.fields[0].length=p.entry.source.length();assert(p.explicitInitial("x",initial)&&initial.asString()=="Pump");
+ p.entry.fields[0].extended=false;p.entry.source=R"({"id":"x","type":"text","class":"temperature"})";p.entry.fields[0].length=p.entry.source.length();p.entry.sourceLength=p.entry.source.length();
+ auto projected=ArdJSON::JSON.parse(p.fieldHttpText(0,0));assert(projected["unit_of_measurement"].asString()=="°C");
+ p.entry.source=R"({"id":"x","type":"slider","class":"duration","unit_of_measurement":"ms"})";p.entry.fields[0].length=p.entry.source.length();p.entry.sourceLength=p.entry.source.length();
+ projected=ArdJSON::JSON.parse(p.fieldHttpText(0,0));assert(projected["unit_of_measurement"].asString()=="ms");
  p.entry.fields[0].length+=10;assert(!p.explicitInitial("x",initial)&&p.fieldConditions(0,0).isUndefined()&&!p.fieldHttpText(0,0).length());
  puts("PASS: actual page methods; RAM/flash definitions, native explicit defaults, selective visibility rules, topic equivalence, extended fallback and invalid slices.");
 }
