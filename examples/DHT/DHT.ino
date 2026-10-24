@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 /*
  * Configurable DHT (GPIO2 / DHT22 by default) with a small Wi-Fi portal, MQTT, Home Assistant, Console and OTA.
- * Home shows readings; Settings contains settings. Settings select GPIO, sensor type, C/F, two offsets and MQTT update rate.
+ * Home shows readings; Settings select GPIO, sensor type, two offsets and MQTT update rate.
  * Install Adafruit's DHT sensor library and its Unified Sensor dependency.
  * Connect VCC to 3.3 V, GND to GND and DATA to the selected GPIO with a 4.7-10 kOhm
  * pull-up to 3.3 V. GPIO2 must remain high during ESP8266 boot (not D2/GPIO4).
@@ -10,9 +10,9 @@
  * ESP8266 serial flashing also drives UART TX on GPIO2. If DHT stops responding
  * after flashing, power-cycle both devices; restarting ESP alone does not reset DHT.
  * MQTT TLS, dependent fields and unused controls are compiled out.
- * Readings update RAM only; sensor settings, units and calibration are saved by ArdFS.
+ * Readings update RAM only; sensor settings and calibration are saved by ArdFS.
  * DHT reads are synchronous (~25 ms normally), scheduled every two seconds.
- * HA temperature stays numeric in Celsius; its UI handles unit conversion.
+ * Readings are numbers in Celsius and percent, or null when unavailable. HA handles display unit conversion.
  */
 #define ARDPORTAL_ENABLE_OTA 1
 #define ARDPORTAL_ENABLE_MQTT 1
@@ -45,9 +45,8 @@ uint8_t failedReads = 0;
 
 static const char HOME_PAGE[] PROGMEM = R"JSON({
   "id":"home","name":"Home","order":0,"fields":[
-    {"id":"temperature","type":"text","class":"temperature","name":"Temperature","default":"Unavailable","persist":false,
-     "ha":{"value_template":"{% set n=value.split()[0]|float(none) %}{{ '' if n is none else ((n-32)*5/9)|round(1) if value.endswith('F') else n }}"}},
-    {"id":"humidity","type":"text","class":"humidity","name":"Humidity (%)","default":"Unavailable","persist":false}
+    {"id":"temperature","type":"text","class":"temperature","name":"Temperature","default":null,"persist":false},
+    {"id":"humidity","type":"text","class":"humidity","name":"Humidity","default":null,"persist":false}
   ]
 })JSON";
 
@@ -57,9 +56,7 @@ static const char SENSOR_PAGE[] PROGMEM = R"JSON({
     {"id":"dht_type","type":"select","name":"DHT sensor type","default":"22",
      "options":[{"value":"11","name":"DHT11"},{"value":"12","name":"DHT12"},
                 {"value":"21","name":"DHT21 / AM2301"},{"value":"22","name":"DHT22 / AM2302"}]},
-    {"id":"units","type":"select","name":"Temperature units","default":"C",
-     "options":[{"value":"C","name":"Celsius (°C)"},{"value":"F","name":"Fahrenheit (°F)"}]},
-    {"id":"temperature_offset","type":"slider","name":"Temperature offset (°)","min":-10,"max":10,"step":0.1,"default":0},
+    {"id":"temperature_offset","type":"slider","name":"Temperature offset (°C)","min":-10,"max":10,"step":0.1,"default":0},
     {"id":"humidity_offset","type":"slider","name":"Humidity offset (%)","min":-20,"max":20,"step":1,"default":0},
     {"id":"mqtt_update","type":"select","name":"MQTT updates","default":"0",
      "options":[{"value":"0","name":"On reading change"},{"value":"10","name":"Every 10 seconds"},
@@ -161,12 +158,21 @@ void serviceMqttUpdates(uint32_t now) {
 }
 
 /**
- * @brief Round a sensor value to one decimal place.
+ * @brief Round a bounded DHT reading to tenths.
+ * @param number Sensor reading to round.
+ * @return Signed count of tenths.
+ */
+int roundedTenths(float number) {
+  return int(number * 10 + (number < 0 ? -0.5f : 0.5f));
+}
+
+/**
+ * @brief Format a reading for diagnostics without the general float-to-string formatter.
  * @param number Sensor reading to round.
  * @return The reading rounded to one decimal place.
  */
 String oneDecimal(float number) {
-  int tenths = int(number * 10 + (number < 0 ? -0.5f : 0.5f));
+  int tenths = roundedTenths(number);
   String value;
   if (tenths < 0) {
     value += '-';
@@ -185,20 +191,15 @@ String oneDecimal(float number) {
 void updateReadings() {
   if (!portal.portalAndAppConfigReady()) return;
   if (isnan(rawTemperature) || isnan(rawHumidity)) {
-    updateMeasurement("temperature", "Unavailable");
-    updateMeasurement("humidity", "Unavailable");
+    updateMeasurement("temperature", nullptr);
+    updateMeasurement("humidity", nullptr);
     return;
   }
   float temperature = rawTemperature + portal.getAppConfigValue("temperature_offset").asDouble();
   float humidity = rawHumidity + portal.getAppConfigValue("humidity_offset").asDouble();
   humidity = constrain(humidity, 0.0f, 100.0f);
-  bool fahrenheit = portal.getAppConfigValue("units").asString() == "F";
-  if (fahrenheit) temperature = temperature * 1.8f + 32.0f;
-  // One fixed decimal avoids linking the general float-to-string formatter.
-  String value = oneDecimal(temperature);
-  value += fahrenheit ? F(" °F") : F(" °C");
-  updateMeasurement("temperature", value);
-  updateMeasurement("humidity", oneDecimal(humidity));
+  updateMeasurement("temperature", roundedTenths(temperature) / 10.0);
+  updateMeasurement("humidity", roundedTenths(humidity) / 10.0);
 }
 
 unsigned registeredPages = 0;
@@ -225,7 +226,7 @@ void setup() {
                                     ArdPortal::ChangeSource) {
     if (key == "dht_pin" || key == "dht_type") sensorSettingsChanged = true;
     if (key == "mqtt_update") loadMqttInterval();
-    if (key == "units" || key == "temperature_offset" || key == "humidity_offset") {
+    if (key == "temperature_offset" || key == "humidity_offset") {
       updateReadings();                   // Reuse the latest sample without another DHT transaction.
       measurementSettingsChanged = true;  // Publish even when a long MQTT interval is selected.
     }

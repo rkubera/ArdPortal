@@ -25,12 +25,7 @@
   "name": "Device tracker",
   "default": "not_home",
   "readonly": true,
-  "controls": [],
-  "ha": {
-    "state_topic": "$state",
-    "payload_home": "home",
-    "payload_not_home": "not_home"
-  }
+  "controls": []
 }
 ```
 
@@ -44,7 +39,6 @@
 | `default` | **Optional** | Omit to use the built-in initial value. |
 | `readonly` | **Optional** | Omit to use the preset editability policy. |
 | `controls` | **Optional** | Omit to use the preset controls; supplying an array replaces them. |
-| `ha` | **Optional** | Omit to use automatic HA discovery; supplied properties override defaults. |
 
 ¹ `name` can be replaced by `names`. Other shared optional properties are listed [in the catalogue](https://github.com/rkubera/ArdPortal/wiki/Controls#required-and-optional-properties).
 

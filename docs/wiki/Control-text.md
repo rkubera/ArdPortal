@@ -40,9 +40,6 @@
 | `class` | **Optional** | Semantic subtype; defaults to `"text"`. See the table below. |
 | `default` | **Optional** | Plain text starts as `""`; numeric subtypes start as `null` (unknown). |
 | `persist` | **Optional** | Defaults to false for this read-only control. |
-| `unit_of_measurement` | **Optional** | Optional unit for the measurement. |
-| `ha.device_class` | **Optional** | Optional HA measurement classification. |
-| `state_class` | **Optional** | Optional HA statistical classification. |
 
 ¹ `name` can be replaced by `names`. Other shared optional properties are listed [in the catalogue](https://github.com/rkubera/ArdPortal/wiki/Controls#required-and-optional-properties).
 

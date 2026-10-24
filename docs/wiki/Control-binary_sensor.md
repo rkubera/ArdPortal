@@ -25,12 +25,7 @@
   "name": "Binary sensor",
   "default": false,
   "readonly": true,
-  "controls": [],
-  "ha": {
-    "state_topic": "$state",
-    "payload_on": "ON",
-    "payload_off": "OFF"
-  }
+  "controls": []
 }
 ```
 
@@ -44,7 +39,6 @@
 | `default` | **Optional** | Omit to use the built-in initial value. |
 | `readonly` | **Optional** | Omit to use the preset editability policy. |
 | `controls` | **Optional** | Omit to use the preset controls; supplying an array replaces them. |
-| `ha` | **Optional** | Omit to use automatic HA discovery; supplied properties override defaults. |
 
 ¹ `name` can be replaced by `names`. Other shared optional properties are listed [in the catalogue](https://github.com/rkubera/ArdPortal/wiki/Controls#required-and-optional-properties).
 
@@ -57,7 +51,7 @@ Boolean measurement shown as a graphical status badge. Code must use a boolean, 
 
 **MQTT component:** `binary_sensor`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
 
-**Supported by ArdPortal:** Read-only boolean state published as `ON`/`OFF`. An explicit `ha.device_class` (or top-level `device_class`) can assign the HA meaning, such as a door or occupancy sensor.
+**Supported by ArdPortal:** Read-only boolean state published as `ON`/`OFF`. Optional `class`, such as `door` or `occupancy`, selects the meaning shared by the adapters. A deliberate HA-only override may use `ha.device_class`.
 
 **Not provided by the built-in integration / limits:** No incoming setting command, hardware input driver, or automatic inference of sensor meaning from the ID/name. The default preset has no device class.
 

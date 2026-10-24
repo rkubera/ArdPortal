@@ -302,11 +302,10 @@ String ArdHomeAssistant::discoveryConfig(const V& definition, String* error) con
   ArdHa::classification(f, c);
   V extra = ArdHa::defaults(type);
   const V& overrides = f["ha"];
-  V overrideKeys = overrides.keys();
-  for (size_t i = 0; i < overrideKeys.length(); ++i) {
-    String key = overrideKeys[i].asString();
-    extra[key] = overrides[key];
-  }
+  overrides.forEachObjectMember([&](const String& key, const V& value) {
+    extra[key] = value;
+    return true;
+  });
 #if ARDPORTAL_ENABLE_CONTROL_EVENT
   if (type == "event") extra["event_types"] = f["event_types"];
 #endif
@@ -324,26 +323,22 @@ String ArdHomeAssistant::discoveryConfig(const V& definition, String* error) con
     extra["state_topic"] = "$state";
   }
 #endif
-  V keys = extra.keys();
-  for (size_t i = 0; i < keys.length(); ++i) {
-    String key = keys[i].asString();
-    if (key == "unique_id" || key == "device" || key == "name" || key == "availability_topic") continue;
-    V value = extra[key];
-    if (value.type() == V::Type::String) {
-      String token = value.asString();
-      if (token == "$state") value = state;
-      else if (token == "$command") value = command;
-      else if (token.indexOf("$command:") == 0) value = command + "_" + token.substring(9);
-    }
-    if (key == ArdMqttFieldTopics::discoveryStateKey(f)) value = state;
-    c[key] = value;
-  }
+  const char* stateKey = ArdMqttFieldTopics::discoveryStateKey(f);
+  extra.forEachObjectMember([&](const String& key, const V& value) {
+    if (key == "unique_id" || key == "device" || key == "name" || key == "availability_topic") return true;
+    const String* token = value.stringValue();
+    if (key == stateKey || (token && *token == "$state")) c[key] = state;
+    else if (token && *token == "$command") c[key] = command;
+    else if (token && token->indexOf("$command:") == 0) c[key] = command + "_" + token->substring(9);
+    else c[key] = value;
+    return true;
+  });
   String component = ArdHa::component(f);
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
   if (type == "switch") {
     // Keep HA mode defaults and explicit field options; choose a toggle icon.
     if (!c["state_topic"].asString().length()) c["state_topic"] = state;
-    if (ArdHa::component(f) == "light") {
+    if (component == "light") {
       c["payload_on"] = "ON";
       c["payload_off"] = "OFF";
     }

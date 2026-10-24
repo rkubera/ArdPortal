@@ -17,7 +17,7 @@ run_test bash tests/run-topic-templates.sh
 run_test bash tests/run-zigbee.sh
 
 for test_name in \
-  control-model device-name ap-band-start factory-reset-callback flash-text language-metadata http-memory mqtt-api mqtt-state-topic mqtt-packet mqtt-serial portal-assets portal-identifiers \
+  control-model control-protocols dht-readings device-name ap-band-start factory-reset-callback flash-text language-metadata http-memory mqtt-api mqtt-state-topic mqtt-packet mqtt-serial portal-assets portal-identifiers \
   network-api network-features power-policy power-periodic power-wake-cause power-integration power-platform power-events page-stream runtime-state \
   zigbee-power zigbee-composite zigbee-persistence; do
   run_test "${PYTHON:-python3}" "tests/${test_name}-test.py"

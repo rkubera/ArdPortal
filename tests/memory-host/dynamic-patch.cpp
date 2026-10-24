@@ -161,6 +161,19 @@ int main() {
   }
   {
     ArdPortal p;
+    auto field = ArdJSON::JSON.parse(R"({"id":"mower","name":"Mower","type":"lawn_mower"})");
+    assert(ArdControl::normalize(field));
+    auto config = ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(field));
+    const char* commands[] = { "start_mowing", "pause", "dock" };
+    for (size_t i = 0; i < 3; ++i) {
+      const auto& action = static_cast<const ArdJSON::JSONVar&>(field)["controls"][i];
+      String prefix = commands[i];
+      assert(config[prefix + "_command_template"].asString() == action["payload"].asString());
+      assert(config[prefix + "_command_topic"].asString() == p._mqttClient.mqttTopic("cmnd", "mower") + "_" + action["command"].asString());
+    }
+  }
+  {
+    ArdPortal p;
     auto plain = ArdJSON::JSON.parse(R"({"id":"reading","name":"Reading","type":"text"})");
     assert(ArdDynamicPages::initial(plain).asString() == "");
     auto config = ArdJSON::JSON.parse(p._homeAssistant.discoveryConfig(plain));

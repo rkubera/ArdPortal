@@ -76,6 +76,10 @@ invoke the change callback. Startup restoration uses
 
 Descriptor-based fields use built-in presets with optional `ha` and `controls`
 overrides. The complete reference below describes every supported type.
+Built-in action payloads, command routes, options and ranges are defined once in
+the shared control catalogue; the build-time HA adapter generates their Discovery
+defaults. Ordinary field JSON does not need an `ha` block. See
+[the preset compilation model](Control-Classes#presets-and-protocol-adapters).
 
 ### Home Assistant entities without panel pages
 
@@ -93,8 +97,7 @@ budgets cover both registries together. `ARDPORTAL_ENABLE_HA` and
 ```cpp
 const char TEMPERATURE_ENTITY[] PROGMEM = R"JSON({
   "id":"air_temperature", "name":"Air temperature", "type":"text",
-  "default":0, "class":"temperature",
-  "state_class":"measurement"
+  "default":0, "class":"temperature"
 })JSON";
 
 // During setup; check registration failures.

@@ -1,0 +1,192 @@
+{
+  "binary_sensor": {
+    "state_topic": "$state",
+    "payload_on": "ON",
+    "payload_off": "OFF"
+  },
+  "date": {
+    "state_topic": "$state",
+    "command_topic": "$command"
+  },
+  "time": {
+    "state_topic": "$state",
+    "command_topic": "$command"
+  },
+  "datetime": {
+    "state_topic": "$state",
+    "command_topic": "$command"
+  },
+  "button": {
+    "command_topic": "$command",
+    "payload_press": "PRESS"
+  },
+  "scene": {
+    "command_topic": "$command",
+    "payload_on": "ON"
+  },
+  "notify": {
+    "command_topic": "$command"
+  },
+  "infrared": {
+    "schema": "emitter",
+    "command_topic": "$command"
+  },
+  "event": {
+    "state_topic": "$state"
+  },
+  "device_trigger": {
+    "automation_type": "trigger",
+    "topic": "$state",
+    "type": "button_short_press",
+    "subtype": "button_1",
+    "payload": "PRESS"
+  },
+  "tag": {
+    "topic": "$state"
+  },
+  "device_tracker": {
+    "state_topic": "$state",
+    "payload_home": "home",
+    "payload_not_home": "not_home"
+  },
+  "light": {
+    "schema": "json",
+    "command_topic": "$command",
+    "state_topic": "$state",
+    "brightness": true,
+    "supported_color_modes": [
+      "rgb"
+    ]
+  },
+  "fan": {
+    "command_topic": "$command",
+    "state_topic": "$state",
+    "state_value_template": "{{ value_json.state }}",
+    "percentage_command_topic": "$command:percentage",
+    "percentage_state_topic": "$state",
+    "percentage_value_template": "{{ value_json.percentage }}",
+    "oscillation_command_topic": "$command:oscillation",
+    "oscillation_state_topic": "$state",
+    "oscillation_value_template": "{{ value_json.oscillation }}",
+    "direction_command_topic": "$command:direction",
+    "direction_state_topic": "$state",
+    "direction_value_template": "{{ value_json.direction }}"
+  },
+  "cover": {
+    "command_topic": "$command",
+    "state_topic": "$state",
+    "value_template": "{{ value_json.state }}",
+    "position_topic": "$state",
+    "position_template": "{{ value_json.position }}",
+    "set_position_topic": "$command:position",
+    "tilt_command_topic": "$command:tilt",
+    "tilt_status_topic": "$state",
+    "tilt_status_template": "{{ value_json.tilt }}"
+  },
+  "valve": {
+    "command_topic": "$command",
+    "state_topic": "$state",
+    "reports_position": true
+  },
+  "lock": {
+    "command_topic": "$command",
+    "state_topic": "$state",
+    "payload_lock": "LOCK",
+    "payload_unlock": "UNLOCK",
+    "payload_open": "OPEN"
+  },
+  "alarm_control_panel": {
+    "command_topic": "$command",
+    "state_topic": "$state",
+    "code_arm_required": false,
+    "code_disarm_required": false,
+    "code_trigger_required": false
+  },
+  "humidifier": {
+    "command_topic": "$command",
+    "state_topic": "$state",
+    "state_value_template": "{{ value_json.state }}",
+    "target_humidity_command_topic": "$command:humidity",
+    "target_humidity_state_topic": "$state",
+    "target_humidity_state_template": "{{ value_json.humidity }}",
+    "current_humidity_topic": "$state",
+    "current_humidity_template": "{{ value_json.current_humidity | default('', true) }}",
+    "mode_command_topic": "$command:mode",
+    "mode_state_topic": "$state",
+    "mode_state_template": "{{ value_json.mode }}",
+    "modes": [
+      "normal",
+      "eco"
+    ]
+  },
+  "siren": {
+    "command_topic": "$command",
+    "state_topic": "$state",
+    "available_tones": [
+      "alarm",
+      "bell"
+    ],
+    "support_duration": true,
+    "support_volume_set": true,
+    "support_turn_on": true,
+    "support_turn_off": true,
+    "support_tones": true
+  },
+  "vacuum": {
+    "command_topic": "$command",
+    "state_topic": "$state",
+    "supported_features": [
+      "start",
+      "stop",
+      "pause",
+      "return_home",
+      "status",
+      "locate",
+      "clean_spot",
+      "fan_speed",
+      "send_command"
+    ],
+    "set_fan_speed_topic": "$command:fan",
+    "fan_speed_list": [
+      "quiet",
+      "normal",
+      "turbo"
+    ],
+    "send_command_topic": "$command:custom"
+  },
+  "lawn_mower": {
+    "activity_state_topic": "$state",
+    "start_mowing_command_topic": "$command:start",
+    "start_mowing_command_template": "START",
+    "pause_command_topic": "$command:pause",
+    "pause_command_template": "PAUSE",
+    "dock_command_topic": "$command:dock",
+    "dock_command_template": "DOCK"
+  },
+  "water_heater": {
+    "temperature_command_topic": "$command:temperature",
+    "temperature_state_topic": "$state",
+    "temperature_state_template": "{{ value_json.temperature }}",
+    "current_temperature_topic": "$state",
+    "current_temperature_template": "{{ value_json.current_temperature | default('', true) }}",
+    "mode_command_topic": "$command:mode",
+    "mode_state_topic": "$state",
+    "mode_state_template": "{{ value_json.mode }}",
+    "modes": [
+      "off",
+      "eco",
+      "electric",
+      "performance",
+      "heat_pump",
+      "high_demand"
+    ],
+    "min_temp": 30,
+    "max_temp": 80,
+    "temperature_unit": "C"
+  },
+  "update": {
+    "state_topic": "$state",
+    "command_topic": "$command",
+    "payload_install": "INSTALL"
+  }
+}

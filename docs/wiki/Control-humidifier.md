@@ -57,24 +57,7 @@
         "eco"
       ]
     }
-  ],
-  "ha": {
-    "command_topic": "$command",
-    "state_topic": "$state",
-    "state_value_template": "{{ value_json.state }}",
-    "target_humidity_command_topic": "$command:humidity",
-    "target_humidity_state_topic": "$state",
-    "target_humidity_state_template": "{{ value_json.humidity }}",
-    "current_humidity_topic": "$state",
-    "current_humidity_template": "{{ value_json.current_humidity | default('', true) }}",
-    "mode_command_topic": "$command:mode",
-    "mode_state_topic": "$state",
-    "mode_state_template": "{{ value_json.mode }}",
-    "modes": [
-      "normal",
-      "eco"
-    ]
-  }
+  ]
 }
 ```
 
@@ -87,7 +70,6 @@
 | `name` | Required title¹ | Display title; may be replaced by a nonempty `names` object. |
 | `default` | **Optional** | Omit to use the built-in initial value. |
 | `controls` | **Optional** | Omit to use the preset controls; supplying an array replaces them. |
-| `ha` | **Optional** | Omit to use automatic HA discovery; supplied properties override defaults. |
 
 ¹ `name` can be replaced by `names`. Other shared optional properties are listed [in the catalogue](https://github.com/rkubera/ArdPortal/wiki/Controls#required-and-optional-properties).
 
