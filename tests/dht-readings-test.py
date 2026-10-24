@@ -19,8 +19,11 @@ def function(name):
 
 source = r'''
 #include <cassert>
+#include <cmath>
 #include "HaEntities.h"
 using V=ArdJSON::JSONVar;
+// Arduino exposes isnan globally; a standalone Linux <cmath> need not do so.
+using std::isnan;
 uint32_t fakeMillis=0;
 struct Portal {
   bool ready=true;
