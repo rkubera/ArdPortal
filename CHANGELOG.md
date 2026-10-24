@@ -1,25 +1,39 @@
 # Changelog
 
-## Unreleased
+## 0.8.2 — 2026-10-24
 
-- Reduce temporary JSON allocations during HA Discovery by visiting members directly and borrowing string values. Reuse the state-topic key, component mapping and normalized control type instead of rebuilding temporary strings and metadata.
+### Breaking changes
 
+- Replace `textType` and top-level `device_class` with optional, type-checked `class`; rename `ARDPORTAL_ENABLE_TEXT_TYPES` to `ARDPORTAL_ENABLE_CLASSES`. Move event vocabularies from `ha.event_types` to top-level `event_types`. No compatibility aliases are retained.
+- Regenerate layout-specific Zigbee2MQTT converters and ZHA quirks after upgrading: schema 2 adds class, canonical-unit and native/generic mapping metadata. Gateways may need a re-interview to refresh their cached layout.
+
+### Added
+
+- Add 119 semantic classes across 12 control types: `text`, `slider`, `binary_sensor`, `switch`, `valve`, `cover`, `event`, `device_trigger`, `button`, `humidifier`, `update` and `infrared`. `class` is always optional; class names and metadata are compiled only with their enabled controls.
+- Add outlet and On/Off-light endpoint identities, class-aware covering presets and infrared receiver events. Keep protocol-independent control capabilities and validation available to adapters; Matter is not implemented in this release.
+- Add enabled-by-default `ARDPORTAL_ENABLE_POWER_MANAGEMENT` to exclude the power-management subsystem when unused.
+- Expand the DHT example with configurable GPIO and DHT11/12/21/22 sensor type, remote Console diagnostics and sensor reinitialization after repeated read failures.
+
+### Changed
+
+- Define built-in control presets once in a protocol-independent catalogue. Generate HA Discovery action payloads, command routes, templates, options, ranges and capabilities before compilation; keep explicit HA overrides for integration-specific customizations.
+- Reduce firmware storage with compact class and preset tables, enum preset identities, shared unit/name strings, compressed Unicode device-name ranges and packed translated-message pools. Preserve accepted device-name characters and keep disabled controls and diagnostics behind their feature flags.
+- Reduce portal HTML/CSS/JavaScript assets with generated one-character CSS classes and DOM IDs, direct translation of text-only containers, optional HTML attribute-quote removal and Console CSS exclusion when disabled. Preserve semantic page IDs, form names, API operations, ARIA references and readable authoring sources across control profiles.
+- Reduce temporary strings and JSON allocations during control validation, normalization and HA Discovery. Visit Discovery members directly, borrow existing values, and reuse type/component/topic metadata.
+- Centralize firmware diagnostics and shared UI/validation messages; use the Arduino IDE formatting style for sources and generated C++.
+- Update the control catalogue, class migration guide, HA/Zigbee mapping documentation and screenshot preview to use the shared presets without repeated HA defaults.
+
+### Fixed
+
+- Publish DHT measurements as numeric Celsius/percent values or `null`, matching their classes. Remove the portal C/F selector and HA text-conversion template; HA handles display unit conversion.
+- Generate lawn-mower HA command templates from shared action payloads so commands send the accepted `START`/`PAUSE`/`DOCK` values.
 - Derive fan power/oscillation and humidifier power payloads from shared On/Off values. Keep device-tracker presence vocabulary independent of its initial state, without adding runtime metadata.
+- Make the DHT host regression portable to Linux by explicitly importing `std::isnan`.
 
-- Compile HA Discovery presets from the shared, protocol-independent control catalogue: derive action payloads, command routes, property templates, options, ranges and capabilities before compilation. Keep the existing firmware resources and feature guards; remove repeated HA defaults from full control examples and use the shared model in the screenshot preview.
-- Fix DHT readings to use numeric Celsius/percent values and `null` for unavailable samples, matching their classes. Remove the C/F portal setting and HA text-conversion override; HA controls display unit conversion.
-- Derive lawn-mower HA command templates from the shared action payloads, so HA sends the accepted `START`/`PAUSE`/`DOCK` values instead of its default action names.
+### Validation
 
-- Generate one-character CSS classes and DOM IDs consistently across HTML, CSS, JavaScript, ARIA references and dynamic pages. Preserve semantic page IDs, form names and API operations; keep readable identifiers in the source.
-- Reduce portal HTML by translating text-only containers directly and omitting optional attribute quotes during generation. Exclude Console CSS when Console is disabled; apply asset optimizations independently of the selected control set.
-- Store control and HA preset identities as enum IDs in compact parallel tables, reusing the common type lookup and omitting duplicate type-name strings with per-control compile guards.
-- Avoid temporary string copies when validating control values, titles and enum/select options; compare JSON literals directly against the input instead of allocating substrings.
-- Compress the Unicode device-name character table with indexed delta encoding, preserving the existing accepted characters and allocation-free validation. Make the character catalogue independent of the generator's Python Unicode version.
-- Reduce control metadata storage with shared unit strings and compact records; reuse common class names in HA and avoid computing unused control capabilities during Discovery.
-- Compact translated-message tables with 16-bit offsets and shared text pools; exclude unused diagnostics with their feature switches while preserving MQTT Serial diagnostics. Guard disabled control validation/capability branches and avoid computing unused capabilities in Zigbee mapping.
-- Breaking: replace `textType` and top-level `device_class` with optional, type-checked `class`; rename `ARDPORTAL_ENABLE_TEXT_TYPES` to `ARDPORTAL_ENABLE_CLASSES`. Move event vocabularies from `ha.event_types` to top-level `event_types`. No compatibility aliases are retained.
-- Separate protocol-independent control presets, value/command validation and compact capabilities from Home Assistant Discovery data. Add 119 classes across 12 control types: `text`, `slider`, `binary_sensor`, `switch`, `valve`, `cover`, `event`, `device_trigger`, `button`, `humidifier`, `update` and `infrared`. `class` is optional for every control; class names and metadata are included only when their control types are enabled at compile time.
-- Propagate classes and units through HA, portal and schema 2 Z2M/ZHA exports; distinguish native versus generic Zigbee mappings. Add outlet/On-Off light endpoint identities, receiver IR events and class-aware presets. Matter remains outside this change.
+- Pass host regressions with ASan/UBSan, gateway exporter compatibility, the Arduino example/API feature matrix, Arduino Lint, formatting and generated-resource checks in CI.
+- Cover all 30 control types and class/type combinations, adapter payload/route/options mutations, numeric DHT readings and every generated portal JavaScript variant.
 
 ## 0.8.1 — 2026-10-22
 
