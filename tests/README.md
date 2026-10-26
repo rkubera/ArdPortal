@@ -1,8 +1,8 @@
 # Pull request checks
 
 The `PR checks` workflow runs on pull requests (including forks), pushes to `main`
-and manual dispatch. Its three stable check names are `Host tests`,
-`Arduino builds` and `Lint and assets`. Jobs have read-only repository access and
+and manual dispatch. It runs `Host tests`, individual `Arduino builds (...)` and `Matter SDK (...)`
+jobs, and `Lint and assets`. Jobs have read-only repository access and
 no repository secrets. Actions are pinned to commit hashes; tool/core/API-test
 versions are explicit in the workflow. Only GitHub-owned actions are used;
 Arduino CLI/Lint are downloaded from official releases with pinned SHA-256 hashes.
@@ -40,8 +40,15 @@ using their official package indexes, then run:
 bash tests/compile-arduino.sh
 ```
 
-The script builds DynamicPages for ESP8266 and ESP32, and ZigbeeClimate for
-ESP32-C5/C6/H2. It also compiles the public API feature-switch matrix on ESP8266.
+Each firmware/profile is a separate Actions matrix job with its own status/log.
+Failures do not cancel the other profiles; each runner installs only its required
+board core. The 19 profiles cover DynamicPages on ESP8266/ESP32, ZigbeeClimate
+End Device on C5/C6/H2, four Matter Arduino builds, nine ESP8266 public-API
+variants and a separate ESP32 network-free build with linker verification.
+
+Run `bash tests/compile-arduino.sh --list` for profile IDs. Pass one ID to compile
+only that firmware, for example `bash tests/compile-arduino.sh zigbee-c5-ed`.
+Omitting the argument (or passing `all`) still runs the complete local matrix.
 Temporary build directories are cleaned on exit. `ARDUINO_CLI` can select a local
 CLI executable. For ESP8266 builds only, a narrow Python warning filter hides
 core 3.1.2's known `elf2bin.py` non-raw `\s` regex warning under Python 3.12.

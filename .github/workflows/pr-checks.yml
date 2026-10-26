@@ -43,9 +43,70 @@ jobs:
           ZHC_NODE_MODULES="$RUNNER_TEMP/converter-tests/node_modules" Z2M_HA_SOURCE="$RUNNER_TEMP/z2m-homeassistant.ts" node tests/zigbee-converter-test.mjs
 
   arduino-builds:
-    name: Arduino builds
+    name: Arduino builds (${{ matrix.name }})
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: portal-esp8266
+            name: "DynamicPages, ESP8266"
+            core: esp8266:esp8266@3.1.2
+          - profile: portal-esp32
+            name: "DynamicPages, ESP32"
+            core: esp32:esp32@3.3.12
+          - profile: zigbee-c5-ed
+            name: "ZigbeeClimate, ESP32-C5, End Device"
+            core: esp32:esp32@3.3.12
+          - profile: zigbee-c6-ed
+            name: "ZigbeeClimate, ESP32-C6, End Device"
+            core: esp32:esp32@3.3.12
+          - profile: zigbee-h2-ed
+            name: "ZigbeeClimate, ESP32-H2, End Device"
+            core: esp32:esp32@3.3.12
+          - profile: matter-c6-wifi
+            name: "MatterPortal, ESP32-C6, Wi-Fi"
+            core: esp32:esp32@3.3.12
+          - profile: matter-c6-thread
+            name: "MatterPortal, ESP32-C6, Thread"
+            core: esp32:esp32@3.3.12
+          - profile: matter-h2-thread
+            name: "MatterPortal, ESP32-H2, Thread"
+            core: esp32:esp32@3.3.12
+          - profile: matter-c6-full
+            name: "MatterPortal, ESP32-C6, all controls"
+            core: esp32:esp32@3.3.12
+          - profile: no-network-esp32
+            name: "Public API, ESP32, no network"
+            core: esp32:esp32@3.3.12
+          - profile: api-all
+            name: "Public API, ESP8266, all"
+            core: esp8266:esp8266@3.1.2
+          - profile: api-no_power
+            name: "Public API, ESP8266, no_power"
+            core: esp8266:esp8266@3.1.2
+          - profile: api-no_www
+            name: "Public API, ESP8266, no_www"
+            core: esp8266:esp8266@3.1.2
+          - profile: api-log_headless
+            name: "Public API, ESP8266, log_headless"
+            core: esp8266:esp8266@3.1.2
+          - profile: api-log_without_console
+            name: "Public API, ESP8266, log_without_console"
+            core: esp8266:esp8266@3.1.2
+          - profile: api-no_network
+            name: "Public API, ESP8266, no_network"
+            core: esp8266:esp8266@3.1.2
+          - profile: api-no_dynamic
+            name: "Public API, ESP8266, no_dynamic"
+            core: esp8266:esp8266@3.1.2
+          - profile: api-no_actions
+            name: "Public API, ESP8266, no_actions"
+            core: esp8266:esp8266@3.1.2
+          - profile: api-local_dynamic
+            name: "Public API, ESP8266, local_dynamic"
+            core: esp8266:esp8266@3.1.2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,13 +118,17 @@ jobs:
         run: |
           python tests/install-arduino-tool.py arduino-cli "$RUNNER_TEMP/arduino-tools"
           echo "$RUNNER_TEMP/arduino-tools" >> "$GITHUB_PATH"
-      - name: Install pinned board cores
+      - name: Install pinned board core
         run: |
-          arduino-cli core update-index --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json,https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          arduino-cli core install esp8266:esp8266@3.1.2 --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
-          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-      - name: Examples and public API feature matrix
-        run: bash tests/compile-arduino.sh
+          case '${{ matrix.core }}' in
+            esp8266:*) board_index=https://arduino.esp8266.com/stable/package_esp8266com_index.json ;;
+            esp32:*) board_index=https://espressif.github.io/arduino-esp32/package_esp32_index.json ;;
+            *) exit 2 ;;
+          esac
+          arduino-cli core update-index --additional-urls "$board_index"
+          arduino-cli core install '${{ matrix.core }}' --additional-urls "$board_index"
+      - name: Compile selected firmware and verify its profile
+        run: bash tests/compile-arduino.sh '${{ matrix.profile }}'
 
   matter-sdk:
     name: Matter SDK (${{ matrix.profile }}, ${{ matrix.credentials }}, ${{ matrix.power }}, ${{ matrix.thread_role }})
