@@ -6,6 +6,9 @@
 #include "HeapMemory.h"
 #if ARDPORTAL_ENABLE_POWER_MANAGEMENT
 #include "ArdPower.h"
+#if ARDPORTAL_ENABLE_MATTER && ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+#include "PowerDiagnostics.h"
+#endif
 #endif
 #include "ArdAsset.h"
 #include <Arduino.h>
@@ -28,6 +31,9 @@ enum class Key : uint16_t;
 #include "AppConfigPageRegistration.h"
 #endif
 #include "PortalTypes.h"
+#if ARDPORTAL_ENABLE_MATTER
+#include "ArdMatter.h"
+#endif
 #if ARDPORTAL_ENABLE_ZIGBEE
 #include "ArdZigbee.h"
 #endif
@@ -57,8 +63,20 @@ ARD_LANG_COMPILE_ERROR(ARD_LANG_NATIVE_BUILD_ARDPORTAL_REQUIRES_AN_ESP8266_OR_ES
 // Single-threaded: call begin(), loop() and public methods from the Arduino task.
 class ArdPortal {
 public:
+#if ARDPORTAL_ENABLE_LOG_CALLBACK
+  enum class LogChannel : uint8_t { Messages,
+                                    Mqtt,
+                                    Matter,
+                                    Zigbee };
+  using LogCallback = void (*)(LogChannel channel, const String& message);
+  /** @brief Install a synchronous loop-owned log sink; nullptr detaches.
+   * @param callback Nonblocking handler; message is borrowed for the call. Nested logging is not forwarded. */
+  void onLog(LogCallback callback) {
+    _logCallback = callback;
+  }
+#endif
   /**
-   * @brief Disallow copying or moving this resource-owning instance.
+   * @brief Construct a portal with the compile-time feature configuration.
    * Input: ArdPortalBuildTag<ARDPORTAL_FEATURE_MASK>.
    * @return No value.
    */
@@ -92,6 +110,7 @@ public:
   ArdPower& power() {
     return _power;
   }
+  /** @brief Access the owned power manager without changing policy. */
   const ArdPower& power() const {
     return _power;
   }
@@ -134,6 +153,16 @@ private:
 #endif
   using MqttState = ArdMqttState;
 public:
+#if ARDPORTAL_ENABLE_MATTER
+  /** @brief Access the owned Matter adapter; configure before startup and service through portal.loop(). */
+  ArdMatter& matter() {
+    return _matter;
+  }
+  /** @brief Access the owned Matter adapter for cached status queries. */
+  const ArdMatter& matter() const {
+    return _matter;
+  }
+#endif
   using ChangeSource = ArdPortalChangeSource;
   using RestartReason = ArdPortalRestartReason;
 #if ARDPORTAL_ENABLE_ZIGBEE
@@ -205,6 +234,14 @@ public:
   using WifiScanCallback = std::function<void(bool, const String&)>;
   /** @brief Connect using saved credentials and resume retries. @return False when not ready, busy or missing credentials. */
   bool connectWifiStation();
+  /** @brief Stop portal clients, MQTT and Wi-Fi without stopping Zigbee/Thread. Call from loop. False while busy or Matter uses Wi-Fi. */
+  bool suspendPortal();
+  /** @brief Restore the saved AP/reconnect policy and HTTP listener. Call from loop. */
+  bool resumePortal();
+  /** @brief Whether portal networking is explicitly suspended. */
+  bool portalSuspended() const {
+    return _portalSuspended;
+  }
   /** @brief Disconnect station and suspend retries. @return False during an active configuration/OTA operation. */
   bool disconnectWifiStation();
   /** @brief Set automatic station retry policy. @param enabled Retry permission. @return No value. */
@@ -805,14 +842,24 @@ public:
 #endif
   static bool validPortalConfig(const PortalConfig& config);
 private:
+#if ARDPORTAL_ENABLE_LOG_CALLBACK
+  LogCallback _logCallback = nullptr;
+  bool _dispatchingLog = false;
+  void emitLog(LogChannel channel, const String& message);
+#endif
 #if ARDPORTAL_ENABLE_POWER_MANAGEMENT
   ArdPower _power;
+#if ARDPORTAL_ENABLE_MATTER && ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  ArdPowerDiagnostics _powerDiagnostics;
+#endif
   void servicePower();
 #if ARDPORTAL_ENABLE_ZIGBEE
   void prepareZigbeePower();
 #endif
 #endif
 #if ARDPORTAL_ENABLE_WIFI
+  bool _portalSuspended = false;
+  bool _resumeWifiAutoReconnect = true;
   bool _wifiAutoReconnect = ARDPORTAL_ENABLE_WIFI;
   ApPolicy _apPolicy = ApPolicy::Automatic;
   WifiStateCallback _wifiStateCallback;
@@ -976,6 +1023,16 @@ private:
   char _firmwareVersion[18] = "\x03"
                               "1.0";  // ZCL length prefix plus bounded text and terminator.
   Options _options;
+#if ARDPORTAL_ENABLE_MATTER
+  ArdMatter _matter;
+  void serviceMatter(uint32_t now);
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  void serviceMatterDiagnostics();
+#endif
+  bool handleMatterHttp(const String& method, const String& path);
+  bool acceptMatterCommand(const ArdMatterFields::Command& command);
+#endif
+
 #if ARDPORTAL_ENABLE_ZIGBEE
   ArdZigbee _zigbee;
   ZigbeeOptions _zigbeeOptions;
@@ -1140,6 +1197,9 @@ private:
   size_t _httpDynamicField = 0;
   bool _httpDynamicConditionFirst = true;
   uint32_t _httpDynamicRevision = 0;
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+  std::unique_ptr<ArdAppControls::VisibilityCache> _httpVisibilityCache;
+#endif
   /**
    * @brief Build the next bounded fragment of a streamed dynamic-page response.
    * @return True on success; false if validation, resource allocation or the operation fails.
@@ -1157,7 +1217,7 @@ private:
 #if ARDPORTAL_ENABLE_CONSOLE
   struct ConsoleLine {
     uint32_t id = 0;
-    bool mqtt = false;
+    uint8_t channel = 0;  // 0: messages, 1: MQTT, 2: Matter.
     String text;
   };
   static constexpr size_t ConsoleCapacity = 16;
@@ -1169,7 +1229,12 @@ private:
   ConsoleLine _consoleMessages[ConsoleCapacity];
   uint32_t _consoleMessagesCount = 0;
 #endif
-  size_t _consoleHistoryBudget = 4096;  // Per channel, never shared.
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+  static constexpr size_t MatterConsoleCapacity = 8;
+  ConsoleLine _matterConsole[MatterConsoleCapacity];
+  uint32_t _matterConsoleCount = 0;
+#endif
+  size_t _consoleHistoryBudget = 4096;  // Matter history is additionally capped at 1024 bytes.
   uint32_t _consoleId = 0;
 #endif
 #if ARDPORTAL_SUPPORT_WEBSOCKET
@@ -1194,14 +1259,19 @@ private:
   };
   uint8_t _eventWsRx[136];
   WebSocketState _eventWs{ _eventWsRx, sizeof(_eventWsRx), false };
-#if ARDPORTAL_ENABLE_CONSOLE
-  uint8_t _consoleWsRx[1032];
+#if ARDPORTAL_ENABLE_CONSOLE && (ARDPORTAL_ENABLE_MQTT || ARDPORTAL_ENABLE_CONSOLE_MESSAGES)
+  uint8_t _consoleWsRx[ARDPORTAL_ENABLE_MQTT ? 1032 : 136];
   WebSocketState _consoleWs{ _consoleWsRx, sizeof(_consoleWsRx), true };
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE
   uint8_t _zigbeeWsRx[136];
   WebSocketState _zigbeeWs{ _zigbeeWsRx, sizeof(_zigbeeWsRx), false };
   bool _wsUpgradeZigbee = false;
+#endif
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+  uint8_t _matterWsRx[136];
+  WebSocketState _matterWs{ _matterWsRx, sizeof(_matterWsRx), false };
+  bool _wsUpgradeMatter = false;
 #endif
   bool _wsUpgrade = false, _wsUpgradeConsole = false;
   /**
@@ -1238,7 +1308,7 @@ private:
    * @param text Text to read, encode or display.
    * @return No value.
    */
-  void consoleLine(bool mqtt, const String& text);
+  void consoleLine(uint8_t channel, const String& text);
   /**
    * @brief Append MQTT traffic to its separate Console history when the console is enabled.
    * @param direction MQTT traffic direction displayed in Console.

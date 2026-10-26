@@ -55,6 +55,12 @@ public:
   // The source must be a validated JSON serialization and remain immutable until completion.
   // Each call returns exactly min(maximum,length-offset) bytes, or empty on failure.
   using JsonSource = std::function<String(size_t offset, size_t maximum)>;
+  /** @brief Queue a streamed, validated JSON document for journaled storage.
+   * @param path Journal file path.
+   * @param length Exact serialized byte count.
+   * @param source Immutable source returning requested slices until callback completion; empty signals failure.
+   * @param callback Receives completion/error from loop().
+   * @return True if accepted, not confirmation that data has been committed. */
   bool writeJson(const String& path, size_t length, JsonSource source, Callback callback);
 
   /**

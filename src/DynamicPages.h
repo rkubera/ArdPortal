@@ -615,6 +615,15 @@ public:
     return String();
   }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
+  /** @brief Load only page-field visibility rules; entities retain their existing representation. */
+  V conditionsAt(size_t index) const {
+    for (size_t p = 0; p < pages.length(); ++p)
+      for (size_t f = 0; f < pages.fields(p); ++f)
+        if (pages.fieldIndex(p, f) == index) return pages.fieldConditions(p, f);
+    for (const Entity* e = entities.get(); e; e = e->next.get())
+      if (e->index == index) return entityValue(*e);
+    return V();
+  }
   /**
    * @brief Read the dependent field at the requested index.
    * @param index Zero-based element or field index.
@@ -851,7 +860,7 @@ public:
     if (page.type() != T::Object) return fail("page", "", ARD_LANG_NATIVE_PAGE_MUST_BE_AN_OBJECT);
     if (!identifier(page["id"].asString())) return fail("page", "", ARD_LANG_NATIVE_INVALID_ID_USE_1_48_ASCII_LETTERS_DIGITS_OR);
     if (!title(page)) return fail("page", "", ARD_LANG_NATIVE_INVALID_NAME_NAMES_1_80_BYTES);
-    if (!page["order"].isInteger()) return fail("page", "", ARD_LANG_NATIVE_ORDER_MUST_BE_AN_INTEGER);
+    if (page.hasOwnProperty("order") && !page["order"].isInteger()) return fail("page", "", ARD_LANG_NATIVE_ORDER_MUST_BE_AN_INTEGER);
     if (page["fields"].type() != T::Array || !page["fields"].length()) return fail("page", "", ARD_LANG_NATIVE_FIELDS_MUST_BE_A_NONEMPTY_ARRAY);
     if (count() + page["fields"].length() > ArdAppConfigMaxFields) return fail("limits", "", ARD_LANG_NATIVE_FIELD_LIMIT_1024);
     const V& fields = page["fields"];

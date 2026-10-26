@@ -24,11 +24,15 @@ void ArdPortal::servicePower() {
   if (_attempting || _scanning || _scanRequested) block(ArdPowerBlocker::Network);
 #endif
 #if ARDPORTAL_ENABLE_WWW
-  if (_http || _httpConfigUpload) block(ArdPowerBlocker::Http);
+  // Keep the radio awake between the browser's consecutive asset/API requests.
+  if (_http || _httpConfigUpload || (_httpSince && uint32_t(millis() - _httpSince) < 1000)) block(ArdPowerBlocker::Http);
 #endif
 #if ARDPORTAL_SUPPORT_WEBSOCKET
   if (_eventWs.client) block(ArdPowerBlocker::WebSocket);
-#if ARDPORTAL_ENABLE_CONSOLE
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+  if (_matterWs.client) block(ArdPowerBlocker::WebSocket);
+#endif
+#if ARDPORTAL_ENABLE_CONSOLE && (ARDPORTAL_ENABLE_MQTT || ARDPORTAL_ENABLE_CONSOLE_MESSAGES)
   if (_consoleWs.client) block(ArdPowerBlocker::WebSocket);
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE
@@ -59,6 +63,29 @@ void ArdPortal::servicePower() {
   context.afterDeepSleepAttempt = [](void* owner) {
     static_cast<ArdPortal*>(owner)->_zigbee.cancelDeepSleep();
   };
+#endif
+#if ARDPORTAL_ENABLE_MATTER
+#if !ARDPORTAL_MATTER_THREAD || (defined(CONFIG_ENABLE_ICD_SERVER) && CONFIG_ENABLE_ICD_SERVER)
+  const bool matterSleep = _power.policy() != ArdPower::Policy::AlwaysOn && _power.sleepType() == ArdPower::SleepType::ConnectedSleep;
+  context.managedRadioSleeping = matterSleep && _matter.connected();
+#endif
+  context.connectedSleepAdmission = [](void* owner, bool admitted) {
+    auto* portal = static_cast<ArdPortal*>(owner);
+    const bool released = portal->_matter.powerSaving(admitted, !admitted);
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+    constexpr bool supported = !ARDPORTAL_MATTER_THREAD
+#if defined(CONFIG_ENABLE_ICD_SERVER) && CONFIG_ENABLE_ICD_SERVER
+                               || true
+#endif
+      ;
+    String diagnostic = portal->_powerDiagnostics.update(portal->_power.policy(), portal->_power.sleepType(), portal->_power.blockers(), admitted, released, portal->_matter.connected(), supported);
+    if (diagnostic.length()) portal->consoleLine(0, diagnostic);
+#else
+    (void)released;
+#endif
+  };
+  // Never force light/deep sleep underneath CHIP. ConnectedSleep uses SDK/RTOS idle.
+  if (!context.managedRadioSleeping) block(ArdPowerBlocker::Network);
 #endif
   context.owner = this;
   context.beforeDeepSleep = [](void* owner) {

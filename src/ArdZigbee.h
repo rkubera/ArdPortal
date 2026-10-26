@@ -43,8 +43,11 @@ public:
   /** Stage the sleepy profile before begin(); later toggle native sleep only.
    * RxOnWhenIdle is fixed at network startup. Routers always refuse sleep. */
   bool powerSaving(bool enable, bool deepSleep = false);
+  /** @brief Check sleepy end-device readiness, quiet queues and recent native idle; routers return false. */
   bool canDeepSleep() const;
+  /** @brief Acquire the native stack lock after rechecking readiness; false leaves sleep unprepared. Cancel if sleep is aborted. */
   bool prepareDeepSleep();
+  /** @brief Release a prepared native sleep lock when sleep entry is cancelled; safe when not locked. */
   void cancelDeepSleep();
   enum class Operation : uint8_t { None,
                                    Pair,
@@ -99,6 +102,13 @@ public:
     _diagnosticContext = context;
     _diagnosticSink = sink;
   }
+#if ARDPORTAL_ENABLE_LOG_CALLBACK
+  /** @brief Install a loop-owned traffic sink with borrowed context; nullptr disables forwarding. */
+  void onLogDiagnostic(void* context, void (*sink)(void*, const String&)) {
+    _logContext = context;
+    _logSink = sink;
+  }
+#endif
   /** @brief Get current state. @return Cached loop-owned state. */
   State state() const {
     return _state;
@@ -314,11 +324,20 @@ private:
   bool _begun = false, _ready = false, _known = false, _waiting = false, _resetPending = false, _bootPairHandled = false, _cancelRequested = false, _resetCancelPending = false, _resetWaitingCancel = false;
   uint8_t _channel = 0, _attempts = 0;
   uint16_t _pan = 0;
-  uint32_t _since = 0, _attemptSince = 0, _retryAt = 0, _lineId = 0, _reconnectAt = 0;
+  uint32_t _since = 0, _attemptSince = 0, _retryAt = 0, _reconnectAt = 0;
+#if !defined(ARDPORTAL_ENABLE_WWW) || ARDPORTAL_ENABLE_WWW || ARDPORTAL_ZIGBEE_DEBUG_SERIAL
+  uint32_t _lineId = 0;
+#endif
   bool _reconnectPending = false, _autoConnect = true;
   String _error;
   char _startupError[96] = {};  // SDK task publishes this before its failure event.
+#if !defined(ARDPORTAL_ENABLE_WWW) || ARDPORTAL_ENABLE_WWW
   Line _history[HistoryCapacity];
+#endif
+#if ARDPORTAL_ENABLE_LOG_CALLBACK
+  void* _logContext = nullptr;
+  void (*_logSink)(void*, const String&) = nullptr;
+#endif
   FinishedCallback _finished;
   StateCallback _changed;
   void* _diagnosticContext = nullptr;

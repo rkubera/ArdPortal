@@ -20,7 +20,7 @@ GROUPS={
 # @param features Feature selections used to evaluate the asset guard.
 # @return True if the feature expression is enabled for the chosen controls.
 def condition_enabled(condition, controls=None, features=None):
- values={'ARDPORTAL_ENABLE_ZIGBEE':0,'ARDPORTAL_ENABLE_DEPENDENCIES':1,'ARDPORTAL_ENABLE_DYNAMIC_PAGES':1}
+ values={'ARDPORTAL_ENABLE_ZIGBEE':0,'ARDPORTAL_ENABLE_MATTER':0,'ARDPORTAL_ENABLE_MATTER_CONSOLE':0,'ARDPORTAL_ENABLE_DEPENDENCIES':1,'ARDPORTAL_ENABLE_DYNAMIC_PAGES':1}
  values.update({PREFIX+c.upper():int(controls is None or c in controls) for c in CONTROLS})
  values.update({'ARDPORTAL_CONTROL_SUPPORT_'+g:int(any(values[PREFIX+c.upper()] for c in cs)) for g,cs in GROUPS.items()})
  if features:values.update({'ARDPORTAL_ENABLE_'+k:int(v) for k,v in features.items()})
@@ -51,8 +51,24 @@ def segments(source):
 # @param controls Optional set of controls included in the asset.
 # @param features Feature selections used to evaluate the asset guard.
 # @return Source text containing only enabled asset segments.
+def inline_console_rows(result):
+    result = re.sub(r'^function appendConsoleLine[^\n]*\n', '', result, flags=re.M)
+    def inline_rows(match):
+        return ("const rows=consoleRows[message.channel];if(rows.some(row=>row.id===message.id))return;"
+                "rows.push(message);if(rows.length>200)rows.shift();const box=" + match[1] +
+                ",atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<30;"
+                "box.textContent=rows.map(row=>formatConsoleLine(row.text)).join('\\n');"
+                "if(atEnd)box.scrollTop=box.scrollHeight}")
+    result, count = re.subn(r'appendConsoleLine\(message\.channel,message,(document\.querySelector\([^\n]+?)\)\}', inline_rows, result)
+    if count != 1:
+        raise ValueError('Unsupported single-console row renderer')
+    return result
+
+
 def selected(source,controls=None,features=None):
- return ''.join(text for condition,text in segments(source) if condition_enabled(condition,controls,features))
+    result = ''.join(text for condition,text in segments(source) if condition_enabled(condition,controls,features))
+    # Share only with multiple consumers; retain the smaller inlined common case.
+    return inline_console_rows(result) if result.count('appendConsoleLine(') == 2 else result
 
 # @brief Emit C++ declarations and feature guards for a set of asset chunks.
 # @param name Fallback name or generated symbol name.
@@ -99,12 +115,21 @@ def emit_chunks(name,parts,gzip_array):
 # @param gzip_array Asset encoder.
 # @return Conditional C++ asset declarations.
 def emit_selected(name,source,controls,features,gzip_array):
-    if 'ARDPORTAL_ENABLE_ZIGBEE' not in source:
+    native=[key for key in ['ZIGBEE','MATTER'] if 'ARDPORTAL_ENABLE_'+key in source]
+    if not native:
         return emit_chunks(name,[('1',selected(source,controls,features))],gzip_array)
-    lines=['#if ARDPORTAL_ENABLE_ZIGBEE']
-    for enabled in [1,0]:
-        if not enabled:lines.append('#else')
-        lines+=emit_chunks(name,[('1',selected(source,controls,{**features,'ZIGBEE':enabled}))],gzip_array)
+    lines=[]
+    for index,key in enumerate(native+[None]):
+        lines.append(('#if ' if index==0 else '#elif ')+'ARDPORTAL_ENABLE_'+key if key else '#else')
+        flags={item:int(item==key) for item in native}
+        if key == 'MATTER' and 'ARDPORTAL_ENABLE_MATTER_CONSOLE' in source:
+            lines.append('#if ARDPORTAL_ENABLE_MATTER_CONSOLE')
+            lines+=emit_chunks(name,[('1',selected(source,controls,{**features,**flags,'MATTER_CONSOLE':1}))],gzip_array)
+            lines.append('#else')
+            lines+=emit_chunks(name,[('1',selected(source,controls,{**features,**flags,'MATTER_CONSOLE':0}))],gzip_array)
+            lines.append('#endif')
+        else:
+            lines+=emit_chunks(name,[('1',selected(source,controls,{**features,**flags}))],gzip_array)
     return lines+['#endif']
 
 def emit_profile_chunks(name, source, gzip_array):
@@ -123,5 +148,12 @@ def emit_profile_chunks(name, source, gzip_array):
     lines += emit_selected(name,source,['slider','text','select','edit'],{'DEPENDENCIES':0},gzip_array)
     lines += ['#endif']
     lines += ['#else']
-    lines += emit_chunks(name,segments(source),gzip_array)
+    if 'function appendConsoleLine(' in source:
+        lines += ['#if ARDPORTAL_ENABLE_ZIGBEE || ARDPORTAL_ENABLE_MATTER_CONSOLE']
+        lines += emit_chunks(name,segments(source),gzip_array)
+        lines += ['#else']
+        lines += emit_chunks(name,segments(inline_console_rows(source)),gzip_array)
+        lines += ['#endif']
+    else:
+        lines += emit_chunks(name,segments(source),gzip_array)
     return lines+['#endif']

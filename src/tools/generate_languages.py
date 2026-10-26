@@ -39,8 +39,8 @@ STORAGE_KEYS = {f's_{number}' for number in (194,195,196,198,199,200,204)}
 # @param dynamic Whether dynamic-page UI is included.
 # @param tls Whether MQTT TLS UI is included.
 # @return The collected UI string definitions.
-def ui_strings(strings, ota=1, mqtt=1, console=1, controls=None, dynamic=True, tls=True, zigbee=True):
-    enabled = {'OTA': ota, 'MQTT': mqtt, 'CONSOLE': console, 'HA': True, 'DEPENDENCIES': dynamic, 'DYNAMIC_PAGES': dynamic, 'WEBSOCKET': dynamic or console, 'MQTT_TLS':tls and mqtt, 'ZIGBEE':zigbee}
+def ui_strings(strings, ota=1, mqtt=1, console=1, controls=None, dynamic=True, tls=True, zigbee=True, matter=False):
+    enabled = {'OTA': ota, 'MQTT': mqtt, 'CONSOLE': console, 'HA': True, 'DEPENDENCIES': dynamic, 'DYNAMIC_PAGES': dynamic, 'WEBSOCKET': dynamic or console, 'MQTT_TLS':tls and mqtt, 'ZIGBEE':zigbee, 'MATTER':matter}
     excluded = {key for feature, keys in FEATURE_KEYS.items() if not enabled[feature] for key in keys}
     return {key: value for key, value in strings.items() if key.startswith('ui_') and key not in excluded and condition_enabled(condition_for(key), controls, enabled)}
 
@@ -57,10 +57,9 @@ def ui_payload(lines,name,strings,flags,controls=None,dynamic=True):
     lines.append('#if ARDPORTAL_ENABLE_MQTT_TLS')
     for tls in [True,False]:
         if not tls:lines.append('#else')
-        lines.append('#if ARDPORTAL_ENABLE_ZIGBEE')
-        for zigbee in [True,False]:
-            if not zigbee:lines.append('#else')
-            payload=json.dumps(ui_strings(strings,*flags,controls=controls,dynamic=dynamic,tls=tls,zigbee=zigbee),ensure_ascii=False,separators=(',',':'))
+        for guard,zigbee,matter in [('#if ARDPORTAL_ENABLE_ZIGBEE',True,False),('#elif ARDPORTAL_ENABLE_MATTER',False,True),('#else',False,False)]:
+            lines.append(guard)
+            payload=json.dumps(ui_strings(strings,*flags,controls=controls,dynamic=dynamic,tls=tls,zigbee=zigbee,matter=matter),ensure_ascii=False,separators=(',',':'))
             lines.extend(emit_chunks(name,[('1',payload)],gzip_array))
         lines.append('#endif')
     lines.append('#endif')
@@ -89,8 +88,8 @@ def condition_for(key):
         return 'ARDPORTAL_ENABLE_MQTT && ARDPORTAL_ENABLE_CONSOLE_MESSAGES'
     if key == 's_117': return 'ARDPORTAL_HTTP_OTA_SUPPORT && ARDPORTAL_ENABLE_CONSOLE_MESSAGES'
     if key in {'s_116','s_152','s_153','s_155'}: return 'ARDPORTAL_HTTP_OTA_SUPPORT'
-    if key == 's_146': return 'ARDPORTAL_ENABLE_MQTT && (ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL)'
-    if key == 's_178': return 'ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL'
+    if key == 's_146': return 'ARDPORTAL_ENABLE_MQTT && (ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL || ARDPORTAL_ENABLE_LOG_CALLBACK)'
+    if key == 's_178': return 'ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL || (ARDPORTAL_ENABLE_LOG_CALLBACK && ARDPORTAL_ENABLE_MQTT)'
     if key == 's_164': return 'ARDPORTAL_ENABLE_MQTT && ARDPORTAL_ENABLE_CONSOLE'
     if key in {'s_109','s_124','s_128','s_129','s_131','s_142','s_174','s_179','s_211'}:
         return 'ARDPORTAL_ENABLE_WWW'

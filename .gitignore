@@ -1,2 +1,12 @@
 .DS_Store
 __pycache__/
+
+# ESP-IDF generated build products
+idf/**/build*/
+idf/**/managed_components/
+idf/**/sdkconfig
+idf/**/sdkconfig.old
+# Component Manager records absolute paths for the local Arduino source override.
+idf/**/dependencies.lock
+
+.build-tools/

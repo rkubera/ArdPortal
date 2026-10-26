@@ -21,6 +21,14 @@ for test_name in json-patch journal-selection stream dynamic-patch mqtt-state-to
   "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined "${flags[@]}" -Itests/memory-host -Isrc "${source_files[@]}" -o "$test_dir/$test_name"
   "$test_dir/$test_name"
 done
+for www in 0 1; do
+  for mqtt in 0 1; do
+    "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined \
+      -DESP8266 -DARDFS_HOST_TEST -DARDPORTAL_ENABLE_WWW=$www -DARDPORTAL_ENABLE_MQTT=$mqtt \
+      -Itests/memory-host -Isrc tests/memory-host/log-callback.cpp src/ArdFS.cpp -o "$test_dir/log-callback"
+    "$test_dir/log-callback"
+  done
+done
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -Itests/memory-host -Isrc tests/memory-host/ardfs.cpp src/ArdFS.cpp src/ArdFSVolume.cpp -o "$test_dir/power-cut"
 "$test_dir/power-cut"
 for enabled in 0 1; do

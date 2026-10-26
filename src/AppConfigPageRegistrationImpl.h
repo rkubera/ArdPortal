@@ -35,6 +35,9 @@ bool ArdPortal::startAppConfigPageRegistration(const __FlashStringHelper* defini
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdPortal::beginAppConfigPageRegistration(const String* source, const __FlashStringHelper* flash, String* owned) {
+#if ARDPORTAL_ENABLE_MATTER
+  if (_matter.frozen()) return appConfigRegistrationFailed("busy", "", F("Matter layout is frozen; restart before registering pages"));
+#endif
   if (appConfigPageRegistrationBusy()) return appConfigRegistrationFailed("busy", "", F(ARD_LANG_NATIVE_ANOTHER_PAGE_REGISTRATION_IS_PENDING));
   if (otaActive() || _rebootPending) return appConfigRegistrationFailed("busy", "", F(ARD_LANG_NATIVE_OTA_OR_RESTART_IS_IN_PROGRESS));
   _appConfigPageRegistrationState = AppConfigPageRegistrationState::Failed;
@@ -167,7 +170,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
           failAppConfigPageRegistration("page", "", F(ARD_LANG_NATIVE_INVALID_NAME_NAMES_1_80_BYTES));
           return;
         }
-        if (!header["order"].isInteger()) {
+        if (header.hasOwnProperty("order") && !header["order"].isInteger()) {
           failAppConfigPageRegistration("page", "", F(ARD_LANG_NATIVE_ORDER_MUST_BE_AN_INTEGER));
           return;
         }
@@ -198,6 +201,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
         V menu = V::object();
         for (const char* key : { "id", "name", "names", "order", "visibleWhen" })
           if (header.hasOwnProperty(key)) menu[key] = header[key];
+        if (!header.hasOwnProperty("order")) menu["order"] = int(_dynamic.pages.length());
         ArdJSON::Limits limits;
         limits.maxNodes = 4096;
         limits.escapeHtml = true;

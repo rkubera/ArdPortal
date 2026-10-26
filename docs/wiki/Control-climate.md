@@ -99,7 +99,7 @@ Explicit `ha` properties can override Discovery metadata. They do not create add
 
 **Not provided / limits:** No presets, schedules, occupancy setpoints, emergency heating, precooling or sleep selection. Fan modes translate only standard names: off/low/medium/high/on/auto/smart. RunningState encodes heating or cooling only: fan and additional-stage bits/combinations are absent. idle/off/unknown and other actions become zero relay bits; these are not equivalent application states. A distinct RunningMode report is not supplied.
 
-`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway presentation depends on its support for the mapped clusters. ArdPortal can export a [Zigbee2MQTT converter or ZHA quirk](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download); see the [validation scope](https://github.com/rkubera/ArdPortal/wiki/Zigbee#validation-and-troubleshooting).
+`visibleWhen` does not dynamically add/remove Zigbee endpoints: they remain registered, and Zigbee commands remain accepted regardless of field visibility. Gateway presentation depends on its support for the mapped clusters. ArdPortal can export a [Zigbee2MQTT converter or ZHA quirk](https://github.com/rkubera/ArdPortal/wiki/Zigbee#zigbee2mqtt-converter-download); see the [validation scope](https://github.com/rkubera/ArdPortal/wiki/Zigbee#troubleshooting).
 
 See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
 

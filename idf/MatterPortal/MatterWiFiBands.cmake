@@ -1,0 +1,38 @@
+# Correct the pinned CHIP ESP32 driver's 2.4 GHz-only capability metadata on
+# dual-band targets. Generate an overlay; never modify Component Manager files.
+if(CONFIG_ENABLE_WIFI_STATION AND CONFIG_SOC_WIFI_SUPPORT_5G)
+    set(band_driver_found FALSE)
+    foreach(source IN LISTS matter_sources)
+        if(source MATCHES "/platform/ESP32/NetworkCommissioningDriver\\.cpp$")
+            get_filename_component(driver_dir "${source}" DIRECTORY)
+            file(READ "${source}" driver_cpp)
+            file(READ "${driver_dir}/NetworkCommissioningDriver.h" driver_h)
+            set(old_band "item.wiFiBand = chip::DeviceLayer::NetworkCommissioning::WiFiBand::k2g4;")
+            set(old_mask "uint32_t bands = static_cast<uint32_t>(1UL << chip::to_underlying(WiFiBandEnum::k2g4));")
+            string(FIND "${driver_h}" "${old_band}" band_at)
+            string(FIND "${driver_cpp}" "${old_mask}" mask_at)
+            if(band_at EQUAL -1 OR mask_at EQUAL -1)
+                message(FATAL_ERROR "Matter Wi-Fi driver changed; review the dual-band overlay")
+            endif()
+            string(REPLACE "${old_band}"
+                "item.wiFiBand = ap_record.primary > 14 ? chip::DeviceLayer::NetworkCommissioning::WiFiBand::k5g : chip::DeviceLayer::NetworkCommissioning::WiFiBand::k2g4;"
+                driver_h "${driver_h}")
+            string(REPLACE "${old_mask}"
+                "uint32_t bands = static_cast<uint32_t>((1UL << chip::to_underlying(WiFiBandEnum::k2g4)) | (1UL << chip::to_underlying(WiFiBandEnum::k5g)));"
+                driver_cpp "${driver_cpp}")
+            set(overlay "${CMAKE_BINARY_DIR}/ardportal-matter-wifi")
+            file(MAKE_DIRECTORY "${overlay}/platform/ESP32")
+            file(CONFIGURE OUTPUT "${overlay}/platform/ESP32/NetworkCommissioningDriver.h" CONTENT "${driver_h}" @ONLY)
+            file(CONFIGURE OUTPUT "${overlay}/NetworkCommissioningDriver.cpp" CONTENT "${driver_cpp}" @ONLY)
+            list(REMOVE_ITEM matter_sources "${source}")
+            list(APPEND matter_sources "${overlay}/NetworkCommissioningDriver.cpp")
+            target_include_directories(${matter_lib} BEFORE PRIVATE "${overlay}")
+            set(band_driver_found TRUE)
+            break()
+        endif()
+    endforeach()
+    if(NOT band_driver_found)
+        message(FATAL_ERROR "Matter Wi-Fi commissioning driver not found for dual-band target")
+    endif()
+    set_property(TARGET ${matter_lib} PROPERTY SOURCES "${matter_sources}")
+endif()

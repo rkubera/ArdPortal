@@ -12,7 +12,7 @@
 
 Set feature defines in the main `.ino`, before including `ArdPortal.h`.
 Module flags default to `1` (enabled), except `ARDPORTAL_ENABLE_CONSOLE_MESSAGES`,
-which defaults to `0`. All enable flags accept only `0` or `1`:
+which follows `ARDPORTAL_ENABLE_LOG_CALLBACK` (default `0`). The log callback also defaults to `0`. All enable flags accept only `0` or `1`:
 
 ```cpp
 #define ARDPORTAL_ENABLE_OTA 0
@@ -26,10 +26,11 @@ which defaults to `0`. All enable flags accept only `0` or `1`:
 | `ARDPORTAL_ENABLE_WIFI` | Defaults to `1`. Set `0` to disable station Wi-Fi and AP; forces WWW and MQTT off, including MQTT TLS/HA. Zigbee, storage and local AppConfig APIs remain available. Wi-Fi/AP and MQTT public APIs are unavailable. |
 | `ARDPORTAL_ENABLE_POWER_MANAGEMENT` | Defaults to `1`. Set `0` to remove the power manager, GPIO/timer wake handling and `portal.power()` API. |
 | `ARDPORTAL_ENABLE_OTA` | Removes OTA implementation and Update page. |
-| `ARDPORTAL_ENABLE_MQTT` | Removes MQTT, MQTT Configuration, Console and HA. |
+| `ARDPORTAL_ENABLE_MQTT` | Removes MQTT, MQTT Configuration, MQTT command handling and HA. Messages and native protocol diagnostics can remain enabled independently. |
 | `ARDPORTAL_ENABLE_MQTT_TLS` | Removes secure MQTT transport and TLS/CA settings. Defaults to `1`; MQTT disabled forces it off. Stored TLS configurations require explicit reconfiguration, with no automatic plaintext fallback. |
 | `ARDPORTAL_ENABLE_HA` | Removes HA discovery; local dynamic pages remain available. |
-| `ARDPORTAL_ENABLE_CONSOLE_MESSAGES` | Enables the Messages diagnostic tab when set to `1`; defaults to `0`, requires Console. |
+| `ARDPORTAL_ENABLE_CONSOLE_MESSAGES` | Enables lifecycle/power Messages. Defaults to the log callback flag. The web tab requires Console; the callback works without Console or WWW. |
+| `ARDPORTAL_ENABLE_LOG_CALLBACK` | Defaults to `0`. Set `1` to enable `onLog()` for sketch-owned output independently of WWW. |
 | `ARDPORTAL_ENABLE_CONSOLE` | Removes Console while keeping MQTT and HA enabled. |
 | `ARDPORTAL_ENABLE_DYNAMIC_PAGES` | Removes dynamic forms, field renderers/validation and their HTTP/MQTT handling; forces all control flags, HA and dependencies off. |
 | `ARDPORTAL_ENABLE_DEPENDENCIES` | Removes `visibleWhen` evaluation, conditional portal visibility and HA discovery removal/recreation. |
@@ -146,7 +147,7 @@ needed for a custom selection of controls.
 | `ARDPORTAL_NETWORK_BLOCK_RESERVE` | 4096 | 1024 | Largest contiguous block headroom beyond a work allocation |
 
 Values are bytes. Set them before the library include consistently in all
-translation units. See [Memory and limits](https://github.com/rkubera/ArdPortal/wiki/Memory-and-Limits) for measured
+translation units. See [Memory and limits](https://github.com/rkubera/ArdPortal/wiki/Memory-and-Limits) for reserve
 behavior and why lowering these values can starve networking. Runtime timing
 settings belong in `ArdPortal::Options`, not in defines.
 
@@ -309,3 +310,65 @@ support is available in End Device and Router roles.
 ## Typed text measurements
 
 `ARDPORTAL_ENABLE_CLASSES` defaults to `1`. Set it to `0` to omit optional semantic class names, units and automatic classifications. All controls still work without `class`. Each catalogue entry also follows its applicable `ARDPORTAL_ENABLE_CONTROL_*` flags; slider classes remain available when text controls are disabled. See [Control classes](Control-Classes).
+
+## Matter
+
+`ARDPORTAL_ENABLE_MATTER` defaults to `0`. With `1`, `ARDPORTAL_MATTER_THREAD` selects Wi-Fi (`0`) or Thread (`1`, default on H2). `ARDPORTAL_MATTER_MAX_ENDPOINTS` defaults to `16` (range `1..64`). Individual control flags also exclude their native endpoint implementations. Requires dynamic pages, a Matter-enabled ESP32 SDK, sufficient app/NVS partitions and a supported radio. Matter and Zigbee cannot be enabled together. See [Matter](Matter) for the build profile, commissioning and mapping restrictions.
+
+`ARDPORTAL_MATTER_PRODUCTION` defaults to `0`. The source SDK sets it to `1` for `ARDPORTAL_CREDENTIALS=production`, which requires factory credential providers and excludes development setup overrides. See [Matter credential profiles](Matter#credential-profiles).
+
+### Matter command console
+
+`ARDPORTAL_ENABLE_MATTER_CONSOLE` defaults to `0`. Set it to `1` with Matter and
+WWW Console enabled to add **Console → Matter**. It shows readable incoming
+commands, accepted/rejected outcomes and application state updates to Matter.
+It is independent of `ARDPORTAL_ENABLE_CONSOLE_MESSAGES`, which controls lifecycle
+messages such as pairing and connectivity. The MatterPortal example enables both.
+Disabling Matter, WWW or Console normalizes the command-console define to `0`.
+
+### Log callback without WWW
+
+`ARDPORTAL_ENABLE_LOG_CALLBACK` defaults to `0`. Enable it before including
+`ArdPortal.h` to expose `portal.onLog()` and `ArdPortal::LogChannel`:
+
+```cpp
+#define ARDPORTAL_ENABLE_WWW 0
+#define ARDPORTAL_ENABLE_LOG_CALLBACK 1
+#include <ArdPortal.h>
+
+// After Serial.begin(), before portal.begin():
+portal.onLog([](ArdPortal::LogChannel channel, const String& message) {
+  if (Serial.availableForWrite() >= int(message.length() + 5)) {
+    Serial.print(unsigned(channel));
+    Serial.print(": ");
+    Serial.println(message);
+  }
+});
+```
+
+Channels are `Messages`, `Mqtt`, `Matter`, and `Zigbee` (in that order, 0–3).
+The sink receives raw text before WWW timestamps/truncation and before history
+memory checks. Its callback must not block; it runs synchronously during portal
+work, never directly from a Matter/Zigbee SDK event handler. The message reference
+is valid only for the call. Register a noncapturing function/lambda; `onLog(nullptr)`
+detaches it. Logging recursively inside the sink is not forwarded back to it.
+Register before `begin()` to include startup diagnostics.
+
+Enabling the callback defaults `ARDPORTAL_ENABLE_CONSOLE_MESSAGES` to `1`; an
+explicit `0` still removes Messages (including Matter lifecycle/power diagnostics).
+MQTT/Matter/Zigbee traffic follows its module define. The callback also enables
+Matter traffic formatting independently of `ARDPORTAL_ENABLE_MATTER_CONSOLE`,
+which remains a WWW-only tab. Disabling WWW excludes console histories and
+WebSockets; native Zigbee keeps only its bounded SDK event/traffic queues.
+Disabling the callback removes its handler pointer and dispatch guard entirely.
+This API does not intercept arbitrary `Serial` or SDK ESP_LOG output.
+See `examples/UsbDiagnostics/UsbDiagnostics.ino`.
+
+### Thread router capability
+
+`ARDPORTAL_MATTER_THREAD_ROUTER` defaults to the SDK's FTD selection when Matter
+uses Thread, otherwise `0`. It accepts only `0` or `1`; a sketch override must
+match the SDK. Router mode requires FTD with ICD and IEEE 802.15.4 radio sleep
+disabled. The source project selects it with `-DARDPORTAL_THREAD_ROLE=router`;
+`mtd` remains its default. Wi-Fi Matter cannot select it. See [Thread device
+mode](Matter#thread-device-mode-and-routing) for build commands and sleep behavior.

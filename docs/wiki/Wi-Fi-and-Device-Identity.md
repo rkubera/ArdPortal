@@ -72,3 +72,18 @@ DNS stops when the AP stops.
 ---
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
+
+## Runtime portal standby
+
+The unreleased `suspendPortal()` / `resumePortal()` API turns Wi-Fi and portal
+services off and restores the previous AP/reconnect policy without erasing
+settings. `portalSuspended()` reports the state. Zigbee or Matter over Thread
+can continue; Matter over Wi-Fi rejects suspension. Calls are loop-owned and
+can fail while configuration, OTA or scans are busy. Resume starts networking
+asynchronously, so check connectivity separately. See [Portal API](Portal-API#suspending-portal-networking).
+
+For commissioning, the ArdUI AP provides configuration and development pairing
+codes. Put the phone on the home Wi-Fi before adding Matter in HA; the setup AP
+is not the operational Matter network. ESP home-Wi-Fi association is needed for
+Matter Wi-Fi, while Matter Thread uses its own mesh credentials and border
+router. See [Matter AP commissioning](Matter#commissioning-while-the-portal-uses-ap-mode).

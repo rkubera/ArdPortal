@@ -145,11 +145,15 @@ def portal_parts(root, ota=True, mqtt=True, console=True, controls=None, guarded
         if not enabled:
             script = re.sub(r",?\{id:'" + entry + r"',path:'[^']+',label:'[^']+'\}", '', script)
     if not ota:
+        script = script.replace("[t('ui_074'),bytes(i.otaFreeBytes)],", "")
         script = '\n'.join(line for line in script.split('\n')
                            if not line.startswith("document.querySelector('#upgradeForm').onsubmit")
                            and not line.startswith("document.querySelector('#upgradeUrlForm').onsubmit"))
-    if not messages:
-        pass
+    if not mqtt and not messages:
+        # Native protocol tabs use their own read-only sockets. Do not allocate
+        # an unused common Console connection on these pages.
+        script = script.replace("function openConsole(){", "function openConsole(){if(currentPage?.id==='console')return;")
+        script = script.replace("${currentPage?.id==='console'?'/api/console':'/api/events'}", "/api/events")
     if not console:
         script = script.replace("else document.querySelector('#publishForm').elements.topic.placeholder=t('ui_097',{device:document.querySelector('#publishForm').dataset.device})", "")
         script = script.replace("document.querySelector('#publishForm').dataset.device=c.mqttName;", "")
@@ -160,7 +164,13 @@ def portal_parts(root, ota=True, mqtt=True, console=True, controls=None, guarded
         script = '\n'.join(line for line in script.split('\n')
                            if not line.startswith("document.querySelector('#publishForm').onsubmit")
                            and not line.startswith("if(currentPage?.id==='console'){consoleAvailability();")
-                           and not line.startswith("function selectConsoleTab("))
+                           and not line.startswith("function selectConsoleTab(")
+                           and not line.startswith("function appendConsoleLine(")
+                           and not line.startswith("function openZigbeeConsole(")
+                           and not line.startswith("function openMatterConsole(")
+                           and not line.startswith("let zigbeeConsoleSocket=")
+                           and not line.startswith("let matterConsoleSocket=")
+                           and not (line.startswith("window.addEventListener('pagehide'") and ("zigbeeConsoleRetry" in line or "matterConsoleRetry" in line)))
         script = script.replace("setMessage(document.querySelector('#consoleState'),", "setConsoleMessage(")
         script = script.replace("function openConsole()", "function setConsoleMessage(){}\nfunction openConsole()")
         script = script.replace("currentPage?.id==='console'?'/api/console':'/api/events'", "'/api/events'")
@@ -228,7 +238,7 @@ def generate(root):
     variants=[(*flags,messages) for flags in variants for messages in ([1,0] if flags[2] else [0])]
     for index, (ota, mqtt, console, tls, messages) in enumerate(variants):
         flags = [('OTA', ota), ('MQTT', mqtt), ('CONSOLE', console), ('MQTT_TLS',tls), ('CONSOLE_MESSAGES',messages)]
-        condition = ' && '.join(('' if value else '!') + 'ARDPORTAL_ENABLE_' + name for name, value in flags)
+        condition = ' && '.join(('' if value else '!') + 'ARDPORTAL_ENABLE_' + name for name, value in flags if console or name != 'CONSOLE_MESSAGES')
         lines.append(('#if ' if not index else '#elif ') + condition)
         _, script, shell = portal_parts(root, ota, mqtt, console, guarded=True,tls=tls,messages=messages)
         head=(root/'PortalPage.h').read_text().split('R"HEAD(',1)[1].split(')HEAD"',1)[0].split('<script id="pageCatalog"',1)[0]

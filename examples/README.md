@@ -8,6 +8,7 @@
 | `DHT/DHT.ino` | Configurable GPIO and DHT11/12/21/22 type (default GPIO2 / DHT22), numeric °C/% readings, calibration, MQTT/HA, Console and OTA; no TLS. |
 | `MinimalPortal/MinimalPortal.ino` | Portal with OTA enabled and MQTT disabled; HA and Console are disabled automatically. |
 | `BasicPortal/BasicPortal.ino` | Minimal portal; configuration, JSON and ArdFS journal are managed by the library. The loop only calls `portal.loop()`. |
+| `UsbDiagnostics/UsbDiagnostics.ino` | Messages over a sketch-owned USB/UART log callback, with WWW and its console histories disabled. |
 | `PowerManagement/PowerManagement.ino` | Independent power policy/sleep type, GPIO/ISR events and software timers. |
 | `ZigbeeDeepSleep/ZigbeeDeepSleep.ino` | Automatic end-device deep sleep with saved network identity and native readiness checks; Wi-Fi disabled. |
 | `ZigbeePowerManagement/ZigbeePowerManagement.ino` | Native Zigbee end-device radio sleep, optional CPU light sleep and periodic application events; Wi-Fi disabled. |
@@ -226,3 +227,7 @@ DHT diagnostics are available remotely in **Console > Messages**, including the
 selected GPIO/type, read failures, driver reinitialization and the first valid
 reading after startup or recovery. The same messages are printed to Serial at
 115200 baud. Console history is bounded and stored in RAM, so it clears on restart.
+
+- `MatterPortal`: ESP32-C6, optional Matter over Wi-Fi or Thread; use the included single-app partition table and read [Matter](../docs/wiki/Matter.md).
+
+- `PortalStandby`: Zigbee connection followed by Wi-Fi/WWW suspension; a debounced GPIO button restores the portal for two minutes.

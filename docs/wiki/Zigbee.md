@@ -4,7 +4,16 @@
 
 ArdPortal's Zigbee extension connects the same AppConfig controls to a Zigbee network through the chip's native radio. It includes joining/rejoining, standard and composite endpoints, bidirectional values, persistent settings, gateway definition export, diagnostics and firmware reception. The application still reads sensors and operates hardware.
 
-This guide describes the current development branch. It does not imply these features are present in older release ZIPs. Native compilation and host tests use Arduino-ESP32 **3.3.12**; device tests on ESP32-C5 with Zigbee2MQTT include control exchanges and complete OTA both with and without Wi-Fi. See [validation and troubleshooting](#validation-and-troubleshooting) for the exact scope.
+This guide describes the current development branch. It does not imply these features are present in older release ZIPs. Native compilation and host tests use Arduino-ESP32 **3.3.12**; device tests on ESP32-C5 with Zigbee2MQTT include control exchanges and complete OTA both with and without Wi-Fi. See [troubleshooting](#troubleshooting) for common setup issues.
+
+## Portal view
+
+The Zigbee page provides network state, rejoin/reset actions and downloads of the
+layout-specific Zigbee2MQTT converter and ZHA quirk. The view below uses
+illustrative data; the role is chosen at compilation.
+
+![Zigbee network management and gateway exports](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/zigbee-network.png)
+
 
 ## Choose a build
 
@@ -514,7 +523,7 @@ Complete OTA reception, validation, the before-restart callback, version-2 boot 
 2. Increment `ARDPORTAL_ZIGBEE_OTA_FILE_VERSION` and optionally set the human-readable version with `setFirmwareVersion("1.1")` before `begin()`. Neither value is the ArdPortal library version.
 3. Package the application `.bin` in a standard Zigbee OTA container with matching manufacturer/image type and the new file version. Do not send a merged flash image, `.bin.gz` or raw `.bin` to this client.
 4. Make the image available through the coordinator's OTA provider. Installing the ArdPortal converter does not host an image or configure a provider. Follow your gateway's OTA documentation.
-5. Start the update through the gateway, or the mapped INSTALL action when an image is available. Keep stable USB/power and radio placement for the full transfer. Zigbee transfer is substantially slower than HTTP; the tested images took over two hours.
+5. Start the update through the gateway, or the mapped INSTALL action when an image is available. Keep stable USB/power and radio placement for the full transfer. Zigbee transfer is substantially slower than HTTP; allow sufficient time for the full transfer.
 6. Confirm the gateway's successful completion, new image version and device rejoin. `TX queued` or 100% transfer alone does not prove the new firmware booted. Verify application operation after restart.
 
 While native OTA is active, application control processing is suspended. Commands issued then are not a valid control-latency test; wait for completion. The existing firmware remains selected when reception or image validation fails. Never change the partition layout through this OTA path.
@@ -836,11 +845,7 @@ Both End Device and Router roles are supported. HTTP OTA requires WWW; Zigbee OT
 
 Call `portal.setFirmwareVersion("1.2.3")` before `begin()` to set the shared application display version (default `1.0`, at most 16 UTF-8 bytes). Home Assistant MQTT Discovery uses device `sw_version`; Zigbee Basic `SWBuildID` exposes the same text. Gateways cache device metadata, so an existing device may need a new attribute read/interview. The layout model excludes this version, live values and IEEE identity: another device with the same layout can reuse the installed converter or quirk. The integer OTA file version remains separate. [Version API](https://github.com/rkubera/ArdPortal/wiki/Portal-API#application-firmware-version).
 
-## Validation and troubleshooting
-
-Host tests cover mappings, SDK command validation, queue ordering, reporting retries, scheduler capacity, OTA parsing/errors and restart sequencing. Hardware testing used ESP32-C5, Arduino-ESP32 3.3.12 and Zigbee2MQTT 2.14.2. Settings, telemetry and action routing were exercised with simulated application actuators. Actions confirm callback acceptance, not operation of real hardware. Native gaps and unsupported commands remain documented per control. ZHA exports have API-level tests; the C5/Zigbee2MQTT hardware results do not certify ZHA or commercial bridges, C6/H2, Router operation or every feature-flag combination.
-
-Full OTA without Wi-Fi passed on 15 October 2026 (approximately 2 h 16 min); full OTA with Wi-Fi/WWW passed on 16 October (approximately 2 h 27 min). Earlier runs had an actual reception timeout and an SDK MAC assertion; a later run passed without reproducing them, so their triggering cause remains unproven. Moving USB/power contacts or changing antenna placement can affect a test, but was not established as the cause in those logs. The [hardware validation report](https://github.com/rkubera/ArdPortal/wiki/Zigbee-Validation) distinguishes passing runs, interrupted attempts and failures.
+## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
@@ -854,3 +859,26 @@ Full OTA without Wi-Fi passed on 15 October 2026 (approximately 2 h 16 min); ful
 | OTA stops or device restarts | Preserve serial and gateway logs, last block/progress, power/reset evidence, Wi-Fi status and heap. Check image identity/layout, then distinguish reception timeout, image validation and SDK assertion. Do not treat a cached Connected label as proof of a working link. |
 
 Use the dedicated Console Zigbee tab when WWW is enabled, or `ARDPORTAL_ZIGBEE_DEBUG_SERIAL=1` otherwise. Diagnostics are bounded application/stack logs, not an RF capture or proof of broker delivery. No gateway installation or modification is performed automatically by ArdPortal.
+
+
+### Sensor-only command queue allocation
+
+The application command queue is allocated at startup only when at least one staged endpoint accepts commands. Measurement endpoints and read-only compound state parts do not require it. A mixed device, including one writable part in a compound control, retains the queue. This decision uses endpoint mappings for every sketch and does not depend on field IDs or names. Event/traffic queues and sensor reporting remain available.
+
+Sensor-only devices save the storage for 16 `ArdZigbeeFields::Command` records plus the FreeRTOS queue allocation overhead. This is runtime heap savings; it does not remove the shared SDK callback code from firmware.
+
+## Portal standby and sensor-only builds
+
+With Wi-Fi compiled in, the application can use `portal.suspendPortal()` to
+stop Wi-Fi, WWW, WebSockets, DNS and MQTT after joining Zigbee. Zigbee remains
+active as long as `portal.loop()` continues. Restore access from a local button
+with `portal.resumePortal()` and inspect `portal.portalSuspended()`; the saved
+AP/reconnect policy and credentials are retained. See [Portal API](Portal-API#suspending-portal-networking)
+for busy guards and [PortalStandby](https://github.com/rkubera/ArdPortal/blob/matter/examples/PortalStandby/PortalStandby.ino)
+for the two-minute access window. This does not change ED/router role or select
+a sleep policy.
+
+The Zigbee application command queue is allocated only when staged endpoints
+accept commands. Sensor-only and read-only compound endpoints retain state
+reporting without that actuator queue. This optimization follows endpoint
+capabilities, independent of example IDs, names or values.

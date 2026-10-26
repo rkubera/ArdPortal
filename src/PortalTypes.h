@@ -23,7 +23,8 @@ enum class ArdPortalChangeSource { Application,
                                    Portal,
                                    FactoryReset,
                                    Mqtt,
-                                   Zigbee };
+                                   Zigbee,
+                                   Matter };
 
 enum class ArdPortalRestartReason { Portal,
                                     FirmwareUpdate,

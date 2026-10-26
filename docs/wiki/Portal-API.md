@@ -615,3 +615,55 @@ The Device information view and `GET /api/info` expose this value as `firmwareVe
 - `const char* getFirmwareVersion() const` returns the current version; the returned text belongs to the portal.
 
 Home Assistant MQTT Discovery includes this value as device `sw_version`. Zigbee exposes it through the standard Basic cluster `SWBuildID` (`0x4000`) on the management and application endpoints. Existing Zigbee devices may need a new interview/read to refresh cached software metadata. The version is firmware metadata, not a saved user setting; assign it in each firmware build. Changing it does not change the control-layout model ID. This display string is independent of the integer `ARDPORTAL_ZIGBEE_OTA_FILE_VERSION` used to order Zigbee OTA images; set that macro separately for OTA releases.
+
+## Suspending portal networking
+
+**Unreleased API.**
+
+| Method | Return value |
+| --- | --- |
+| `bool suspendPortal()` | `true` after shutdown, or when already suspended; `false` if startup/busy guards or Wi-Fi shutdown prevent it. Always `false` in Matter-over-Wi-Fi builds. |
+| `bool resumePortal()` | `true` when restoration starts; when already active, returns configuration readiness. `false` while restart/OTA/configuration work or driver startup prevents restoration. |
+| `bool portalSuspended() const` | Explicit suspension flag; not a Wi-Fi connectivity or sleep-state test. |
+
+With `ARDPORTAL_ENABLE_WIFI=1`, call `portal.suspendPortal()` from the application
+loop to turn Wi-Fi off and close HTTP, WebSocket, DNS and MQTT connections.
+Zigbee and Matter over Thread keep running. Continue calling `portal.loop()`.
+`portal.portalSuspended()` reports the explicit suspension state.
+
+`portal.resumePortal()` restarts Wi-Fi and the HTTP listener, restoring the AP
+policy and automatic station reconnect policy saved at suspension. Saved network
+credentials are retained. With the default automatic AP policy, saved station
+credentials are tried first and the fallback AP starts on failure; without
+credentials the AP starts immediately. For a button that should always expose
+an AP, set `portal.startAccessPoint()` after a successful resume.
+
+Repeated successful calls are safe. Resume does not wait for Wi-Fi or MQTT to reconnect, and it does not restore old browser socket sessions; clients must reconnect. Suspension returns false
+before configuration is ready, during configuration writes, OTA, reboot, MQTT
+connection trials or queued/running Wi-Fi scans. It is unavailable for Matter
+over Wi-Fi because Wi-Fi carries Matter traffic. Network-changing API calls
+return false while suspended. Calls belong in `loop()`, never a GPIO ISR.
+Suspension itself does not select a Zigbee sleepy role or Thread ICD profile.
+
+See [PortalStandby](https://github.com/rkubera/ArdPortal/blob/matter/examples/PortalStandby/PortalStandby.ino) for Zigbee
+connection detection, a debounced button and a two-minute portal window. For
+Matter over Thread, use `portal.matter().commissioned()` together with
+`portal.matter().connected()` as the readiness condition.
+
+Suspension does not erase settings, release all compiled networking buffers, or
+reduce firmware size. It keeps application processing and enabled mesh transports
+running. Use feature defines for a permanently smaller build. For a compiled-out
+Wi-Fi build these three methods are not exposed.
+
+```cpp
+// In loop(), after portal.loop(); retry on a later loop when false.
+if (wantPortalOff && !portal.portalSuspended()) {
+  portal.suspendPortal();
+} else if (!wantPortalOff && portal.portalSuspended()) {
+  portal.resumePortal();
+}
+```
+
+Here `wantPortalOff` is an application-owned flag, for example from a debounced
+button. Resume needs a local trigger while Wi-Fi is off; a web request cannot
+reach the suspended portal. See [power management](Power-Management#portal-network-suspension).

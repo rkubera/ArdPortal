@@ -23,7 +23,7 @@ class Socket {
   close() {this.readyState=3;this.onclose?.();}
 }
 const context = vm.createContext({document:{querySelector:node, getElementById:id=>node('#'+id), createElement:()=>node(Symbol())},
-  location:{protocol:'http:',host:'device.local'}, currentPage:{id:'zigbee'}, WebSocket:Socket, confirm:text=>{confirmation=text;return true;},
+  location:{protocol:'http:',host:'device.local'}, currentPage:{id:'zigbee'}, languageCode:'en', WebSocket:Socket, confirm:text=>{confirmation=text;return true;},
   window:{addEventListener(){}}, setInterval(){}, setTimeout(){}, clearTimeout(){},
   fetch:async(url,options)=>{requests.push({url,options});return {ok:true,text:async()=> 'accepted',json:async()=>state};},
   t:key=>translations[key],
@@ -33,6 +33,7 @@ vm.runInContext(script,context);
 async function test() {
   await vm.runInContext("refreshZigbee()",context); await new Promise(setImmediate);
   assert.equal(sockets.length,0);
+  assert.ok(!source.includes("[t('ui_218'),state.endpoints||0]"));
   assert.equal(node('#zigbeeConverterDownload').hidden,true);
   state.converterReady=true;await vm.runInContext("refreshZigbee()",context);
   assert.equal(node('#zigbeeConverterDownload').hidden,false);

@@ -300,9 +300,6 @@ alongside the portal. Formatting affects all files in that volume.
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
 
-Local regression coverage and the USB ESP32-C5 bank-reuse investigation are recorded
-in [configuration persistence validation](../testing/Configuration-persistence-validation.md).
-
 ### Application edits during a save
 
 `setAppConfigValue()` and `removeAppConfigValue()` accept valid application edits

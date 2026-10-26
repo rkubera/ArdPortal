@@ -28,3 +28,7 @@
 #include "PowerSignalsImpl.h"
 #include "ArdPowerImpl.h"
 #endif
+
+#if ARDPORTAL_ENABLE_MATTER
+#include "MatterPortalImpl.h"
+#endif

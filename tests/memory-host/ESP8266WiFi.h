@@ -60,6 +60,9 @@ struct WiFiServer {
   static std::deque<WiFiClient> incoming;
   explicit WiFiServer(int) {}
   void begin() {}
+  void stop() {
+    incoming.clear();
+  }
   WiFiClient accept() {
     if (incoming.empty()) return {};
     auto client = incoming.front();
@@ -75,7 +78,7 @@ struct WiFiStub {
   unsigned softAPgetStationNum() const {
     return stations;
   }
-  bool softAPdisconnect(bool) {
+  bool enableAP(bool) {
     return true;
   }
   String apName, apPassword, hostName;

@@ -43,9 +43,40 @@ jobs:
           ZHC_NODE_MODULES="$RUNNER_TEMP/converter-tests/node_modules" Z2M_HA_SOURCE="$RUNNER_TEMP/z2m-homeassistant.ts" node tests/zigbee-converter-test.mjs
 
   arduino-builds:
-    name: Arduino builds
+    name: Firmware / Arduino / ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: portal-esp8266
+            name: "ESP8266 / portal"
+            core: esp8266:esp8266@3.1.2
+          - profile: portal-esp32
+            name: "ESP32 / portal"
+            core: esp32:esp32@3.3.12
+          - profile: zigbee-c6-ed
+            name: "ESP32-C6 / Zigbee end device"
+            core: esp32:esp32@3.3.12
+          - profile: zigbee-h2-ed
+            name: "ESP32-H2 / Zigbee end device"
+            core: esp32:esp32@3.3.12
+          - profile: matter-h2-thread
+            name: "ESP32-H2 / Matter Thread"
+            core: esp32:esp32@3.3.12
+          - profile: matter-c6-full
+            name: "ESP32-C6 / Matter Wi-Fi / all controls"
+            core: esp32:esp32@3.3.12
+          - profile: no-network-esp32
+            name: "ESP32 / API / no network"
+            core: esp32:esp32@3.3.12
+          - profile: api-all
+            name: "ESP8266 / API / all features"
+            core: esp8266:esp8266@3.1.2
+          - profile: api-log_headless
+            name: "ESP8266 / API / headless logging"
+            core: esp8266:esp8266@3.1.2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,13 +88,59 @@ jobs:
         run: |
           python tests/install-arduino-tool.py arduino-cli "$RUNNER_TEMP/arduino-tools"
           echo "$RUNNER_TEMP/arduino-tools" >> "$GITHUB_PATH"
-      - name: Install pinned board cores
+      - name: Install pinned board core
         run: |
-          arduino-cli core update-index --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json,https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          arduino-cli core install esp8266:esp8266@3.1.2 --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
-          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-      - name: Examples and public API feature matrix
-        run: bash tests/compile-arduino.sh
+          case '${{ matrix.core }}' in
+            esp8266:*) board_index=https://arduino.esp8266.com/stable/package_esp8266com_index.json ;;
+            esp32:*) board_index=https://espressif.github.io/arduino-esp32/package_esp32_index.json ;;
+            *) exit 2 ;;
+          esac
+          arduino-cli core update-index --additional-urls "$board_index"
+          arduino-cli core install '${{ matrix.core }}' --additional-urls "$board_index"
+      - name: Compile selected firmware and verify its profile
+        run: bash tests/compile-arduino.sh '${{ matrix.profile }}'
+
+  matter-sdk:
+    name: Firmware / Matter SDK / ${{ matrix.profile }} / ${{ matrix.credentials }} / ${{ matrix.power }} / ${{ matrix.thread_role }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container: espressif/idf:v5.5.5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: wifi
+            credentials: development
+            power: connected
+            thread_role: mtd
+          - profile: thread
+            credentials: development
+            power: icd
+            thread_role: mtd
+          - profile: thread-wifi
+            credentials: production
+            power: off
+            thread_role: mtd
+          - profile: thread-wifi
+            credentials: development
+            power: icd
+            thread_role: mtd
+          - profile: thread-wifi
+            credentials: development
+            power: off
+            thread_role: router
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build pinned ESP-Matter from source and verify linked transports
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py -C idf/MatterPortal -B "$RUNNER_TEMP/matter-${{ matrix.profile }}-${{ matrix.credentials }}-${{ matrix.power }}-${{ matrix.thread_role }}" -DARDPORTAL_PROFILE=${{ matrix.profile }} -DARDPORTAL_CREDENTIALS=${{ matrix.credentials }} -DARDPORTAL_POWER=${{ matrix.power }} -DARDPORTAL_THREAD_ROLE=${{ matrix.thread_role }} -DIDF_TARGET=esp32c6 build
+          python tests/check-matter-sdk.py "$RUNNER_TEMP/matter-${{ matrix.profile }}-${{ matrix.credentials }}-${{ matrix.power }}-${{ matrix.thread_role }}" --profile ${{ matrix.profile }} --credentials ${{ matrix.credentials }} --power ${{ matrix.power }} --thread-role ${{ matrix.thread_role }}
 
   lint-assets:
     name: Lint and assets
@@ -88,7 +165,15 @@ jobs:
           assert properties["name"] == "ArdPortal", "Changing the registered library name requires an Arduino Registry maintenance request"
           PY
       - name: Install Arduino IDE formatter
-        run: sudo apt-get update && sudo apt-get install --yes clang-format-14
+        timeout-minutes: 4
+        run: |
+          if command -v clang-format-14 >/dev/null 2>&1; then
+            clang-format-14 --version
+            exit 0
+          fi
+          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
+          sudo timeout 90s apt-get "${apt_options[@]}" update
+          sudo timeout 120s apt-get "${apt_options[@]}" install --yes --no-install-recommends clang-format-14
       - name: Check Arduino code formatting
         run: python src/tools/format_code.py --check
       - name: Check generated resources without modifying files

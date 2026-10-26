@@ -7,6 +7,8 @@ import hashlib
 import io
 from pathlib import Path, PurePosixPath
 import tarfile
+import time
+import urllib.error
 import urllib.request
 
 TOOLS = {
@@ -21,13 +23,29 @@ TOOLS = {
 }
 
 
+def download(request):
+    """Retry transient HTTP and transport failures, with bounded backoff."""
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                return response.read()
+        except urllib.error.HTTPError as error:
+            if error.code not in (408, 429, 500, 502, 503, 504) or attempt == 4:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == 4:
+                raise
+        delay = 2 ** (attempt + 1)
+        print(f'Download failed; retrying in {delay}s', flush=True)
+        time.sleep(delay)
+
+
 def install(tool, directory):
     """Download an official release and extract only its verified executable."""
     tag, archive, checksum = TOOLS[tool]
     url = f'https://github.com/arduino/{tool}/releases/download/{tag}/{archive}'
     request = urllib.request.Request(url, headers={'User-Agent': 'ArdPortal-CI'})
-    with urllib.request.urlopen(request, timeout=120) as response:
-        payload = response.read()
+    payload = download(request)
     if hashlib.sha256(payload).hexdigest() != checksum:
         raise SystemExit(f'{tool}: unexpected archive SHA-256')
     with tarfile.open(fileobj=io.BytesIO(payload), mode='r:gz') as bundle:

@@ -15,9 +15,13 @@ namespace ArdPowerDetail {
 class Signals {
 public:
   static constexpr uint8_t MaxPins = 4, MaxInterruptSources = 16;
+  /** @brief Initialize an empty GPIO registry and ISR latch. */
   Signals() = default;
+  /** @brief Prevent copying native GPIO/ISR ownership. */
   Signals(const Signals&) = delete;
+  /** @brief Prevent assigning native GPIO/ISR ownership. */
   Signals& operator=(const Signals&) = delete;
+  /** @brief Detach registered GPIO handlers and release the optional wait semaphore. */
   ~Signals() {
     for (auto& slot : _pins)
       if (slot.used) removePin(slot.pin);
@@ -25,6 +29,7 @@ public:
     if (_wait) vSemaphoreDelete(_wait);
 #endif
   }
+  /** @brief Register a level wake GPIO; false for invalid settings, unsupported deep wake or exhausted slots. */
   bool addWakePin(uint8_t pin, ArdPowerWakeLevel level, ArdPowerWakeScope scope) {
     if (uint8_t(level) > 1 || uint8_t(scope) > 1) return false;
     if (scope == ArdPowerWakeScope::LightAndDeepSleep) {
@@ -38,12 +43,14 @@ public:
     }
     return addPin(pin, level == ArdPowerWakeLevel::Low ? ONLOW : ONHIGH, true, scope == ArdPowerWakeScope::LightAndDeepSleep);
   }
+  /** @brief Register an edge GPIO event source; return whether native registration succeeded. */
   bool addInterruptPin(uint8_t pin, ArdPowerInterrupt trigger) {
     if (uint8_t(trigger) > 2) return false;
     return addPin(pin, trigger == ArdPowerInterrupt::Rising ? RISING : trigger == ArdPowerInterrupt::Falling ? FALLING
                                                                                                              : CHANGE,
                   false, false);
   }
+  /** @brief Detach a GPIO, clear pending state and disable its wake source; false if not found or detach fails. */
   bool removePin(uint8_t pin) {
     for (uint8_t i = 0; i < MaxPins; ++i)
       if (_pins[i].used && _pins[i].pin == pin) {
@@ -64,32 +71,39 @@ public:
       }
     return false;
   }
+  /** @brief Latch a coalesced application ISR source 0–15; ignore out-of-range IDs. */
   void __attribute__((always_inline)) signalFromISR(uint8_t source) {
     if (source < MaxInterruptSources) recordFromISR(uint32_t(1) << (8 + source));
   }
+  /** @brief Check the pending ISR latch without consuming it. */
   bool hasSignals() {
     return pending() != 0;
   }
+  /** @brief Return whether any GPIO source is registered. */
   bool hasSources() const {
     for (const auto& slot : _pins)
       if (slot.used) return true;
     return false;
   }
+  /** @brief Return whether any registered GPIO requires interrupt handling rather than wake handling. */
   bool interruptOnly() const {
     for (const auto& slot : _pins)
       if (slot.used && !slot.wake) return true;
     return false;
   }
+  /** @brief Return whether a registered level wake pin is currently asserted. */
   bool wakePinsActive() const {
     for (const auto& slot : _pins)
       if (slot.used && slot.wake && active(slot)) return true;
     return false;
   }
+  /** @brief Return whether every registered GPIO supports deep sleep; true when no pins exist. */
   bool deepSourcesReady() const {
     for (const auto& slot : _pins)
       if (slot.used && !slot.deep) return false;
     return true;
   }
+  /** @brief Consume pending signal bits, coalescing held wake levels and rearming released pins. */
   uint32_t takeSignals() {
     uint32_t bits = takePending();
     for (uint8_t i = 0; i < MaxPins; ++i) {
@@ -106,6 +120,7 @@ public:
     }
     return bits;
   }
+  /** @brief Map a signal bit to its GPIO/application event identity; false for unregistered bits. */
   bool describeSignal(uint8_t bit, ArdPowerEvent& event) const {
     if (bit >= 8 && bit < 24) {
       event.kind = ArdPowerEventKind::Interrupt;
@@ -119,6 +134,7 @@ public:
     }
     return false;
   }
+  /** @brief Wait cooperatively for a latched signal or the requested millisecond timeout. */
   void waitForSignal(uint32_t ms) {
 #if defined(ESP32) && configSUPPORT_STATIC_ALLOCATION
     if (!_wait) {
@@ -139,6 +155,7 @@ public:
     if (!hasSignals()) delay(ms);
 #endif
   }
+  /** @brief Arm native deep-wake GPIO after checking sources and pending events; false if unsafe or unsupported. */
   bool prepareDeepPins() {
     if (!deepSourcesReady() || hasSignals() || wakePinsActive()) return false;
 #if defined(ESP32)
@@ -160,6 +177,7 @@ public:
 #endif
     return true;
   }
+  /** @brief Disarm an armed deep-wake GPIO and restore light-wake handling as needed. */
   void clearDeepPins() {
 #if defined(ESP32)
     if (!_deepPinArmed) return;
