@@ -7,12 +7,16 @@
 - [Optional modules](#optional-modules)
 - [Definition budget](#definition-budget)
 - [Network memory reserves](#network-memory-reserves)
+- [Zigbee](#zigbee-esp32-c5c6h2)
+- [Matter](#matter)
 
 ## Optional modules
 
 Set feature defines in the main `.ino`, before including `ArdPortal.h`.
-Module flags default to `1` (enabled), except `ARDPORTAL_ENABLE_CONSOLE_MESSAGES`,
-which follows `ARDPORTAL_ENABLE_LOG_CALLBACK` (default `0`). The log callback also defaults to `0`. All enable flags accept only `0` or `1`:
+Module flags default to `1` (enabled), except Zigbee, Matter, the Matter traffic
+console and the log callback, which default to `0`. `ARDPORTAL_ENABLE_CONSOLE_MESSAGES`
+follows `ARDPORTAL_ENABLE_LOG_CALLBACK` unless explicitly set. All enable flags
+accept only `0` or `1`:
 
 ```cpp
 #define ARDPORTAL_ENABLE_OTA 0
@@ -20,10 +24,13 @@ which follows `ARDPORTAL_ENABLE_LOG_CALLBACK` (default `0`). The log callback al
 #include <ArdPortal.h>
 ```
 
-| Define | Disabled behavior |
+| Define | Default / effect |
 | --- | --- |
 | `ARDPORTAL_ENABLE_WWW` | Defaults to `1`. Set `0` to stop HTTP/WWW and WebSockets, including HTTP API, web Console, uploads and HTTP converter downloads. Omits HTTP transport/buffers and captive DNS. Disables HTTP OTA; Zigbee OTA remains controlled by `ARDPORTAL_ENABLE_OTA`. Converter export through the C++ API remains available. Wi-Fi, AP, MQTT, Zigbee, storage and programmatic APIs remain available. |
 | `ARDPORTAL_ENABLE_WIFI` | Defaults to `1`. Set `0` to disable station Wi-Fi and AP; forces WWW and MQTT off, including MQTT TLS/HA. Zigbee, storage and local AppConfig APIs remain available. Wi-Fi/AP and MQTT public APIs are unavailable. |
+| `ARDPORTAL_ENABLE_ZIGBEE` | Defaults to `0`. Set `1` to enable native Zigbee on ESP32-C5/C6/H2 with a matching SDK/board mode. Set `0` to omit its adapter and endpoints. Independent of MQTT; cannot coexist with Matter. See [Zigbee options](#zigbee-esp32-c5c6h2). |
+| `ARDPORTAL_ENABLE_MATTER` | Defaults to `0`. Set `1` to enable native Matter with a supported ESP32 SDK; transport is selected separately. Set `0` to omit its adapter and SDK dependency from ArdPortal. Requires dynamic pages; cannot coexist with Zigbee. See [Matter options](#matter). |
+| `ARDPORTAL_ENABLE_MATTER_CONSOLE` | Defaults to `0`. Set `1` to add Matter traffic history and a dedicated web Console tab/WebSocket; requires Matter, WWW and Console. See [Matter diagnostics](#matter-command-console-and-lifecycle-messages). |
 | `ARDPORTAL_ENABLE_POWER_MANAGEMENT` | Defaults to `1`. Set `0` to remove the power manager, GPIO/timer wake handling and `portal.power()` API. |
 | `ARDPORTAL_ENABLE_OTA` | Removes OTA implementation and Update page. |
 | `ARDPORTAL_ENABLE_MQTT` | Removes MQTT, MQTT Configuration, MQTT command handling and HA. Messages and native protocol diagnostics can remain enabled independently. |
@@ -42,8 +49,8 @@ and `emitAppConfigEvent()` then return false and `onAppConfigCommand()` is a no-
 change callback remain available and persist through ArdFS. When Console is
 also disabled, WebSocket handling and buffers are omitted as well.
 
-MinimalPortal enables OTA and disables MQTT and dynamic forms. Disabling MQTT automatically forces HA and
-Console off. No shared-header edits or companion build files are required.
+MinimalPortal enables OTA and disables MQTT and dynamic forms. Disabling MQTT automatically forces HA off; Console diagnostics can remain
+enabled independently. No shared-header edits or companion build files are required.
 
 The entry header compiles the portal implementation in the sketch translation
 unit, so sketch defines apply to its modules and compressed web assets on both
@@ -313,18 +320,90 @@ support is available in End Device and Router roles.
 
 ## Matter
 
-`ARDPORTAL_ENABLE_MATTER` defaults to `0`. With `1`, `ARDPORTAL_MATTER_THREAD` selects Wi-Fi (`0`) or Thread (`1`, default on H2). `ARDPORTAL_MATTER_MAX_ENDPOINTS` defaults to `16` (range `1..64`). Individual control flags also exclude their native endpoint implementations. Requires dynamic pages, a Matter-enabled ESP32 SDK, sufficient app/NVS partitions and a supported radio. Matter and Zigbee cannot be enabled together. See [Matter](Matter) for the build profile, commissioning and mapping restrictions.
+Matter is opt-in and independent of MQTT/Home Assistant Discovery. Define library
+options before `#include <ArdPortal.h>` in the sketch. They select ArdPortal code;
+they do not rebuild a precompiled SDK or add radio/ICD/factory-provider support.
+Use an ESP32 board with the required Matter SDK and app/NVS partition layout.
+ESP8266 is not supported. See the [Matter build guide](Matter).
 
-`ARDPORTAL_MATTER_PRODUCTION` defaults to `0`. The source SDK sets it to `1` for `ARDPORTAL_CREDENTIALS=production`, which requires factory credential providers and excludes development setup overrides. See [Matter credential profiles](Matter#credential-profiles).
+### Library options
 
-### Matter command console
+| Define | Default | Values and effect |
+| --- | --- | --- |
+| `ARDPORTAL_ENABLE_MATTER` | `0` | `1` includes the native Matter adapter, endpoint mapping, lifecycle and enabled portal/API integration. `0` excludes the adapter and its SDK dependency from ArdPortal. Requires `ARDPORTAL_ENABLE_DYNAMIC_PAGES=1`; cannot coexist with `ARDPORTAL_ENABLE_ZIGBEE=1`. |
+| `ARDPORTAL_MATTER_THREAD` | `1` on ESP32-H2, otherwise `0` | `0`: Matter uses Wi-Fi and requires `ARDPORTAL_ENABLE_WIFI=1`. `1`: Matter uses Thread on ESP32-C5/C6/H2 with a Thread-enabled SDK. This selects one Matter transport; it does not mean both transports are used simultaneously. Thread can retain a separate Wi-Fi portal when the SDK supports it. |
+| `ARDPORTAL_MATTER_PRODUCTION` | `0` | `0`: SDK development credentials and development pairing-code options. `1`: factory credential providers; requires a source SDK built for production with test setup disabled. This does not generate/install certificates or certify the device. Select through `ARDPORTAL_CREDENTIALS` in source builds. |
+| `ARDPORTAL_MATTER_MAX_ENDPOINTS` | `16` | Integer `1..64`: upper limit on mapped native control endpoints, not the number of portal fields or total SDK memory. Raising it allows larger layouts but does not guarantee enough flash/heap; unsupported fields do not gain mappings. |
+| `ARDPORTAL_MATTER_THREAD_ROUTER` | SDK FTD selection for Matter Thread; otherwise `0` | `1`: compile for router-capable FTD; `0`: MTD/end-device build. Must match the SDK. FTD requires ICD and IEEE 802.15.4 radio sleep disabled; invalid combinations fail compilation. It enables eligibility, not a forced router role. |
+| `ARDPORTAL_ENABLE_MATTER_CONSOLE` | `0` | `1`: add the human-readable Matter traffic tab and its dedicated read-only WebSocket/history. Requires Matter, WWW and Console; normalized to `0` when those prerequisites are disabled. Separate from lifecycle Messages. |
 
-`ARDPORTAL_ENABLE_MATTER_CONSOLE` defaults to `0`. Set it to `1` with Matter and
-WWW Console enabled to add **Console → Matter**. It shows readable incoming
-commands, accepted/rejected outcomes and application state updates to Matter.
-It is independent of `ARDPORTAL_ENABLE_CONSOLE_MESSAGES`, which controls lifecycle
-messages such as pairing and connectivity. The MatterPortal example enables both.
-Disabling Matter, WWW or Console normalizes the command-console define to `0`.
+All boolean defines accept only `0` or `1`. Invalid transport/device-type choices
+fail compilation rather than silently selecting another radio. On ESP32-C5 with
+the precompiled Arduino core, the **Matter Network** board menu must also match
+`ARDPORTAL_MATTER_THREAD`.
+
+### Minimal Arduino selection
+
+```cpp
+// Before #include <ArdPortal.h>:
+#define ARDPORTAL_ENABLE_MATTER 1
+#define ARDPORTAL_MATTER_THREAD 0 // 0: Matter Wi-Fi; 1: Matter Thread
+#define ARDPORTAL_ENABLE_MQTT 0   // Optional; Matter does not need MQTT
+#define ARDPORTAL_ENABLE_HA 0     // Disables MQTT Discovery, not HA Matter support
+#include <ArdPortal.h>
+```
+
+Leave `ARDPORTAL_ENABLE_DYNAMIC_PAGES` enabled (default `1`). Individual
+`ARDPORTAL_ENABLE_CONTROL_*` flags include/exclude their native endpoint code.
+`ARDPORTAL_ENABLE_CLASSES=1` (default) is needed to retain explicit class-based
+mappings such as brightness and measurement sensors. A class does not add a
+mapping for an unsupported control; see [control mappings](Matter#mappings).
+Disabling WWW removes web pages/APIs but does not require disabling Matter.
+
+### Source SDK settings are not sketch defines
+
+Pass these CMake settings to `idf.py` when building `idf/MatterPortal`. They select
+SDK configuration fragments and matching library settings. Use a fresh build
+directory when changing transport, credential, power or Thread device type.
+
+| CMake setting | Default | Choices |
+| --- | --- | --- |
+| `ARDPORTAL_PROFILE` | `wifi` | `wifi`: Matter and portal over Wi-Fi; `thread`: Matter Thread without Wi-Fi; `thread-wifi`: Matter exclusively over Thread with a separate Wi-Fi portal. |
+| `ARDPORTAL_CREDENTIALS` | `development` | `development`: SDK test credentials; `production`: own certificates and commissioning data provisioned into the dedicated `fctry` partition. |
+| `ARDPORTAL_POWER` | `off` | `off`: no extra SDK PM/ICD support; `connected`: connected saving for Wi-Fi; `icd`: Short Idle Time ICD for Thread or Thread + Wi-Fi portal. Compiling support does not by itself change the default runtime `AlwaysOn` policy. |
+| `ARDPORTAL_THREAD_ROLE` | `mtd` | `mtd`: end device; `router`: router-capable FTD for Thread profiles with power `off`. The network determines whether its current role is Child, Router or Leader. |
+
+For example, build Matter over Thread with an always-listening router-capable
+radio and a separate Wi-Fi portal:
+
+```sh
+idf.py -C idf/MatterPortal -B build-thread-router \
+  -DARDPORTAL_PROFILE=thread-wifi \
+  -DARDPORTAL_THREAD_ROLE=router -DARDPORTAL_POWER=off \
+  -DIDF_TARGET=esp32c6 build
+```
+
+Do not force `ARDPORTAL_MATTER_THREAD_ROUTER=1` in a sketch backed by an MTD SDK:
+the define cannot replace an FTD build. Similarly, setting the production flag
+cannot replace factory provisioning. See [credential profiles](Matter#credential-profiles),
+[Thread device mode](Matter#thread-device-mode-and-routing) and
+[power management](Matter#power-management) for the full requirements.
+
+### Matter command console and lifecycle Messages
+
+```cpp
+// Optional additions before #include <ArdPortal.h>:
+#define ARDPORTAL_ENABLE_MATTER_CONSOLE 1 // Commands and reported control values
+#define ARDPORTAL_ENABLE_CONSOLE_MESSAGES 1 // Pairing, connectivity and power decisions
+```
+
+The traffic tab is **Console → Matter**. It shows readable commands,
+accepted/rejected outcomes and application state updates sent to Matter.
+`ARDPORTAL_ENABLE_CONSOLE_MESSAGES` is independent and controls lifecycle messages;
+it normally defaults to `0`, or `1` when `ARDPORTAL_ENABLE_LOG_CALLBACK=1` unless
+explicitly overridden. The MatterPortal example enables both diagnostic views.
+Turning the traffic tab off removes its web history/socket; a separately enabled
+log callback can still receive Matter traffic without WWW.
 
 ### Log callback without WWW
 
@@ -363,12 +442,3 @@ WebSockets; native Zigbee keeps only its bounded SDK event/traffic queues.
 Disabling the callback removes its handler pointer and dispatch guard entirely.
 This API does not intercept arbitrary `Serial` or SDK ESP_LOG output.
 See `examples/UsbDiagnostics/UsbDiagnostics.ino`.
-
-### Thread router capability
-
-`ARDPORTAL_MATTER_THREAD_ROUTER` defaults to the SDK's FTD selection when Matter
-uses Thread, otherwise `0`. It accepts only `0` or `1`; a sketch override must
-match the SDK. Router mode requires FTD with ICD and IEEE 802.15.4 radio sleep
-disabled. The source project selects it with `-DARDPORTAL_THREAD_ROLE=router`;
-`mtd` remains its default. Wi-Fi Matter cannot select it. See [Thread device
-mode](Matter#thread-device-mode-and-routing) for build commands and sleep behavior.
