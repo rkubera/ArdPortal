@@ -19,7 +19,7 @@ source = (ROOT/'src/PortalPage.h').read_text()
 classes, ids = identifier_maps(source)
 assert len(set(classes.values())) == len(classes)
 assert len(set(ids.values())) == len(ids)
-assert all(len(value) == 1 for value in [*classes.values(), *ids.values()])
+assert all(len(value) == 2 for value in [*classes.values(), *ids.values()])
 assert html_names('<label for="wifiForm" class="card secondary" aria-labelledby="deviceTitle languageLabel"></label>',classes,ids) == '<label for="'+ids['wifiForm']+'" class="'+classes['card']+' '+classes['secondary']+'" aria-labelledby="'+ids['deviceTitle']+' '+ids['languageLabel']+'"></label>'
 assert '#'+ids['notice']+'.'+classes['message']+'{' in css_names('#notice.message{color:#abcdef;content:".message #notice"}',classes,ids)
 assert 'color:#abcdef;content:".message #notice"' in css_names('#notice.message{color:#abcdef;content:".message #notice"}',classes,ids)
@@ -30,19 +30,20 @@ for flags in itertools.product((False,True),repeat=5):
     _, script, html = portal_parts(ROOT/'src',guarded=True,**options)
     # Different control sets exercise complete and selectively assembled assets.
     for controls in (None, [], ['text'], ['slider','text','select'], ['light','cover']):
-        for zigbee, dependencies in itertools.product((0,1),repeat=2):
-            compiled = selected(script,controls,{'ZIGBEE':zigbee,'DEPENDENCIES':dependencies})
+        for (zigbee,matter,matter_console), dependencies in itertools.product(((0,0,0),(1,0,0),(0,1,0),(0,1,1)),(0,1)):
+            compiled = selected(script,controls,{'ZIGBEE':zigbee,'MATTER':matter,'MATTER_CONSOLE':matter_console,'DEPENDENCIES':dependencies})
             scripts.append(compiled)
     assert 'id="deviceTitle"' not in html and 'class="secondary"' not in html
 
 _, compiled, _ = portal_parts(ROOT/'src',guarded=True)
+matter_compiled = selected(compiled,None,{'ZIGBEE':0,'MATTER':1})
 compiled = selected(compiled,None,{'ZIGBEE':1})
 fixture = r'''
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
 for(const source of input.scripts)new vm.Script(source);
 const c=input.classes,ids=input.ids,lines=input.compiled.split('\n');
-const node=()=>({hidden:false,disabled:false,attributes:{},children:[],dataset:{},elements:{},setAttribute(k,v){this.attributes[k]=v},append(n){this.children.push(n)}});
+const node=()=>({replaceChildren(){this.children=[]},hidden:false,disabled:false,attributes:{},children:[],dataset:{},elements:{},setAttribute(k,v){this.attributes[k]=v},append(n){this.children.push(n)}});
 const nodes={};for(const id of Object.values(ids))nodes[id]=node();
 nodes[ids.publishForm].elements.topic={};nodes[ids.publishForm].dataset={};
 const band={disabled:true,value:''},form={elements:{apBand:band}};
@@ -58,7 +59,7 @@ zigbeeBusy:false,confirm:()=>true,fetch:async path=>{requests.push(path);return 
 for(const line of lines)if(line.startsWith('const _domIds=')||line.startsWith('const _pageId='))vm.runInContext(line,context);
 context.dynamicDefinitions=Array.from({length:16},(_,i)=>({id:'user-page-'+i}));
 const aliases=context.dynamicDefinitions.map(page=>{context.page=page;return vm.runInContext('_pageId(page)',context)});
-assert.equal(new Set(aliases).size,16);assert(aliases.every(id=>id.length===1&&!Object.values(ids).includes(id)));
+assert.equal(new Set(aliases).size,16);assert(aliases.every(id=>id.length===2&&!Object.values(ids).includes(id)));
 assert.equal(context.dynamicDefinitions[0].id,'user-page-0');
 assert.equal(vm.runInContext('_domId("toString")',context),'toString');
 assert.equal(vm.runInContext('_domId("dynamic-user-page")',context),'dynamic-user-page');
@@ -80,6 +81,14 @@ context.currentPage={id:'wifi'};nodes[ids.wifi].hidden=true;
 vm.runInContext(lines.find(l=>l.startsWith('if(currentPage)document.getElementById')),context);
 assert.equal(nodes[ids.wifi].hidden,false);
 (async()=>{
+ const matterLines=input.matterCompiled.split('\n');
+ const matterContext=vm.createContext({document:{querySelector:s=>{const id=s.split(' ').at(-1).slice(1);assert(nodes[id],'Unknown Matter selector '+s);return nodes[id]},getElementById:id=>{assert(nodes[id],'Unknown Matter DOM ID '+id);return nodes[id]},createElement:node},t:key=>key,matterBusy:false,matterMessage(){}});
+ vm.runInContext(matterLines.find(l=>l.startsWith('const _domIds=')),matterContext);
+ vm.runInContext(matterLines.find(l=>l.startsWith('function renderMatter(')),matterContext);
+ vm.runInContext('renderMatter({state:"commissioning",transport:"wifi",endpoints:3,unsupported:0,manualCode:"123",error:""})',matterContext);
+ assert.equal(nodes[ids.rejoin].disabled,false);assert.equal(nodes[ids.reset].disabled,false);
+ vm.runInContext('matterBusy=true;renderMatter({state:"commissioning",endpoints:3,unsupported:0})',matterContext);
+ assert.equal(nodes[ids.rejoin].disabled,true);assert.equal(nodes[ids.reset].disabled,true);
  await vm.runInContext('loadConfig()',context);assert.equal(band.value,5);assert.equal(band.disabled,false);
  assert.equal(nodes[ids.deviceTitle].textContent,'Test');
  await vm.runInContext('operateZigbee("reset")',context);
@@ -89,6 +98,6 @@ assert.equal(nodes[ids.wifi].hidden,false);
 '''
 with tempfile.TemporaryDirectory(prefix='ardportal-dom-') as directory:
     work=Path(directory)
-    (work/'input.json').write_text(json.dumps({'scripts':scripts,'compiled':compiled,'classes':classes,'ids':ids}))
+    (work/'input.json').write_text(json.dumps({'scripts':scripts,'compiled':compiled,'matterCompiled':matter_compiled,'classes':classes,'ids':ids}))
     (work/'test.cjs').write_text(fixture)
     subprocess.run([os.environ.get('NODE','node'),str(work/'test.cjs'),str(work/'input.json')],check=True)

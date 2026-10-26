@@ -1,0 +1,7 @@
+# 4 MiB development profile, single app; no firmware OTA slot.
+# Name, Type, SubType, Offset, Size, Flags
+nvs, data, nvs, 0x9000, 0x16000,
+phy_init, data, phy, 0x1F000, 0x1000,
+factory, app, factory, 0x20000, 0x380000,
+spiffs, data, spiffs, 0x3A0000, 0x50000,
+coredump, data, coredump, 0x3F0000, 0x10000,

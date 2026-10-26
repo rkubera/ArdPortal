@@ -23,7 +23,7 @@ class Socket {
   close() {this.readyState=3;this.onclose?.();}
 }
 const context = vm.createContext({document:{querySelector:node, getElementById:id=>node('#'+id), createElement:()=>node(Symbol())},
-  location:{protocol:'http:',host:'device.local'}, currentPage:{id:'zigbee'}, WebSocket:Socket, confirm:text=>{confirmation=text;return true;},
+  location:{protocol:'http:',host:'device.local'}, currentPage:{id:'zigbee'}, languageCode:'en', WebSocket:Socket, confirm:text=>{confirmation=text;return true;},
   window:{addEventListener(){}}, setInterval(){}, setTimeout(){}, clearTimeout(){},
   fetch:async(url,options)=>{requests.push({url,options});return {ok:true,text:async()=> 'accepted',json:async()=>state};},
   t:key=>translations[key],

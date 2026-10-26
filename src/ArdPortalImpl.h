@@ -3,7 +3,9 @@
 #include "LanguageLiterals.h"
 #include "ArdPortalDeclarations.h"
 #include "Language.h"
+#if ARDPORTAL_ENABLE_WWW
 #include "PortalAssets.h"
+#endif
 #include "ConfigJson.h"
 #include "ConsoleTimestamp.h"
 #include "DeviceName.h"
@@ -17,6 +19,9 @@ using ArdNetworkIo::stopClient;
 #endif
 #if defined(ESP32)
 #include <esp_system.h>
+#if ARDPORTAL_ENABLE_MATTER && ARDPORTAL_MATTER_THREAD && ARDPORTAL_ENABLE_WIFI
+#include <esp_wifi.h>
+#endif
 #if ARDPORTAL_ENABLE_WWW
 #include <lwip/sockets.h>
 #include <errno.h>
@@ -242,6 +247,11 @@ bool ArdPortal::begin(const Options& options) {
     static_cast<ArdPortal*>(context)->log(ARD_LANG_NATIVE_ZIGBEE + message);
   });
 #endif
+#if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_LOG_CALLBACK
+  _zigbee.onLogDiagnostic(this, [](void* context, const String& message) {
+    static_cast<ArdPortal*>(context)->emitLog(LogChannel::Zigbee, message);
+  });
+#endif
   _options = options;
   _config.apName = options.deviceName ? options.deviceName : defaultDeviceName();
   _config.apPassword = options.apPassword ? options.apPassword : "";
@@ -255,7 +265,29 @@ bool ArdPortal::begin(const Options& options) {
   _config.apName = ArdDeviceName::ap(_config.deviceName);
   if (!validPortalConfig(_config)) return false;
 #if ARDPORTAL_ENABLE_WIFI
+#if ARDPORTAL_ENABLE_MATTER && ARDPORTAL_MATTER_THREAD
+  // The first Wi-Fi init owns buffer sizes. Arduino applies its Matter limits
+  // only to Matter over Wi-Fi, so reserve memory for Thread + BLE here too.
+  wifi_mode_t wifiMode;
+  if (esp_wifi_get_mode(&wifiMode) == ESP_ERR_WIFI_NOT_INIT) {
+    wifi_init_config_t wifi = WIFI_INIT_CONFIG_DEFAULT();
+    wifi.static_rx_buf_num = 4;
+    wifi.dynamic_rx_buf_num = 8;
+    wifi.tx_buf_type = 1;
+    wifi.static_tx_buf_num = 0;
+    wifi.dynamic_tx_buf_num = 8;
+    wifi.cache_tx_buf_num = 4;
+    wifi.rx_ba_win = 6;
+    if (esp_wifi_init(&wifi) != ESP_OK) return false;
+  }
+#endif
+#if ARDPORTAL_ENABLE_MATTER && !ARDPORTAL_MATTER_THREAD
+  // ESP-Matter's network commissioning driver persists and rolls back Wi-Fi
+  // credentials through the SDK Wi-Fi storage, including across a reboot.
+  WiFi.persistent(true);
+#else
   WiFi.persistent(false);
+#endif
   WiFi.setAutoReconnect(false);
   WiFi.mode(WIFI_STA);
   // Stop any SDK/core association inherited at startup. Storage loading gives
@@ -287,7 +319,7 @@ bool ArdPortal::begin(const Options& options) {
  */
 void ArdPortal::connectWifi() {
 #if ARDPORTAL_ENABLE_WIFI
-  if (!_wifiAutoReconnect) return;
+  if (_portalSuspended || !_wifiAutoReconnect) return;
   _wifiSince = millis();
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   logMessage(String(F(ARD_LANG_NATIVE_WI_FI_CONNECTING)) + _config.ssid);
@@ -307,7 +339,7 @@ void ArdPortal::connectWifi() {
  */
 void ArdPortal::startAP() {
 #if ARDPORTAL_ENABLE_WIFI
-  if (_apPolicy == ApPolicy::Disabled) return;
+  if (_portalSuspended || _apPolicy == ApPolicy::Disabled) return;
   if (!_apActive) {
     WiFi.mode(WIFI_AP_STA);
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
@@ -343,6 +375,7 @@ void ArdPortal::startAP() {
  */
 void ArdPortal::serviceWifi(uint32_t now) {
 #if ARDPORTAL_ENABLE_WIFI
+  if (_portalSuspended) return;
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   const unsigned stations = _apActive ? WiFi.softAPgetStationNum() : 0;
   if (stations != _diagnosticApStations) {
@@ -377,7 +410,9 @@ void ArdPortal::serviceWifi(uint32_t now) {
     apChannelConflict = (_config.apBand == 5) != (WiFi.channel() > 14);
 #endif
     if (_apActive && (apChannelConflict || (_apPolicy == ApPolicy::Automatic && !_http && WiFi.softAPgetStationNum() == 0))) {
-      if (WiFi.softAPdisconnect(true)) {
+      // Disable the interface directly: softAPdisconnect clears its config to
+      // channel 1, which the SDK rejects while STA is connected on 5 GHz.
+      if (WiFi.enableAP(false)) {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
         log(ArdUILanguage::text(ArdUILanguage::Key::s_103));
 #endif
@@ -390,6 +425,18 @@ void ArdPortal::serviceWifi(uint32_t now) {
     }
     return;
   }
+#if ARDPORTAL_ENABLE_MATTER && !ARDPORTAL_MATTER_THREAD
+  // The Matter SDK owns credentials/reconnection after commissioning starts.
+  if (_matter.started()) {
+    if (_wasConnected) {
+      _wasConnected = false;
+      closeMqtt();
+    }
+    _attempting = false;
+    _wifiState = _apActive ? WifiState::FallbackAP : WifiState::Disconnected;
+    return;
+  }
+#endif
   // STA association can retune the shared radio and disconnect AP stations.
   // Keep automatic retries paused while someone is using the fallback portal.
   const bool apInUse = _apActive && WiFi.softAPgetStationNum() != 0;
@@ -492,6 +539,12 @@ void ArdPortal::loop() {
   if (heapSample.free8 < _minimumFreeHeap) _minimumFreeHeap = heapSample.free8;
   if (heapSample.freeDma < _minimumFreeDma) _minimumFreeDma = heapSample.freeDma;
   serviceStorage(tick);
+#if ARDPORTAL_ENABLE_MATTER
+  serviceMatter(tick);
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+  serviceMatterDiagnostics();
+#endif
+#endif
 #if ARDPORTAL_ENABLE_ZIGBEE
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   serviceZigbeeControls(tick);
@@ -547,11 +600,17 @@ void ArdPortal::loop() {
     _mqttClient.configurationLoaded();
 #endif
 #if ARDPORTAL_ENABLE_WIFI
-    WiFi.disconnect();
-    _wasConnected = false;
-    _attempting = false;
-    if (_config.ssid.length()) connectWifi();
-    else startAP();
+#if ARDPORTAL_ENABLE_MATTER && !ARDPORTAL_MATTER_THREAD
+    if (!_matter.started()) {
+#endif
+      WiFi.disconnect();
+      _wasConnected = false;
+      _attempting = false;
+      if (_config.ssid.length()) connectWifi();
+      else startAP();
+#if ARDPORTAL_ENABLE_MATTER && !ARDPORTAL_MATTER_THREAD
+    }
+#endif
 #endif
     _pending = PortalConfig();
     if (_notifyPending) {
@@ -591,6 +650,19 @@ void ArdPortal::loop() {
       if (portalAndAppConfigBusy()) return;
     }
     // Storage completion (and onPortalAndAppConfigSaved) precedes the actual restart.
+#if ARDPORTAL_ENABLE_MATTER
+    if (_restartReason == RestartReason::FactoryReset && _matter.started()) {
+      if (_matter._state != ArdMatter::State::Resetting) {
+        _matter.reset();
+        _matter._state = ArdMatter::State::Resetting;
+#if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
+        serviceMatterDiagnostics();
+#endif
+        Matter.decommission();
+      }
+      return;
+    }
+#endif
     ESP.restart();
     return;
   }
@@ -607,7 +679,7 @@ void ArdPortal::loop() {
   serviceNetworkApi();
 #if ARDPORTAL_ENABLE_WWW
   budget.checkpoint();
-  serviceHttp(now);
+  if (!_portalSuspended) serviceHttp(now);
 #endif
   budget.checkpoint();
 #if ARDPORTAL_SUPPORT_WEBSOCKET
@@ -738,6 +810,9 @@ void ArdPortal::closeHttp() {
   _response = String();
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   _httpDynamicText = String();
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+  _httpVisibilityCache.reset();
+#endif
   _httpDynamicMode = _httpDynamicStage = 0;
   _httpDynamicField = 0;
   _httpDynamicConditionFirst = true;
@@ -827,7 +902,12 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
       _responseOffset = 0;
 #endif
     } else if (_httpDynamicPages) {
-      if (!dynamicHttpMemoryReady()) return;
+      if (!dynamicHttpMemoryReady()) {
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+        _httpVisibilityCache.reset();
+#endif
+        return;
+      }
       if (_httpPortalTail) {
         if (!_httpDynamicPageStarted) {
           _response = "[";
@@ -846,18 +926,42 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
           _httpDynamicPages = false;
         }
       } else {
-        if (_httpDynamicPageOffset >= _httpDynamicText.length()) {
-          _httpDynamicText = String();
-          _httpDynamicPageOffset = 0;
-          auto part = prepareDynamicHttpPart();
-          if (part == DynamicHttpPart::RetryLater) return;
-          if (part == DynamicHttpPart::Failed || part == DynamicHttpPart::Finished) {
-            closeHttp();
-            return;
+        // Reuse the existing transport String: no additional coalescing buffer.
+        // Bound fragment construction independently of transport backpressure.
+        const uint32_t started = millis();
+        bool accumulated = false;
+        for (size_t parts = 0; parts < 8; ++parts) {
+          if (_httpDynamicPageOffset >= _httpDynamicText.length()) {
+            if (!_httpDynamicPages) break;
+            if (!dynamicHttpMemoryReady()) {
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+              _httpVisibilityCache.reset();
+#endif
+              break;
+            }
+            auto part = prepareDynamicHttpPart();
+            if (part == DynamicHttpPart::RetryLater) break;
+            if (part == DynamicHttpPart::Failed || part == DynamicHttpPart::Finished) {
+              if (accumulated) break;
+              closeHttp();
+              return;
+            }
           }
+          size_t bytes = _httpDynamicText.length() - _httpDynamicPageOffset;
+          const size_t used = accumulated ? _response.length() : 0;
+          if (bytes > 256 - used) bytes = 256 - used;
+          // Keep the old consumed response as the service-state sentinel until
+          // replacement succeeds; failed appends never consume source bytes.
+          if (!accumulated) {
+            if (!_response.reserve(bytes)) return;
+            _response.remove(0);
+            _response.concat(_httpDynamicText.c_str() + _httpDynamicPageOffset, bytes);
+            accumulated = true;
+          } else if (!_response.concat(_httpDynamicText.c_str() + _httpDynamicPageOffset, bytes)) break;
+          _httpDynamicPageOffset += bytes;
+          if (_response.length() == 256 || uint32_t(millis() - started) >= 2) break;
         }
-        _response = _httpDynamicText.substring(_httpDynamicPageOffset, _httpDynamicPageOffset + 256);
-        _httpDynamicPageOffset += _response.length();
+        if (!accumulated) return;
       }
       _responseOffset = 0;
     } else if (_httpPortalTail) {
@@ -1001,6 +1105,9 @@ void ArdPortal::handleHttp() {
  */
 void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
   const bool get = ardFlashEqual(method, F("GET")), post = ardFlashEqual(method, F("POST"));
+#if ARDPORTAL_ENABLE_MATTER
+  if (handleMatterHttp(method, path)) return;
+#endif
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_WWW
   if (handleZigbeeHttp(method, path)) return;
 #else
@@ -1055,8 +1162,11 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
   }
 #if ARDPORTAL_SUPPORT_WEBSOCKET
   if (get && (ardFlashEqual(path, F("/api/events"))
-#if ARDPORTAL_ENABLE_CONSOLE
+#if ARDPORTAL_ENABLE_CONSOLE && (ARDPORTAL_ENABLE_MQTT || ARDPORTAL_ENABLE_CONSOLE_MESSAGES)
               || ardFlashEqual(path, F("/api/console"))
+#endif
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+              || ardFlashEqual(path, F("/api/matter/console"))
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE
               || ardFlashEqual(path, F("/api/zigbee/console"))
@@ -1065,7 +1175,12 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
 #if ARDPORTAL_ENABLE_ZIGBEE
     _wsUpgradeZigbee = ardFlashEqual(path, F("/api/zigbee/console"));
 #endif
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+    _wsUpgradeMatter = ardFlashEqual(path, F("/api/matter/console"));
+#endif
+#if ARDPORTAL_ENABLE_CONSOLE && (ARDPORTAL_ENABLE_MQTT || ARDPORTAL_ENABLE_CONSOLE_MESSAGES)
     _wsUpgradeConsole = ardFlashEqual(path, F("/api/console"));
+#endif
     if (upgradeWebSocket().client) {
       replyMessage(409, ArdUILanguage::Key::s_132);
       return;
@@ -1107,7 +1222,11 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     return;
   }
 #endif
-  if (_apActive && get && !ardFlashEqual(path, F("/")) && !ardFlashEqual(path, F("/device")) && !ardFlashEqual(path, F("/wifi")) && path.indexOf("/p/") != 0 && !ardFlashEqual(path, F("/zigbee")) && !ardFlashEqual(path, F("/ap")) && !ardFlashEqual(path, F("/mqtt")) && !ardFlashEqual(path, F("/upgrade")) && !ardFlashEqual(path, F("/console")) && path.indexOf("/api/") != 0) {
+  if (_apActive && get && !ardFlashEqual(path, F("/")) && !ardFlashEqual(path, F("/device")) && !ardFlashEqual(path, F("/wifi")) && path.indexOf("/p/") != 0 && !ardFlashEqual(path, F("/zigbee")) && !ardFlashEqual(path, F("/ap")) && !ardFlashEqual(path, F("/mqtt")) && !ardFlashEqual(path, F("/upgrade")) && !ardFlashEqual(path, F("/console")) && path.indexOf("/api/") != 0
+#if ARDPORTAL_ENABLE_MATTER
+      && !ardFlashEqual(path, F("/matter"))
+#endif
+  ) {
     _response = String(F("HTTP/1.1 302 Found\r\nConnection: close\r\nCache-Control: no-store\r\nLocation: http://")) + apIP().toString() + "/\r\nContent-Length: 0\r\n\r\n";
     _responseOffset = 0;
     _httpSince = millis();
@@ -1205,6 +1324,13 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     String out;
     appendJsonBool(out, F("{\"wifi\":"), wifiConnected());
     appendJsonBool(out, F(",\"mqtt\":"), mqttConnected());
+#if ARDPORTAL_ENABLE_MATTER
+    appendJsonBool(out, F(",\"matterConnected\":"), _matter.connected());
+    appendJsonBool(out, F(",\"matterCommissioned\":"), _matter.commissioned());
+#if ARDPORTAL_MATTER_THREAD
+    appendJsonBool(out, F(",\"threadConnected\":"), _matter._running && _matter._connected);
+#endif
+#endif
     appendJsonNumber(out, F(",\"portalConfigRevision\":"), _portalConfigRevision);
     out += F(",\"state\":");
     out += String(int(_wifiState));
@@ -1570,7 +1696,9 @@ String ArdPortal::infoJson() {
   appendJsonNumber(out, F(",\"dmaLargestBlockBytes\":"), byteHeap.blockDma);
   appendJsonNumber(out, F(",\"minimumDmaFreeBytes\":"), _minimumFreeDma == UINT32_MAX ? byteHeap.freeDma : _minimumFreeDma);
   appendJsonNumber(out, F(",\"sketchBytes\":"), ESP.getSketchSize());
+#if ARDPORTAL_ENABLE_OTA
   appendJsonNumber(out, F(",\"otaFreeBytes\":"), ESP.getFreeSketchSpace());
+#endif
   appendJsonNumber(out, F(",\"uptimeSeconds\":"), static_cast<unsigned long>(_uptimeMs / 1000));
   appendJsonText(out, F(",\"utc\":"), timestamp);
   appendJsonBool(out, F(",\"wifi\":"), wifiConnected());
@@ -1607,18 +1735,31 @@ static void ardMqttSerialDiagnostic(const String& text) {
 }
 #endif
 
+#if ARDPORTAL_ENABLE_LOG_CALLBACK
+void ArdPortal::emitLog(LogChannel channel, const String& message) {
+  if (!_logCallback || _dispatchingLog) return;
+  _dispatchingLog = true;
+  _logCallback(channel, message);
+  _dispatchingLog = false;
+}
+#endif
+
 #if ARDPORTAL_ENABLE_CONSOLE
 /**
  * @brief Format a Console record with its timestamp and diagnostic text.
- * @param mqtt Whether MQTT UI is included.
+ * @param channel Messages (0), MQTT (1), or Matter traffic (2).
  * @param text Text to read, encode or display.
  * @return No value.
  */
-void ArdPortal::consoleLine(bool mqtt, const String& text) {
+void ArdPortal::consoleLine(uint8_t channel, const String& text) {
+#if ARDPORTAL_ENABLE_LOG_CALLBACK
+  if (channel <= 2 && (channel != 0 || ARDPORTAL_ENABLE_CONSOLE_MESSAGES)) emitLog(static_cast<LogChannel>(channel), text);
+#endif
+  const bool mqtt = channel == 1;
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
   if (mqtt) ardMqttSerialDiagnostic(text);
 #endif
-  if (!mqtt && !ARDPORTAL_ENABLE_CONSOLE_MESSAGES) return;
+  if ((channel == 0 && !ARDPORTAL_ENABLE_CONSOLE_MESSAGES) || (channel == 2 && !ARDPORTAL_ENABLE_MATTER_CONSOLE) || channel > 2) return;
   auto consoleHeap = ArdHeap::sample();
   if (consoleHeap.free8 < 24576 || consoleHeap.block8 < 4096) _consoleHistoryBudget = 1024;
   if (consoleHeap.free8 < 2048 || consoleHeap.block8 < 512) return;
@@ -1636,21 +1777,30 @@ void ArdPortal::consoleLine(bool mqtt, const String& text) {
     count = &_consoleMessagesCount;
   }
 #endif
+  size_t capacity = ConsoleCapacity, budget = _consoleHistoryBudget;
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+  if (channel == 2) {
+    history = _matterConsole;
+    count = &_matterConsoleCount;
+    capacity = MatterConsoleCapacity;
+    if (budget > 1024) budget = 1024;
+  }
+#endif
   if (!history) return;
-  const size_t slot = (*count) % ConsoleCapacity;
+  const size_t slot = (*count) % capacity;
   ConsoleLine& line = history[slot];
   line = ConsoleLine();
   ++(*count);
   size_t used = 0;
-  for (size_t i = 0; i < ConsoleCapacity; ++i) used += history[i].text.length();
+  for (size_t i = 0; i < capacity; ++i) used += history[i].text.length();
   size_t incoming = (mqtt ? text.length() : (text.length() > 320 ? 320 : text.length())) + 64;
-  for (size_t i = 1; used + incoming > _consoleHistoryBudget && i < ConsoleCapacity; ++i) {
-    auto& old = history[(slot + i) % ConsoleCapacity];
+  for (size_t i = 1; used + incoming > budget && i < capacity; ++i) {
+    auto& old = history[(slot + i) % capacity];
     used -= old.text.length();
     old = ConsoleLine();
   }
   line.id = ++_consoleId;
-  line.mqtt = mqtt;
+  line.channel = channel;
   String timestamp = String(millis()) + ARD_LANG_NATIVE_MS;
   if (tlsClockReady()) {
     time_t current = time(nullptr);
@@ -1659,9 +1809,9 @@ void ArdPortal::consoleLine(bool mqtt, const String& text) {
   }
   line.text = "[" + timestamp + "] " + (mqtt ? text : text.substring(0, 320));
   size_t total = 0;
-  for (size_t i = 0; i < ConsoleCapacity; ++i) total += history[i].text.length();
-  for (size_t i = 1; total > _consoleHistoryBudget && i < ConsoleCapacity; ++i) {
-    auto& old = history[(slot + i) % ConsoleCapacity];
+  for (size_t i = 0; i < capacity; ++i) total += history[i].text.length();
+  for (size_t i = 1; total > budget && i < capacity; ++i) {
+    auto& old = history[(slot + i) % capacity];
     total -= old.text.length();
     old = ConsoleLine();
   }
@@ -1673,7 +1823,11 @@ void ArdPortal::consoleLine(bool mqtt, const String& text) {
  * Input: const String&.
  * @return No value.
  */
-void ArdPortal::consoleLine(bool mqtt, const String& text) {
+void ArdPortal::consoleLine(uint8_t channel, const String& text) {
+#if ARDPORTAL_ENABLE_LOG_CALLBACK
+  if (channel <= 2 && (channel != 0 || ARDPORTAL_ENABLE_CONSOLE_MESSAGES)) emitLog(static_cast<LogChannel>(channel), text);
+#endif
+  const bool mqtt = channel == 1;
 #if ARDPORTAL_MQTT_DEBUG_SERIAL
   if (mqtt) ardMqttSerialDiagnostic(text);
 #else
@@ -1699,7 +1853,7 @@ void ArdPortal::log(const String& message) {
  */
 void ArdPortal::log(const String&) {}
 #endif
-#if ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL
+#if ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL || (ARDPORTAL_ENABLE_LOG_CALLBACK && ARDPORTAL_ENABLE_MQTT)
 /**
  * @brief Append MQTT traffic to its separate Console history when the console is enabled.
  * @param direction MQTT traffic direction displayed in Console.
@@ -1738,10 +1892,13 @@ void ArdPortal::logMqtt(const String&, const String&, const uint8_t*, size_t) {}
  * @return Reference to the requested stored value or component.
  */
 ArdPortal::WebSocketState& ArdPortal::upgradeWebSocket() {
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+  if (_wsUpgradeMatter) return _matterWs;
+#endif
 #if ARDPORTAL_ENABLE_ZIGBEE
   if (_wsUpgradeZigbee) return _zigbeeWs;
 #endif
-#if ARDPORTAL_ENABLE_CONSOLE
+#if ARDPORTAL_ENABLE_CONSOLE && (ARDPORTAL_ENABLE_MQTT || ARDPORTAL_ENABLE_CONSOLE_MESSAGES)
   if (_wsUpgradeConsole) return _consoleWs;
 #endif
   return _eventWs;
@@ -1753,10 +1910,13 @@ ArdPortal::WebSocketState& ArdPortal::upgradeWebSocket() {
  */
 void ArdPortal::serviceWebSocket(uint32_t now) {
   serviceWebSocket(_eventWs, now);
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+  serviceWebSocket(_matterWs, now);
+#endif
 #if ARDPORTAL_ENABLE_ZIGBEE
   serviceWebSocket(_zigbeeWs, now);
 #endif
-#if ARDPORTAL_ENABLE_CONSOLE
+#if ARDPORTAL_ENABLE_CONSOLE && (ARDPORTAL_ENABLE_MQTT || ARDPORTAL_ENABLE_CONSOLE_MESSAGES)
   serviceWebSocket(_consoleWs, now);
 #endif
 }
@@ -1798,7 +1958,7 @@ void ArdPortal::queueWebSocket(WebSocketState& ws, uint8_t opcode, const String&
   ws.txOffset = 0;
   ws.since = millis();
 }
-#if ARDPORTAL_ENABLE_CONSOLE
+#if ARDPORTAL_ENABLE_CONSOLE && ARDPORTAL_ENABLE_MQTT
 /**
  * @brief Handle a JSON command received from a portal WebSocket client.
  * @param command Command identifier or MQTT packet header.
@@ -1919,7 +2079,7 @@ void ArdPortal::serviceWebSocket(WebSocketState& ws, uint32_t now) {
       ws.pongPending = true;
     }
     if (opcode == 1) {
-      if (!ws.logs) {
+      if (!ws.logs || !ARDPORTAL_ENABLE_MQTT) {
         closeWebSocket(ws);
         return;
       }
@@ -1936,6 +2096,31 @@ void ArdPortal::serviceWebSocket(WebSocketState& ws, uint32_t now) {
       ws.pingPending = true;
       ws.pingSince = now;
     }
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+    else if (&ws == &_matterWs) {
+      // Data heartbeat keeps the browser's liveness timer alive during quiet periods.
+      if (!ws.statusSent || uint32_t(now - ws.statusSince) >= 10000) {
+        ws.statusSent = true;
+        ws.statusSince = now;
+        String payload;
+        appendJsonBool(payload, F("{\"type\":\"status\",\"connected\":"), _matter.connected());
+        payload += '}';
+        queueWebSocket(ws, 1, payload);
+        return;
+      }
+      const ConsoleLine* next = nullptr;
+      for (const auto& line : _matterConsole)
+        if (line.id > ws.cursor && line.text.length() && (!next || line.id < next->id)) next = &line;
+      if (next) {
+        ws.cursor = next->id;
+        String payload;
+        appendJsonNumber(payload, F("{\"type\":\"log\",\"id\":"), next->id);
+        appendJsonText(payload, F(",\"text\":"), next->text);
+        payload += '}';
+        queueWebSocket(ws, 1, payload);
+      }
+    }
+#endif
 #if ARDPORTAL_ENABLE_ZIGBEE
     else if (&ws == &_zigbeeWs) {
       if (!ws.statusSent || uint32_t(now - ws.statusSince) >= 1000) {
@@ -1968,7 +2153,7 @@ void ArdPortal::serviceWebSocket(WebSocketState& ws, uint32_t now) {
       payload += '}';
       queueWebSocket(ws, 1, payload);
     }
-#if ARDPORTAL_ENABLE_CONSOLE
+#if ARDPORTAL_ENABLE_CONSOLE && (ARDPORTAL_ENABLE_MQTT || ARDPORTAL_ENABLE_CONSOLE_MESSAGES)
     if (!ws.tx.length() && ws.logs) {
       const ConsoleLine* next = nullptr;
       auto consider = [&](const ConsoleLine* history) {
@@ -1986,7 +2171,8 @@ void ArdPortal::serviceWebSocket(WebSocketState& ws, uint32_t now) {
       if (next) {
         ws.cursor = next->id;
         String payload;
-        appendJsonText(payload, F("{\"type\":\"log\",\"channel\":"), next->mqtt ? "mqtt" : "messages");
+        appendJsonText(payload, F("{\"type\":\"log\",\"channel\":"), next->channel == 1 ? "mqtt" : next->channel == 2 ? "matter"
+                                                                                                                      : "messages");
         appendJsonNumber(payload, F(",\"id\":"), next->id);
         appendJsonText(payload, F(",\"text\":"), next->text);
         payload += '}';
@@ -2151,6 +2337,9 @@ void ArdPortal::serviceStorage(uint32_t now) {
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdPortal::scheduleConfig(const PortalConfig& config, const ArdJSON::JSONVar& app, ChangeSource source, bool immediate) {
+#if ARDPORTAL_ENABLE_MATTER && !ARDPORTAL_MATTER_THREAD
+  if (_matter.started() && source != ChangeSource::FactoryReset && (config.ssid != _config.ssid || config.password != _config.password)) return false;
+#endif
   if (!_configurationReady || (!_configurationWritable && source != ChangeSource::FactoryReset) || _saveQueued || _saveRetryPending || _pendingReady || !_storage.mounted() || otaActive() || (_rebootPending && !(_beforeRestartRunning && source == ChangeSource::Application && ArdPortalJson::equal(config, _config))) || !validPortalConfig(config) || !validApp(app)) return false;
   if (_savePending && (source != ChangeSource::Application || _saveSource != source)) return false;
   _pending = config;
@@ -2181,12 +2370,19 @@ bool ArdPortal::scheduleAppPatch(ArdJSON::JSONVar patch, ChangeSource source, bo
                                                                                                                                                                                                                                                                                            )
       || (_savePending && _saveSource != source && !coalesceSource && !defer))
     return false;
-#if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
+#if (ARDPORTAL_ENABLE_ZIGBEE || ARDPORTAL_ENABLE_MATTER) && ARDPORTAL_ENABLE_DYNAMIC_PAGES
   ArdAppConfigFieldMask superseded;
-  if (source != ChangeSource::Zigbee) patch.forEachObjectMember([&](const String& key, const V&) {
-    superseded |= ArdAppConfigFieldMask::forField(_dynamic.indexOf(key));
-    return true;
-  });
+  if (source !=
+#if ARDPORTAL_ENABLE_MATTER
+      ChangeSource::Matter
+#else
+      ChangeSource::Zigbee
+#endif
+  )
+    patch.forEachObjectMember([&](const String& key, const V&) {
+      superseded |= ArdAppConfigFieldMask::forField(_dynamic.indexOf(key));
+      return true;
+    });
 #endif
   auto limits = snapshotLimits();
   limits.maxOutputBytes = MaxAppConfigBytes;
@@ -2213,12 +2409,17 @@ bool ArdPortal::scheduleAppPatch(ArdJSON::JSONVar patch, ChangeSource source, bo
     _pending = _config;
     _pending.apName = ArdDeviceName::ap(_pending.deviceName);
   }
-#if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  // A newer accepted intent supersedes Zigbee values still waiting for storage.
+#if (ARDPORTAL_ENABLE_ZIGBEE || ARDPORTAL_ENABLE_MATTER) && ARDPORTAL_ENABLE_DYNAMIC_PAGES
+  // A newer accepted intent supersedes radio commands still waiting for storage.
   while (superseded) {
     size_t field = superseded.firstSet();
     superseded &= ~ArdAppConfigFieldMask::forField(field);
+#if ARDPORTAL_ENABLE_ZIGBEE
     _zigbeeAppQueue.remove(_dynamic.idAt(field));
+#endif
+#if ARDPORTAL_ENABLE_MATTER
+    _matter.discard(field);
+#endif
   }
 #endif
   if (!defer) {

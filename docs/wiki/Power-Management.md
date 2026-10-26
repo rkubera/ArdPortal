@@ -362,6 +362,21 @@ ESP32 uses a private static FreeRTOS semaphore for interruptible idle waits when
 
 Software timers use the monotonic `millis()` clock, handle its rollover, and are serviced when `portal.loop()` runs. They are not calendar/RTC alarms, real-time hardware interrupts or persistent deep-sleep schedules. Timers and callback registrations must be recreated after a deep-sleep restart; an application needing the boot wake cause can query the platform SDK.
 
+## Matter
+
+Matter supports `ConnectedSleep` through SDK-coordinated radio/CPU power saving.
+Wi-Fi uses modem sleep and optional automatic light sleep; Thread requires the
+optional Short Idle Time ICD build. `Manual`, `Periodic`, application locks and
+`allowCpuSleep=false` follow the same admission rules. Forced `LightSleep` and
+`DeepSleep` are blocked with `Network`; never suspend the running Matter stack.
+See [Matter power management](Matter.md#power-management) for SDK build profiles,
+ICD timing, AP restrictions and an example.
+
+HTTP, WebSocket and AP activity suspend Wi-Fi modem saving as well as CPU sleep.
+HTTP keeps this protection for 1 second after the latest request/response activity,
+so consecutive browser asset and API requests do not repeatedly enter radio sleep.
+Other power blockers retain their existing behavior.
+
 ## Diagnostics
 
 - `policy()` / `sleepType()` report the independent selections.
@@ -370,3 +385,19 @@ Software timers use the monotonic `millis()` clock, handle its rollover, and are
 - `sleepPending()` reports an explicit queued request; automatic sleep is evaluated directly from the selected policy/type.
 
 The earlier mixed `Mode` enum, `setMode()` and `requestDeepSleep()` API have been replaced. The separate `SleepType::ModemSleep` has been replaced by `ConnectedSleep` with `connectedSleep.allowCpuSleep=false`. See the [GPIO/timer example](../../examples/PowerManagement/PowerManagement.ino). Hardware current consumption and wake reliability require testing on the target board; host tests and compilation do not measure them.
+
+## Portal network suspension
+
+**Unreleased:** `portal.suspendPortal()` switches Wi-Fi off and closes WWW,
+WebSockets, captive DNS and MQTT. Zigbee and Matter over Thread keep running;
+continue calling `portal.loop()`. `portal.resumePortal()` restores the previous
+AP/reconnect policy using retained settings; `portal.portalSuspended()` checks
+this explicit state. A local GPIO button can reopen access, as demonstrated by
+[PortalStandby](https://github.com/rkubera/ArdPortal/blob/matter/examples/PortalStandby/PortalStandby.ino).
+
+This is independent of ArdPower policy, CPU sleep, Zigbee role and Thread ICD.
+It does not select a sleepy mesh role, guarantee current consumption, or shrink
+the firmware. Matter-over-Wi-Fi builds reject suspension because Wi-Fi carries
+Matter. Busy initialization/storage/OTA/scanning can also reject it; check the
+return value and retry from the application loop. Resume is asynchronous and
+browser clients need to reconnect. See the [full API contract](Portal-API#suspending-portal-networking).

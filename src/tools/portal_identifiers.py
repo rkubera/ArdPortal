@@ -12,13 +12,11 @@ QUOTED = r'''(?:'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")'''
 
 
 def short_name(index):
-    alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'
-    result = ''
-    while True:
-        result = alphabet[index % len(alphabet)] + result
-        index = index // len(alphabet) - 1
-        if index < 0:
-            return result
+    first = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    second = first + '0123456789'
+    if not 0 <= index < len(first) * len(second):
+        raise ValueError('Two-character DOM alias capacity exceeded')
+    return first[index // len(second)] + second[index % len(second)]
 
 
 @functools.lru_cache(maxsize=4)
@@ -44,14 +42,7 @@ def identifier_maps(source):
     def allocate(names):
         frequency = Counter({name: len(re.findall(r'(?<![-\w])'+re.escape(name)+r'(?![-\w])', source)) for name in names})
         return {name: short_name(i) for i, name in enumerate(sorted(names, key=lambda n: (-frequency[n], n)))}
-    selector_ids = set(re.findall(r'#('+SAFE_NAME+r')', source))
-    selector_ids.update(name for name in ids if name.endswith(('Log', 'Tab', 'Panel')))
-    # Numeric IDs are shortest too, but only safe for getElementById/ARIA uses.
-    # ID selectors keep alphabetic aliases so no CSS escaping is necessary.
-    numeric = sorted(ids-selector_ids)[:10]
-    id_map = allocate(ids-set(numeric))
-    id_map.update({name: str(i) for i,name in enumerate(numeric)})
-    return allocate(classes), id_map
+    return allocate(classes), allocate(ids)
 
 
 def selector_names(selector, classes, ids):
@@ -164,7 +155,7 @@ def script_names(script, classes, ids):
     if '.getElementById(id)' in script:
         dynamic.update(('rejoin', 'reset'))
     if re.search(r'\.querySelector\(`#\$\{[^}]+\}(?:Log|Tab|Panel)`\)', script):
-        dynamic.update(name+suffix for name in ('mqtt', 'messages', 'zigbee') for suffix in ('Log', 'Tab', 'Panel'))
+        dynamic.update(name+suffix for name in ('mqtt', 'messages', 'zigbee', 'matter') for suffix in ('Log', 'Tab', 'Panel'))
     if dynamic:
         # Keep only semantic names used by indirect DOM lookups. Static selectors
         # and literal IDs need no runtime map. No map is stored in MCU RAM.
@@ -172,7 +163,13 @@ def script_names(script, classes, ids):
         for name in sorted(dynamic):
             if name not in ids: continue
             entry = json.dumps(name)+':'+json.dumps(ids[name])+','
-            if name.startswith('zigbee') or name in ('rejoin', 'reset'):
+            if name in ('rejoin', 'reset'):
+                entry = '/*@if ARDPORTAL_ENABLE_ZIGBEE || ARDPORTAL_ENABLE_MATTER*/'+entry+'/*@endif*/'
+            elif name == 'matter':
+                entry = '/*@if ARDPORTAL_ENABLE_MATTER*/'+entry+'/*@endif*/'
+            elif name.startswith('matter'):
+                entry = '/*@if ARDPORTAL_ENABLE_MATTER_CONSOLE*/'+entry+'/*@endif*/'
+            elif name.startswith('zigbee'):
                 entry = '/*@if ARDPORTAL_ENABLE_ZIGBEE*/'+entry+'/*@endif*/'
             if name.startswith('messages'):
                 # Console Messages has already been selected for this variant.
@@ -184,7 +181,7 @@ def script_names(script, classes, ids):
     if "'dynamic-'+page.id" in script:
         script = script.replace(".getElementById('dynamic-'+page.id)", ".getElementById(_pageId(page))")
         script = script.replace("section.id='dynamic-'+page.id", "section.id=_pageId(page)")
-        # The registry permits at most 16 pages. Punctuation never collides with
-        # static alphanumeric aliases; these IDs are accessed by getElementById.
-        script = "/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/const _pageId=p=>'!#$%&()*+,-./:;?@'[dynamicDefinitions.indexOf(p)];/*@endif*/\n"+script
+        # Reserve underscore-prefixed two-character aliases for the 16 pages.
+        # Static aliases always start with an ASCII letter.
+        script = "/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/const _pageId=p=>'_'+'abcdefghijklmnop'[dynamicDefinitions.indexOf(p)];/*@endif*/\n"+script
     return script

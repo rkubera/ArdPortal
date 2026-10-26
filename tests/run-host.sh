@@ -17,12 +17,12 @@ run_test bash tests/run-topic-templates.sh
 run_test bash tests/run-zigbee.sh
 
 for test_name in \
-  control-model control-protocols dht-readings device-name ap-band-start factory-reset-callback flash-text language-metadata http-memory mqtt-api mqtt-state-topic mqtt-packet mqtt-serial portal-assets portal-identifiers \
-  network-api network-features power-policy power-periodic power-wake-cause power-integration power-platform power-events page-stream runtime-state \
+  log-callback rtc-allocation matter-memory-policy control-model control-protocols matter-fields matter-decode matter-queue matter-dimmer matter-cover matter-restored-state matter-service matter-empty matter-startup matter-coexistence matter-thread-transport matter-wifi-bands matter-command matter-qr matter-credentials matter-labels matter-power matter-diagnostics matter-traffic matter-console-storage dht-readings device-name ap-band-start factory-reset-callback flash-text language-metadata http-memory http-coalescing visibility-cache mqtt-api mqtt-state-topic mqtt-packet mqtt-serial portal-assets portal-profile-assets portal-identifiers \
+  network-api network-features power-policy power-periodic power-wake-cause power-diagnostics power-integration power-platform power-events page-stream runtime-state \
   zigbee-power zigbee-composite zigbee-persistence; do
   run_test "${PYTHON:-python3}" "tests/${test_name}-test.py"
 done
-for test_name in ap-band-ui climate-range-ui wifi-console-ui zigbee-ui; do
+for test_name in page-order-ui app-refresh local-visibility ap-band-ui climate-range-ui wifi-console-ui zigbee-ui matter-ui matter-console-ui; do
   run_test "${NODE:-node}" "tests/${test_name}-test.js"
 done
 

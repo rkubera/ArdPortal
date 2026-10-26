@@ -165,6 +165,7 @@ public:
     }
     return false;
   }
+  /** @brief Visit the expected fields array as source slices; return false on malformed input, count mismatch or callback rejection. */
   template<class Callback> bool fields(size_t expected, Callback store) const {
     size_t i = 0;
     whitespace(i);

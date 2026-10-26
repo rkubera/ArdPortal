@@ -12,7 +12,9 @@ ArdPortal is a modular Arduino library for ESP8266 and ESP32, combining a device
 
 Zigbee supports ESP32-C5/C6/H2 as End Device or Router, automatic native/composite control mapping, generated Zigbee2MQTT converters and ZHA quirks, OTA, time synchronization and diagnostics. It can operate without Wi-Fi or WWW. ArdFS and ArdJSON are included standalone storage and JSON modules; no external web server, MQTT or JSON library is required. Zigbee uses the SDK bundled with the ESP32 Arduino core.
 
-This Wiki documents the current development branch, including Zigbee. Check the selected release's changelog before using it with an older installed package. Updated **16 October 2026**; hardware validation scope and limitations are documented in the Zigbee guide.
+This Wiki documents the current development branch, including Zigbee, Matter and runtime portal suspension. Check the selected release's changelog before using it with an older installed package. Matter and portal suspension are unreleased additions.
+
+Matter supports alternative Wi-Fi/Thread builds, BLE commissioning, development/production credentials, shared control mappings and optional connected power saving. Thread may retain Wi-Fi for the portal. See [Matter](Matter) for build profiles, HA commissioning.
 
 ## Start here
 
@@ -29,6 +31,7 @@ This Wiki documents the current development branch, including Zigbee. Check the 
 | [Dynamic pages](https://github.com/rkubera/ArdPortal/wiki/Dynamic-Pages) | JSON schemas, registration, limits, flash sources and HTTP loading |
 | [Dependent fields](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields) | Single conditions, AND/OR, page conditions and cascades |
 | [Home Assistant](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) | Discovery, mapping, availability, state and HA-only entities |
+| [Matter](Matter) | Wi-Fi/Thread profiles, commissioning, credentials, mappings and power management |
 | [Zigbee](https://github.com/rkubera/ArdPortal/wiki/Zigbee) | Setup, roles, shared controls, pairing/rejoin, gateway exports, API, diagnostics and OTA |
 | [MQTT messages](https://github.com/rkubera/ArdPortal/wiki/MQTT-Messages) | Topic construction, payload examples, retain and custom commands |
 | [Wi-Fi and device identity](https://github.com/rkubera/ArdPortal/wiki/Wi-Fi-and-Device-Identity) | Station/AP operation and normalized names |
@@ -36,7 +39,7 @@ This Wiki documents the current development branch, including Zigbee. Check the 
 | [Memory and limits](https://github.com/rkubera/ArdPortal/wiki/Memory-and-Limits) | Actual heap pools, reserves, limits and allocation failure |
 | [Languages](https://github.com/rkubera/ArdPortal/wiki/Languages) | Translation catalogs and localized field labels |
 | [Troubleshooting](https://github.com/rkubera/ArdPortal/wiki/Troubleshooting) | Registration, memory, networking, HA and persistence failures |
-| [Screenshots](https://github.com/rkubera/ArdPortal/wiki/Screenshots) | Eight annotated views of the DHT example portal |
+| [Screenshots](https://github.com/rkubera/ArdPortal/wiki/Screenshots) | Current portal views, Zigbee network management and Matter Wi-Fi/Thread |
 
 ## First connection
 
@@ -47,7 +50,7 @@ Connect to `ArdUI-<chip ID>` with the default AP password **`1234567890`** and o
 and network work. The library requires the ESP Arduino core; only examples with
 external sensors require their sensor libraries.
 
-![DHT example Home page](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/Demo1.png)
+![Portal Home with illustrative sensor readings](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/Demo1.png)
 
 ## Project links
 

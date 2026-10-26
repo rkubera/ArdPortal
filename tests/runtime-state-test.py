@@ -9,11 +9,12 @@ long allocationBudget=-1;
 void* testAllocate(size_t bytes) noexcept {if(allocationBudget==0)return nullptr;if(allocationBudget>0)--allocationBudget;return std::malloc(bytes);}
 uint32_t fakeMillis=0;
 using V=ArdJSON::JSONVar;
-enum class ChangeSource{Application};
+enum class ChangeSource{Application,Matter};
 namespace ArdControl{bool transient(const V& f){return f["transient"].asBool();}}
 struct ArdDynamicPages{static bool validValue(const V&,const V& v){return v.isValid();}};
-struct Dynamic{V f=V::object();bool missing=false;const V& field(const String&){static V empty;return missing?empty:f;}};
+struct Dynamic{size_t indexOf(const String&){return 0;}V f=V::object();bool missing=false;const V& field(const String&){static V empty;return missing?empty:f;}};
 struct Portal{
+ struct MatterTracker{unsigned discarded=0,reports=0;void discard(size_t){++discarded;}void dirty(size_t){++reports;}} _matter;
  Dynamic _dynamic;V defaults=V::object();V* state=nullptr;unsigned _appRevision=0,callbacks=0;
  V getAppConfigValue(const char* key){return state&&state->hasOwnProperty(key)?static_cast<const V&>(*state)[key]:static_cast<const V&>(defaults)[key];}
  std::function<void(const String&,const V&,ChangeSource)> _appChanged;
@@ -39,11 +40,20 @@ int main(){
  p.defaults["enabled"]=false;assert(c.applyAppState("enabled",V(false),ChangeSource::Application,true));assert(c._appState.length()==2);
  assert(c.applyAppState("enabled",V(true),ChangeSource::Application,false));assert(c._appState.length()==3&&p._appRevision==3&&c.dirty==1);
  assert(c.applyAppState("new-reading",V("first"),ChangeSource::Application,false));assert(c._appState.length()==4&&p._appRevision==4);
+ unsigned discarded=p._matter.discarded;
  c.outputLimit=1;assert(!c.applyAppState("field1",V(32),ChangeSource::Application,true));assert(c._appState["field1"].asDouble()==31&&p._appRevision==4);c.outputLimit=32768;
  p._dynamic.f["transient"]=true;assert(!c.applyAppState("enabled",V(false),ChangeSource::Application,true));p._dynamic.f.remove("transient");p._dynamic.missing=true;assert(!c.applyAppState("enabled",V(false),ChangeSource::Application,true));
+ assert(p._matter.discarded==discarded);
+#if ARDPORTAL_ENABLE_MATTER
+ assert(discarded>0 && p._matter.reports==4);
+ p._dynamic.missing=false;
+ assert(c.applyAppState("enabled",V(false),ChangeSource::Matter,false));
+ assert(p._matter.discarded==discarded && p._matter.reports==5);
+#endif
  puts("PASS: actual applyAppState; 1500 unchanged snapshots allocate no runtime members; no-op works with OOM allocator; real changes, types, case, first readings, serialization failure, callbacks and MQTT dirty semantics preserved.");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='ardportal-runtime-test-') as tmp:
  tmp=Path(tmp);(tmp/'test.cpp').write_text(fixture+func+main)
- subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),'-o',str(tmp/'test')],check=True);subprocess.run([str(tmp/'test')],check=True)
+ for matter in (0,1):
+  subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror',f'-DARDPORTAL_ENABLE_MATTER={matter}','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),'-o',str(tmp/'test')],check=True);subprocess.run([str(tmp/'test')],check=True)

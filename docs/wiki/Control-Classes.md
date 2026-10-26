@@ -2,7 +2,7 @@
 
 [Control catalogue](Controls) · [Feature flags](Defines) · [Zigbee](Zigbee)
 
-`type` selects a control and its value/command structure. Optional `class` describes its meaning. The pair is shared by the portal, MQTT/Home Assistant and Zigbee adapters. No Matter stack or Matter dependency is included; a future adapter can consume the same normalized model.
+`type` selects a control and its value/command structure. Optional `class` describes its meaning. The pair is shared by the portal, MQTT/Home Assistant and Zigbee adapters. The optional [Matter adapter](Matter) consumes the same normalized model and is compiled only when enabled.
 
 Every control accepts omission of `class`. Unknown, empty, non-string and type-incompatible classes are registration errors. The class catalogue is removed with `ARDPORTAL_ENABLE_CLASSES=0`; ordinary controls continue to work. Class names, units and mapping metadata are compiled only when a corresponding `ARDPORTAL_ENABLE_CONTROL_*` is enabled.
 
@@ -29,8 +29,7 @@ compact; customized payloads are emitted automatically.
 
 For example, the button's `press` action defines `payload: "PRESS"` once. The
 portal/Zigbee control descriptor receives that action, while the HA adapter emits
-`payload_press` and its command topic. A future Matter adapter can consume the same
-catalogue; Matter is not implemented by this change.
+`payload_press` and its command topic. The optional [Matter adapter](Matter) consumes this same catalogue.
 
 This compilation applies to the library's built-in presets. An application's
 runtime JSON can still replace `controls`; it is not passed through the Python
@@ -167,7 +166,7 @@ All rows marked Yes above are supported numeric settings. Additional slider clas
 - **HA:** `control_protocols.py` compiles preset Discovery defaults; `HaEntities.h`, `HaClassData.h` and `HaEntityData.h` map classes and resolve runtime topics. Protocol keys and topics are absent from shared presets. `class` supplies default units and measurement metadata where applicable. `ha` supplies explicit Discovery overrides; a measurement class cannot infer whether energy/volume values are totals or instantaneous readings. Choose such statistical overrides deliberately; `entity_category` is independent of physical meaning.
 - **Zigbee:** `ZigbeeFields.h` owns native endpoint/cluster/wire conversion. `switch/outlet` uses the smart-plug endpoint identity; `switch/light` uses an On/Off light identity. Other scalar outputs remain On/Off. Cover classes select native awning/drapery/shutter/shade types where available; doors, gates, garage doors, dampers and windows use the general covering transport and are marked generic. Existing native measurements retain their canonical wire units. Additional numeric reading classes use generic Analog Input, settings use Analog Output, and binary classes use generic Binary Input.
 - **Gateway exports:** schema 2 metadata includes class, canonical unit and native/generic mapping. Z2M and ZHA classify generic readings/settings/binary sensors without claiming a native occupancy, contact or IAS cluster. Grouped children do not inherit the parent device class. Z2M forwards outlet and cover metadata; ZHA supports the class enums exposed by the pinned gateway API. Unsupported gateway classes remain generic.
-- **Matter:** no adapter is implemented in this change. A recognized class does not promise a Matter device type, native cluster, or certification.
+- **Matter:** see [supported mappings](Matter#mappings). A recognized class does not promise a native endpoint or certification.
 
 ## Actions, events and IR
 

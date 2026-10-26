@@ -42,6 +42,21 @@ struct Spec {
   bool fan = false;
   uint8_t sequence = 4;
 };
+/** @brief Whether a staged endpoint can accept application commands. @param spec Endpoint mapping. @return False for measurements and read-only state parts. */
+inline bool acceptsCommands(const Spec& spec) {
+  switch (spec.kind) {
+    case Kind::Switch:
+    case Kind::Slider:
+    case Kind::Select: return true;
+    case Kind::Action: return spec.part != 0xffff;
+    case Kind::Light:
+    case Kind::Climate:
+    case Kind::Cover:
+    case Kind::Lock:
+    case Kind::Siren: return spec.part == 0xffff;
+    default: return false;
+  }
+}
 static_assert(sizeof(Spec) <= 24, "Zigbee mapping must not grow per-endpoint RAM");
 enum class Mapping : uint8_t { Unsupported,
                                Generic,

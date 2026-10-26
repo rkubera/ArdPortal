@@ -82,11 +82,6 @@ Registration cycle checks reuse their completed-node and pending-root masks.
 Boolean evaluation and schema validation share non-templated traversal code;
 callback adapters borrow their context without allocating `std::function` objects.
 
-Measured on ESP8266 generic (`eesz=1M128`) with
-DynamicPagesWithDependencies: this optimization reduced `.bin` size from 554848
-to 554000 bytes (848 bytes). Static RAM remained 43748 bytes and IRAM 60691 bytes;
-heap savings depend on field count and dependency depth.
-
 Entire pages can use the same simple or grouped conditions, referencing a field
 on a previously registered page:
 

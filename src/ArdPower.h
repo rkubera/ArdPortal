@@ -32,14 +32,18 @@ extern "C" {
 namespace ArdPowerDetail {
 class Platform : public Signals {
 public:
+  /** @brief Capture the immutable native boot wake cause. */
   Platform()
     : _wakeCause(readWakeCause()) {}
+  /** @brief Return the boot wake cause captured during construction. */
   ArdPowerWakeCause wakeCause() const {
     return _wakeCause;
   }
+  /** @brief Return the wrapping millisecond clock used by power scheduling. */
   static uint32_t now() {
     return millis();
   }
+  /** @brief Validate the platform timer range for a deep-sleep duration in milliseconds. */
   static bool validDeepSleep(uint32_t ms) {
 #if defined(ESP8266)
     return uint64_t(ms) * 1000ULL <= ESP.deepSleepMax();
@@ -47,9 +51,11 @@ public:
     return ms != 0;
 #endif
   }
+  /** @brief Restore native power-management settings before releasing the backend. */
   ~Platform() {
     restore();
   }
+  /** @brief Check native support for the requested sleep type. */
   bool supportsSleep(ArdPowerSleepType type) const {
 #if defined(ESP8266)
     return type != ArdPowerSleepType::LightSleep;
@@ -58,6 +64,7 @@ public:
     return true;
 #endif
   }
+  /** @brief Apply native connected-saving settings and return the resulting state or Error. */
   ArdPowerState apply(ArdPowerSleepType type, bool wifiActive, bool connected) {
     using State = ArdPowerState;
     using Sleep = ArdPowerSleepType;
@@ -104,9 +111,11 @@ public:
     if (!connected) return State::ModemSleep;
     return light ? (type == Sleep::LightSleep ? State::LightSleep : State::ConnectedSleep) : State::ModemSleepFallback;
   }
+  /** @brief Yield while waiting for a signal or the bounded idle timeout. */
   void idle(uint32_t ms) {
     waitForSignal(ms);
   }
+  /** @brief Enter timed native light sleep when supported and report the resulting state. */
   ArdPowerState lightSleep(uint32_t ms) {
 #if defined(ESP32)
     if (hasSignals() || wakePinsActive()) return ArdPowerState::Awake;
@@ -132,6 +141,7 @@ public:
     return ArdPowerState::Error;
 #endif
   }
+  /** @brief Prepare sources and enter native deep sleep; return false on failure. Successful entry restarts the application on wake. */
   bool deepSleep(uint32_t ms) {
     if (!prepareDeepPins()) return false;
 #if defined(ESP32) && ARDPORTAL_POWER_AUTO_LIGHT_SLEEP

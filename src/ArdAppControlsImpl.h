@@ -33,17 +33,27 @@ bool ArdAppControls::dependencyValueMatches(const V& rule) const {
  * @param index Zero-based element or field index.
  * @return True when the complete dependency chain permits visibility; false otherwise.
  */
-bool ArdAppControls::dependencyFieldVisible(size_t index) const {
+bool ArdAppControls::dependencyFieldVisible(size_t index, VisibilityCache* cache) const {
   if (index >= _portal._dynamic.count()) return false;
   if (!_portal._dynamic.dependentAt(index)) return true;
+  if (cache && cache->revision != _portal._appRevision) {
+    cache->complete = cache->visible = 0;
+    cache->revision = _portal._appRevision;
+  }
+  if (cache && cache->complete.test(index)) return cache->visible.test(index);
+  const uint32_t revision = _portal._appRevision;
   const size_t count = _portal._dynamic.count();
   ArdDependencies::Stack stack;
   if (!stack.reserve(1, count)) return false;
   size_t depth = 1;
   stack[0] = { uint16_t(index), 0, 0 };
   ArdAppConfigFieldMask active = ArdAppConfigFieldMask::forField(index), complete = 0, visible = 0;
+  if (cache) {
+    complete = cache->complete;
+    visible = cache->visible;
+  }
   auto load = [&](size_t i) {
-    return _portal._dynamic.at(i);
+    return _portal._dynamic.conditionsAt(i);
   };
   auto indexOf = [&](const String& id) {
     return _portal._dynamic.indexOf(id);
@@ -56,7 +66,13 @@ bool ArdAppControls::dependencyFieldVisible(size_t index) const {
   };
   while (depth) {
     auto result = ArdDependencies::step(stack, depth, active, complete, visible, count, load, indexOf, dependent, match);
-    if (result != ArdDependencies::Result::Running) return result == ArdDependencies::Result::Visible;
+    if (result != ArdDependencies::Result::Running) {
+      if (cache && revision == _portal._appRevision && (result == ArdDependencies::Result::Visible || result == ArdDependencies::Result::Hidden)) {
+        cache->complete = complete;
+        cache->visible = visible;
+      }
+      return result == ArdDependencies::Result::Visible;
+    }
     yield();
   }
   return false;
@@ -66,11 +82,11 @@ bool ArdAppControls::dependencyFieldVisible(size_t index) const {
  * @param rule Dependency rule to evaluate.
  * @return True when the referenced field is visible and its value matches the rule.
  */
-bool ArdAppControls::dependencyMatches(const V& rule) const {
+bool ArdAppControls::dependencyMatches(const V& rule, VisibilityCache* cache) const {
   auto match = [&](const V& leaf) {
     if (!dependencyValueMatches(leaf)) return false;
     size_t index = _portal._dynamic.indexOf(leaf["field"].asString());
-    return index < _portal._dynamic.count() && dependencyFieldVisible(index);
+    return index < _portal._dynamic.count() && dependencyFieldVisible(index, cache);
   };
   return ArdDependencies::evaluate(rule, match);
 }
@@ -80,8 +96,8 @@ bool ArdAppControls::dependencyMatches(const V& rule) const {
  * @param field Application field definition or identifier.
  * @return True when the field is visible; false when its dependency condition is not satisfied.
  */
-bool ArdAppControls::appFieldVisible(const V& field) const {
-  return dependencyMatches(field["_pageVisibleWhen"]) && dependencyMatches(field["visibleWhen"]);
+bool ArdAppControls::appFieldVisible(const V& field, VisibilityCache* cache) const {
+  return dependencyMatches(field["_pageVisibleWhen"], cache) && dependencyMatches(field["visibleWhen"], cache);
 }
 #else
 /**
@@ -296,6 +312,10 @@ bool ArdAppControls::applyAppState(const String& key, const V& value, ChangeSour
   // Failed serialization must never be interpreted as equality.
   if (!after.length() || (!previous.isUndefined() && !before.length())) return false;
   if (!previous.isUndefined() && before == after) {
+#if ARDPORTAL_ENABLE_MATTER
+    if (source != ChangeSource::Matter) _portal._matter.discard(_portal._dynamic.indexOf(key));
+#endif
+
 #if ARDPORTAL_ENABLE_ZIGBEE
     if (source != ChangeSource::Zigbee) _portal._zigbeeAppQueue.remove(key);
 #endif
@@ -303,6 +323,9 @@ bool ArdAppControls::applyAppState(const String& key, const V& value, ChangeSour
   }
   _appState[key] = value;
   if (!_appState.isValid()) return false;
+#if ARDPORTAL_ENABLE_MATTER
+  if (source != ChangeSource::Matter) _portal._matter.discard(_portal._dynamic.indexOf(key));
+#endif
 #if ARDPORTAL_ENABLE_ZIGBEE
   if (source != ChangeSource::Zigbee) _portal._zigbeeAppQueue.remove(key);
 #endif
@@ -313,6 +336,9 @@ bool ArdAppControls::applyAppState(const String& key, const V& value, ChangeSour
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE
     _portal.markZigbeeStateDirty(key);
+#endif
+#if ARDPORTAL_ENABLE_MATTER
+    _portal._matter.dirty(_portal._dynamic.indexOf(key));
 #endif
     if (publishMqtt) markDirty(key);
     if (_portal._appChanged) _portal._appChanged(key, value, source);
@@ -375,7 +401,11 @@ bool ArdAppControls::emitAppConfigEvent(const char* key, const V& value) {
 bool ArdAppControls::appControl(const V& definition, size_t index, const V& value, ChangeSource source) {
 #if ARDPORTAL_CONTROL_SUPPORT_EXTENDED
   _appControlStage = 1;
-  if (source != ChangeSource::Zigbee && !appFieldVisible(definition)) {
+  if (source != ChangeSource::Zigbee
+#if ARDPORTAL_ENABLE_MATTER
+      && source != ChangeSource::Matter
+#endif
+      && !appFieldVisible(definition)) {
     _appControlStage = 6;
     return false;
   }
@@ -516,9 +546,16 @@ void ArdAppControls::applyAppConfig(V app) {
 #if ARDPORTAL_ENABLE_ZIGBEE
     _portal.markZigbeeStateDirty(key);
 #endif
+#if ARDPORTAL_ENABLE_MATTER
+    _portal._matter.dirty(_portal._dynamic.indexOf(key));
+#endif
     markDirty(key);
     // MQTT intent was already dispatched on receipt. A flash commit is not a new command.
-    if (source != ChangeSource::Mqtt && source != ChangeSource::Zigbee && _portal._appChanged) {
+    if (source != ChangeSource::Mqtt && source != ChangeSource::Zigbee
+#if ARDPORTAL_ENABLE_MATTER
+        && source != ChangeSource::Matter
+#endif
+        && _portal._appChanged) {
       V copy = value;
       _portal._appChanged(key, copy, source);
     }
@@ -552,8 +589,16 @@ void ArdAppControls::applyAppPatch(V patch) {
 #if ARDPORTAL_ENABLE_ZIGBEE
     _portal.markZigbeeStateDirty(key);
 #endif
+#if ARDPORTAL_ENABLE_MATTER
+    _portal._matter.dirty(_portal._dynamic.indexOf(key));
+#endif
     markDirty(key);
-    if (_portal._saveSource != ChangeSource::Mqtt && _portal._saveSource != ChangeSource::Zigbee && _portal._appChanged) _portal._appChanged(key, value, _portal._saveSource);
+    if (_portal._saveSource != ChangeSource::Mqtt && _portal._saveSource != ChangeSource::Zigbee
+#if ARDPORTAL_ENABLE_MATTER
+        && _portal._saveSource != ChangeSource::Matter
+#endif
+        && _portal._appChanged)
+      _portal._appChanged(key, value, _portal._saveSource);
   }
 }
 #if ARDPORTAL_ENABLE_MQTT

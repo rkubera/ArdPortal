@@ -51,6 +51,33 @@ void drain(ArdPortal& p) {
 int main() {
   {
     ArdPortal p;
+    auto registerPage = [&](const char* id, const char* order, bool valid) {
+      String definition = String("{\"id\":\"") + id + "\",\"name\":\"Order test\",\"fields\":[{\"id\":\"" + id + "_value\",\"type\":\"switch\",\"name\":\"Value\"}]";
+      if (order) definition += String(",\"order\":") + order;
+      definition += "}";
+      assert(p.startAppConfigPageRegistration(std::move(definition)));
+      for (int i = 0; i < 1000 && p.appConfigPageRegistrationBusy(); ++i) p.serviceAppConfigPageRegistration();
+      assert(!p.appConfigPageRegistrationBusy());
+      assert((p.appConfigPageRegistrationState() == ArdPortal::AppConfigPageRegistrationState::Succeeded) == valid);
+    };
+    registerPage("first", "10", true);
+    registerPage("second", nullptr, true);
+    registerPage("third", "1", true);
+    registerPage("badnull", "null", false);
+    registerPage("badtext", "\"1\"", false);
+    registerPage("badfloat", "1.5", false);
+    registerPage("fourth", nullptr, true);
+    registerPage("fifth", "-1", true);
+    registerPage("sixth", nullptr, true);
+    const int expected[] = { 10, 1, 1, 3, -1, 5 };
+    assert(p._dynamic.pages.length() == 6);
+    for (size_t i = 0; i < 6; ++i) {
+      auto menu = ArdJSON::JSON.parse(p._dynamic.pages.menu(i));
+      assert(menu["order"].isInteger() && menu["order"].asDouble() == expected[i]);
+    }
+  }
+  {
+    ArdPortal p;
     auto& mqtt = p._mqttClient;
     const auto savedMillis = fakeMillis;
     const int savedWifi = WiFi.state;

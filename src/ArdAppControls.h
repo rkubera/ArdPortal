@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "AppConfigFields.h"
+#include "ArdAllocation.h"
 #include "ArdPortalFeatures.h"
 #include "PortalTypes.h"
 #include "ArdJSON.h"
@@ -46,12 +47,17 @@ private:
     _appControlStage = 0;
   }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
+  struct VisibilityCache {
+    ARDPORTAL_NO_THROW_ALLOCATION
+    ArdAppConfigFieldMask complete, visible;
+    uint32_t revision = 0;
+  };
   /**
    * @brief Evaluate a visibility dependency against the current application values.
    * @param rule Dependency rule to evaluate.
    * @return True when the referenced field is visible and its value matches the rule.
    */
-  bool dependencyMatches(const ArdJSON::JSONVar& rule) const;
+  bool dependencyMatches(const ArdJSON::JSONVar& rule, VisibilityCache* cache = nullptr) const;
   /**
    * @brief Compare the referenced application value or property with the dependency expectation.
    * @param rule Dependency rule to evaluate.
@@ -63,14 +69,18 @@ private:
    * @param index Zero-based element or field index.
    * @return True when the complete dependency chain permits visibility; false otherwise.
    */
-  bool dependencyFieldVisible(size_t index) const;
+  bool dependencyFieldVisible(size_t index, VisibilityCache* cache = nullptr) const;
 #endif
   /**
    * @brief Evaluate the field visibility condition against current application values.
    * @param field Application field definition or identifier.
    * @return True when the field is visible; false when its dependency condition is not satisfied.
    */
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+  bool appFieldVisible(const ArdJSON::JSONVar& field, VisibilityCache* cache = nullptr) const;
+#else
   bool appFieldVisible(const ArdJSON::JSONVar& field) const;
+#endif
   /**
    * @brief Validate and apply an incoming application configuration change.
    * @param app Application configuration object.

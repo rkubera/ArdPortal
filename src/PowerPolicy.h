@@ -41,6 +41,8 @@ namespace ArdPowerDetail {
 struct Context {
   uint16_t blockers = 0;
   bool wifiActive = false, wifiConnected = false, zigbee = false, zigbeeSleeping = false, zigbeeDeepSleep = false;
+  bool managedRadioSleeping = false;
+  void (*connectedSleepAdmission)(void*, bool) = nullptr;
   bool (*prepareDeepSleep)(void*) = nullptr;
   void (*afterDeepSleepAttempt)(void*) = nullptr;
   void (*beforeDeepSleep)(void*) = nullptr;
@@ -77,9 +79,13 @@ public:
     uint32_t sleepDelayMs = 1000;  // Inactivity delay before automatic sleep; explicit requests skip it.
     uint16_t maxIdleMs = 20;       // At most 100 ms so portal timers and sockets remain serviced.
   };
+  /** @brief Construct a manager with default AlwaysOn policy and no selected sleep type. */
   Manager() = default;
+  /** @brief Prevent copying timers, registered pins and backend ownership. */
   Manager(const Manager&) = delete;
+  /** @brief Prevent assigning manager resource ownership. */
   Manager& operator=(const Manager&) = delete;
+  /** @brief Validate and apply options atomically; false preserves the previous configuration. Success resets pending sleep and inactivity timing. */
   bool configure(const Options& options) {
     if (uint8_t(options.policy) > uint8_t(Policy::Periodic) || uint8_t(options.sleep) > uint8_t(SleepType::DeepSleep) || !_backend.supportsSleep(options.sleep) || options.sleepDelayMs > INT32_MAX || !options.maxIdleMs || options.maxIdleMs > 100) return false;
     if (options.policy == Policy::Periodic && (!options.periodic.intervalMs || options.periodic.intervalMs > INT32_MAX || options.sleepDelayMs >= options.periodic.intervalMs)) return false;
@@ -96,19 +102,23 @@ public:
     notifyActivity();
     return true;
   }
+  /** @brief Reconfigure the policy while retaining other options; return false for an unsupported combination. */
   bool setPolicy(Policy policy) {
     Options options = _options;
     options.policy = policy;
     return configure(options);
   }
+  /** @brief Reconfigure sleep type while retaining other options; return false when unsupported or incompatible with registered sources. */
   bool setSleepType(SleepType type) {
     Options options = _options;
     options.sleep = type;
     return configure(options);
   }
+  /** @brief Return the selected scheduling policy. */
   Policy policy() const {
     return _options.policy;
   }
+  /** @brief Return the selected sleep type, independently of policy and current admission. */
   SleepType sleepType() const {
     return _options.sleep;
   }
@@ -116,16 +126,20 @@ public:
   WakeCause wakeCause() const {
     return _backend.wakeCause();
   }
+  /** @brief Return whether the immutable boot cause identifies a deep-sleep wake. */
   bool wokeFromDeepSleep() const {
     const auto cause = wakeCause();
     return cause == WakeCause::Timer || cause == WakeCause::Gpio || cause == WakeCause::DeepSleep || cause == WakeCause::OtherWake;
   }
+  /** @brief Return the last applied sleep configuration/admission state, not measured power consumption. */
   State state() const {
     return _state;
   }
+  /** @brief Return the blocker bitmask from the latest service pass. */
   uint16_t blockers() const {
     return _blockers;
   }
+  /** @brief Check whether the latest blocker mask contains the supplied reason. */
   bool blockedBy(Blocker blocker) const {
     return (_blockers & uint16_t(blocker)) != 0;
   }
@@ -150,16 +164,20 @@ public:
     _callback = callback;
     _callbackArgument = argument;
   }
+  /** @brief Register a level-triggered wake pin with scope inferred from the current sleep type; false on unsupported input or resource exhaustion. */
   bool addWakePin(uint8_t pin, WakeLevel level) {
     return addWakePin(pin, level, _options.sleep == SleepType::DeepSleep ? WakeScope::LightAndDeepSleep : WakeScope::LightSleep);
   }
+  /** @brief Register a wake pin for the explicit scope; reject light-only pins under DeepSleep and unsupported native GPIOs. */
   bool addWakePin(uint8_t pin, WakeLevel level, WakeScope scope) {
     if (_options.sleep == SleepType::DeepSleep && scope != WakeScope::LightAndDeepSleep) return false;
     return _backend.addWakePin(pin, level, scope);
   }
+  /** @brief Register an edge-triggered event pin; return false under DeepSleep or when registration fails. */
   bool addInterruptPin(uint8_t pin, Interrupt trigger) {
     return _options.sleep != SleepType::DeepSleep && _backend.addInterruptPin(pin, trigger);
   }
+  /** @brief Remove a registered GPIO and its wake/interrupt handling; false if absent or native removal fails. */
   bool removePin(uint8_t pin) {
     return _backend.removePin(pin);
   }
@@ -186,6 +204,7 @@ public:
     *slot = { Backend::now() + ms, repeat ? ms : 0, id, true };
     return true;
   }
+  /** @brief Cancel the timer with this application ID; false if it is not registered. */
   bool cancelTimer(uint8_t id) {
     for (auto& timer : _timers)
       if (timer.used && timer.id == id) {
@@ -194,6 +213,7 @@ public:
       }
     return false;
   }
+  /** @brief Return whether a loop-owned wake callback is currently being dispatched. */
   bool dispatching() const {
     return _dispatching;
   }
@@ -236,6 +256,7 @@ public:
     ++_locks;
     return true;
   }
+  /** @brief Release one application lock and restart inactivity timing; false when no lock is held. */
   bool unlock() {
     if (!_locks) return false;
     --_locks;
@@ -255,12 +276,14 @@ public:
     _sleepFailed = false;
     return true;
   }
+  /** @brief Cancel the pending explicit sleep request and restart inactivity timing. */
   void cancelSleep() {
     _pending = false;
     _requestStarted = false;
     _lastActivity = Backend::now();
     _sleepFailed = false;
   }
+  /** @brief Return whether an explicit sleep request is pending; automatic policy evaluation is separate. */
   bool sleepPending() const {
     return _pending;
   }
@@ -288,8 +311,11 @@ public:
     const bool automatic = _options.policy == Policy::EventDriven || periodic;
     const bool sleepAllowed = (_pending || (automatic && uint32_t(now - _lastActivity) >= _options.sleepDelayMs)) && untilPeriodic > 0;
     const SleepType effective = _options.policy == Policy::AlwaysOn ? SleepType::None : type;
-    const bool connected = ((effective == SleepType::ConnectedSleep && _options.connectedSleep.allowCpuSleep) || (effective == SleepType::LightSleep && context.zigbeeSleeping)) && !_blockers && (context.wifiConnected || context.zigbeeSleeping) && (!context.wifiActive || context.wifiConnected) && sleepAllowed;
-    _state = _backend.apply(effective, context.wifiActive, connected);
+    const bool connected = ((effective == SleepType::ConnectedSleep && _options.connectedSleep.allowCpuSleep) || (effective == SleepType::LightSleep && context.zigbeeSleeping)) && !_blockers && (context.wifiConnected || context.zigbeeSleeping || context.managedRadioSleeping) && (!context.wifiActive || context.wifiConnected) && sleepAllowed;
+    if (context.connectedSleepAdmission) context.connectedSleepAdmission(context.owner, effective == SleepType::ConnectedSleep && !_blockers && sleepAllowed && !_sleepFailed);
+    // Interactive network traffic must suppress modem sleep as well as CPU sleep.
+    const bool interactive = _blockers & (uint16_t(Blocker::Http) | uint16_t(Blocker::WebSocket) | uint16_t(Blocker::AccessPoint));
+    _state = _backend.apply(interactive ? SleepType::None : effective, context.wifiActive, connected);
     if (_state != State::Error && context.zigbeeSleeping && !context.wifiActive && effective == SleepType::ConnectedSleep && !connected) _state = State::ModemSleep;
     if (_state == State::Error) return;
     if (_sleepFailed) {
@@ -328,7 +354,8 @@ public:
     bool hasDeadline = _deadlineSet || periodic;
     for (const auto& timer : _timers)
       if (timer.used) hasDeadline = true;
-    if (!_pending && !hasDeadline && !_backend.hasSources() && !_callback) return;
+    // A managed network has SDK timers/tasks that wake the RTOS independently.
+    if (!_pending && !hasDeadline && !_backend.hasSources() && !_callback && !context.managedRadioSleeping) return;
     uint32_t ms = _options.maxIdleMs;
     if (periodic && uint32_t(untilPeriodic) < ms) ms = uint32_t(untilPeriodic);
     if (_pending) {

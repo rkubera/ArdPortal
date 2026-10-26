@@ -63,7 +63,9 @@ bool ArdZigbee::begin(const Options& options) {
     return false;
   }
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  if (_controlCount) {
+  bool commands = false;
+  for (auto* entry = _controls.get(); entry && !commands; entry = entry->next.get()) commands = ArdZigbeeFields::acceptsCommands(entry->spec);
+  if (commands) {
     _commands = xQueueCreate(16, sizeof(ArdZigbeeFields::Command));
     if (!_commands) {
       vQueueDelete(_events);
@@ -366,21 +368,37 @@ void ArdZigbee::setState(State state) {
 /** @brief Append a bounded Zigbee-only history record. @param text Diagnostic text. @return No value. */
 void ArdZigbee::log(const String& text, bool lifecycle) {
   if (lifecycle && _diagnosticSink) _diagnosticSink(_diagnosticContext, text);
+#if !defined(ARDPORTAL_ENABLE_WWW) || ARDPORTAL_ENABLE_WWW
   const char* data = text.c_str();
   if (data == _history[_lineId % HistoryCapacity].text.c_str()) {
     String copy = text;
     logText(copy.c_str(), copy.length());
   } else logText(data, text.length());
+#else
+  logText(text.c_str(), text.length());
+#endif
 }
 /** @brief Format a log record without temporary Strings or copying a traffic message.
  * @param text Borrowed diagnostic bytes. @param bytes Diagnostic length. @return No value.
  */
 void ArdZigbee::logText(const char* text, size_t bytes) {
+#if ARDPORTAL_ENABLE_LOG_CALLBACK
+  if (_logSink) {
+    String message;
+    message.concat(text, bytes);
+    _logSink(_logContext, message);
+  }
+#endif
+#if !defined(ARDPORTAL_ENABLE_WWW) || ARDPORTAL_ENABLE_WWW || ARDPORTAL_ZIGBEE_DEBUG_SERIAL
   bytes = std::min(bytes, size_t(220));
   char timestamp[32];
   const time_t current = time(nullptr);
   if (current < 1704067200 || !ArdConsoleTime::utcTimestamp(current, timestamp, sizeof(timestamp))) snprintf(timestamp, sizeof(timestamp), ARD_LANG_NATIVE_LU_MS, (unsigned long)millis());
+#if !defined(ARDPORTAL_ENABLE_WWW) || ARDPORTAL_ENABLE_WWW
   auto& line = _history[_lineId % HistoryCapacity];
+#else
+  Line line;
+#endif
   const size_t timestampBytes = strlen(timestamp);
   if (!line.text.reserve(timestampBytes + bytes + 3)) return;
   line.text = "[";
@@ -397,13 +415,22 @@ void ArdZigbee::logText(const char* text, size_t bytes) {
     Serial.write(&newline, 1);
   }
 #endif
+#else
+  (void)text;
+  (void)bytes;
+#endif
 }
 /** @brief Find oldest available record newer than cursor. @param cursor Last sent record ID. @return Borrowed record or nullptr. */
 const ArdZigbee::Line* ArdZigbee::nextLine(uint32_t cursor) const {
+#if !defined(ARDPORTAL_ENABLE_WWW) || ARDPORTAL_ENABLE_WWW
   const Line* next = nullptr;
   for (const auto& line : _history)
     if (line.id > cursor && (!next || line.id < next->id)) next = &line;
   return next;
+#else
+  (void)cursor;
+  return nullptr;
+#endif
 }
 /** @brief Complete an accepted operation once. @param ok Success. @param reason Result detail. @param stopped User cancellation flag. @return No value. */
 void ArdZigbee::finish(bool ok, const char* reason, bool stopped) {

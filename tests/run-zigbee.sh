@@ -8,7 +8,7 @@ ASAN_OPTIONS=detect_leaks=0 "$work/test"
 ASAN_OPTIONS=detect_leaks=0 "$work/test" saved-network
 ASAN_OPTIONS=detect_leaks=0 "$work/test" time-service
 
-for suite in fields native composite-native ota console converter time; do
+for suite in log-callback fields sensor-queue native composite-native ota console converter time; do
   c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -I"$root/tests/zigbee-host" -I"$root/tests/host" -I"$root/src" "$root/tests/zigbee-host/$suite.cpp" -o "$work/$suite"
   ASAN_OPTIONS=detect_leaks=0 "$work/$suite"
 done

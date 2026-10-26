@@ -350,10 +350,11 @@ public:
   bool remove(size_t index);
   /** @brief Conservative allocator footprint of one JSON member, including heap bookkeeping. */
   static size_t memberAllocationBytes();
-  // Iterate without constructing an array containing every object key.
+  /** @brief Visit object members without a key array; false for invalid/nonobject input, key allocation failure or visitor rejection. */
   template<class Visitor> bool forEachObjectMember(Visitor&& visitor) const;
-  // Undefined patch members delete keys; existing/new nodes are moved, never cloned.
+  /** @brief Move validated patch nodes into this object without cloning; eraseUndefined removes undefined keys. False rejects an invalid/oversized patch. */
   bool applyObjectPatch(JSONVar&& patch, bool eraseUndefined = true);
+  /** @brief Check that this object patch and its members are valid; undefined members are allowed as deletions. */
   bool isObjectPatchValid() const;
 
 private:
@@ -536,6 +537,7 @@ public:
       if ((flash() ? pgm_read_byte(_bytes + i) : uint8_t(_bytes[i])) != (other.flash() ? pgm_read_byte(other._bytes + i) : uint8_t(other._bytes[i]))) return false;
     return true;
   }
+  /** @brief Compare the complete key with RAM text, respecting flash-backed key storage. */
   bool matches(const String& key) const {
     if (key.length() != length()) return false;
     if (!length()) return true;
@@ -1421,10 +1423,12 @@ public:
   const char* error() const {
     return _error;
   }
+  /** @brief Measure merged object JSON without materializing it; return zero on validation or serialization failure. */
   size_t measureObjectPatch(const JSONVar& base, const JSONVar& patch) {
     _measure = true;
     return writeObjectPatch(base, patch) ? _bytes : 0;
   }
+  /** @brief Serialize at most maximum bytes from offset in the merged object JSON; return empty at end or on failure. */
   String sliceObjectPatch(const JSONVar& base, const JSONVar& patch, size_t offset, size_t maximum) {
     _slice = true;
     _sliceOffset = offset;

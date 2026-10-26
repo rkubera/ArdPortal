@@ -11,7 +11,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true', help='Check formatting without writing files')
     args = parser.parse_args()
-    paths = sorted(path for folder in ('src', 'examples', 'tests')
+    paths = sorted(path for folder in ('src', 'examples', 'tests', 'idf/MatterPortal/main')
                    for path in (ROOT / folder).rglob('*')
                    if path.suffix in {'.h', '.hpp', '.c', '.cpp', '.ino'})
     mode = ['--dry-run', '--Werror', '--ferror-limit=1'] if args.check else ['-i']

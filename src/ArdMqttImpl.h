@@ -104,7 +104,7 @@ bool ArdMqtt::publishRaw(const char* topic, const char* payload, bool retain) {
   appendText(body, topic);
   body += payload;
   bool queued = queuePacket(retain ? 0x31 : 0x30, body);
-#if ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL
+#if ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL || ARDPORTAL_ENABLE_LOG_CALLBACK
   if (queued) _portal.logMqtt(ArdUILanguage::text(ArdUILanguage::Key::s_146), topic, reinterpret_cast<const uint8_t*>(payload), strlen(payload));
 #endif
   return queued;
@@ -148,7 +148,7 @@ bool ArdMqtt::subscribeRaw(const char* topic) {
  * @return No value.
  */
 void ArdMqtt::closeMqtt(const char* reason) {
-#if ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL
+#if ARDPORTAL_ENABLE_CONSOLE || ARDPORTAL_MQTT_DEBUG_SERIAL || ARDPORTAL_ENABLE_LOG_CALLBACK
   if (reason || _mqttState == MqttState::Connecting || _mqttState == MqttState::Connected) {
     String message = ArdUILanguage::text(ArdUILanguage::Key::s_147);
     _portal.consoleLine(true, message);

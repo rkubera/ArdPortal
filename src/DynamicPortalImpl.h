@@ -29,6 +29,9 @@ bool ArdPortal::addAppConfigEntity(const __FlashStringHelper* definition) {
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdPortal::addAppConfigEntity(const String& definition) {
+#if ARDPORTAL_ENABLE_MATTER
+  if (_matter.frozen()) return false;
+#endif
   if (appConfigPageRegistrationBusy()) return appConfigRegistrationFailed("busy", "", ARD_LANG_NATIVE_ANOTHER_PAGE_REGISTRATION_IS_PENDING);
 #if ARDPORTAL_ENABLE_HA
   ArdJSON::Limits limits;
@@ -354,11 +357,11 @@ bool ArdPortal::reserveDynamicHttpMemory(size_t bytes, size_t block) {
 #if ARDPORTAL_ENABLE_CONSOLE
   // History is expendable before an active form or network reserve. Preserve
   // the newest traffic record and three newest diagnostic messages.
-  auto reclaim = [&](ConsoleLine* history, size_t keep) {
+  auto reclaim = [&](ConsoleLine* history, size_t keep, size_t capacity = ConsoleCapacity) {
     for (;;) {
-      size_t count = 0, oldest = ConsoleCapacity;
+      size_t count = 0, oldest = capacity;
       uint32_t id = UINT32_MAX;
-      for (size_t i = 0; i < ConsoleCapacity; ++i)
+      for (size_t i = 0; i < capacity; ++i)
         if (history[i].text.length()) {
           ++count;
           if (history[i].id < id) {
@@ -366,13 +369,16 @@ bool ArdPortal::reserveDynamicHttpMemory(size_t bytes, size_t block) {
             oldest = i;
           }
         }
-      if (count <= keep || oldest == ConsoleCapacity) return false;
+      if (count <= keep || oldest == capacity) return false;
       history[oldest] = ConsoleLine();
       if (ArdHeap::permits(bytes, block)) return true;
     }
   };
 #if ARDPORTAL_ENABLE_MQTT
   if (reclaim(_console, 1)) return true;
+#endif
+#if ARDPORTAL_ENABLE_MATTER_CONSOLE
+  if (reclaim(_matterConsole, 1, MatterConsoleCapacity)) return true;
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   if (reclaim(_consoleMessages, 3)) return true;
@@ -396,7 +402,8 @@ ArdPortal::DynamicHttpPart ArdPortal::prepareDynamicHttpPart() {
   const auto page = _httpDynamicPageIndex;
   const auto field = _httpDynamicField;
   const bool conditionFirst = _httpDynamicConditionFirst, pages = _httpDynamicPages;
-  if (buildDynamicHttpPart() && _httpDynamicText.length()) return DynamicHttpPart::Ready;
+  if (buildDynamicHttpPart())
+    return _httpDynamicText.length() ? DynamicHttpPart::Ready : DynamicHttpPart::RetryLater;
   _httpDynamicStage = stage;
   _httpDynamicPageIndex = page;
   _httpDynamicField = field;
@@ -462,23 +469,32 @@ bool ArdPortal::buildDynamicHttpPart() {
     _httpDynamicField = 0;
     _httpDynamicStage = 2;
 #if ARDPORTAL_ENABLE_DEPENDENCIES
+    // Optional acceleration only: low-memory clients keep the uncached path.
+    if (ArdHeap::permits(2048 + sizeof(ArdAppControls::VisibilityCache), 1024))
+      _httpVisibilityCache.reset(new (std::nothrow) ArdAppControls::VisibilityCache());
     _httpDynamicText = F("},\"conditions\":{");
     return true;
 #endif
   }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-  if (_httpDynamicField < _dynamic.pages.fields(p)) {
-    const size_t f = _httpDynamicField++;
-    if (!_dynamic.pages.dependent(p, f)) {
-      _httpDynamicText = " ";
+  // Commit bounded cursor-only progress without emitting whitespace fragments.
+  for (size_t skipped = 0; _httpDynamicField < _dynamic.pages.fields(p) && !_dynamic.pages.dependent(p, _httpDynamicField); ++_httpDynamicField)
+    if (++skipped == 16) {
+      ++_httpDynamicField;
+      _httpDynamicText = String();
       return true;
     }
+  if (_httpDynamicField < _dynamic.pages.fields(p)) {
+    const size_t f = _httpDynamicField++;
     V field = _dynamic.pages.fieldConditions(p, f);
     if (!field.isValid() || field.isUndefined()) return false;
-    _httpDynamicText = (_httpDynamicConditionFirst ? String() : String(F(","))) + _json.stringify(V(_dynamic.pages.fieldId(p, f))) + F(":{\"visible\":") + (_appControls.appFieldVisible(field) ? String(F("true")) : String(F("false"))) + "}";
+    _httpDynamicText = (_httpDynamicConditionFirst ? String() : String(F(","))) + _json.stringify(V(_dynamic.pages.fieldId(p, f))) + F(":{\"visible\":") + (_appControls.appFieldVisible(field, _httpVisibilityCache.get()) ? String(F("true")) : String(F("false"))) + "}";
     _httpDynamicConditionFirst = false;
     return true;
   }
+#endif
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+  _httpVisibilityCache.reset();
 #endif
   _httpDynamicText = String(F("},\"revision\":")) + String(_httpDynamicRevision) + "}";
   _httpDynamicPages = false;

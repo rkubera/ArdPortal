@@ -400,6 +400,7 @@ esp_err_t ArdZigbee::action(esp_zb_core_action_callback_id_t id, const void* mes
   }
   for (auto* entry = _instance->_controls.get(); entry; entry = entry->next.get())
     if (entry->spec.endpoint == c.endpoint) {
+      if (!acceptsCommands(entry->spec)) return ESP_OK;
       if (!_instance->_commands || xQueueSend(_instance->_commands, &c, 0) != pdTRUE) {
         _instance->traffic(ARD_LANG_NATIVE_RX_ZCL_COMMAND_QUEUE_FULL_COMMAND_REJECTED);
         return ESP_ERR_NO_MEM;

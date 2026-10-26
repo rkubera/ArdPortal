@@ -64,7 +64,7 @@ RF range, physical actuator behavior, radio coexistence or complete device OTA.
 ## Arduino code formatting
 
 The root `.clang-format` is the default Arduino IDE 2 configuration. The source,
-example sketches and C++ test fixtures use clang-format 14, matching the IDE.
+example sketches, C++ test fixtures and `idf/MatterPortal/main` sources use clang-format 14, matching the IDE.
 Run `python3 src/tools/format_code.py` to format them, or add `--check` to verify
 formatting without modifying files. CI runs this check.
 

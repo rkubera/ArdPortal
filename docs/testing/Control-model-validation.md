@@ -4,7 +4,7 @@ Date: 2026-10-23. Branch: `codex/control-model-classes`.
 
 ## Scope
 
-The catalogue covers all 30 field types and 119 semantic classes; 12 types have optional classes. Matter runtime code is outside this change. `class` can be omitted for every field type.
+The catalogue covers all 30 field types and 119 semantic classes; 12 types have optional classes. Matter has a separate optional adapter; see `Matter.md` and `tests/matter-fields-test.py`. `class` can be omitted for every field type.
 
 ## Automated checks
 

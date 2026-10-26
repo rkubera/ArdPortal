@@ -65,6 +65,40 @@ jobs:
       - name: Examples and public API feature matrix
         run: bash tests/compile-arduino.sh
 
+  matter-sdk:
+    name: Matter SDK (${{ matrix.profile }}, ${{ matrix.credentials }}, ${{ matrix.power }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container: espressif/idf:v5.5.5
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [wifi, thread, thread-wifi]
+        credentials: [development, production]
+        power: [off]
+        include:
+          - profile: wifi
+            credentials: development
+            power: connected
+          - profile: thread
+            credentials: development
+            power: icd
+          - profile: thread-wifi
+            credentials: development
+            power: icd
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build pinned ESP-Matter from source and verify linked transports
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py -C idf/MatterPortal -B "$RUNNER_TEMP/matter-${{ matrix.profile }}-${{ matrix.credentials }}-${{ matrix.power }}" -DARDPORTAL_PROFILE=${{ matrix.profile }} -DARDPORTAL_CREDENTIALS=${{ matrix.credentials }} -DARDPORTAL_POWER=${{ matrix.power }} -DIDF_TARGET=esp32c6 build
+          python tests/check-matter-sdk.py "$RUNNER_TEMP/matter-${{ matrix.profile }}-${{ matrix.credentials }}-${{ matrix.power }}" --profile ${{ matrix.profile }} --credentials ${{ matrix.credentials }} --power ${{ matrix.power }}
+
   lint-assets:
     name: Lint and assets
     runs-on: ubuntu-24.04

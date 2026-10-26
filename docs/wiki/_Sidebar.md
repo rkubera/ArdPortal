@@ -42,7 +42,6 @@
   - [update](https://github.com/rkubera/ArdPortal/wiki/Control-update)
 
 - [Zigbee setup and integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee)
-- [Zigbee hardware validation](https://github.com/rkubera/ArdPortal/wiki/Zigbee-Validation)
 - [Home Assistant integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant)
 - [MQTT message construction](https://github.com/rkubera/ArdPortal/wiki/MQTT-Messages)
 - [Power management: policies, sleep types and network matrices](https://github.com/rkubera/ArdPortal/wiki/Power-Management)
@@ -54,3 +53,5 @@
 - [Portal screenshots](https://github.com/rkubera/ArdPortal/wiki/Screenshots)
 
 * [Control classes / shared model](Control-Classes)
+
+- [Matter](Matter)

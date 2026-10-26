@@ -1,0 +1,42 @@
+menu "ArdPortal"
+    config ARDPORTAL_MATTER
+        bool "Enable Matter integration"
+        default n
+
+    choice ARDPORTAL_MATTER_NETWORK
+        prompt "Matter transport and portal network"
+        depends on ARDPORTAL_MATTER
+        default ARDPORTAL_MATTER_WIFI if SOC_WIFI_SUPPORTED
+        default ARDPORTAL_MATTER_THREAD_ONLY
+
+        config ARDPORTAL_MATTER_WIFI
+            bool "Matter Wi-Fi + BLE"
+            depends on SOC_WIFI_SUPPORTED
+
+        config ARDPORTAL_MATTER_THREAD_ONLY
+            bool "Matter Thread + BLE, no Wi-Fi portal"
+            depends on SOC_IEEE802154_SUPPORTED
+
+        config ARDPORTAL_MATTER_THREAD_WIFI
+            bool "Matter Thread + BLE, Wi-Fi portal"
+            depends on SOC_IEEE802154_SUPPORTED && SOC_WIFI_SUPPORTED
+    endchoice
+
+    choice ARDPORTAL_MATTER_CREDENTIALS
+        prompt "Matter credential profile"
+        depends on ARDPORTAL_MATTER
+        default ARDPORTAL_MATTER_DEVELOPMENT
+
+        config ARDPORTAL_MATTER_DEVELOPMENT
+            bool "Development: SDK test credentials"
+
+        config ARDPORTAL_MATTER_PRODUCTION
+            bool "Production: provisioned factory credentials"
+    endchoice
+
+    config ARDPORTAL_MATTER_MAX_ENDPOINTS
+        int "Maximum application Matter endpoints"
+        depends on ARDPORTAL_MATTER
+        range 1 64
+        default 16
+endmenu

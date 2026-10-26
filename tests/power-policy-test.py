@@ -39,6 +39,14 @@ int main(){
   assert(p.configure(options(Policy::AlwaysOn,Sleep(type))));p.service(online);
   assert(p.state()==State::Awake&&!p.requestSleep(1)&&!Backend::deepCalls&&!Backend::lightCalls&&!Backend::idled);
  }
+ // HTTP/WebSocket/AP traffic must disable radio power saving, including radio-only mode.
+ auto interactiveOptions=options(Policy::EventDriven,Sleep::ConnectedSleep);interactiveOptions.connectedSleep.allowCpuSleep=false;
+ assert(p.configure(interactiveOptions));
+ Blocker interactiveBlockers[]={Blocker::Http,Blocker::WebSocket,Blocker::AccessPoint};
+ for(auto blocker:interactiveBlockers){
+  online.blockers=uint16_t(blocker);p.service(online);assert(p.state()==State::Awake&&!Backend::idled);
+ }
+ online.blockers=0;p.service(online);assert(p.state()==State::ModemSleep);
  // Event-driven modem sleep affects the radio; connected sleep waits on deadlines.
  auto radioOnly=options(Policy::EventDriven,Sleep::ConnectedSleep);radioOnly.connectedSleep.allowCpuSleep=false;
  assert(p.configure(radioOnly));assert(p.wakeIn(7));p.service(online);

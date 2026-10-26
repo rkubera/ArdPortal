@@ -20,6 +20,21 @@ for chip in esp32c5 esp32c6 esp32h2; do
     --library "$repo_root" --build-property upload.maximum_size=1835008 \
     --build-path "$build_root/$chip" examples/ZigbeeClimate
 done
+# Matter uses a custom 3.5 MiB single-app partition table; no firmware OTA.
+for transport in 0 1; do
+  "$cli" compile --fqbn esp32:esp32:esp32c6:PartitionScheme=huge_app \
+    --library "$repo_root" --build-property upload.maximum_size=3670016 \
+    --build-property "compiler.cpp.extra_flags=-DARDPORTAL_MATTER_THREAD=$transport" \
+    --build-path "$build_root/matter-c6-$transport" examples/MatterPortal
+done
+"$cli" compile --fqbn esp32:esp32:esp32h2:PartitionScheme=huge_app \
+  --library "$repo_root" --build-property upload.maximum_size=3670016 \
+  --build-property compiler.cpp.extra_flags=-DARDPORTAL_MATTER_THREAD=1 \
+  --build-path "$build_root/matter-h2" examples/MatterPortal
+"$cli" compile --fqbn esp32:esp32:esp32c6:PartitionScheme=huge_app \
+  --library "$repo_root" --build-property upload.maximum_size=3670016 \
+  --build-property compiler.cpp.extra_flags=-DARDPORTAL_ENABLE_CONTROLS=1 \
+  --build-path "$build_root/matter-full" examples/MatterPortal
 # Compile-time probes verify APIs disappear with their feature switches.
 "${PYTHON:-python3}" tests/public-api-matrix.py "$build_root/api"
 # The network-free ESP32 profile must not retain the native Wi-Fi driver.

@@ -5,6 +5,13 @@
 #include <memory>
 #include <new>
 #include <utility>
+#if defined(ESP32) && defined(ESP_PLATFORM)
+#include <sdkconfig.h>
+#if defined(CONFIG_ARDPORTAL_MATTER_THREAD_WIFI) && CONFIG_ARDPORTAL_MATTER_THREAD_WIFI && defined(CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP) && CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP && !defined(CONFIG_SPIRAM)
+#include <esp_heap_caps.h>
+#define ARDPORTAL_PREFER_RTC_HEAP 1
+#endif
+#endif
 
 // Test builds can replace only ArdPortal allocations without intercepting the SDK.
 #ifdef ARDPORTAL_TEST_ALLOCATE
@@ -19,6 +26,10 @@ namespace ArdAllocation {
 inline void* allocate(size_t bytes) noexcept {
 #ifdef ARDPORTAL_TEST_ALLOCATE
   return ARDPORTAL_TEST_ALLOCATE(bytes);
+#elif defined(ARDPORTAL_PREFER_RTC_HEAP)
+  // CPU-owned JSON nodes/metadata do not need DMA. Prefer an SDK-enabled RTC
+  // heap and fall back normally, leaving DMA-capable SRAM for the radio/AES.
+  return heap_caps_malloc_prefer(bytes, 2, uint32_t(MALLOC_CAP_RTCRAM | MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT), uint32_t(MALLOC_CAP_DEFAULT));
 #else
   return std::malloc(bytes);
 #endif

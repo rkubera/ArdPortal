@@ -169,7 +169,7 @@ The same sketch is available as
 | `id` | Required | Unique page identifier; used in `/p/<id>` and form requests. |
 | `name` | Recommended default title | Required unless a nonempty `names` object supplies titles. `Home`/`home` places the form on Start. |
 | `names` | Optional | Language-code-to-title object, e.g. `{"en":"Settings","de":"Einstellungen"}`. No separate `default` language key is needed; use `name`. |
-| `order` | Required integer | Position among dynamic links; does not reorder built-in pages. |
+| `order` | Optional integer | Position among dynamic links; defaults to the zero-based registration position. Equal values preserve registration order. Does not reorder built-in pages. |
 | `fields` | Required nonempty array | Field definitions; field IDs are globally unique, not page-local. |
 | `visibleWhen` | Optional | A dependency rule applying to the menu link, content, all fields and HA entities. See [Dependent fields and pages](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields). |
 
@@ -362,7 +362,7 @@ The existing `startAppConfigPageRegistration(const __FlashStringHelper*)` overlo
 For conditional pages and fields, see [Dependent fields](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields).
 For field values and composite schemas, see [Controls](https://github.com/rkubera/ArdPortal/wiki/Controls).
 
-![Dynamic DHT settings page](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/Demo8.png)
+![Example dynamic sensor settings page](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/Demo8.png)
 
 ---
 

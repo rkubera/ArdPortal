@@ -37,13 +37,9 @@ Override these defines globally in the library build when needed:
 | `ARDPORTAL_NETWORK_DMA_RESERVE` | 16384 bytes | Unavailable |
 | `ARDPORTAL_NETWORK_BLOCK_RESERVE` | 4096 bytes | 1024 bytes |
 
-Reserves are additional to the estimated work allocation. The ESP32 defaults
-were exercised with two concurrent HTTP clients and a connected MQTT broker:
-HTTP/network activity consumed roughly 8–11 KiB temporarily. Registration was
-held pending below the reserve and completed after pressure was released.
-These measurements cover the included test, not every TLS/radio/project load.
-ESP8266 defaults are conservative starting values verified by compilation and
-host tests; calibrate them on the actual device/workload.
+Reserves are additional to the estimated work allocation. Adjust them for the
+actual target, enabled transports and concurrent workload; lowering them can
+leave insufficient memory for networking.
 
 With `ARDPORTAL_ENABLE_CONSOLE_MESSAGES=1`, registration reports accepted,
 deferred and completed/failed states with before/after heap8 and DMA samples,
@@ -95,3 +91,24 @@ pools with different access capabilities. DMA is a subset, so do not add it to h
 ---
 
 [Back to documentation home](https://github.com/rkubera/ArdPortal/wiki/Home)
+
+## Matter build costs and feature boundaries
+
+Matter uses a native SDK and BLE commissioning, so its flash/RAM cost is larger
+than the portal alone. Transport profiles select actual SDK components: Wi-Fi
+builds exclude OpenThread; Thread-only builds exclude Wi-Fi; mixed builds retain
+both radios but use Thread exclusively for Matter. Source builds disable C++
+exceptions and keep optional Wi-Fi throughput paths out of IRAM to preserve
+radio/DMA SRAM. Mixed builds also use bounded Wi-Fi/OpenThread buffers, on-demand
+SDK pools and eligible CPU-only RTC heap allocations. See [Matter memory and
+coexistence](Matter#memory-and-concurrency) for admission limits.
+
+Library controls, command decoding and diagnostic strings follow feature flags.
+Sensor-only Matter/Zigbee inventories avoid an actuator command queue. Disabled
+MQTT removes its console command parser and permits a smaller read-only Messages
+socket. Without WWW, browser history/sockets are omitted. Generated portal CSS classes and DOM IDs use exactly
+two characters; authoring sources retain readable names.
+
+Runtime `suspendPortal()` turns Wi-Fi off but does not remove firmware or promise
+release of every networking allocation. Compile unused features out for permanent
+size savings.
