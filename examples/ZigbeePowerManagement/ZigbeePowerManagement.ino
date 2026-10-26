@@ -1,4 +1,19 @@
 // SPDX-License-Identifier: MIT
+
+/*
+ * ZigbeePowerManagement
+ *
+ * Purpose: Keep a Zigbee end device joined while allowing radio/CPU light sleep.
+ *
+ * Demonstrates: EventDriven LightSleep, a repeating 10-second timer and retained RAM state.
+ *
+ * Requirements: ESP32-C6/H2, Zigbee ED mode and included partitions.csv; CPU sleep needs SDK
+ * PM/tickless idle support.
+ *
+ * What to expect: Wi-Fi is disabled. Add sensor/report work in the timer callback; this is a
+ * power API skeleton without sensor endpoints.
+ */
+
 // ESP32-C6/H2, Zigbee ED board mode. Keep partitions.csv beside the sketch.
 #define ARDPORTAL_ENABLE_ZIGBEE 1
 #define ARDPORTAL_ENABLE_WIFI 0

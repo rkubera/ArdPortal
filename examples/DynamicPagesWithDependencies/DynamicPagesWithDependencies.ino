@@ -1,5 +1,20 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * DynamicPagesWithDependencies
+ *
+ * Purpose: Make portal fields appear or disappear according to other field values.
+ *
+ * Demonstrates: visibleWhen conditions, including grouped AND/OR rules and HA discovery
+ * visibility.
+ *
+ * Requirements: Wi-Fi-capable ESP8266/ESP32 with dynamic pages and dependencies enabled.
+ *
+ * What to expect: Change the controlling values and observe dependent fields and optional HA
+ * entities.
+ */
+
 /*
  * Show and hide dynamic fields using visibleWhen single-field and grouped AND/OR dependencies.
  * With HA enabled, discovery is removed/recreated as field visibility changes.

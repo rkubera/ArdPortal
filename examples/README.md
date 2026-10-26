@@ -4,16 +4,17 @@
 
 | Sketch | What it demonstrates |
 | --- | --- |
-| `ESP01-1MB/ESP01-1MB.ino` | ESP-01 with MQTT, OTA and HA enabled; TLS and Console disabled in the sketch. Use Generic ESP8266 Module with the actual flash size and an ArdFS area. |
 | `DHT/DHT.ino` | Configurable GPIO and DHT11/12/21/22 type (default GPIO2 / DHT22), numeric °C/% readings, calibration, MQTT/HA, Console and OTA; no TLS. |
-| `MinimalPortal/MinimalPortal.ino` | Portal with OTA enabled and MQTT disabled; HA and Console are disabled automatically. |
 | `BasicPortal/BasicPortal.ino` | Minimal portal; configuration, JSON and ArdFS journal are managed by the library. The loop only calls `portal.loop()`. |
+| `PortalStandby/PortalStandby.ino` | Suspend the Wi-Fi portal after Zigbee connects; a GPIO4 button reopens it for two minutes without stopping Zigbee. |
+| `MatterPortal/MatterPortal.ino` | Matter plug, temperature and brightness endpoints; Wi-Fi/Thread selection, pairing UI and shared callbacks. |
+| `ZigbeePortal/ZigbeePortal.ino` | Broad native/composite Zigbee control catalogue with portal callbacks and gateway converter/quirk export. |
+| `ZigbeeClimate/ZigbeeClimate.ino` | Simulated temperature slider and thermostat over native Zigbee without MQTT. |
 | `UsbDiagnostics/UsbDiagnostics.ino` | Messages over a sketch-owned USB/UART log callback, with WWW and its console histories disabled. |
 | `PowerManagement/PowerManagement.ino` | Independent power policy/sleep type, GPIO/ISR events and software timers. |
-| `ZigbeeDeepSleep/ZigbeeDeepSleep.ino` | Automatic end-device deep sleep with saved network identity and native readiness checks; Wi-Fi disabled. |
 | `ZigbeePowerManagement/ZigbeePowerManagement.ino` | Native Zigbee end-device radio sleep, optional CPU light sleep and periodic application events; Wi-Fi disabled. |
 | `PowerManagementPeriodic/PowerManagementPeriodic.ino` | Scheduled application cycles, Periodic wake events and automatic sleep between cycles. |
-| `PowerManagementDeepSleep/PowerManagementDeepSleep.ino` | Automatic timed deep-sleep, boot/wake cause diagnostics and cooperative storage work, with Wi-Fi disabled. |
+| `PowerManagementDeepSleep/PowerManagementDeepSleep.ino` | Timed deep sleep and wake-cause diagnostics with Wi-Fi disabled; optional Zigbee end device via `ARDPORTAL_ENABLE_ZIGBEE=1`, ED board mode and the supplied optional partition layout. |
 | `DynamicPages/DynamicPages.ino` | Two JSON-defined pages registered cooperatively in sequence; completion/error callbacks and startup values applied after both storage and registration are ready. |
 | `DynamicPagesWithDependencies/DynamicPagesWithDependencies.ino` | A toggle controls slider and text-field visibility, including retained HA discovery removal/recreation. |
 | `HomeAssistantEntities/HomeAssistantEntities.ino` | HA sensor and switch without panel pages; bounded HA work and shared AppConfig callbacks. |
@@ -78,9 +79,9 @@ on demand. Definitions passed as a String instead retain an owned JSON source.
 
 ## Small control profiles
 
-`ESP01-1MB` compiles only `slider`, `text`, `select` and `edit`. Its main `.ino`
-sets `ARDPORTAL_ENABLE_CONTROLS` to `0` and enables these four individual flags.
-`MinimalPortal` instead sets `ARDPORTAL_ENABLE_DYNAMIC_PAGES` to `0`: no dynamic
+To compile only selected controls, set `ARDPORTAL_ENABLE_CONTROLS` to `0`
+and enable the required individual `ARDPORTAL_ENABLE_CONTROL_*` flags.
+Setting `ARDPORTAL_ENABLE_DYNAMIC_PAGES` to `0` excludes all dynamic fields: no dynamic
 forms or control types are included, and HA/dependencies are forced off. Generic
 application configuration methods and ArdFS persistence remain available. Other examples use the default of all 30 field types.
 Each type can be switched separately with `ARDPORTAL_ENABLE_CONTROL_<TYPE>`.
@@ -91,74 +92,6 @@ Use `switch` for graphical on/off fields, `slider` for numeric settings and `tex
 for read-only numeric or text values. HA still receives switch, number and sensor
 entities respectively. Shared primitives remain inside an enabled composite
 control such as a light or fan.
-
-## ESP-01 MQTT build
-
-`ESP01-1MB` enables MQTT, OTA and HA; disables MQTT TLS, Console and field
-dependencies through defines before `ArdPortal.h`. Only slider, text, select and
-edit fields are included. ESP8266 core 3.1.2, Generic ESP8266 Module, flash layout
-`1MB (FS:64KB OTA:~470KB)` produces a 374,368-byte firmware binary and uses
-36,740 bytes of static RAM. It fits a 1 MB ESP-01. The remaining sector-aligned
-OTA staging space is 581,632 bytes, enough for this image. Initial upload is by
-serial; subsequent uploads can use the Update page. Hardware OTA upload has not
-been tested. ArdFS uses the filesystem reservation. Static RAM excludes runtime
-heap allocations.
-
-The preceding build with all control types was 504,608 bytes / 37,440 static RAM
-bytes. Selecting four controls saves 21,376 firmware bytes and 648 static RAM
-bytes. The earlier OTA-disabled `MinimalPortal` on the same board settings built to 345,968 bytes with
-31,052 static RAM bytes. Selecting four controls originally saved 18,640 firmware
-bytes and 424 static RAM bytes there. The corrected four-control gzip profile
-saves an additional 2,112 bytes in MinimalPortal and 2,240 bytes in ESP01-1MB,
-with unchanged static RAM.
-
-An earlier OTA-enabled check of the same MQTT sketch builds to 570,784 bytes
-and uses 38,428 bytes of static RAM. It fits as a serial-uploaded application,
-but the 1 MB / 64 KB storage layout leaves only 389,120 bytes for
-the incoming update, too little for another raw firmware image of this size.
-The portal currently accepts raw `.bin` images only.
-
-ESP01-1MB sets `ARDPORTAL_ENABLE_DEPENDENCIES` to `0` before including
-`ArdPortal.h`. MinimalPortal disables dependencies automatically by excluding
-all dynamic forms. In ESP01-1MB, dynamic fields remain available, but `visibleWhen` definitions are
-rejected. Disabling this feature saves 1,040 firmware bytes in MinimalPortal and
-1,168 bytes in ESP01-1MB, plus 36 static RAM bytes in each, compared with the
-same four-control builds with dependencies enabled. Other examples retain the
-default enabled setting, including DynamicPagesWithDependencies.
-
-Excluding all dynamic forms saves an additional 13,568 firmware bytes and
-816 static RAM bytes in MinimalPortal versus its preceding dependency-disabled,
-four-control build (363,264 bytes / 31,932 static RAM bytes). That build
-was 349,696 bytes / 31,116 static RAM bytes, using ESP8266 core 3.1.2 and the
-same Generic ESP8266 1 MB / FS 64 KB settings.
-
-Recompiling the same current code with dynamic forms enabled and the four basic
-control flags produces 363,328 bytes. Thus the new define alone saves 13,632
-firmware bytes; the comparison to the preceding revision above includes a
-64-byte change in the shared configuration adapter and web helper ordering.
-
-The static HTML shell is now gzip-compressed when dynamic forms are disabled.
-MinimalPortal builds to 347,520 bytes / 31,116 static RAM bytes, saving another
-2,176 firmware bytes versus 349,696 bytes with the uncompressed HTML shell.
-The ESP streams compressed bytes directly from flash; only the browser inflates
-them. No extra decompression buffer is allocated on the device.
-
-Numeric native-message IDs further reduce ESP01-1MB to 477,904 firmware bytes
-and 36,680 static RAM bytes: 1,968 firmware / 76 RAM bytes saved versus 479,872
-/ 36,756. Changing only `ARDPORTAL_ENABLE_HA` to `1` builds to 481,232 firmware
-bytes and 37,012 static RAM bytes, saving 1,952 firmware / 84 RAM bytes versus
-the preceding HA-enabled build. Both profiles keep OTA, Console and dependencies
-disabled and enable slider, text, select and edit.
-
-With numeric native-message IDs, the earlier OTA-disabled MinimalPortal built to 345,968 firmware
-bytes and 31,052 static RAM bytes; the gzip-only measurement above precedes
-this message-catalog optimization.
-
-The current MinimalPortal enables OTA while keeping MQTT and dynamic forms off.
-With ESP8266 core 3.1.2 and Generic 1 MB / FS 64 KB settings, its firmware
-is 346,928 bytes and static RAM is 31,144 bytes. Shared HTTP response construction
-saved 1,536 bytes, followed by 2,416 bytes from compact language messages.
-The preceding OTA-enabled build was 350,880 bytes.
 
 ## DHT
 

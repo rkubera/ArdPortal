@@ -38,7 +38,7 @@ Dependency support defaults to enabled. Set
 compile it out, including browser logic and its native message. Dynamic pages
 and ordinary fields remain supported. Registration rejects definitions containing
 `visibleWhen` when this flag is zero; it does not silently ignore their rules.
-MinimalPortal and ESP01-1MB disable dependencies in their main sketches.
+Set `ARDPORTAL_ENABLE_DEPENDENCIES=0` before including `ArdPortal.h` to exclude dependency handling.
 
 Fields can declare a `visibleWhen` dependency:
 

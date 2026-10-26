@@ -1,5 +1,20 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * DHT
+ *
+ * Purpose: Expose real DHT temperature and humidity readings in the portal and MQTT/HA.
+ *
+ * Demonstrates: Sensor configuration, calibration offsets, numeric measurements and live
+ * updates.
+ *
+ * Requirements: ESP8266/ESP32, Adafruit DHT and Unified Sensor libraries; wiring notes below.
+ *
+ * What to expect: Home shows Celsius/% readings; Settings selects GPIO/type, offsets and
+ * reporting rate.
+ */
+
 /*
  * Configurable DHT (GPIO2 / DHT22 by default) with a small Wi-Fi portal, MQTT, Home Assistant, Console and OTA.
  * Home shows readings; Settings select GPIO, sensor type, two offsets and MQTT update rate.

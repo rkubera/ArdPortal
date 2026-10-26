@@ -1,5 +1,19 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * AsyncStorage
+ *
+ * Purpose: Save and read a JSON document using ArdFS without starting ArdPortal.
+ *
+ * Demonstrates: Cooperative storage.loop(), journal callbacks and identical-write detection.
+ *
+ * Requirements: ESP8266/ESP32 with an ArdFS region; Serial Monitor at 115200 baud.
+ *
+ * What to expect: Writes /example.json and reads it back. Do not share the volume with a
+ * running portal.
+ */
+
 /*
  * Use ArdFS as a standalone cooperative JSON document store with a journal.
  * Demonstrates background reads/writes, callbacks and skipped identical saves.

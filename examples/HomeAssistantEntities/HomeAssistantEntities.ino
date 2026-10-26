@@ -1,5 +1,19 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * HomeAssistantEntities
+ *
+ * Purpose: Expose an uptime sensor and GPIO indicator to HA without custom portal pages.
+ *
+ * Demonstrates: addAppConfigEntity(), runtime sensor updates and shared value-change callbacks.
+ *
+ * Requirements: ESP8266/ESP32, MQTT broker and HA MQTT integration; adapt GPIO2 to your board.
+ *
+ * What to expect: HA receives uptime updates every 10 seconds; the indicator switch controls
+ * the GPIO.
+ */
+
 // HA entities without dynamic portal pages. Wi-Fi/MQTT settings stay in the portal.
 #include <ArdPortal.h>
 

@@ -53,9 +53,7 @@ Examples are in `examples`:
 
 | Example | Purpose |
 | --- | --- |
-| `ESP01-1MB` | ESP-01 portal with MQTT, OTA and HA; without TLS or Console |
 | `DHT` | Configurable GPIO and DHT type, numeric °C/% readings, calibration, MQTT/HA and OTA; requires Adafruit DHT sensor library |
-| `MinimalPortal` | Basic portal with OTA enabled; MQTT and dynamic forms disabled by sketch defines |
 | `DynamicPagesWithDependencies` | Dynamic fields with visibility dependencies |
 | `BasicPortal` | Minimal `begin()` / `loop()` portal with integrated storage |
 | `DynamicPages` | Two JSON-defined pages with switch, slider, editable text, select and a change callback |

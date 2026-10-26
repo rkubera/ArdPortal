@@ -1,5 +1,18 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * JsonBasics
+ *
+ * Purpose: Use ArdJSON independently of the portal and filesystem.
+ *
+ * Demonstrates: JSON object/array creation, field access, serialization and parsing.
+ *
+ * Requirements: An Arduino target supported by ArdJSON; Serial Monitor at 115200 baud.
+ *
+ * What to expect: Read the JSON results in Serial; no Wi-Fi, portal or storage is started.
+ */
+
 /*
  * Create and access ArdJSON objects/arrays, then serialize and parse JSON.
  * Results are printed to the serial monitor; no portal is started.

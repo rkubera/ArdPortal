@@ -1,4 +1,18 @@
 // SPDX-License-Identifier: MIT
+
+/*
+ * UsbDiagnostics
+ *
+ * Purpose: Forward ArdPortal Messages to USB/UART Serial without serving WWW.
+ *
+ * Demonstrates: onLog() and LogChannel with web histories, MQTT and OTA compiled out.
+ *
+ * Requirements: ESP8266/ESP32; Serial Monitor at 115200 baud and an appropriate USB/UART port.
+ *
+ * What to expect: Read portal diagnostics in Serial. This is not a bridge for arbitrary SDK
+ * logs; Wi-Fi remains compiled in.
+ */
+
 #define ARDPORTAL_ENABLE_WWW 0
 #define ARDPORTAL_ENABLE_LOG_CALLBACK 1
 #define ARDPORTAL_ENABLE_MQTT 0

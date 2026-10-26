@@ -1,5 +1,21 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * ZigbeePortal
+ *
+ * Purpose: Expose a broad set of JSON controls through native Zigbee and the portal.
+ *
+ * Demonstrates: Native/composite endpoint mapping, registration feedback and shared
+ * value/action callbacks.
+ *
+ * Requirements: ESP32-C5/C6 with 4 MiB flash, Zigbee ED mode and included partitions.csv; see
+ * router alternative below.
+ *
+ * What to expect: Pair with Zigbee2MQTT/ZHA and inspect the exported converter/quirk.
+ * Values/actions are demonstrations; implement physical devices yourself.
+ */
+
 // ESP32-C5/C6 4 MiB: select Zigbee ED mode; keep the included partitions.csv.
 // Arduino IDE: select Minimal SPIFFS (1.9MB APP with OTA) for its size check.
 // For router: set ARDPORTAL_ZIGBEE_ROUTER=1, select ZCZR mode.

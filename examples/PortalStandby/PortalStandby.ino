@@ -1,4 +1,18 @@
 // SPDX-License-Identifier: MIT
+
+/*
+ * PortalStandby
+ *
+ * Purpose: Temporarily close the Wi-Fi portal while native Zigbee keeps running.
+ *
+ * Demonstrates: suspendPortal(), resumePortal() and portalSuspended(), not CPU/deep sleep.
+ *
+ * Requirements: ESP32-C6 with Zigbee ED mode; button from GPIO4 to GND; adapt pin as needed.
+ *
+ * What to expect: After Zigbee connects, the portal closes. Press the button to reopen it for
+ * two minutes. No application control endpoints are added.
+ */
+
 // ESP32-C6, Zigbee ED board mode. Connect a button from GPIO4 to GND.
 #define ARDPORTAL_ENABLE_ZIGBEE 1
 #include <ArdPortal.h>
