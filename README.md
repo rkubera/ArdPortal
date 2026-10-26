@@ -72,29 +72,25 @@ Native and composite mappings have different coverage: plain text, dates and arb
 
 Matter consumes the same optional `class`, application values and callbacks as the other integrations. Its adapter is separate from Zigbee; select one native protocol per firmware. Start with [MatterPortal](examples/MatterPortal/MatterPortal.ino) and the [Matter guide](https://github.com/rkubera/ArdPortal/wiki/Matter).
 
+```cpp
+// Before #include <ArdPortal.h>:
+#define ARDPORTAL_ENABLE_MATTER 1
+#define ARDPORTAL_MATTER_THREAD 0 // Wi-Fi; 1 selects Thread
+#define ARDPORTAL_ENABLE_MQTT 0   // Optional: Matter does not need MQTT on the ESP
+#define ARDPORTAL_ENABLE_HA 0
+```
+
+Use a supported Matter board/SDK configuration; the defines select the adapter and transport but do not add missing SDK capabilities. The source SDK project selects transport through its build profiles described below. See the [Matter build guide](https://github.com/rkubera/ArdPortal/wiki/Matter) and [feature flags](https://github.com/rkubera/ArdPortal/wiki/Defines).
+
 The source SDK project provides three compile-time profiles: `wifi` (Matter and portal over Wi-Fi), `thread` (Matter over Thread, no Wi-Fi), and `thread-wifi` (Matter exclusively over Thread, portal over Wi-Fi). BLE commissioning remains enabled. Independent credential profiles select SDK development credentials by default or per-device production factory data. Optional connected power saving uses the existing ArdPower API; Thread saving requires an ICD build. Thread defaults to MTD; the optional `ARDPORTAL_THREAD_ROLE=router` source-build variant enables an always-listening FTD that can extend the mesh when Thread assigns it a router role. The Matter tab shows device mode and actual role separately.
 
 Supported native mappings cover outlets, on/off lights, brightness, RGB, temperature/humidity/pressure/illuminance, contact/occupancy/leak, fans, thermostats and lift/tilt covers. Other controls remain available to their existing integrations. The Matter menu provides status, pairing/reset and development QR/manual codes. The status bar distinguishes Matter connectivity from Thread attachment.
 
 For pairing in HA, keep the phone on the home Wi-Fi. The setup AP is for configuration and reading the code. Matter Wi-Fi can receive home-network credentials through BLE; Matter Thread needs a border router and Thread credentials synchronized to the phone. Start adding the device from the Home Assistant app so HA completes its own commissioning.
 
-Dynamic-page `order` is now optional: omission uses the zero-based registration position, and ties preserve registration order. An empty compatible Matter inventory reports informational `no_endpoints`, without starting the SDK or preventing later registration.
-
 The [screenshot gallery](https://github.com/rkubera/ArdPortal/wiki/Screenshots) includes both Matter transports and Zigbee network management.
 
 ![Matter over Thread with separate Matter and Thread status](docs/wiki/assets/matter-thread.png)
-
-## Temporarily disabling the portal
-
-With Wi-Fi compiled in, call these methods from the application loop:
-
-| Method | Behavior |
-| --- | --- |
-| `portal.suspendPortal()` | Turns off Wi-Fi and closes WWW, all portal WebSockets, captive DNS and MQTT; Zigbee/Thread continue running. Returns `false` while busy or in a Matter-over-Wi-Fi build. |
-| `portal.resumePortal()` | Restarts portal networking with the previous AP/reconnect policy and retained credentials. Success starts restoration; it does not mean the network is already connected. |
-| `portal.portalSuspended()` | Reports explicit portal suspension. |
-
-Keep calling `portal.loop()`. A physical button can reopen the portal: see [PortalStandby](examples/PortalStandby/PortalStandby.ino) and [API details](https://github.com/rkubera/ArdPortal/wiki/Portal-API#suspending-portal-networking). Suspension is a runtime operation, so it does not remove compiled code or select a sleep policy.
 
 ## Documentation
 
