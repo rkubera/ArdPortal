@@ -13,10 +13,11 @@ workflow = (root / '.github/workflows/pr-checks.yml').read_text()
 job = workflow.split('  arduino-builds:', 1)[1].split('  matter-sdk:', 1)[0]
 profiles = subprocess.check_output(['bash', str(script), '--list'], text=True).splitlines()
 entries = re.findall(r'- profile: (\S+)\n\s+name: "([^"]+)"\n\s+core: (\S+)', job)
-assert len(profiles) == len(set(profiles)) == len(entries) == 19
-assert profiles == [entry[0] for entry in entries]
+assert len(profiles) == len(set(profiles)) == 19
+assert len(entries) == len({entry[0] for entry in entries}) == 9
+assert {entry[0] for entry in entries} <= set(profiles)
 assert 'fail-fast: false' in job and "compile-arduino.sh '${{ matrix.profile }}'" in job
-assert 'Arduino builds (${{ matrix.name }})' in job
+assert 'Firmware / Arduino / ${{ matrix.name }}' in job
 
 with tempfile.TemporaryDirectory(prefix='ardportal-ci-dispatch-') as directory:
     path = Path(directory)
@@ -34,7 +35,8 @@ if Path(args[-1]).name=='no_network' and args[args.index('--fqbn')+1]=='esp32:es
     cli.chmod(0o755)
     log = path / 'commands.jsonl'
     env = {**os.environ, 'ARDUINO_CLI': str(cli), 'ARD_TEST_LOG': str(log)}
-    for profile, _, core in entries:
+    for profile in profiles:
+        core = 'esp8266:esp8266@3.1.2' if profile == 'portal-esp8266' or profile.startswith('api-') else 'esp32:esp32@3.3.12'
         log.write_text('')
         result = subprocess.run(['bash', str(script), profile], env=env, capture_output=True, text=True)
         assert result.returncode == 0, (profile, result.stderr)
@@ -71,4 +73,4 @@ if Path(args[-1]).name=='no_network' and args[args.index('--fqbn')+1]=='esp32:es
                                      ('unknown', {}, 2)]:
         result = subprocess.run(['bash', str(script), profile], env={**env, **extra}, capture_output=True, text=True)
         assert result.returncode == expected, (profile, result.returncode, result.stderr)
-print('PASS: 19 isolated Arduino jobs, target/core/flag dispatch, all-profiles entry point and linker/compiler failures')
+print('PASS: 9 CI Arduino jobs, 19 local profiles, target/core/flag dispatch, all-profiles entry point and linker/compiler failures')

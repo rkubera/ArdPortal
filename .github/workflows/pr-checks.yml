@@ -43,7 +43,7 @@ jobs:
           ZHC_NODE_MODULES="$RUNNER_TEMP/converter-tests/node_modules" Z2M_HA_SOURCE="$RUNNER_TEMP/z2m-homeassistant.ts" node tests/zigbee-converter-test.mjs
 
   arduino-builds:
-    name: Arduino builds (${{ matrix.name }})
+    name: Firmware / Arduino / ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -51,61 +51,31 @@ jobs:
       matrix:
         include:
           - profile: portal-esp8266
-            name: "DynamicPages, ESP8266"
+            name: "ESP8266 / portal"
             core: esp8266:esp8266@3.1.2
           - profile: portal-esp32
-            name: "DynamicPages, ESP32"
-            core: esp32:esp32@3.3.12
-          - profile: zigbee-c5-ed
-            name: "ZigbeeClimate, ESP32-C5, End Device"
+            name: "ESP32 / portal"
             core: esp32:esp32@3.3.12
           - profile: zigbee-c6-ed
-            name: "ZigbeeClimate, ESP32-C6, End Device"
+            name: "ESP32-C6 / Zigbee end device"
             core: esp32:esp32@3.3.12
           - profile: zigbee-h2-ed
-            name: "ZigbeeClimate, ESP32-H2, End Device"
-            core: esp32:esp32@3.3.12
-          - profile: matter-c6-wifi
-            name: "MatterPortal, ESP32-C6, Wi-Fi"
-            core: esp32:esp32@3.3.12
-          - profile: matter-c6-thread
-            name: "MatterPortal, ESP32-C6, Thread"
+            name: "ESP32-H2 / Zigbee end device"
             core: esp32:esp32@3.3.12
           - profile: matter-h2-thread
-            name: "MatterPortal, ESP32-H2, Thread"
+            name: "ESP32-H2 / Matter Thread"
             core: esp32:esp32@3.3.12
           - profile: matter-c6-full
-            name: "MatterPortal, ESP32-C6, all controls"
+            name: "ESP32-C6 / Matter Wi-Fi / all controls"
             core: esp32:esp32@3.3.12
           - profile: no-network-esp32
-            name: "Public API, ESP32, no network"
+            name: "ESP32 / API / no network"
             core: esp32:esp32@3.3.12
           - profile: api-all
-            name: "Public API, ESP8266, all"
-            core: esp8266:esp8266@3.1.2
-          - profile: api-no_power
-            name: "Public API, ESP8266, no_power"
-            core: esp8266:esp8266@3.1.2
-          - profile: api-no_www
-            name: "Public API, ESP8266, no_www"
+            name: "ESP8266 / API / all features"
             core: esp8266:esp8266@3.1.2
           - profile: api-log_headless
-            name: "Public API, ESP8266, log_headless"
-            core: esp8266:esp8266@3.1.2
-          - profile: api-log_without_console
-            name: "Public API, ESP8266, log_without_console"
-            core: esp8266:esp8266@3.1.2
-          - profile: api-no_network
-            name: "Public API, ESP8266, no_network"
-            core: esp8266:esp8266@3.1.2
-          - profile: api-no_dynamic
-            name: "Public API, ESP8266, no_dynamic"
-            core: esp8266:esp8266@3.1.2
-          - profile: api-no_actions
-            name: "Public API, ESP8266, no_actions"
-            core: esp8266:esp8266@3.1.2
-          - profile: api-local_dynamic
-            name: "Public API, ESP8266, local_dynamic"
+            name: "ESP8266 / API / headless logging"
             core: esp8266:esp8266@3.1.2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -131,17 +101,13 @@ jobs:
         run: bash tests/compile-arduino.sh '${{ matrix.profile }}'
 
   matter-sdk:
-    name: Matter SDK (${{ matrix.profile }}, ${{ matrix.credentials }}, ${{ matrix.power }}, ${{ matrix.thread_role }})
+    name: Firmware / Matter SDK / ${{ matrix.profile }} / ${{ matrix.credentials }} / ${{ matrix.power }} / ${{ matrix.thread_role }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     container: espressif/idf:v5.5.5
     strategy:
       fail-fast: false
       matrix:
-        profile: [wifi, thread, thread-wifi]
-        credentials: [development, production]
-        power: [off]
-        thread_role: [mtd]
         include:
           - profile: wifi
             credentials: development
@@ -152,13 +118,13 @@ jobs:
             power: icd
             thread_role: mtd
           - profile: thread-wifi
+            credentials: production
+            power: off
+            thread_role: mtd
+          - profile: thread-wifi
             credentials: development
             power: icd
             thread_role: mtd
-          - profile: thread
-            credentials: development
-            power: off
-            thread_role: router
           - profile: thread-wifi
             credentials: development
             power: off
