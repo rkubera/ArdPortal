@@ -315,7 +315,7 @@ Deep sleep waits at least 5 seconds after a successful connection, a fresh succe
 
 The SDK owns persistent network state and writes it through its native storage backend. This path does not call leave, factory reset, erase NVRAM, or rewrite pairing datasets on every sleep. After wake, normal startup restores the saved identity and reattaches/rejoins; it does not preserve a live RAM session. A parent can age out a device during a long absence (the configured end-device timeout is 64 minutes, subject to parent support). Rejoin and additional traffic may therefore be necessary. Queues being empty is not proof of coordinator/application receipt: hold an application power lock until any required acknowledgement arrives.
 
-See the [Zigbee deep-sleep example](../../examples/ZigbeeDeepSleep/ZigbeeDeepSleep.ino).
+See the unified [PowerManagementDeepSleep example](../../examples/PowerManagementDeepSleep/PowerManagementDeepSleep.ino). Set `ARDPORTAL_ENABLE_ZIGBEE=1`, select Zigbee ED mode on a supported 4 MiB ESP32-C6/H2, and copy its `zigbee-partitions.csv` to `partitions.csv` before building. The default variant leaves Zigbee disabled.
 
 ## GPIO, interrupts and timers
 

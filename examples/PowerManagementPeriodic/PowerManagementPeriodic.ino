@@ -1,4 +1,18 @@
 // SPDX-License-Identifier: MIT
+
+/*
+ * PowerManagementPeriodic
+ *
+ * Purpose: Schedule application work once per minute with connected saving between cycles.
+ *
+ * Demonstrates: Periodic policy, an initial work cycle and later Periodic wake callbacks.
+ *
+ * Requirements: ESP8266/ESP32 with platform support for the selected connected sleep behavior.
+ *
+ * What to expect: Serial prints a placeholder sensor cycle at 115200 baud; replace it with your
+ * work. Active portal/network work can postpone sleep.
+ */
+
 #include <ArdPortal.h>
 
 ArdPortal portal;

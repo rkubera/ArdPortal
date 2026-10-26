@@ -1,4 +1,19 @@
 // SPDX-License-Identifier: MIT
+
+/*
+ * PowerManagement
+ *
+ * Purpose: Handle timer and GPIO events while allowing connected power saving.
+ *
+ * Demonstrates: EventDriven policy, ConnectedSleep, wake pins, software timers and ISR
+ * signaling.
+ *
+ * Requirements: ESP8266/ESP32; button from GPIO4 to GND; adapt pin and SDK sleep support.
+ *
+ * What to expect: Watch events at 115200 baud. The sample ISR must be connected by your
+ * application; AP/web activity can postpone sleep.
+ */
+
 #include <ArdPortal.h>
 
 ArdPortal portal;

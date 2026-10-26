@@ -49,7 +49,7 @@ and `emitAppConfigEvent()` then return false and `onAppConfigCommand()` is a no-
 change callback remain available and persist through ArdFS. When Console is
 also disabled, WebSocket handling and buffers are omitted as well.
 
-MinimalPortal enables OTA and disables MQTT and dynamic forms. Disabling MQTT automatically forces HA off; Console diagnostics can remain
+Disabling MQTT automatically forces HA off; Console diagnostics can remain
 enabled independently. No shared-header edits or companion build files are required.
 
 The entry header compiles the portal implementation in the sketch translation
@@ -80,9 +80,8 @@ For a small portal with only four field types:
 ```
 
 `ARDPORTAL_ENABLE_CONTROLS` changes the default for unspecified control flags;
-individual flags take precedence when dynamic forms are enabled. `ESP01-1MB`
-uses this four-control selection. `MinimalPortal` instead sets
-`ARDPORTAL_ENABLE_DYNAMIC_PAGES` to `0`, omitting all field types. This switch
+individual flags take precedence when dynamic forms are enabled. Setting `ARDPORTAL_ENABLE_DYNAMIC_PAGES`
+to `0` omits all field types. This switch
 also overrides explicitly enabled control, HA and dependency flags. OTA, MQTT
 and Console can still be enabled independently. Disabled field definitions are
 rejected by `startAppConfigPageRegistration()`; they are not silently converted into another type.

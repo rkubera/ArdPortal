@@ -1,5 +1,20 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * BasicPortal
+ *
+ * Purpose: Start a general-purpose device configuration portal with default modules.
+ *
+ * Demonstrates: The minimal begin()/loop() lifecycle; automatic settings storage and network
+ * servicing.
+ *
+ * Requirements: Wi-Fi-capable ESP8266/ESP32 and a flash layout with ArdFS and OTA space.
+ *
+ * What to expect: Connect to the setup AP, configure Wi-Fi/MQTT and use the built-in pages. No
+ * custom controls are added.
+ */
+
 /*
  * Basic portal with Wi-Fi, MQTT, Home Assistant discovery and OTA enabled.
  * ArdFS restores and saves settings automatically; loop() services all modules.

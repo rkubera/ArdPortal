@@ -1,5 +1,20 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * ZigbeeClimate
+ *
+ * Purpose: Expose a simulated temperature slider and thermostat over native Zigbee.
+ *
+ * Demonstrates: JSON control mapping, shared state and application thermostat behavior.
+ *
+ * Requirements: ESP32-C5/C6 with at least 4 MiB flash, Zigbee ED mode and included
+ * partitions.csv; see board notes below.
+ *
+ * What to expect: Pair with a coordinator, change the simulated temperature/setpoint and
+ * observe state. MQTT is not required; no real temperature sensor is sampled.
+ */
+
 // ESP32-C5/C6, at least 4 MiB flash. Keep partitions.csv with this sketch.
 // Select Zigbee ED and Minimal SPIFFS (1.9MB APP with OTA) in Arduino IDE.
 // Router alternative: ARDPORTAL_ZIGBEE_ROUTER=1 and Zigbee ZCZR board mode.

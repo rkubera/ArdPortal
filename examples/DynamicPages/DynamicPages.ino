@@ -1,5 +1,20 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * DynamicPages
+ *
+ * Purpose: Add Controls and Settings pages from JSON definitions.
+ *
+ * Demonstrates: Sequential cooperative page registration, PROGMEM definitions and
+ * readiness/change callbacks.
+ *
+ * Requirements: Wi-Fi-capable ESP8266/ESP32; configure MQTT only if HA discovery is wanted.
+ *
+ * What to expect: Edit switches, sliders and other fields in the portal; saved values survive
+ * restart.
+ */
+
 /*
  * Register two dynamic pages cooperatively, without building a whole-page DOM.
  * Controls contains a switch and slider; Settings contains text and a select.

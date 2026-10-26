@@ -1,5 +1,21 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * MatterPortal
+ *
+ * Purpose: Expose a plug, temperature sensor and brightness control over native Matter.
+ *
+ * Demonstrates: Shared JSON-to-Matter mappings, value callbacks, pairing UI and traffic
+ * diagnostics.
+ *
+ * Requirements: Supported Matter ESP32 SDK; default Arduino target ESP32-C6, 4 MB/Huge APP;
+ * keep partitions.csv.
+ *
+ * What to expect: Commission from the controller app over BLE. Wi-Fi is default; Thread needs a
+ * border router. Values are illustrative; add hardware in callbacks.
+ */
+
 // ESP32-C6, 4 MB flash, Huge APP board menu. Keep partitions.csv beside this sketch.
 // Select Wi-Fi (0) or Thread (1); Thread requires a border router.
 #ifndef ARDPORTAL_ENABLE_MATTER

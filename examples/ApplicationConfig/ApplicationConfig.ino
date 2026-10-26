@@ -1,5 +1,19 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
+
+/*
+ * ApplicationConfig
+ *
+ * Purpose: Persist application settings without defining custom web controls.
+ *
+ * Demonstrates: Configuration readiness, get/set APIs, change callbacks and durable-save
+ * results.
+ *
+ * Requirements: ESP8266/ESP32 with an ArdFS region; Serial Monitor at 115200 baud.
+ *
+ * What to expect: Watch configuration messages and the configured report interval in Serial.
+ */
+
 /*
  * Read and change application configuration values through the portal API.
  * Demonstrates configuration readiness, change callbacks and durable save results.

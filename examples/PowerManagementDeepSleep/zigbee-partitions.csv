@@ -1,4 +1,5 @@
-# ESP32-C5/C6 4 MiB: two 1792 KiB OTA slots, 320 KiB ArdFS, dedicated Zigbee data.
+# Optional Zigbee variant only: copy to partitions.csv before compiling.
+# ESP32-C6/H2 4 MiB: two 1792 KiB OTA slots, 320 KiB ArdFS, dedicated Zigbee data.
 # Name, Type, SubType, Offset, Size, Flags
 nvs, data, nvs, 0x9000, 0x5000,
 otadata, data, ota, 0xE000, 0x2000,
