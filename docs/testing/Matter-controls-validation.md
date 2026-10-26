@@ -1,7 +1,7 @@
 # Matter control hardware validation
 
 The opt-in `ARDPORTAL_MATTER_CONTROL_VALIDATION=ON` build selects
-`tests/device/MatterControls.ino` instead of the small example. Normal builds
+`tests/device/MatterControls.h` instead of the small example. Normal builds
 exclude the fixture. Use the source SDK project's Wi-Fi/Thread profile options.
 Changing this endpoint inventory requires resetting Matter with the old image
 before flashing. Portal Wi-Fi configuration is retained.

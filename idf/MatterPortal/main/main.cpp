@@ -8,7 +8,7 @@ void ardportalSdkDiagnosticsBegin();
 void ardportalSdkDiagnosticsDrain();
 #endif
 #if ARDPORTAL_MATTER_CONTROL_VALIDATION
-#include "../../../tests/device/MatterControls.ino"
+#include "../../../tests/device/MatterControls.h"
 #else
 #include "../../../examples/MatterPortal/MatterPortal.ino"
 #endif

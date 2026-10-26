@@ -55,7 +55,7 @@ example_checks = r'''
   assert(registry.validateField(f,page["fields"]) && kind(f)==expected[i]);
  }
 ''' % page
-fixture = (root/'tests/device/MatterControls.ino').read_text()
+fixture = (root/'tests/device/MatterControls.h').read_text()
 fixture_json = re.findall(r'R"JSON\((.*?)\)JSON"', fixture, re.S)
 validation_checks = r'''
  auto validation=ArdJSON::JSON.parse(R"VALIDATION(%s)VALIDATION");

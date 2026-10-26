@@ -38,7 +38,8 @@ int main(){
  const std::string encoded=result.c_str();
  const std::string prefix="{\"size\":21,\"bits\":\"";
  assert(encoded.substr(0,prefix.size())==prefix);assert(encoded.size()==prefix.size()+111+2);
- for(int i=0;i<110;i++)assert(encoded[prefix.size()+i]=='a');assert(encoded[prefix.size()+110]=='8');
+ for(int i=0;i<110;i++){assert(encoded[prefix.size()+i]=='a');}
+ assert(encoded[prefix.size()+110]=='8');
  assert(ArdMatterQr::output==nullptr);
  assert(!ArdMatterQr::generate("https://example.test/?data=MT%3AX%").length());
  assert(!ArdMatterQr::generate("https://example.test/?data=HTTP%3AX").length());

@@ -34,7 +34,8 @@ int main(){
  m._state=ArdMatter::State::Staging;assert(m.frozen());
  m._state=ArdMatter::State::Failed;assert(m.frozen());
  Portal p;p._matter._state=ArdMatter::State::NoEndpoints;
- for(int i=0;i<100;++i)p.service();assert(!p.calls);
+ for(int i=0;i<100;++i){p.service();}
+ assert(!p.calls);
  p._dynamic.size=1;p.service();assert(p.calls==1);
  p._dynamic.size=0;p._appConfigPageRegistration=true;p.service();assert(p.calls==2);
  p._appConfigPageRegistration=false;p._appConfigPageRegistrationState=Portal::AppConfigPageRegistrationState::Failed;

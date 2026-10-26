@@ -27,7 +27,8 @@ source=r'''
 #include <esp_heap_caps.h>
 int main(){
  auto p=static_cast<unsigned char*>(heap_caps_calloc(3,17,MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));assert(p);
- for(unsigned i=0;i<51;++i)assert(!p[i]);std::free(p);
+ for(unsigned i=0;i<51;++i){assert(!p[i]);}
+ std::free(p);
 #if EXPECT_POLICY
  assert(preferred==1 && direct==0);
 #else
