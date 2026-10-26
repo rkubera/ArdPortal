@@ -12,7 +12,7 @@ ArdPortal is a modular Arduino library for ESP8266 and ESP32, combining a device
 
 Zigbee supports ESP32-C5/C6/H2 as End Device or Router, automatic native/composite control mapping, generated Zigbee2MQTT converters and ZHA quirks, OTA, time synchronization and diagnostics. It can operate without Wi-Fi or WWW. ArdFS and ArdJSON are included standalone storage and JSON modules; no external web server, MQTT or JSON library is required. Zigbee uses the SDK bundled with the ESP32 Arduino core.
 
-This Wiki documents the current development branch, including Zigbee, Matter and runtime portal suspension. Check the selected release's changelog before using it with an older installed package. Matter and portal suspension are unreleased additions.
+This Wiki documents ArdPortal 0.9.0, including Zigbee, Matter and runtime portal suspension. Check the selected release's changelog when using an older installed package.
 
 Matter supports alternative Wi-Fi/Thread builds, BLE commissioning, development/production credentials, shared control mappings and optional connected power saving. Thread may retain Wi-Fi for the portal. See [Matter](Matter) for build profiles, HA commissioning.
 

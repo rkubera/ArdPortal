@@ -1,98 +1,48 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — 2026-10-26
 
-- Remove native-endpoint/unsupported-control counters from Matter and Zigbee web views while retaining API counts.
+### Added
 
-- Add optional Thread router-capable FTD source profiles (`ARDPORTAL_THREAD_ROLE=router`), keeping MTD as default; reject ICD/radio sleep and stale SDK device-type selections without forcing network roles.
-- Show Thread device mode and actual Disabled/Detached/Child/Router/Leader role separately in the Matter page and status API; extend Actions with Thread-only and Wi-Fi-portal FTD builds.
+- Add opt-in native Matter over Wi-Fi or Thread on supported ESP32 targets, consuming the shared control classes, values and application callbacks independently of Zigbee.
+- Map outlets, On/Off lights, dimmers, RGB lights, temperature/humidity/pressure/illuminance sensors, contact/occupancy/leak sensors, fans, thermostats and lift/tilt covers to native Matter endpoints.
+- Add an ESP-IDF component and pinned ESP-Matter source project with `wifi`, `thread` and `thread-wifi` profiles. The mixed profile carries Matter exclusively over Thread while retaining the Wi-Fi portal; BLE commissioning stays enabled.
+- Add default SDK development credentials and optional per-device factory credential providers, with a dedicated factory partition and no fallback to test credentials.
+- Add Matter status, pairing-window and reset APIs, a main-menu Matter page and locally rendered QR/manual pairing codes for development credentials.
+- Add optional human-readable Matter traffic diagnostics with a dedicated read-only WebSocket, bounded history and lifecycle messages for commissioning, connectivity, fabric removal and startup errors.
+- Show Matter connectivity and separate Thread attachment in the status bar; show Thread device mode and actual network role in the Matter page and status API.
+- Add optional router-capable Thread FTD source builds with `ARDPORTAL_THREAD_ROLE=router`. MTD remains the default; the network assigns the actual role, and router builds reject ICD and radio sleep.
+- Add optional connected power saving for Matter Wi-Fi and Short Idle Time ICD for Matter Thread, integrated with ArdPower admission and pending work. Block forced light/deep sleep under Matter.
+- Add `suspendPortal()`, `resumePortal()` and `portalSuspended()` to temporarily stop Wi-Fi, WWW, WebSockets, DNS and MQTT while Zigbee or Matter Thread keeps running. Preserve connection settings and reject suspension for Matter Wi-Fi.
+- Add an optional sketch-owned `onLog` callback for Messages, MQTT, Matter and Zigbee, including builds without WWW; guard recursive forwarding.
 
-- Add runtime `suspendPortal()`, `resumePortal()` and `portalSuspended()` for Wi-Fi portal standby while Zigbee/Matter Thread continue; reject suspension for Matter Wi-Fi and preserve AP/reconnect settings.
-- Expand README and wiki coverage of Matter builds, commissioning, controls and portal standby.
+### Changed
 
-- Validate all Matter control families with an opt-in 16-endpoint hardware fixture; fix light-sensor initialization, cover readiness/motion reporting and restored SDK cache synchronization after reboot.
+- Make dynamic-page `order` optional, using the zero-based registration position when omitted and preserving registration order for ties.
+- Use two-character generated CSS classes and DOM IDs, including dynamic pages.
+- Remove endpoint and unsupported-control counters from Matter/Zigbee web views while retaining API counts.
+- Expand README/wiki documentation for Matter, Thread roles, credentials, power policies and portal suspension; update portal, Zigbee and Matter screenshots.
+- Reduce firmware and RAM use through selective diagnostics/control compilation, shorter messages, shared command decoding and Console rendering, and sensor-only paths without command queues in Matter and Zigbee.
+- Exclude unused MQTT WebSocket parsing and reduce Messages socket storage when MQTT is disabled; omit WWW history in headless builds while retaining sketch log callbacks.
+- Disable C++ exceptions in source SDK profiles and validate saved build configurations. Reduce unused BLE reservations while preserving commissioning.
+- Tune mixed Thread/Wi-Fi SDK memory use with bounded Wi-Fi/OpenThread buffers, on-demand Matter pools and eligible RTC-heap allocations; defer Thread startup until Wi-Fi/storage activity and available heap permit it.
+- Cache Matter connectivity instead of repeatedly acquiring SDK locks in every portal loop.
+- Run nine representative Arduino firmware builds and five source SDK builds as separately named Actions jobs, retaining the complete 19-profile Arduino suite locally.
+- Retry transient Arduino tool downloads and install pinned clang-format 14.0.6 from a PyPI wheel instead of relying on Ubuntu package mirrors.
 
-- Make dynamic-page `order` optional, defaulting to the zero-based registration position; equal orders retain registration order.
-- Treat an empty supported Matter inventory as informational (`no_endpoints`), without starting the SDK or repeating startup attempts; allow later page registration while keeping actual registration failures as errors.
+### Fixed
 
-- Correct the source SDK's Matter Wi-Fi band capabilities and scan-result bands on dual-band targets such as ESP32-C5; retain the original driver for single-band and Thread builds.
-
-- Bind Matter's IPv6 UDP transport to Thread in mixed Thread/Wi-Fi builds, preventing CASE replies from following the portal's Wi-Fi default route; preserve portal sockets and avoid persistent routing state.
-
-- Enable SDK Wi-Fi/IEEE 802.15.4 coexistence after starting Matter Thread when the Wi-Fi portal is enabled; reject unsupported/failed initialization and verify the call survives linking.
-
-- Expose SDK commissioning-in-progress and compact Thread/SRP discovery diagnostics in the Matter status API, separating mesh attachment from registered Matter services.
-
-- Keep Matter commissioning exclusively on Thread in the Thread + Wi-Fi portal SDK profile; leave Wi-Fi enabled for the portal and place Thread commissioning on endpoint 0.
-- Cache Matter connectivity once per second instead of acquiring SDK/Thread locks on every portal loop; expose Thread provisioning and attachment in Matter diagnostics.
-
-- Show a separate Thread network connection status in the portal status bar when Matter uses Thread.
-
-- Use official on-demand Matter pools in mixed Thread/Wi-Fi source profiles and prefer SDK-enabled RTC heap for CPU-only portal/data-model allocations when PSRAM is absent, preserving DMA SRAM for radio/AES.
-
-- Paint the Wi-Fi scan warning before starting the request, including guidance to reconnect to the same AP after a scan disconnects it.
-
-- Reserve heap in mixed Thread/Wi-Fi source builds with 32 OpenThread message buffers while retaining standard SDK event buffers and BLE commissioning.
-
-- Defer Matter Thread SDK startup until Wi-Fi association/storage work settles and network heap reserves permit it, keeping the portal available under memory pressure.
-
-- Limit portal Wi-Fi buffers before starting Thread + BLE to retain heap for Matter initialization in mixed transport builds.
-
-- Keep the ESP32-C5 source-built Thread + Wi-Fi portal profile from applying the Arduino Thread-only override that disables Wi-Fi and breaks linking.
-
-- Allocate the Zigbee application command queue only when staged endpoints accept commands; sensor-only and read-only compound endpoints retain reporting without a command queue.
-
-- Use a 136-byte read-only Messages socket when MQTT is disabled (896 bytes less RAM), and exclude the MQTT WebSocket command parser.
-
-- Reduce Matter flash use with shorter readable diagnostics, one shared command decoder, sensor-only callback paths without a command queue and control-specific traffic formatting; avoid temporary copies when clipping traffic text.
-- Share console row rendering, retain Matter console assets in FULL/BASIC profiles and exclude console socket code/assets when disabled; allow USB diagnostics with WWW enabled but Console disabled.
-
-- Add an optional sketch-owned onLog callback for Messages/MQTT/Matter/Zigbee, independent of WWW; omit WWW history without WWW and guard recursive forwarding.
-
-- Suppress repeated power-paused messages when HTTP/WebSocket blockers change without changing the saving decision.
-
-- Show Matter connectivity in the status bar also when MQTT is disabled.
-
-- Log changes in ArdPortal Matter power-saving admission and pause reasons to Messages for Wi-Fi/Thread, without logging physical SDK sleep/wake cycles or repeating unchanged decisions.
-
-- Hide OTA space in device information and omit its API field and label when OTA is disabled.
-
-- Prevent stale Matter reports from overwriting queued commands; merge same-source commands during configuration save debounce instead of delaying every command until flash commit.
-
-- Keep Matter dimmer brightness independent of On/Off: remembered-level updates while off no longer switch the slider back on, and turning on restores the SDK level.
-
-- Add optional human-readable Console → Matter traffic behind ARDPORTAL_ENABLE_MATTER_CONSOLE, with a dedicated read-only WebSocket and bounded history; show Matter pairing/connectivity in the main status bar.
-
-- Add bounded, loop-owned Matter lifecycle diagnostics to Console Messages, including pairing windows/sessions, completion, fail-safe expiry, connectivity, fabric removal, reset and startup errors.
-
-- Load the language dictionary before polling Matter/Zigbee status and refresh their labels immediately after language changes.
-
-- Disable the fallback AP without rewriting its channel configuration; avoid repeated SDK errors when STA connects on 5 GHz.
-
-- Suspend radio power saving during HTTP, WebSocket and AP activity, including a short HTTP grace period between browser requests.
-
-- Add optional Matter connected power saving and Thread Short Idle Time ICD source-build profiles, integrated with ArdPower admission and pending work; block forced light/deep sleep under Matter.
-
-- Publish control names as bounded Matter endpoint Fixed Labels, including Home Assistant’s test/DIY name-label alias.
-
-- Add independent Matter credential profiles: default development SDK credentials and production factory provisioning, with a dedicated partition and no fallback to test credentials.
-
-- Preserve SDK Wi-Fi credential storage for Matter commissioning and its fail-safe rollback across restarts.
-
-- Display Matter pairing QR codes locally in the WWW portal and read cached setup codes without a transient CHIP lock failure.
-
-- Reduce unused NimBLE connection and packet-pool reservations in source SDK profiles while retaining peripheral BLE commissioning.
-
-- Use exactly two characters for generated DOM IDs and CSS classes, including dynamic page IDs; include shared button aliases in Matter builds.
-
-- Add an ESP-IDF component and pinned ESP-Matter source build with Wi-Fi, Thread-only and Thread-with-Wi-Fi-portal SDK profiles, preserving BLE commissioning and the Arduino control API.
-- Disable C++ exceptions across all three source-build SDK profiles to reduce firmware size; verify compiler flags and reject saved configurations with exceptions enabled.
-- Fix the Matter example page registration order; report registration errors and Wi-Fi addresses, and enable its native USB Serial/JTAG console in ESP-IDF builds.
-- Keep Wi-Fi throughput and sleep-path optimizations out of IRAM in source-build profiles to preserve DMA-capable SRAM for AP authentication, BLE and HTTP.
-
-- Add opt-in ESP32 Matter integration, selected Wi-Fi/Thread transport, native control mappings, bounded command queue and incremental reports.
-- Add commissioning/status/reset UI in the main WWW menu at `/matter`, layout change protection, selective control compilation and a single-app ESP32-C6 example.
-- Keep Matter separate from Zigbee; disabled Matter adds no SDK dependency. See the Matter guide for supported mappings, SDK limits and hardware validation requirements.
+- Bind mixed-profile Matter IPv6 UDP traffic to Thread so CASE replies do not follow the Wi-Fi portal's default route; keep Thread commissioning on endpoint 0 and enable SDK radio coexistence.
+- Correct dual-band Matter Wi-Fi capabilities and scan-result bands on ESP32-C5. Preserve commissioning credentials and fail-safe rollback across restarts.
+- Prevent stale Matter reports from overwriting queued commands and merge same-source updates during configuration-save debounce.
+- Keep dimmer brightness separate from On/Off; changing a remembered level while off no longer turns the light on, and turning on restores its level.
+- Fix illuminance endpoint initialization, cover readiness/motion reporting and restored SDK state synchronization after reboot; publish bounded endpoint name labels for Home Assistant.
+- Treat an empty compatible Matter inventory as informational `no_endpoints`, allow later page registration, and retain errors for actual registration failures.
+- Load translations before Matter/Zigbee status polling and refresh labels after language changes; avoid transient SDK lock failures when reading cached pairing codes.
+- Show Matter status when MQTT is disabled; hide OTA space and its API field when OTA is disabled.
+- Pause radio saving during portal HTTP/WebSocket/AP activity, suppress repeated unchanged power decisions and report ArdPortal power admission changes to Messages.
+- Show Wi-Fi scan/reconnect guidance before scanning and stop reconfiguring the fallback AP channel when disabling it after a 5 GHz connection.
+- Correct Matter example page registration and USB console setup, mixed-profile Arduino feature overrides, and Linux host-test/lint failures.
 
 ## 0.8.2 — 2026-10-24
 

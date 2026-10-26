@@ -618,7 +618,7 @@ Home Assistant MQTT Discovery includes this value as device `sw_version`. Zigbee
 
 ## Suspending portal networking
 
-**Unreleased API.**
+**Available since 0.9.0.**
 
 | Method | Return value |
 | --- | --- |
