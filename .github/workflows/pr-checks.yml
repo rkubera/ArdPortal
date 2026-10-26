@@ -199,7 +199,15 @@ jobs:
           assert properties["name"] == "ArdPortal", "Changing the registered library name requires an Arduino Registry maintenance request"
           PY
       - name: Install Arduino IDE formatter
-        run: sudo apt-get update && sudo apt-get install --yes clang-format-14
+        timeout-minutes: 4
+        run: |
+          if command -v clang-format-14 >/dev/null 2>&1; then
+            clang-format-14 --version
+            exit 0
+          fi
+          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
+          sudo timeout 90s apt-get "${apt_options[@]}" update
+          sudo timeout 120s apt-get "${apt_options[@]}" install --yes --no-install-recommends clang-format-14
       - name: Check Arduino code formatting
         run: python src/tools/format_code.py --check
       - name: Check generated resources without modifying files
