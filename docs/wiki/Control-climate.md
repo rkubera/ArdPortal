@@ -103,6 +103,20 @@ Explicit `ha` properties can override Discovery metadata. They do not create add
 
 See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
 
+## Integration with Matter
+
+**Native mapping:** Thermostat (Thermostat cluster `0x0201`).
+
+**Definition requirements:** Declare heating and/or cooling in `modes`; only `off`, `heat`, `cool` and `heat_cool` are supported. At least heating or cooling is required. When both are declared, include `heat_cool`. The whole field range must fit heat 7–30 °C, cool 16–32 °C, or their intersection 16–30 °C for dual capability. Explicit `readonly: true` is unsupported.
+
+**Supported by ArdPortal:** Reports `mode`, `current_temperature` and setpoints in Celsius. Single-capability presets use `temperature`; definitions with `heat_cool` use `temperature_low`/`temperature_high`. Accepts supported mode and setpoint commands through the shared model. Unknown current temperature is reported as Matter null.
+
+**Not provided / limits:** Dual heating/cooling setpoints must retain at least a 2.5 °C deadband, including while off. Thermostat fan modes and action labels are not native attributes in this adapter. No heating/cooling hardware or control algorithm is supplied.
+
+**Setup:** Requires a supported ESP32 target, `ARDPORTAL_ENABLE_MATTER=1`, dynamic pages and the control’s feature flag. Select Matter Wi-Fi or Thread at compilation; MQTT/HA Discovery is not required. Register the initial pages before Matter endpoint startup. Native Zigbee and Matter are alternative firmware integrations.
+
+The sketch supplies hardware behavior and updates the shared application value; Matter does not drive GPIOs or sensors. Call `portal.loop()` frequently. Incoming writable commands use normal validation/persistence and `ChangeSource::Matter`; acceptance does not confirm physical completion. `visibleWhen` only affects the portal UI and does not remove a Matter endpoint or disable its commands. Changes to the native endpoint layout may require a Matter reset and commissioning again; see [Matter integration](Matter#mappings).
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.
