@@ -120,6 +120,20 @@ ArdPortal supports standard XY, Hue/Saturation and Enhanced Hue/Saturation Zigbe
 
 See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
 
+## Integration with Matter
+
+**Native mapping:** Color light (On/Off `0x0006`, Level Control `0x0008`, Color Control `0x0300`).
+
+**Definition requirements:** The definition must provide power, brightness and RGB capabilities, as in the built-in preset. Explicit `readonly: true` is unsupported.
+
+**Supported by ArdPortal:** Reports `state`, `brightness` (0–255) and `color` (`r`, `g`, `b`). Accepts power, brightness, hue/saturation and XY color commands; the adapter converts color commands to the shared RGB value.
+
+**Not provided / limits:** No color-temperature endpoint, effects/scenes driver or LED hardware implementation. RGB/HSV/XY conversion and Matter brightness scaling can introduce rounding. A custom light missing any required capability is unsupported.
+
+**Setup:** Requires a supported ESP32 target, `ARDPORTAL_ENABLE_MATTER=1`, dynamic pages and the control’s feature flag. Select Matter Wi-Fi or Thread at compilation; MQTT/HA Discovery is not required. Register the initial pages before Matter endpoint startup. Native Zigbee and Matter are alternative firmware integrations.
+
+The sketch supplies hardware behavior and updates the shared application value; Matter does not drive GPIOs or sensors. Call `portal.loop()` frequently. Incoming writable commands use normal validation/persistence and `ChangeSource::Matter`; acceptance does not confirm physical completion. `visibleWhen` only affects the portal UI and does not remove a Matter endpoint or disable its commands. Changes to the native endpoint layout may require a Matter reset and commissioning again; see [Matter integration](Matter#mappings).
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.

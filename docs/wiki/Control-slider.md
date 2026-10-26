@@ -75,6 +75,20 @@ Explicit `ha` properties can override Discovery metadata. They do not create add
 
 See [Zigbee integration](https://github.com/rkubera/ArdPortal/wiki/Zigbee) for pairing, endpoint lifecycle, gateway limitations and OTA requirements.
 
+## Integration with Matter
+
+**Native mapping:** Dimmable plug (On/Off `0x0006` and Level Control `0x0008`).
+
+**Definition requirements:** Only `"class": "brightness"` with `"min": 0` and a positive `max` is mapped. The slider’s `step` is respected when decoding controller levels. Other slider classes and ordinary numeric sliders have no Matter endpoint. Explicit `readonly: true` is unsupported.
+
+**Supported by ArdPortal:** Reports numeric brightness and accepts brightness and On/Off commands. Values are scaled between the declared range and Matter levels 0–254. Application zero means off; turning on restores the remembered SDK level. A remembered-level update while off does not turn it on.
+
+**Not provided / limits:** This is a brightness actuator, not a generic Matter number or an illuminance measurement. Quantization can round values to the application step. No RGB, color temperature or dimmer hardware driver.
+
+**Setup:** Requires a supported ESP32 target, `ARDPORTAL_ENABLE_MATTER=1`, dynamic pages and the control’s feature flag. Select Matter Wi-Fi or Thread at compilation; MQTT/HA Discovery is not required. Register the initial pages before Matter endpoint startup. Native Zigbee and Matter are alternative firmware integrations.
+
+The sketch supplies hardware behavior and updates the shared application value; Matter does not drive GPIOs or sensors. Call `portal.loop()` frequently. Incoming writable commands use normal validation/persistence and `ChangeSource::Matter`; acceptance does not confirm physical completion. `visibleWhen` only affects the portal UI and does not remove a Matter endpoint or disable its commands. Changes to the native endpoint layout may require a Matter reset and commissioning again; see [Matter integration](Matter#mappings).
+
 ## Read and update values from C++
 
 These examples use the field ID from the JSON above and an existing `ArdPortal portal`. Run them after page registration has finished and `portal.portalAndAppConfigReady()` is true. Call `portal.loop()` frequently. Register callbacks once in `setup()`; do not repeat setters on every loop iteration.
