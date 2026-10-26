@@ -68,7 +68,7 @@ The Zigbee page provides network management and download buttons for a **layout-
 
 Native and composite mappings have different coverage: plain text, dates and arbitrary events are not transported; gateway grouping differs from portal pages, and `visibleWhen` does not hide Zigbee endpoints. ESP32-H2 runs without Wi-Fi. C5/C6 coexistence depends on role and workload. See the [Zigbee guide and complete control matrix](https://github.com/rkubera/ArdPortal/wiki/Zigbee), [feature flags](https://github.com/rkubera/ArdPortal/wiki/Defines#zigbee-esp32-c5c6h2).
 
-## Matter extension (unreleased)
+## Matter extension
 
 Matter consumes the same optional `class`, application values and callbacks as the other integrations. Its adapter is separate from Zigbee; select one native protocol per firmware. Start with [MatterPortal](examples/MatterPortal/MatterPortal.ino) and the [Matter guide](https://github.com/rkubera/ArdPortal/wiki/Matter).
 
@@ -84,7 +84,7 @@ The [screenshot gallery](https://github.com/rkubera/ArdPortal/wiki/Screenshots) 
 
 ![Matter over Thread with separate Matter and Thread status](docs/wiki/assets/matter-thread.png)
 
-## Temporarily disabling the portal (unreleased)
+## Temporarily disabling the portal
 
 With Wi-Fi compiled in, call these methods from the application loop:
 

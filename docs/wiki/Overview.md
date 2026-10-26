@@ -14,8 +14,8 @@ It uses the ESP Arduino core and its bundled Zigbee SDK, with no external web se
 
 ## Main features
 
-- **Matter (unreleased):** Wi-Fi or Thread transport, BLE commissioning, development/factory credential profiles, native shared-control mappings, status/QR/reset UI and independent traffic diagnostics. Thread can retain the Wi-Fi portal; see [Matter](Matter).
-- **Portal standby (unreleased):** suspend/resume Wi-Fi, WWW, WebSockets, DNS and MQTT while Zigbee or Matter over Thread keeps running. This is separate from CPU sleep and unavailable for Matter over Wi-Fi; see [Portal API](Portal-API#suspending-portal-networking).
+- **Matter:** Wi-Fi or Thread transport, BLE commissioning, development/factory credential profiles, native shared-control mappings, status/QR/reset UI and independent traffic diagnostics. Thread can retain the Wi-Fi portal; see [Matter](Matter).
+- **Portal standby:** suspend/resume Wi-Fi, WWW, WebSockets, DNS and MQTT while Zigbee or Matter over Thread keeps running. This is separate from CPU sleep and unavailable for Matter over Wi-Fi; see [Portal API](Portal-API#suspending-portal-networking).
 
 - **Wi-Fi setup:** scan nearby networks, connect to a saved network and start a fallback AP when connection attempts time out. The portal remains accessible after connecting.
 - **Captive portal:** configure the device from a browser, with captive DNS for supported operating systems.

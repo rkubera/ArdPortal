@@ -75,7 +75,7 @@ DNS stops when the AP stops.
 
 ## Runtime portal standby
 
-The unreleased `suspendPortal()` / `resumePortal()` API turns Wi-Fi and portal
+The `suspendPortal()` / `resumePortal()` API turns Wi-Fi and portal
 services off and restores the previous AP/reconnect policy without erasing
 settings. `portalSuspended()` reports the state. Zigbee or Matter over Thread
 can continue; Matter over Wi-Fi rejects suspension. Calls are loop-owned and

@@ -388,7 +388,7 @@ The earlier mixed `Mode` enum, `setMode()` and `requestDeepSleep()` API have bee
 
 ## Portal network suspension
 
-**Unreleased:** `portal.suspendPortal()` switches Wi-Fi off and closes WWW,
+**Since 0.9.0:** `portal.suspendPortal()` switches Wi-Fi off and closes WWW,
 WebSockets, captive DNS and MQTT. Zigbee and Matter over Thread keep running;
 continue calling `portal.loop()`. `portal.resumePortal()` restores the previous
 AP/reconnect policy using retained settings; `portal.portalSuspended()` checks
