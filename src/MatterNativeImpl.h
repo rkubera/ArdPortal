@@ -550,6 +550,17 @@ inline bool ArdMatter::start(const char* name, const char* manufacturer) {
     return false;
   }
 #endif
+#if ARDPORTAL_MATTER_THREAD_ROUTER
+  chip::DeviceLayer::PlatformMgr().LockChipStack();
+  const auto threadType = chip::DeviceLayer::ConnectivityMgr().GetThreadDeviceType();
+  // A network security policy may prohibit routing; an awake FTD can still join as a child.
+  const bool routerReady = threadType == chip::DeviceLayer::ConnectivityManager::kThreadDeviceType_Router || threadType == chip::DeviceLayer::ConnectivityManager::kThreadDeviceType_FullEndDevice;
+  chip::DeviceLayer::PlatformMgr().UnlockChipStack();
+  if (!routerReady) {
+    fail("Thread router capability unavailable");
+    return false;
+  }
+#endif
   // OpenThread initialization alone does not enable Wi-Fi/802.15.4 arbitration.
 #if ARDPORTAL_MATTER_THREAD && ARDPORTAL_ENABLE_WIFI
 #if CONFIG_ESP_COEX_SW_COEXIST_ENABLE && CONFIG_SOC_IEEE802154_SUPPORTED

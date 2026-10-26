@@ -1,0 +1,7 @@
+# Standard router-eligible FTD; Thread elects its actual role.
+CONFIG_OPENTHREAD_FTD=y
+CONFIG_OPENTHREAD_MTD=n
+CONFIG_ENABLE_ICD_SERVER=n
+CONFIG_IEEE802154_SLEEP_ENABLE=n
+# Routing forwards/buffers traffic for other nodes; retain 64 message buffers.
+CONFIG_OPENTHREAD_NUM_MESSAGE_BUFFERS=64

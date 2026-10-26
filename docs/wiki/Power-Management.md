@@ -401,3 +401,15 @@ the firmware. Matter-over-Wi-Fi builds reject suspension because Wi-Fi carries
 Matter. Busy initialization/storage/OTA/scanning can also reject it; check the
 return value and retry from the application loop. Resume is asynchronous and
 browser clients need to reconnect. See the [full API contract](Portal-API#suspending-portal-networking).
+
+## Thread router mode
+
+The optional Matter FTD/router-capable build keeps Thread reception on, including
+while the network keeps it in the Child role. It cannot use ICD, radio sleep or
+ArdPower-controlled CPU/deep sleep. The source build rejects incompatible SDK
+settings, and runtime sleep admission retains the Network blocker. This mode is
+intended for continuous power; choose MTD/ICD for sleepy devices.
+
+The Wi-Fi portal can still be explicitly suspended and resumed without stopping
+Thread. See [Thread mode selection](Matter#thread-device-mode-and-routing). Actual
+Router/Leader assignment is managed by Thread, independently of the power policy.

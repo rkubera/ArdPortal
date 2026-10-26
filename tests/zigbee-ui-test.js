@@ -33,6 +33,7 @@ vm.runInContext(script,context);
 async function test() {
   await vm.runInContext("refreshZigbee()",context); await new Promise(setImmediate);
   assert.equal(sockets.length,0);
+  assert.ok(!source.includes("[t('ui_218'),state.endpoints||0]"));
   assert.equal(node('#zigbeeConverterDownload').hidden,true);
   state.converterReady=true;await vm.runInContext("refreshZigbee()",context);
   assert.equal(node('#zigbeeConverterDownload').hidden,false);

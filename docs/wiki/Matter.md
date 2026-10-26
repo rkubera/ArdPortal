@@ -33,8 +33,8 @@ Use a separate build directory for each profile:
 | `ARDPORTAL_PROFILE` | Matter transport | Portal | SDK networking |
 | --- | --- | --- | --- |
 | `wifi` | Wi-Fi | Wi-Fi WWW | Wi-Fi + BLE; OpenThread disabled |
-| `thread` | Thread | Serial, no Wi-Fi | OpenThread MTD + BLE; Wi-Fi disabled |
-| `thread-wifi` | Thread | Wi-Fi WWW | OpenThread MTD + BLE; Wi-Fi driver for the portal, Matter Wi-Fi commissioning disabled |
+| `thread` | Thread | Serial, no Wi-Fi | OpenThread MTD (or optional FTD) + BLE; Wi-Fi disabled |
+| `thread-wifi` | Thread | Wi-Fi WWW | OpenThread MTD (or optional FTD) + BLE; Wi-Fi driver for the portal, Matter Wi-Fi commissioning disabled |
 
 For example, replace both `build-wifi` and `wifi` with `build-thread` and `thread`. Profile selection is translated to the existing `ARDPORTAL_MATTER_THREAD` and `ARDPORTAL_ENABLE_WIFI` defines. It also changes actual SDK Kconfig options, rather than merely selecting a network at runtime. Simultaneous Matter on both networks is not implemented. BLE remains enabled. All three source-build profiles disable C++ exceptions throughout the application, Arduino and Matter SDK to reduce flash usage. Error handling must use return values rather than `throw`/`try`/`catch`; fatal library errors can abort and restart the device.
 
@@ -45,6 +45,53 @@ The source-build profiles also disable `ESP_WIFI_IRAM_OPT`, `ESP_WIFI_EXTRA_IRAM
 On targets with native USB Serial/JTAG, the IDF example uses that port for both flashing and its serial console. The example prints Wi-Fi state changes, station/AP addresses, page registration errors and Matter state. A station address of `0.0.0.0` means the device has not joined a LAN; connect to its setup AP to reach the WWW portal at `http://192.168.4.1/`. The default AP password is `1234567890`. For Wi-Fi Matter, LAN credentials can be provisioned by the Matter controller through BLE commissioning.
 
 `idf.py -C idf/MatterPortal -B idf/MatterPortal/build-wifi -p PORT flash monitor` flashes the built image. Keep the included partition table: this 4 MiB development project has a single app slot and no firmware OTA. Reset Matter using the old firmware before changing the Matter transport or native endpoint identity/capabilities, then commission the new image. The build verification script checks both resolved configuration and the live linker map, so a Wi-Fi build retaining OpenThread is rejected.
+
+### Thread device mode and routing
+
+`ARDPORTAL_THREAD_ROLE=mtd` is the default source-build choice. It compiles the
+smaller Minimal Thread Device SDK, which cannot forward traffic for other nodes.
+With `ARDPORTAL_POWER=icd`, this mode uses a sleepy end device.
+
+Select `ARDPORTAL_THREAD_ROLE=router` with `thread` or `thread-wifi` to compile a
+Full Thread Device (FTD). The SDK enables router eligibility and continuous radio
+reception; Thread decides whether it is a child, router or leader. This can extend
+the mesh when the network assigns a routing role. ArdPortal never forces a role
+with `otThreadBecomeRouter()` and does not become a Thread Border Router.
+
+```sh
+idf.py -C idf/MatterPortal -B idf/MatterPortal/build-thread-router -DARDPORTAL_PROFILE=thread-wifi -DARDPORTAL_THREAD_ROLE=router -DARDPORTAL_POWER=off -DIDF_TARGET=esp32c5 build
+python3 tests/check-matter-sdk.py idf/MatterPortal/build-thread-router --profile thread-wifi --thread-role router
+```
+
+Use a separate build directory for each role. Configuration rejects a stale SDK
+with the wrong FTD/MTD choice. Router mode rejects ICD and Thread radio sleep;
+ArdPower also blocks forced light/deep sleep and connected CPU sleep for this
+always-listening Thread profile. Use a continuously powered device. Wi-Fi portal
+suspension through `suspendPortal()` remains available with `thread-wifi`.
+
+FTD includes routing code and maintains mesh state, so its flash/RAM requirements
+are greater than MTD. The source router profile retains 64 OpenThread message
+buffers, including when the Wi-Fi portal is enabled. MTD remains the default for
+smaller or battery-powered firmware.
+
+`ARDPORTAL_MATTER_THREAD_ROUTER` is derived from the SDK's FTD selection. Setting
+it in a sketch cannot add routing to a precompiled MTD SDK. Incompatible flag,
+transport, ICD or radio-sleep combinations fail compilation. The pinned SDK sets
+router eligibility before starting its Thread task; ArdPortal checks the native
+full-device mode after startup, allowing a network policy to keep it as a child.
+
+In the **Matter** tab, Thread builds show **Thread device mode** separately from
+**Current Thread role**. Modes distinguish MTD, sleepy MTD/ICD and router-capable
+FTD. Roles are Disabled, Detached, Child, Router or Leader. A configured FTD that
+shows Child is not currently routing. These fields refresh with the usual status
+poll; they do not change the selected SDK mode.
+
+`GET /api/matter/status` exposes `threadDeviceType` (`mtd`/`ftd`), `threadIcd`
+and the existing `threadRole`. Wi-Fi-only Matter omits these fields. Changing the
+role requires rebuilding; it is not a web toggle. Changing only the FTD/MTD role
+with the same endpoint inventory and Matter identity does not require clearing
+fabrics; incompatible endpoint/credential/transport changes retain the normal
+reset requirements.
 
 ### Credential profiles
 

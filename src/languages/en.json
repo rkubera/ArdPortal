@@ -520,7 +520,6 @@
     "ui_215": "Channel",
     "ui_216": "PAN ID",
     "ui_217": "Attempts",
-    "ui_218": "Native endpoints",
     "ui_220": "Clear Zigbee pairing and join a new network?",
     "native_cancelled": "Cancelled",
     "export_unknown_action": "Unknown action",
@@ -584,12 +583,10 @@
     "ui_221": "Matter",
     "ui_222": "Transport",
     "ui_223": "State",
-    "ui_224": "Unsupported controls",
     "ui_225": "Pairing code",
     "ui_226": "Open pairing window",
     "ui_227": "Reset Matter",
     "ui_228": "Remove Matter fabrics and network credentials, then restart? Portal settings are preserved.",
-    "ui_229": "Native endpoints",
     "ui_230": "Use the QR code or manual pairing code supplied with this device.",
     "ui_231": "Credentials",
     "ui_232": "Development",
@@ -632,6 +629,16 @@
     "native_matter_event_factoryreset": "factory reset",
     "native_matter_event_handlerunavailable": "diagnostics unavailable",
     "native_matter_diagnostic_overflow": "diagnostic overflow",
-    "ui_234": "Not paired"
+    "ui_234": "Not paired",
+    "ui_235": "Thread device mode",
+    "ui_236": "Current Thread role",
+    "ui_237": "End device (MTD)",
+    "ui_238": "Router-capable device (FTD)",
+    "ui_239": "Disabled",
+    "ui_240": "Detached",
+    "ui_241": "Child",
+    "ui_242": "Router",
+    "ui_243": "Leader",
+    "ui_244": "Sleepy end device (MTD / ICD)"
   }
 }

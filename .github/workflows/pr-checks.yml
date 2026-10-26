@@ -66,7 +66,7 @@ jobs:
         run: bash tests/compile-arduino.sh
 
   matter-sdk:
-    name: Matter SDK (${{ matrix.profile }}, ${{ matrix.credentials }}, ${{ matrix.power }})
+    name: Matter SDK (${{ matrix.profile }}, ${{ matrix.credentials }}, ${{ matrix.power }}, ${{ matrix.thread_role }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     container: espressif/idf:v5.5.5
@@ -76,16 +76,28 @@ jobs:
         profile: [wifi, thread, thread-wifi]
         credentials: [development, production]
         power: [off]
+        thread_role: [mtd]
         include:
           - profile: wifi
             credentials: development
             power: connected
+            thread_role: mtd
           - profile: thread
             credentials: development
             power: icd
+            thread_role: mtd
           - profile: thread-wifi
             credentials: development
             power: icd
+            thread_role: mtd
+          - profile: thread
+            credentials: development
+            power: off
+            thread_role: router
+          - profile: thread-wifi
+            credentials: development
+            power: off
+            thread_role: router
     defaults:
       run:
         shell: bash
@@ -96,8 +108,8 @@ jobs:
       - name: Build pinned ESP-Matter from source and verify linked transports
         run: |
           . "$IDF_PATH/export.sh"
-          idf.py -C idf/MatterPortal -B "$RUNNER_TEMP/matter-${{ matrix.profile }}-${{ matrix.credentials }}-${{ matrix.power }}" -DARDPORTAL_PROFILE=${{ matrix.profile }} -DARDPORTAL_CREDENTIALS=${{ matrix.credentials }} -DARDPORTAL_POWER=${{ matrix.power }} -DIDF_TARGET=esp32c6 build
-          python tests/check-matter-sdk.py "$RUNNER_TEMP/matter-${{ matrix.profile }}-${{ matrix.credentials }}-${{ matrix.power }}" --profile ${{ matrix.profile }} --credentials ${{ matrix.credentials }} --power ${{ matrix.power }}
+          idf.py -C idf/MatterPortal -B "$RUNNER_TEMP/matter-${{ matrix.profile }}-${{ matrix.credentials }}-${{ matrix.power }}-${{ matrix.thread_role }}" -DARDPORTAL_PROFILE=${{ matrix.profile }} -DARDPORTAL_CREDENTIALS=${{ matrix.credentials }} -DARDPORTAL_POWER=${{ matrix.power }} -DARDPORTAL_THREAD_ROLE=${{ matrix.thread_role }} -DIDF_TARGET=esp32c6 build
+          python tests/check-matter-sdk.py "$RUNNER_TEMP/matter-${{ matrix.profile }}-${{ matrix.credentials }}-${{ matrix.power }}-${{ matrix.thread_role }}" --profile ${{ matrix.profile }} --credentials ${{ matrix.credentials }} --power ${{ matrix.power }} --thread-role ${{ matrix.thread_role }}
 
   lint-assets:
     name: Lint and assets

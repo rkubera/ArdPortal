@@ -21,6 +21,16 @@ endif()
 if(ARDPORTAL_POWER STREQUAL "connected" AND NOT ARDPORTAL_PROFILE STREQUAL "wifi")
     message(FATAL_ERROR "Thread power saving requires ARDPORTAL_POWER=icd")
 endif()
+# Thread role selects the SDK device type, independently of portal Wi-Fi.
+set(ARDPORTAL_THREAD_ROLE "mtd" CACHE STRING "mtd or router")
+set_property(CACHE ARDPORTAL_THREAD_ROLE PROPERTY STRINGS mtd router)
+if(NOT ARDPORTAL_THREAD_ROLE MATCHES "^(mtd|router)$")
+    message(FATAL_ERROR "ARDPORTAL_THREAD_ROLE must be mtd or router")
+endif()
+if(ARDPORTAL_THREAD_ROLE STREQUAL "router" AND
+   (ARDPORTAL_PROFILE STREQUAL "wifi" OR ARDPORTAL_POWER STREQUAL "icd"))
+    message(FATAL_ERROR "Thread router requires a Thread transport without ICD")
+endif()
 get_filename_component(ARDPORTAL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 get_filename_component(ARDPORTAL_COMPONENT_NAME "${ARDPORTAL_ROOT}" NAME)
 # Pin official sources and avoid a full Git history download in Component Manager.
@@ -55,6 +65,9 @@ set(SDKCONFIG_DEFAULTS
     "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults"
     "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.${ARDPORTAL_PROFILE}"
     "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.credentials.${ARDPORTAL_CREDENTIALS}")
+if(NOT ARDPORTAL_PROFILE STREQUAL "wifi")
+    list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.thread-role.${ARDPORTAL_THREAD_ROLE}")
+endif()
 if(NOT ARDPORTAL_POWER STREQUAL "off")
     list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.power.connected")
 endif()
@@ -145,6 +158,18 @@ else()
        NOT CONFIG_EXAMPLE_DEVICE_INSTANCE_INFO_PROVIDER OR NOT CONFIG_ENABLE_TEST_SETUP_PARAMS OR
        NOT CONFIG_PARTITION_TABLE_CUSTOM_FILENAME STREQUAL "partitions.csv")
         message(FATAL_ERROR "Development requires the SDK test providers and development partition table; use a fresh build directory")
+    endif()
+endif()
+
+# Thread role guards: SDK defaults never override a saved device-type choice.
+if(NOT ARDPORTAL_PROFILE STREQUAL "wifi")
+    if(ARDPORTAL_THREAD_ROLE STREQUAL "router")
+        if(NOT CONFIG_OPENTHREAD_FTD OR CONFIG_OPENTHREAD_MTD OR
+           CONFIG_ENABLE_ICD_SERVER OR CONFIG_IEEE802154_SLEEP_ENABLE)
+            message(FATAL_ERROR "Thread router requires FTD without ICD or radio sleep; use a fresh build directory")
+        endif()
+    elseif(NOT CONFIG_OPENTHREAD_MTD OR CONFIG_OPENTHREAD_FTD)
+        message(FATAL_ERROR "Thread MTD requires the MTD SDK; use a fresh build directory")
     endif()
 endif()
 

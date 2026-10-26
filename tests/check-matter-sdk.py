@@ -12,6 +12,7 @@ parser.add_argument('build', type=Path)
 parser.add_argument('--profile', required=True, choices=('wifi', 'thread', 'thread-wifi'))
 parser.add_argument('--credentials', default='development', choices=('development', 'production'))
 parser.add_argument('--power', default='off', choices=('off', 'connected', 'icd'))
+parser.add_argument('--thread-role', default='mtd', choices=('mtd', 'router'))
 args = parser.parse_args()
 cache = (args.build / 'CMakeCache.txt').read_text()
 match = re.search(r'^SDKCONFIG:[^=]+=(.+)$', cache, re.MULTILINE)
@@ -56,6 +57,13 @@ if args.power == 'icd':
     assert args.profile != 'wifi' and enabled('OPENTHREAD_MTD') and enabled('IEEE802154_SLEEP_ENABLE')
     assert not enabled('ENABLE_ICD_LIT'), 'This profile implements Short Idle Time ICD'
 thread = args.profile != 'wifi'
+router = args.thread_role == 'router'
+assert not router or (thread and args.power != 'icd'), 'Router requires Thread without ICD'
+if thread:
+    assert enabled('OPENTHREAD_FTD') == router
+    assert enabled('OPENTHREAD_MTD') != router
+if router:
+    assert not enabled('IEEE802154_SLEEP_ENABLE'), 'Router must keep the Thread radio listening'
 wifi = args.profile != 'thread'
 assert enabled('ENABLE_MATTER_OVER_THREAD') == thread
 assert enabled('OPENTHREAD_ENABLED') == thread
@@ -64,7 +72,7 @@ if args.profile == 'thread-wifi':
     assert enabled('ESP_COEX_SW_COEXIST_ENABLE'), 'Mixed radios require SDK coexistence'
     assert 'CONFIG_THREAD_NETWORK_ENDPOINT_ID=0' in config.splitlines(), 'Thread commissioning belongs on the root endpoint'
     assert enabled('CHIP_SYSTEM_CONFIG_POOL_USE_HEAP'), 'Mixed profile requires on-demand Matter pools'
-    for key, value in {'OPENTHREAD_NUM_MESSAGE_BUFFERS': 32, 'EVENT_LOGGING_CRIT_BUFFER_SIZE': 4096, 'EVENT_LOGGING_DEBUG_BUFFER_SIZE': 1024}.items():
+    for key, value in {'OPENTHREAD_NUM_MESSAGE_BUFFERS': 64 if router else 32, 'EVENT_LOGGING_CRIT_BUFFER_SIZE': 4096, 'EVENT_LOGGING_DEBUG_BUFFER_SIZE': 1024}.items():
         assert f'CONFIG_{key}={value}' in config.splitlines(), 'Stale mixed-profile memory buffers: ' + key
 if wifi:
     assert enabled('ESP_WIFI_ENABLED')
@@ -101,6 +109,9 @@ link_map = (args.build / 'ArdPortalMatter.map').read_text()
 link_map = link_map.split('Linker script and memory map', 1)[1].split('Cross Reference Table', 1)[0]
 coex_sections = re.findall(r'\.text\.esp_coex_wifi_i154_enable\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)', link_map)
 coex_live = any(int(address, 16) >= 0x40000000 and int(size, 16) for address, size in coex_sections)
+router_sections = re.findall(r'\.text\.otThreadSetRouterEligible\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)', link_map)
+router_live = any(int(address, 16) >= 0x40000000 and int(size, 16) for address, size in router_sections)
+assert router_live == router, 'Unexpected router-eligibility code in linked firmware'
 assert coex_live == (args.profile == 'thread-wifi'), 'Unexpected Wi-Fi/802.15.4 coexistence initialization in linked firmware'
 assert ('ArdMatterThreadTransport' in link_map) == (args.profile == 'thread-wifi'), 'Mixed profile must bind Matter IPv6 UDP to Thread'
 live = []
@@ -119,4 +130,4 @@ if thread:
 wifi_driver = any(re.search(r'lib(?:net80211|pp|esp_wifi)\.a\(', name) for name in live)
 assert wifi_driver == wifi, 'Unexpected live Wi-Fi driver'
 assert any(re.search(r'lib(?:bt|ble_app|btdm_app)\.a\(', name) for name in live), 'BLE stack missing'
-print(f'PASS: {args.profile}/{args.credentials}/{args.power}: correct SDK transport, adapter defines and live linker network stacks; BLE retained')
+print(f'PASS: {args.profile}/{args.credentials}/{args.power}/{args.thread_role}: correct SDK transport, adapter defines and live linker network stacks; BLE retained')

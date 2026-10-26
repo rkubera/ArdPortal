@@ -309,6 +309,12 @@ bool ArdPortal::handleMatterHttp(const String& method, const String& path) {
     out["commissioningInProgress"] = _matter._commissioningInProgress;
     out["connected"] = _matter.connected();
 #if ARDPORTAL_MATTER_THREAD
+#if defined(CONFIG_ENABLE_ICD_SERVER) && CONFIG_ENABLE_ICD_SERVER
+    out["threadIcd"] = true;
+#else
+    out["threadIcd"] = false;
+#endif
+    out["threadDeviceType"] = ARDPORTAL_MATTER_THREAD_ROUTER ? "ftd" : "mtd";
     out["threadProvisioned"] = _matter._threadProvisioned;
     out["threadConnected"] = _matter._running && _matter._connected;
     out["wifiConnected"] = _matter._running && _matter._wifiConnected;

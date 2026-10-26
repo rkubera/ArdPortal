@@ -363,3 +363,12 @@ WebSockets; native Zigbee keeps only its bounded SDK event/traffic queues.
 Disabling the callback removes its handler pointer and dispatch guard entirely.
 This API does not intercept arbitrary `Serial` or SDK ESP_LOG output.
 See `examples/UsbDiagnostics/UsbDiagnostics.ino`.
+
+### Thread router capability
+
+`ARDPORTAL_MATTER_THREAD_ROUTER` defaults to the SDK's FTD selection when Matter
+uses Thread, otherwise `0`. It accepts only `0` or `1`; a sketch override must
+match the SDK. Router mode requires FTD with ICD and IEEE 802.15.4 radio sleep
+disabled. The source project selects it with `-DARDPORTAL_THREAD_ROLE=router`;
+`mtd` remains its default. Wi-Fi Matter cannot select it. See [Thread device
+mode](Matter#thread-device-mode-and-routing) for build commands and sleep behavior.

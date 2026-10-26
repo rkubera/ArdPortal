@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Remove native-endpoint/unsupported-control counters from Matter and Zigbee web views while retaining API counts.
+
+- Add optional Thread router-capable FTD source profiles (`ARDPORTAL_THREAD_ROLE=router`), keeping MTD as default; reject ICD/radio sleep and stale SDK device-type selections without forcing network roles.
+- Show Thread device mode and actual Disabled/Detached/Child/Router/Leader role separately in the Matter page and status API; extend Actions with Thread-only and Wi-Fi-portal FTD builds.
+
 - Add runtime `suspendPortal()`, `resumePortal()` and `portalSuspended()` for Wi-Fi portal standby while Zigbee/Matter Thread continue; reject suspension for Matter Wi-Fi and preserve AP/reconnect settings.
 - Expand README and wiki coverage of Matter builds, commissioning, controls and portal standby.
 

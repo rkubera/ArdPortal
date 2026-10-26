@@ -72,7 +72,7 @@ A calibration slider and named MQTT update options on an application-defined pag
 
 ## Zigbee network
 
-Network identity, native endpoint count, rejoin/reset actions and layout-specific
+Network identity, rejoin/reset actions and layout-specific
 Zigbee2MQTT/ZHA downloads. Role is selected at compilation.
 [Zigbee guide](Zigbee).
 
@@ -80,7 +80,7 @@ Zigbee2MQTT/ZHA downloads. Role is selected at compilation.
 
 ## Matter over Wi-Fi
 
-Transport, credential profile, endpoint counts, development pairing QR/manual code
+Transport, credential profile, development pairing QR/manual code
 and pairing/reset actions. Production credentials use the provisioned device
 label instead of displaying a development code. [Matter guide](Matter).
 

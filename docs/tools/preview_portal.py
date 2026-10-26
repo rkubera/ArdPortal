@@ -100,7 +100,7 @@ def main():
                 '/api/pages': home if parse_qs(route.query).get('page') == ['home'] else page, '/api/app': {'values': values, 'conditions': {k: {'visible': True} for k in values}},
                 '/api/networks': [{'ssid': 'Home Wi-Fi', 'rssi': -42, 'secured': True, 'channel': 6}, {'ssid': 'Home Wi-Fi 5 GHz', 'rssi': -58, 'secured': True, 'channel': 36}],
                 '/api/zigbee/status': dict(role='End Device', paired=True, busy=False, channel=15, panId=0x1A62, attempts=1, endpoints=4, state='connected', error='', converterReady=True, zhaQuirkReady=True),
-                '/api/matter/status': dict(transport='thread' if args.profile == 'thread' else 'wifi', state='connected', credentials='development', endpoints=3, unsupported=0, error='', manualCode='34970112332', qrUrl='https://project-chip.github.io/connectedhomeip/qrcode.html?data=MT%3AY.K9042C00KA0648G00'),
+                '/api/matter/status': dict(transport='thread' if args.profile == 'thread' else 'wifi', state='connected', threadRole='router', threadDeviceType='ftd', threadIcd=False, credentials='development', endpoints=3, unsupported=0, error='', manualCode='34970112332', qrUrl='https://project-chip.github.io/connectedhomeip/qrcode.html?data=MT%3AY.K9042C00KA0648G00'),
                 '/api/matter/qr': json.loads((ROOT / 'docs/tools/fixtures/matter-demo-qr.json').read_text()),
             }
             if path in data:

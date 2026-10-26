@@ -157,8 +157,8 @@ int main(){
 '''
 with tempfile.TemporaryDirectory(prefix='ardportal-power-integration-') as directory:
  directory=Path(directory);cpp=directory/'test.cpp';cpp.write_text(fixture+source+main)
- for network,zigbee,matter,thread,icd in ((0,0,0,0,0),(1,0,0,0,0),(1,1,0,0,0),(1,0,1,0,0),(0,0,1,1,0),(0,0,1,1,1),(1,0,1,1,1)):
-  flags=[f'-DARDPORTAL_ENABLE_CONSOLE_MESSAGES={matter}',f'-DARDPORTAL_ENABLE_MATTER_CONSOLE={int(bool(matter and network))}',f'-DARDPORTAL_ENABLE_ZIGBEE={zigbee}',f'-DARDPORTAL_ENABLE_MATTER={matter}',f'-DARDPORTAL_MATTER_THREAD={thread}',f'-DCONFIG_ENABLE_ICD_SERVER={icd}']
+ for network,zigbee,matter,thread,icd,router in ((0,0,0,0,0,0),(1,0,0,0,0,0),(1,1,0,0,0,0),(1,0,1,0,0,0),(0,0,1,1,0,0),(0,0,1,1,1,0),(1,0,1,1,1,0),(0,0,1,1,0,1),(1,0,1,1,0,1)):
+  flags=[f'-DARDPORTAL_MATTER_THREAD_ROUTER={router}',f'-DARDPORTAL_ENABLE_CONSOLE_MESSAGES={matter}',f'-DARDPORTAL_ENABLE_MATTER_CONSOLE={int(bool(matter and network))}',f'-DARDPORTAL_ENABLE_ZIGBEE={zigbee}',f'-DARDPORTAL_ENABLE_MATTER={matter}',f'-DARDPORTAL_MATTER_THREAD={thread}',f'-DCONFIG_ENABLE_ICD_SERVER={icd}']
   for flag in ('WIFI','WWW','MQTT','DYNAMIC_PAGES','CONSOLE'):
    flags.append(f'-DARDPORTAL_ENABLE_{flag}={network}')
   flags.append(f'-DARDPORTAL_SUPPORT_WEBSOCKET={network}')

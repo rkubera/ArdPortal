@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix='ardportal-profile-choice-') as director
 print('PASS: development is the default credential profile; production is explicit and invalid selections fail')
 
 # Execute the actual fail-closed CMake checks against both default fragments.
-guards=cmake[cmake.index('# Credential selection is independent of transport.'):cmake.index('# SDK defaults do not override')]
+guards=cmake[cmake.index('# Credential selection is independent of transport.'):cmake.index('# Thread role guards:')]
 with tempfile.TemporaryDirectory(prefix='ardportal-provider-guards-') as directory:
  p=Path(directory)/'providers.cmake'
  for stored in ('development','production'):
