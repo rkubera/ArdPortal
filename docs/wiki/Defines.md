@@ -40,7 +40,8 @@ accept only `0` or `1`:
 | `ARDPORTAL_ENABLE_LOG_CALLBACK` | Defaults to `0`. Set `1` to enable `onLog()` for sketch-owned output independently of WWW. |
 | `ARDPORTAL_ENABLE_CONSOLE` | Removes Console while keeping MQTT and HA enabled. |
 | `ARDPORTAL_ENABLE_DYNAMIC_PAGES` | Removes dynamic forms, field renderers/validation and their HTTP/MQTT handling; forces all control flags, HA and dependencies off. |
-| `ARDPORTAL_ENABLE_DEPENDENCIES` | Removes `visibleWhen` evaluation, conditional portal visibility and HA discovery removal/recreation. |
+| `ARDPORTAL_ENABLE_DEPENDENCIES` | Removes `visibleWhen` rules. Programmatic visibility remains independently available. |
+| `ARDPORTAL_ENABLE_VISIBILITY` | Defaults to `1`. Enables optional boolean `visible` on fields/pages and runtime `setFieldVisible()` / `setPageVisible()`. Independent of dependencies; disabled with dynamic pages. |
 
 To omit dynamic forms entirely, add `#define ARDPORTAL_ENABLE_DYNAMIC_PAGES 0`
 before `ArdPortal.h`. It defaults to `1`. `startAppConfigPageRegistration()`, `setAppConfigStateValue()`
@@ -441,3 +442,15 @@ WebSockets; native Zigbee keeps only its bounded SDK event/traffic queues.
 Disabling the callback removes its handler pointer and dispatch guard entirely.
 This API does not intercept arbitrary `Serial` or SDK ESP_LOG output.
 See `examples/UsbDiagnostics/UsbDiagnostics.ino`.
+
+### Navigation groups
+
+`ARDPORTAL_ENABLE_GROUPS` defaults to `0`. Set it to `1` to register independent
+JSON groups and display their pages as tabs. See [Dynamic Pages](Dynamic-Pages.md#navigation-groups-optional).
+
+### Page registration limit
+
+`ARDPORTAL_APP_CONFIG_MAX_PAGES` defaults to `16`. Set an integer from `1` to
+`1024` before including ArdPortal (use the same value in every translation unit).
+This configures page slots independently of the group limit and the shared
+1024-field/entity limit. See [Dynamic Pages](Dynamic-Pages.md).

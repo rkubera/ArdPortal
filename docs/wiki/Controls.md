@@ -88,6 +88,7 @@ Optional properties available across the catalogue:
 | `names` | Optional with `name` | Translated titles; see [Languages](https://github.com/rkubera/ArdPortal/wiki/Languages#multilingual-names-in-page-json). Without it, the default title is used. |
 | `default` | Optional | Initial value. Omission uses the type's default; it does not remove the field. |
 | `persist` | Optional | Storage policy. Omission uses the type policy; `false` keeps edits in RAM. See [Persistence and callbacks](#persistence-and-callbacks). |
+| `visible` | Optional | Boolean, default `true`. Initial programmatic visibility, changed with `portal.setFieldVisible(id, visible)`. Requires `ARDPORTAL_ENABLE_VISIBILITY` (default `1`). Combined with page visibility and `visibleWhen`. |
 | `visibleWhen` | Optional | Visibility rule; without it, there is no field-specific condition. Page conditions still apply. See [Dependent fields](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields). |
 | `icon` | Optional | HA icon override. The preset/HA default is used when omitted. |
 | `mqtt` | Optional | `state_topic` selects the MQTT publication topic, also used by HA discovery. Works with HA disabled. |

@@ -49,6 +49,157 @@ void drain(ArdPortal& p) {
   assert(!p._storage.busy() && !p._savePending);
 }
 int main() {
+#ifdef ARDPORTAL_TEST_VISIBILITY_SIZES
+  printf("Field=%zu Page=%zu Portal=%zu Registration=%zu", sizeof(ArdDynamicPages::PageStore::Field), sizeof(ArdDynamicPages::PageStore::Entry), sizeof(ArdPortal), sizeof(ArdAppConfigPageRegistration));
+#if ARDPORTAL_ENABLE_HA
+  printf(" HA=%zu", sizeof(ArdHomeAssistant));
+#endif
+  puts("");
+#endif
+
+#ifdef ARDPORTAL_TEST_VISIBILITY
+  static_assert(sizeof(ArdDynamicPages::PageStore::Field)==12, "Visibility flags must share the existing field byte");
+  {
+    ArdDynamicPages::PageStore::Entry metadata;
+    metadata.count=ArdAppConfigMaxFields;
+    metadata.visible=false;
+    assert(metadata.count==ArdAppConfigMaxFields && !metadata.visible);
+    metadata.visible=true;
+    assert(metadata.count==ArdAppConfigMaxFields && metadata.visible);
+  }
+  {
+    ArdPortal p;
+    auto add = [&](const char* json, bool expected) {
+      assert(p.startAppConfigPageRegistration(String(json)));
+      for (size_t i=0; i<1000 && p.appConfigPageRegistrationBusy(); ++i) p.serviceAppConfigPageRegistration();
+      assert((p.appConfigPageRegistrationState()==ArdPortal::AppConfigPageRegistrationState::Succeeded)==expected);
+    };
+    add(R"({"id":"invalid","name":"Invalid","visible":0,"fields":[{"id":"invalid_field","type":"switch","name":"Value"}]})", false);
+    add(R"({"id":"badfield","name":"Invalid","fields":[{"id":"bad","type":"switch","name":"Value","visible":"false"}]})", false);
+    add(R"({"id":"page","name":"Page","fields":[{"id":"root","type":"switch","name":"Root"},{"id":"hidden","type":"switch","name":"Hidden","visible":false}]})", bool(ARDPORTAL_ENABLE_VISIBILITY));
+#if ARDPORTAL_ENABLE_VISIBILITY
+    auto visible = [&](const char* id) { return p._appControls.appFieldVisible(p._dynamic.field(id)); };
+    assert(visible("root") && !visible("hidden"));
+#if ARDPORTAL_ENABLE_WWW
+    p._httpDynamicMode=2;p._httpDynamicStage=1;p._httpDynamicPageIndex=0;
+    p._httpDynamicField=p._dynamic.pages.fields(0);p._httpDynamicPages=true;
+    const size_t beforeCacheAllocations=allocations;
+    allocationBudget=0;
+    assert(p.buildDynamicHttpPart());
+    allocationBudget=-1;
+    assert(allocations==beforeCacheAllocations);
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+    assert(!p._httpVisibilityCache);
+#endif
+#endif
+
+#if ARDPORTAL_ENABLE_HA && !ARDPORTAL_ENABLE_DEPENDENCIES
+    // Initial discovery visibility comes directly from metadata, even with no heap available.
+    const size_t beforeVisibilityAllocations=allocations;
+    allocationBudget=0;
+    while (p._homeAssistant.serviceDependencies()) {}
+    allocationBudget=-1;
+    assert(allocations==beforeVisibilityAllocations);
+    const size_t hiddenIndex=p._dynamic.indexOf("hidden");
+    assert(p._homeAssistant._dependencyKnown.test(hiddenIndex));
+    assert(!p._homeAssistant._dependencyVisible.test(hiddenIndex));
+#endif
+
+    assert(!p.setFieldVisible(nullptr,false) && !p.setFieldVisible("missing",false));
+    assert(!p.setPageVisible(nullptr,false) && !p.setPageVisible("missing",false));
+    const auto revision=p._appRevision;
+    assert(p.setFieldVisible("hidden",false) && p._appRevision==revision);
+    assert(p.setFieldVisible("hidden",true));assert(visible("hidden"));assert(p._appRevision!=revision);
+    assert(p.setPageVisible("page",false));assert(!visible("root") && !visible("hidden"));
+    assert(p.setFieldVisible("hidden",true));assert(!visible("hidden"));
+    assert(p.setPageVisible("page",true));assert(visible("root") && visible("hidden"));
+    assert(p.setFieldVisible("root",false));assert(!visible("root") && visible("hidden"));
+#if ARDPORTAL_ENABLE_WWW && !ARDPORTAL_ENABLE_DEPENDENCIES
+    p._httpDynamicMode=2;p._httpDynamicStage=2;p._httpDynamicPageIndex=0;
+    p._httpDynamicField=0;p._httpDynamicConditionFirst=true;p._httpDynamicPages=true;
+    const size_t beforeHttpAllocations=allocations;
+    allocationBudget=0;
+    assert(p.buildDynamicHttpPart());
+    allocationBudget=-1;
+    assert(allocations==beforeHttpAllocations);
+    assert(p._httpDynamicText.indexOf("\"root\":{\"visible\":false}")>=0);
+#endif
+
+    add(R"({"id":"initial","name":"Initial","visible":false,"fields":[{"id":"initial_field","type":"switch","name":"Value"}]})", true);
+    assert(!visible("initial_field"));assert(p.setPageVisible("initial",true));assert(visible("initial_field"));
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+    add(R"({"id":"dependent","name":"Dependent","visibleWhen":{"field":"root","equals":false},"fields":[{"id":"child","type":"switch","name":"Child","visibleWhen":{"field":"hidden","equals":false}}]})", true);
+    assert(!visible("child"));assert(p.setFieldVisible("root",true));assert(visible("child"));
+    assert(p.setFieldVisible("child",false));assert(!visible("child"));assert(p.setFieldVisible("child",true));assert(visible("child"));
+    assert(p.setFieldVisible("hidden",false));assert(!visible("child"));
+    assert(p.setFieldVisible("hidden",true));assert(visible("child"));
+    assert(p.setPageVisible("page",false));assert(!visible("child"));
+#else
+    add(R"({"id":"dependent","name":"Dependent","visibleWhen":{"field":"root","equals":false},"fields":[{"id":"child","type":"switch","name":"Child"}]})", false);
+#endif
+#endif
+    puts("PASS: visibility defaults, runtime field/page switches, invalid definitions, feature flags and dependency conjunction");
+    return 0;
+  }
+#endif
+
+#ifdef ARDPORTAL_TEST_PAGE_LIMIT
+  {
+    ArdPortal p;
+    auto definition = [](size_t i) {
+      return String("{\"id\":\"page_") + String(i) + "\",\"name\":\"Page\",\"fields\":[{\"id\":\"field_" + String(i) + "\",\"type\":\"switch\",\"name\":\"Value\"}]}";
+    };
+    auto finish = [&]() {
+      for (size_t i = 0; i < 1000 && p.appConfigPageRegistrationBusy(); ++i) p.serviceAppConfigPageRegistration();
+      assert(!p.appConfigPageRegistrationBusy());
+    };
+    for (size_t i = 0; i < ArdAppConfigMaxPages; ++i) {
+      assert(p.startAppConfigPageRegistration(definition(i)));
+      finish();
+      assert(p.appConfigPageRegistrationState() == ArdPortal::AppConfigPageRegistrationState::Succeeded);
+      assert(p._dynamic.pages.length() == i + 1);
+      assert(p._dynamic.pages.id(i) == String("page_") + String(i));
+    }
+    // Depending on groups, overflow rejects immediately or after scanning the header.
+    p.startAppConfigPageRegistration(definition(ArdAppConfigMaxPages));
+    finish();
+    assert(p.appConfigPageRegistrationState() == ArdPortal::AppConfigPageRegistrationState::Failed);
+    assert(p.appConfigRegistrationError().reason == String("page limit: ") + String(ArdAppConfigMaxPages));
+    assert(p._dynamic.pages.length() == ArdAppConfigMaxPages);
+#if ARDPORTAL_ENABLE_GROUPS
+    assert(p.startAppConfigPageRegistration(String(R"({"group":{"id":"after_limit","name":"Group"}})")));
+    finish();
+    assert(p.appConfigPageRegistrationState() == ArdPortal::AppConfigPageRegistrationState::Succeeded);
+    assert(p._dynamic.groupCount == 1 && p._dynamic.pages.length() == ArdAppConfigMaxPages);
+#endif
+    return 0;
+  }
+#endif
+
+  {
+    ArdPortal p;
+    auto registerDefinition = [&](const char* json, bool expected) {
+      assert(p.startAppConfigPageRegistration(String(json)));
+      for (int i = 0; i < 1000 && p.appConfigPageRegistrationBusy(); ++i) p.serviceAppConfigPageRegistration();
+      assert(!p.appConfigPageRegistrationBusy());
+      assert((p.appConfigPageRegistrationState() == ArdPortal::AppConfigPageRegistrationState::Succeeded) == expected);
+    };
+#if ARDPORTAL_ENABLE_GROUPS
+    registerDefinition(R"({"group":{"id":"settings","names":{"en":"Settings","pl":"Ustawienia"},"order":10}})", true);
+    assert(p._dynamic.pages.length() == 0 && p._dynamic.groupCount == 1);
+    registerDefinition(R"({"group":{"id":"settings","name":"Duplicate"}})", false);
+    registerDefinition(R"({"group":{"id":"bad","name":"Bad","order":1.5}})", false);
+    registerDefinition(R"({"group":{"id":"bad","name":"Bad"},"fields":[]})", false);
+    registerDefinition(R"({"id":"child","name":"Child","group":"settings","fields":[{"id":"child_value","type":"switch","name":"Value"}]})", true);
+    assert(ArdJSON::JSON.parse(p._dynamic.pages.menu(0))["group"].asString() == "settings");
+    registerDefinition(R"({"id":"invalid","name":"Invalid","group":{},"fields":[{"id":"invalid_value","type":"switch","name":"Value"}]})", false);
+    registerDefinition(R"({"group":{"id":"later","name":"Later"}})", true);
+    assert(p._dynamic.groupCount == 2 && p._dynamic.pages.length() == 1);
+#else
+    registerDefinition(R"({"group":{"id":"settings","name":"Settings"}})", false);
+#endif
+  }
+
   {
     ArdPortal p;
     auto registerPage = [&](const char* id, const char* order, bool valid) {

@@ -115,16 +115,30 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
     reply(404, "text/plain", ArdUILanguage::text(ArdUILanguage::Key::s_192) + path.substring(3));
     return true;
   }
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
   if (get && path == "/api/page-conditions") {
     String body = "{";
     for (size_t p = 0; p < _dynamic.pages.length(); ++p) {
       if (p) body += ',';
-      body += _json.stringify(V(_dynamic.pages.id(p))) + ":" + (_appControls.dependencyMatches(_dynamic.pages.pageCondition(p)) ? "true" : "false");
+      bool visible = _dynamic.pages.pageVisible(p);
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+      visible = visible && _appControls.dependencyMatches(_dynamic.pages.pageCondition(p));
+#endif
+      // Registered IDs contain only ASCII letters, digits, underscore and hyphen.
+      body += '"';
+      body += _dynamic.pages.id(p);
+      body += F("\":");
+      body += visible ? F("true") : F("false");
       yield();
     }
     body += '}';
     reply(200, "application/json", body);
+    return true;
+  }
+#endif
+#if ARDPORTAL_ENABLE_GROUPS
+  if (get && path == "/api/groups") {
+    reply(200, "application/json", _dynamic.groupCatalog);
     return true;
   }
 #endif
@@ -144,7 +158,7 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
       if (_dynamic.pages.id(p) == id) {
         size_t work = 2048, block = 1024;
         for (size_t f = 0; f < _dynamic.pages.fields(p); ++f) {
-          size_t i = _dynamic.pages.fieldIndex(p, f), cost = _dynamic.pages.fieldHttpWork(i), single = _dynamic.pages.fieldBlock(i);
+          size_t i = _dynamic.pages.fieldIndex(p, f), cost = _dynamic.pages.fieldHttpWork(i), single = _dynamic.pages.fieldHttpBlock(i);
           if (cost > work) work = cost;
           if (single > block) block = single;
         }
@@ -179,7 +193,7 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
     size_t work = 2048, block = 1024;
     for (size_t p = 0; p < _dynamic.pages.length(); ++p)
       for (size_t f = 0; f < _dynamic.pages.fields(p); ++f) {
-        size_t i = _dynamic.pages.fieldIndex(p, f), cost = _dynamic.pages.fieldHttpWork(i), single = _dynamic.pages.fieldBlock(i);
+        size_t i = _dynamic.pages.fieldIndex(p, f), cost = _dynamic.pages.fieldHttpWork(i), single = _dynamic.pages.fieldHttpBlock(i);
         if (cost > work) work = cost;
         if (single > block) block = single;
       }
@@ -205,7 +219,7 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
         if (_dynamic.pages.id(p) == pageId) {
           size_t work = 2048, block = 1024;
           for (size_t f = 0; f < _dynamic.pages.fields(p); ++f) {
-            size_t i = _dynamic.pages.fieldIndex(p, f), cost = _dynamic.pages.fieldHttpWork(i), single = _dynamic.pages.fieldBlock(i);
+            size_t i = _dynamic.pages.fieldIndex(p, f), cost = _dynamic.pages.fieldHttpWork(i), single = _dynamic.pages.fieldHttpBlock(i);
             if (cost > work) work = cost;
             if (single > block) block = single;
           }
@@ -392,7 +406,7 @@ bool ArdPortal::dynamicHttpMemoryReady() {
   _httpDynamicPageOffset = 0;
   const bool indexed = _httpDynamicPageIndex < _dynamic.pages.length() && _httpDynamicField < _dynamic.pages.fields(_httpDynamicPageIndex);
   const size_t index = indexed ? _dynamic.pages.fieldIndex(_httpDynamicPageIndex, _httpDynamicField) : 0;
-  return reserveDynamicHttpMemory(indexed ? _dynamic.pages.fieldHttpWork(index) : 2048, indexed ? _dynamic.pages.fieldBlock(index) : 1024);
+  return reserveDynamicHttpMemory(indexed ? _dynamic.pages.fieldHttpWork(index) : 2048, indexed ? _dynamic.pages.fieldHttpBlock(index) : 1024);
 }
 ArdPortal::DynamicHttpPart ArdPortal::prepareDynamicHttpPart() {
   if (!_httpDynamicPages) return DynamicHttpPart::Finished;
@@ -468,15 +482,17 @@ bool ArdPortal::buildDynamicHttpPart() {
   if (_httpDynamicStage == 1) {
     _httpDynamicField = 0;
     _httpDynamicStage = 2;
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-    // Optional acceleration only: low-memory clients keep the uncached path.
-    if (ArdHeap::permits(2048 + sizeof(ArdAppControls::VisibilityCache), 1024))
+    // Plain visibility needs neither a graph cache nor parsed field definitions.
+    if (_dynamic.pages.hasDependencies(p) && ArdHeap::permits(2048 + sizeof(ArdAppControls::VisibilityCache), 1024))
       _httpVisibilityCache.reset(new (std::nothrow) ArdAppControls::VisibilityCache());
+#endif
     _httpDynamicText = F("},\"conditions\":{");
     return true;
 #endif
   }
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
   // Commit bounded cursor-only progress without emitting whitespace fragments.
   for (size_t skipped = 0; _httpDynamicField < _dynamic.pages.fields(p) && !_dynamic.pages.dependent(p, _httpDynamicField); ++_httpDynamicField)
     if (++skipped == 16) {
@@ -486,9 +502,24 @@ bool ArdPortal::buildDynamicHttpPart() {
     }
   if (_httpDynamicField < _dynamic.pages.fields(p)) {
     const size_t f = _httpDynamicField++;
-    V field = _dynamic.pages.fieldConditions(p, f);
-    if (!field.isValid() || field.isUndefined()) return false;
-    _httpDynamicText = (_httpDynamicConditionFirst ? String() : String(F(","))) + _json.stringify(V(_dynamic.pages.fieldId(p, f))) + F(":{\"visible\":") + (_appControls.appFieldVisible(field, _httpVisibilityCache.get()) ? String(F("true")) : String(F("false"))) + "}";
+    const bool runtimeVisible = _dynamic.pages.fieldVisible(p, f);
+    bool visible = runtimeVisible;
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+    if (visible) {
+      V field = _dynamic.pages.fieldConditions(p, f);
+      if (!field.isValid() || field.isUndefined()) return false;
+      visible = _appControls.appFieldVisible(field, _httpVisibilityCache.get());
+    }
+#endif
+    // IDs are validated at registration; quoting them does not require a JSON node.
+    _httpDynamicText = _httpDynamicConditionFirst ? F("\"") : F(",\"");
+    _httpDynamicText += _dynamic.pages.fieldId(p, f);
+    _httpDynamicText += F("\":{\"visible\":");
+    _httpDynamicText += visible ? F("true") : F("false");
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+    if (!runtimeVisible) _httpDynamicText += F(",\"runtimeVisible\":false");
+#endif
+    _httpDynamicText += '}';
     _httpDynamicConditionFirst = false;
     return true;
   }
@@ -542,5 +573,44 @@ bool ArdPortal::queueAppConfigStatePublish(const char* key) {
 #if ARDPORTAL_CONTROL_SUPPORT_EVENTS
 bool ArdPortal::emitAppConfigEvent(const char* key, const V& value) {
   return _appControls.emitAppConfigEvent(key, value);
+}
+#endif
+
+#if ARDPORTAL_ENABLE_VISIBILITY
+bool ArdPortal::setFieldVisible(const char* id, bool visible) {
+  if (!id) return false;
+  bool changed = false;
+  bool found = _dynamic.pages.setFieldVisible(id, visible, changed);
+  if (!found) for (auto* e = _dynamic.entities.get(); e; e = e->next.get())
+    if (e->id == id) { changed = e->visible != visible; e->visible = visible; found = true; break; }
+  if (!found) return false;
+  if (!changed) return true;
+  ++_appRevision;
+#if ARDPORTAL_ENABLE_HA
+  _homeAssistant._dependencyMask |= ArdAppConfigFieldMask::forField(_dynamic.indexOf(id));
+  _homeAssistant._dependencyDirty |= _homeAssistant._dependencyMask;
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+  _homeAssistant._walk.reset();
+  _homeAssistant._walkDepth = 0;
+#endif
+#endif
+  return true;
+}
+bool ArdPortal::setPageVisible(const char* id, bool visible) {
+  bool changed = false;
+  if (!id || !_dynamic.pages.setPageVisible(id, visible, changed)) return false;
+  if (!changed) return true;
+  ++_appRevision;
+#if ARDPORTAL_ENABLE_HA
+  for (size_t p = 0; p < _dynamic.pages.length(); ++p)
+    if (_dynamic.pages.id(p) == id) for (size_t f = 0; f < _dynamic.pages.fields(p); ++f)
+      _homeAssistant._dependencyMask |= ArdAppConfigFieldMask::forField(_dynamic.pages.fieldIndex(p, f));
+  _homeAssistant._dependencyDirty |= _homeAssistant._dependencyMask;
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+  _homeAssistant._walk.reset();
+  _homeAssistant._walkDepth = 0;
+#endif
+#endif
+  return true;
 }
 #endif

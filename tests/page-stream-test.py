@@ -7,11 +7,14 @@ fixture=r'''
 #include "TopicTemplates.h"
 #include "ControlClasses.h"
 #include "JsonCodec.h"
+struct HeapStub{unsigned getFreeHeap(){return 65536;}unsigned getMaxFreeBlockSize(){return 65536;}}testHeap;
+#define ESP testHeap
+#include "HeapMemory.h"
 uint32_t fakeMillis=0;
 struct Pages {
  using V=ArdJSON::JSONVar;
- struct Field {unsigned offset=0,length=0;bool extended=false,persist=false;};
- struct Entry {String source,condition;const __FlashStringHelper* flash=nullptr;size_t sourceLength=0,count=1;Field fields[1];};
+ struct Field {bool visible=true;unsigned offset=0,length=0,index=0;bool extended=false,persist=false;};
+ struct Entry {bool visible=true;String source,condition;const __FlashStringHelper* flash=nullptr;size_t sourceLength=0,count=1;Field fields[1];};
  Entry entry;Entry* entries[1]={&entry};size_t size=1;String topicDevice="unit";ArdJsonCodec codec;
  const char* fieldId(size_t,size_t)const{return "x";}
  V fieldValue(size_t,size_t)const{V v=codec.parse(entry.source);ArdTopicTemplates::resolve(v,topicDevice);if(entry.fields[0].extended){v["extended"]=true;if(!v.hasOwnProperty("persist"))v["persist"]=entry.fields[0].persist;}if(entry.condition.length())v["_pageVisibleWhen"]=codec.parse(entry.condition);return v;}
@@ -22,6 +25,9 @@ int main(){
  Pages p;using V=ArdJSON::JSONVar;
  p.entry.source=R"({"id":"x","type":"slider","default":25,"ha":{"state_topic":"stat/$device/x"},"visibleWhen":{"field":"mode","equals":"manual"}})";
  p.entry.fields[0].length=p.entry.source.length();p.entry.sourceLength=p.entry.source.length();
+ // Streaming needs a source/output buffer even when the DOM node count overflows.
+ assert(p.fieldHttpBlock(0)==p.entry.fields[0].length+512);
+ assert(p.fieldHttpBlock(1)==1024);
  V initial;assert(p.explicitInitial("x",initial)&&initial.asDouble()==25);assert(!p.explicitInitial("missing",initial));
  V conditions=p.fieldConditions(0,0);assert(conditions.isValid()&&conditions.hasOwnProperty("visibleWhen")&&!conditions.hasOwnProperty("ha"));
  V expected=p.fieldValue(0,0);expected.remove("_pageVisibleWhen");assert(ArdJSON::JSON.stringify(ArdJSON::JSON.parse(p.fieldHttpText(0,0)))==ArdJSON::JSON.stringify(expected));

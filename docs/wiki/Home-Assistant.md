@@ -88,7 +88,7 @@ but do not need a dynamic page. Pass a single field object, not a page containin
 `fields`. All supported controls use the same validation,
 MQTT topic namespace, callbacks, state setters and persistence rules as panel
 fields. Entity IDs must be unique across the entire application. HA-only entities
-have their own source registry, consume no slots from the 16 panel pages, and do
+have their own source registry, consume no slots from the configured panel-page limit, and do
 not appear in `/api/pages` or the portal menu. Their current values remain available
 through `getAppConfigValue()` and the complete `/api/app` values endpoint. The 1024-field and configurable source
 budgets cover both registries together. `ARDPORTAL_ENABLE_HA` and

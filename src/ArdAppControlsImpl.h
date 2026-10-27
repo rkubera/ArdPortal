@@ -91,24 +91,28 @@ bool ArdAppControls::dependencyMatches(const V& rule, VisibilityCache* cache) co
   return ArdDependencies::evaluate(rule, match);
 }
 
+#endif
 /**
  * @brief Evaluate the field visibility condition against current application values.
  * @param field Application field definition or identifier.
  * @return True when the field is visible; false when its dependency condition is not satisfied.
  */
+#if ARDPORTAL_ENABLE_DEPENDENCIES
 bool ArdAppControls::appFieldVisible(const V& field, VisibilityCache* cache) const {
-  return dependencyMatches(field["_pageVisibleWhen"], cache) && dependencyMatches(field["visibleWhen"], cache);
-}
 #else
-/**
- * @brief Evaluate the field visibility condition against current application values.
- * Input: const V&.
- * @return True when the field is visible; false when its dependency condition is not satisfied.
- */
-bool ArdAppControls::appFieldVisible(const V&) const {
-  return true;
-}
+bool ArdAppControls::appFieldVisible(const V& field) const {
 #endif
+#if ARDPORTAL_ENABLE_VISIBILITY
+  if ((field.hasOwnProperty("visible") && !field["visible"].asBool()) ||
+      (field.hasOwnProperty("_pageVisible") && !field["_pageVisible"].asBool())) return false;
+#endif
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+  return dependencyMatches(field["_pageVisibleWhen"], cache) && dependencyMatches(field["visibleWhen"], cache);
+#else
+  (void)field;
+  return true;
+#endif
+}
 
 #if ARDPORTAL_ENABLE_MQTT
 /**

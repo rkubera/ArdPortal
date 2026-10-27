@@ -5,6 +5,15 @@
 #include <stddef.h>
 #include <stdint.h>
 constexpr size_t ArdAppConfigMaxFields = 1024;
+// Every registered page contains at least one of the 1024 shared fields.
+#ifndef ARDPORTAL_APP_CONFIG_MAX_PAGES
+#define ARDPORTAL_APP_CONFIG_MAX_PAGES 16
+#endif
+static_assert(ARDPORTAL_APP_CONFIG_MAX_PAGES >= 1 && ARDPORTAL_APP_CONFIG_MAX_PAGES <= ArdAppConfigMaxFields,
+              "ARDPORTAL_APP_CONFIG_MAX_PAGES must be an integer from 1 to 1024");
+constexpr size_t ArdAppConfigMaxPages = ARDPORTAL_APP_CONFIG_MAX_PAGES;
+static_assert(ARDPORTAL_APP_CONFIG_MAX_PAGES == ArdAppConfigMaxPages,
+              "ARDPORTAL_APP_CONFIG_MAX_PAGES must be an integer");
 // Override in the sketch before including ArdPortal.h (bytes, shared by pages/entities).
 #ifndef ARDPORTAL_APP_CONFIG_MAX_DEFINITION_BYTES
 #define ARDPORTAL_APP_CONFIG_MAX_DEFINITION_BYTES (256UL * 1024UL)

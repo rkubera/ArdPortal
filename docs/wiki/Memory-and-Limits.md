@@ -57,7 +57,7 @@ Check JSON values with `isValid()` and check Boolean returns from registration a
 
 | Resource | Limit / default | How configured |
 | --- | --- | --- |
-| Dynamic panel pages | 16 | Source constant; HA-only entities do not consume page slots |
+| Dynamic panel pages | 16 | `ARDPORTAL_APP_CONFIG_MAX_PAGES` (1–1024); HA-only entities do not consume page slots |
 | Registered fields | 1024 total across pages and HA-only entities | Source constant; not a guarantee that 1024 values fit RAM/flash |
 | Total definition source | 256 KiB | `ARDPORTAL_APP_CONFIG_MAX_DEFINITION_BYTES` |
 | Individual page source | No separate 32 KiB limit | Still subject to total definition, parser/header/field limits and RAM |
@@ -112,3 +112,15 @@ two characters; authoring sources retain readable names.
 Runtime `suspendPortal()` turns Wi-Fi off but does not remove firmware or promise
 release of every networking allocation. Compile unused features out for permanent
 size savings.
+
+## Programmatic visibility costs
+
+`ARDPORTAL_ENABLE_VISIBILITY` does not require the dependency graph. With
+`ARDPORTAL_ENABLE_DEPENDENCIES=0`, reverse indexes, cycle-checking/traversal
+stacks and the HTTP visibility cache are excluded. HA and HTTP read programmatic
+visibility directly from compact metadata; browser dependency previews are also
+omitted from flash in this configuration.
+
+Each page-field index occupies 12 bytes, including packed visibility flags;
+page visibility shares the compact field-count storage. With dependencies
+enabled, plain pages without `visibleWhen` do not allocate the optional HTTP graph cache (264 bytes with the ESP8266 toolchain). Programmatically hidden fields bypass condition JSON parsing.

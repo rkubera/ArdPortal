@@ -480,6 +480,7 @@
     "native_output_limit": "output limit",
     "native_packet_rejected": "packet rejected",
     "native_packet_too_large": "packet too large",
+    "native_page_limit": "page limit: ",
     "native_page_limit_16": "page limit: 16",
     "native_page_must_be_an_object": "page must be an object",
     "native_receive_buffer_full": "receive buffer full",

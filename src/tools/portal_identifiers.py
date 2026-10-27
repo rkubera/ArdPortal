@@ -181,7 +181,7 @@ def script_names(script, classes, ids):
     if "'dynamic-'+page.id" in script:
         script = script.replace(".getElementById('dynamic-'+page.id)", ".getElementById(_pageId(page))")
         script = script.replace("section.id='dynamic-'+page.id", "section.id=_pageId(page)")
-        # Reserve underscore-prefixed two-character aliases for the 16 pages.
+        # Reserve underscore-prefixed aliases; base 36 stays unique beyond 16 pages.
         # Static aliases always start with an ASCII letter.
-        script = "/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/const _pageId=p=>'_'+'abcdefghijklmnop'[dynamicDefinitions.indexOf(p)];/*@endif*/\n"+script
+        script = "/*@if ARDPORTAL_ENABLE_DYNAMIC_PAGES*/const _pageId=p=>'_'+(dynamicDefinitions.indexOf(p)+10).toString(36);/*@endif*/\n"+script
     return script
