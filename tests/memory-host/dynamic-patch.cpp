@@ -58,36 +58,41 @@ int main() {
 #endif
 
 #ifdef ARDPORTAL_TEST_VISIBILITY
-  static_assert(sizeof(ArdDynamicPages::PageStore::Field)==12, "Visibility flags must share the existing field byte");
+  static_assert(sizeof(ArdDynamicPages::PageStore::Field) == 12, "Visibility flags must share the existing field byte");
   {
     ArdDynamicPages::PageStore::Entry metadata;
-    metadata.count=ArdAppConfigMaxFields;
-    metadata.visible=false;
-    assert(metadata.count==ArdAppConfigMaxFields && !metadata.visible);
-    metadata.visible=true;
-    assert(metadata.count==ArdAppConfigMaxFields && metadata.visible);
+    metadata.count = ArdAppConfigMaxFields;
+    metadata.visible = false;
+    assert(metadata.count == ArdAppConfigMaxFields && !metadata.visible);
+    metadata.visible = true;
+    assert(metadata.count == ArdAppConfigMaxFields && metadata.visible);
   }
   {
     ArdPortal p;
     auto add = [&](const char* json, bool expected) {
       assert(p.startAppConfigPageRegistration(String(json)));
-      for (size_t i=0; i<1000 && p.appConfigPageRegistrationBusy(); ++i) p.serviceAppConfigPageRegistration();
-      assert((p.appConfigPageRegistrationState()==ArdPortal::AppConfigPageRegistrationState::Succeeded)==expected);
+      for (size_t i = 0; i < 1000 && p.appConfigPageRegistrationBusy(); ++i) p.serviceAppConfigPageRegistration();
+      assert((p.appConfigPageRegistrationState() == ArdPortal::AppConfigPageRegistrationState::Succeeded) == expected);
     };
     add(R"({"id":"invalid","name":"Invalid","visible":0,"fields":[{"id":"invalid_field","type":"switch","name":"Value"}]})", false);
     add(R"({"id":"badfield","name":"Invalid","fields":[{"id":"bad","type":"switch","name":"Value","visible":"false"}]})", false);
     add(R"({"id":"page","name":"Page","fields":[{"id":"root","type":"switch","name":"Root"},{"id":"hidden","type":"switch","name":"Hidden","visible":false}]})", bool(ARDPORTAL_ENABLE_VISIBILITY));
 #if ARDPORTAL_ENABLE_VISIBILITY
-    auto visible = [&](const char* id) { return p._appControls.appFieldVisible(p._dynamic.field(id)); };
+    auto visible = [&](const char* id) {
+      return p._appControls.appFieldVisible(p._dynamic.field(id));
+    };
     assert(visible("root") && !visible("hidden"));
 #if ARDPORTAL_ENABLE_WWW
-    p._httpDynamicMode=2;p._httpDynamicStage=1;p._httpDynamicPageIndex=0;
-    p._httpDynamicField=p._dynamic.pages.fields(0);p._httpDynamicPages=true;
-    const size_t beforeCacheAllocations=allocations;
-    allocationBudget=0;
+    p._httpDynamicMode = 2;
+    p._httpDynamicStage = 1;
+    p._httpDynamicPageIndex = 0;
+    p._httpDynamicField = p._dynamic.pages.fields(0);
+    p._httpDynamicPages = true;
+    const size_t beforeCacheAllocations = allocations;
+    allocationBudget = 0;
     assert(p.buildDynamicHttpPart());
-    allocationBudget=-1;
-    assert(allocations==beforeCacheAllocations);
+    allocationBudget = -1;
+    assert(allocations == beforeCacheAllocations);
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     assert(!p._httpVisibilityCache);
 #endif
@@ -95,45 +100,65 @@ int main() {
 
 #if ARDPORTAL_ENABLE_HA && !ARDPORTAL_ENABLE_DEPENDENCIES
     // Initial discovery visibility comes directly from metadata, even with no heap available.
-    const size_t beforeVisibilityAllocations=allocations;
-    allocationBudget=0;
+    const size_t beforeVisibilityAllocations = allocations;
+    allocationBudget = 0;
     while (p._homeAssistant.serviceDependencies()) {}
-    allocationBudget=-1;
-    assert(allocations==beforeVisibilityAllocations);
-    const size_t hiddenIndex=p._dynamic.indexOf("hidden");
+    allocationBudget = -1;
+    assert(allocations == beforeVisibilityAllocations);
+    const size_t hiddenIndex = p._dynamic.indexOf("hidden");
     assert(p._homeAssistant._dependencyKnown.test(hiddenIndex));
     assert(!p._homeAssistant._dependencyVisible.test(hiddenIndex));
 #endif
 
-    assert(!p.setFieldVisible(nullptr,false) && !p.setFieldVisible("missing",false));
-    assert(!p.setPageVisible(nullptr,false) && !p.setPageVisible("missing",false));
-    const auto revision=p._appRevision;
-    assert(p.setFieldVisible("hidden",false) && p._appRevision==revision);
-    assert(p.setFieldVisible("hidden",true));assert(visible("hidden"));assert(p._appRevision!=revision);
-    assert(p.setPageVisible("page",false));assert(!visible("root") && !visible("hidden"));
-    assert(p.setFieldVisible("hidden",true));assert(!visible("hidden"));
-    assert(p.setPageVisible("page",true));assert(visible("root") && visible("hidden"));
-    assert(p.setFieldVisible("root",false));assert(!visible("root") && visible("hidden"));
+    assert(!p.setFieldVisible(nullptr, false) && !p.setFieldVisible("missing", false));
+    assert(!p.setPageVisible(nullptr, false) && !p.setPageVisible("missing", false));
+    const auto revision = p._appRevision;
+    assert(p.setFieldVisible("hidden", false) && p._appRevision == revision);
+    assert(p.setFieldVisible("hidden", true));
+    assert(visible("hidden"));
+    assert(p._appRevision != revision);
+    assert(p.setPageVisible("page", false));
+    assert(!visible("root") && !visible("hidden"));
+    assert(p.setFieldVisible("hidden", true));
+    assert(!visible("hidden"));
+    assert(p.setPageVisible("page", true));
+    assert(visible("root") && visible("hidden"));
+    assert(p.setFieldVisible("root", false));
+    assert(!visible("root") && visible("hidden"));
 #if ARDPORTAL_ENABLE_WWW && !ARDPORTAL_ENABLE_DEPENDENCIES
-    p._httpDynamicMode=2;p._httpDynamicStage=2;p._httpDynamicPageIndex=0;
-    p._httpDynamicField=0;p._httpDynamicConditionFirst=true;p._httpDynamicPages=true;
-    const size_t beforeHttpAllocations=allocations;
-    allocationBudget=0;
+    p._httpDynamicMode = 2;
+    p._httpDynamicStage = 2;
+    p._httpDynamicPageIndex = 0;
+    p._httpDynamicField = 0;
+    p._httpDynamicConditionFirst = true;
+    p._httpDynamicPages = true;
+    const size_t beforeHttpAllocations = allocations;
+    allocationBudget = 0;
     assert(p.buildDynamicHttpPart());
-    allocationBudget=-1;
-    assert(allocations==beforeHttpAllocations);
-    assert(p._httpDynamicText.indexOf("\"root\":{\"visible\":false}")>=0);
+    allocationBudget = -1;
+    assert(allocations == beforeHttpAllocations);
+    assert(p._httpDynamicText.indexOf("\"root\":{\"visible\":false}") >= 0);
 #endif
 
     add(R"({"id":"initial","name":"Initial","visible":false,"fields":[{"id":"initial_field","type":"switch","name":"Value"}]})", true);
-    assert(!visible("initial_field"));assert(p.setPageVisible("initial",true));assert(visible("initial_field"));
+    assert(!visible("initial_field"));
+    assert(p.setPageVisible("initial", true));
+    assert(visible("initial_field"));
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     add(R"({"id":"dependent","name":"Dependent","visibleWhen":{"field":"root","equals":false},"fields":[{"id":"child","type":"switch","name":"Child","visibleWhen":{"field":"hidden","equals":false}}]})", true);
-    assert(!visible("child"));assert(p.setFieldVisible("root",true));assert(visible("child"));
-    assert(p.setFieldVisible("child",false));assert(!visible("child"));assert(p.setFieldVisible("child",true));assert(visible("child"));
-    assert(p.setFieldVisible("hidden",false));assert(!visible("child"));
-    assert(p.setFieldVisible("hidden",true));assert(visible("child"));
-    assert(p.setPageVisible("page",false));assert(!visible("child"));
+    assert(!visible("child"));
+    assert(p.setFieldVisible("root", true));
+    assert(visible("child"));
+    assert(p.setFieldVisible("child", false));
+    assert(!visible("child"));
+    assert(p.setFieldVisible("child", true));
+    assert(visible("child"));
+    assert(p.setFieldVisible("hidden", false));
+    assert(!visible("child"));
+    assert(p.setFieldVisible("hidden", true));
+    assert(visible("child"));
+    assert(p.setPageVisible("page", false));
+    assert(!visible("child"));
 #else
     add(R"({"id":"dependent","name":"Dependent","visibleWhen":{"field":"root","equals":false},"fields":[{"id":"child","type":"switch","name":"Child"}]})", false);
 #endif

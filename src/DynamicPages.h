@@ -71,7 +71,8 @@ public:
       uint16_t count : 11;
       uint16_t visible : 1;
       size_t jsonLength = 0, sourceLength = 0;
-      Entry() : count(0), visible(true) {}
+      Entry()
+        : count(0), visible(true) {}
     };
   private:
     std::unique_ptr<Entry> entries[ArdAppConfigMaxPages];
@@ -408,27 +409,43 @@ public:
 #if ARDPORTAL_ENABLE_VISIBILITY
       return entries[p]->visible && entries[p]->fields[f].visible;
 #else
-      (void)p; (void)f;
+      (void)p;
+      (void)f;
       return true;
 #endif
     }
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     bool hasDependencies(size_t p) const {
-      for (size_t f = 0; f < fields(p); ++f) if (entries[p]->fields[f].dependent) return true;
+      for (size_t f = 0; f < fields(p); ++f)
+        if (entries[p]->fields[f].dependent) return true;
       return false;
     }
 #endif
-    bool pageVisible(size_t index) const { return entries[index]->visible; }
+    bool pageVisible(size_t index) const {
+      return entries[index]->visible;
+    }
     bool setPageVisible(const String& id, bool visible, bool& changed) {
-      for (size_t p = 0; p < size; ++p) if (entries[p]->id == id) { changed = entries[p]->visible != visible; entries[p]->visible = visible; return true; }
+      for (size_t p = 0; p < size; ++p)
+        if (entries[p]->id == id) {
+          changed = entries[p]->visible != visible;
+          entries[p]->visible = visible;
+          return true;
+        }
       return false;
     }
     bool setFieldVisible(const String& id, bool visible, bool& changed) {
 #if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
-      for (size_t p = 0; p < size; ++p) for (size_t f = 0; f < fields(p); ++f)
-        if (id == fieldId(p, f)) { changed = entries[p]->fields[f].visible != visible; entries[p]->fields[f].visible = visible; return true; }
+      for (size_t p = 0; p < size; ++p)
+        for (size_t f = 0; f < fields(p); ++f)
+          if (id == fieldId(p, f)) {
+            changed = entries[p]->fields[f].visible != visible;
+            entries[p]->fields[f].visible = visible;
+            return true;
+          }
 #else
-      (void)id; (void)visible; (void)changed;
+      (void)id;
+      (void)visible;
+      (void)changed;
 #endif
       return false;
     }

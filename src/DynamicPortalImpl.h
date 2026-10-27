@@ -581,8 +581,14 @@ bool ArdPortal::setFieldVisible(const char* id, bool visible) {
   if (!id) return false;
   bool changed = false;
   bool found = _dynamic.pages.setFieldVisible(id, visible, changed);
-  if (!found) for (auto* e = _dynamic.entities.get(); e; e = e->next.get())
-    if (e->id == id) { changed = e->visible != visible; e->visible = visible; found = true; break; }
+  if (!found)
+    for (auto* e = _dynamic.entities.get(); e; e = e->next.get())
+      if (e->id == id) {
+        changed = e->visible != visible;
+        e->visible = visible;
+        found = true;
+        break;
+      }
   if (!found) return false;
   if (!changed) return true;
   ++_appRevision;
@@ -603,8 +609,9 @@ bool ArdPortal::setPageVisible(const char* id, bool visible) {
   ++_appRevision;
 #if ARDPORTAL_ENABLE_HA
   for (size_t p = 0; p < _dynamic.pages.length(); ++p)
-    if (_dynamic.pages.id(p) == id) for (size_t f = 0; f < _dynamic.pages.fields(p); ++f)
-      _homeAssistant._dependencyMask |= ArdAppConfigFieldMask::forField(_dynamic.pages.fieldIndex(p, f));
+    if (_dynamic.pages.id(p) == id)
+      for (size_t f = 0; f < _dynamic.pages.fields(p); ++f)
+        _homeAssistant._dependencyMask |= ArdAppConfigFieldMask::forField(_dynamic.pages.fieldIndex(p, f));
   _homeAssistant._dependencyDirty |= _homeAssistant._dependencyMask;
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   _homeAssistant._walk.reset();

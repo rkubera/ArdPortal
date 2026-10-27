@@ -169,8 +169,7 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
 #if ARDPORTAL_ENABLE_GROUPS
         const bool isGroup = !work.scanner.fieldsSeen && header.hasOwnProperty("group");
         const V& definition = isGroup ? header["group"] : header;
-        if ((isGroup && header.length() != 1) ||
-            (!isGroup && header.hasOwnProperty("group") && !ArdDynamicPages::identifier(header["group"].asString()))) {
+        if ((isGroup && header.length() != 1) || (!isGroup && header.hasOwnProperty("group") && !ArdDynamicPages::identifier(header["group"].asString()))) {
           failAppConfigPageRegistration("group", "", F(ARD_LANG_NATIVE_INVALID_ID_USE_1_48_ASCII_LETTERS_DIGITS_OR));
           return;
         }
@@ -216,10 +215,11 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
             failAppConfigPageRegistration("group", "", F(ARD_LANG_NATIVE_PAGE_LIMIT_16));
             return;
           }
-          for (size_t i = 0; i < catalog.length(); ++i) if (catalog[i]["id"].asString() == definition["id"].asString()) {
-            failAppConfigPageRegistration("group", "", F(ARD_LANG_NATIVE_DUPLICATE_PAGE_ID));
-            return;
-          }
+          for (size_t i = 0; i < catalog.length(); ++i)
+            if (catalog[i]["id"].asString() == definition["id"].asString()) {
+              failAppConfigPageRegistration("group", "", F(ARD_LANG_NATIVE_DUPLICATE_PAGE_ID));
+              return;
+            }
           // Move the validated metadata instead of copying every name twice.
           V& group = work.header["group"];
           catalog[int(catalog.length())] = std::move(group);

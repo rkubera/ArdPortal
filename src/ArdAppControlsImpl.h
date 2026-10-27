@@ -103,8 +103,7 @@ bool ArdAppControls::appFieldVisible(const V& field, VisibilityCache* cache) con
 bool ArdAppControls::appFieldVisible(const V& field) const {
 #endif
 #if ARDPORTAL_ENABLE_VISIBILITY
-  if ((field.hasOwnProperty("visible") && !field["visible"].asBool()) ||
-      (field.hasOwnProperty("_pageVisible") && !field["_pageVisible"].asBool())) return false;
+  if ((field.hasOwnProperty("visible") && !field["visible"].asBool()) || (field.hasOwnProperty("_pageVisible") && !field["_pageVisible"].asBool())) return false;
 #endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   return dependencyMatches(field["_pageVisibleWhen"], cache) && dependencyMatches(field["visibleWhen"], cache);
