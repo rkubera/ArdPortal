@@ -4,8 +4,8 @@ import subprocess
 import tempfile
 root = Path(__file__).resolve().parents[1]
 s = (root/'src/ArdAppControlsImpl.h').read_text()
-a = s.index('bool ArdAppControls::dependencyValueMatches(')
-b = s.index('\n#else', a)
+a = s.index('#if ARDPORTAL_ENABLE_DEPENDENCIES')
+b = s.index('\n#if ARDPORTAL_ENABLE_MQTT', a)
 methods = s[a:b]
 fixture = r'''
 #include <cassert>

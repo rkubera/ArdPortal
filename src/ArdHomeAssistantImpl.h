@@ -37,20 +37,24 @@ void ArdHomeAssistant::resetDiscovery() {
   _haSince = millis();
   _serviceStage = 0;
   _portal._appControls.resetMqtt();
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
 #if ARDPORTAL_ENABLE_DEPENDENCIES
   _walk.reset();
   _walkDepth = 0;
   _dependencyRetryPending = false;
+#endif
   _dependencyMask = 0;
   const auto& definitions = _portal._dynamic;
   for (size_t p = 0; p < definitions.pages.length(); ++p)
     for (size_t f = 0; f < definitions.pages.fields(p); ++f)
       if (definitions.pages.dependent(p, f)) _dependencyMask |= ArdAppConfigFieldMask::forField(definitions.pages.fieldIndex(p, f));
   for (const auto* entity = definitions.entities.get(); entity; entity = entity->next.get())
-    if (entity->dependent) _dependencyMask |= ArdAppConfigFieldMask::forField(entity->index);
+    if (entity->dependent || !entity->visible) _dependencyMask |= ArdAppConfigFieldMask::forField(entity->index);
   _dependencyDirty = _dependencyMask;
   _dependencyKnown = _dependencyDiscovery = 0;
+#if ARDPORTAL_ENABLE_DEPENDENCIES
   _dependencyRevision = _portal._appRevision;
+#endif
 #endif
 }
 
@@ -64,7 +68,7 @@ void ArdHomeAssistant::registered(size_t first) {
   for (size_t i = first; i < _portal._dynamic.count(); ++i) {
     auto bit = ArdAppConfigFieldMask::forField(i);
     if (!_portal._dynamic.transientAt(i)) states |= bit;
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
     if (_portal._dynamic.dependentAt(i)) dependencies |= bit;
 #endif
   }
@@ -83,7 +87,7 @@ void ArdHomeAssistant::registered(size_t first, const ArdAppConfigFieldMask& sta
     _portal._appControls._stateSince = millis();
   }
   _portal._appControls._stateDirty |= states;
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
   _dependencyMask |= dependencies;
   _dependencyDirty |= dependencies;
 #else
@@ -91,12 +95,13 @@ void ArdHomeAssistant::registered(size_t first, const ArdAppConfigFieldMask& sta
 #endif
 }
 
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
 /**
  * @brief Invalidate the reverse-index closure of one changed controller.
  * @param key Changed application field identifier.
  * @return No value; only a traversal whose root is affected is cancelled.
  */
+#if ARDPORTAL_ENABLE_DEPENDENCIES
 void ArdHomeAssistant::dependencyChanged(const String& key) {
   size_t controller = _portal._dynamic.indexOf(key);
   if (!_portal._dynamic.dependencyControllers.test(controller)) return;
@@ -117,6 +122,7 @@ void ArdHomeAssistant::dependencyChanged(const String& key) {
   }
 }
 
+#endif
 /**
  * @brief Finish the current dependency visibility transition.
  * @param visible Whether the field or page should be visible.
@@ -131,14 +137,17 @@ void ArdHomeAssistant::completeDependency(bool visible) {
   _dependencyVisible = visible ? (_dependencyVisible | bit) : (_dependencyVisible & ~bit);
   _dependencyKnown |= bit;
   _dependencyDirty &= ~bit;
+#if ARDPORTAL_ENABLE_DEPENDENCIES
   _walkDepth = 0;
   _walk.reset();
+#endif
 }
 /**
  * @brief Advance dependency-driven visibility and state changes.
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdHomeAssistant::serviceDependencies() {
+#if ARDPORTAL_ENABLE_DEPENDENCIES
   const size_t workIndex = _walkDepth ? _walk[_walkDepth - 1].index : _dependencyDirty.firstSet();
   if (!ArdHeap::permits(_portal._dynamic.fieldWork(workIndex), _portal._dynamic.fieldBlock(workIndex))) return false;
   _dependencyRevision = _portal._appRevision;  // UI revisions do not invalidate the HA dependency graph.
@@ -182,6 +191,12 @@ bool ArdHomeAssistant::serviceDependencies() {
     _dependencyRetryPending = true;
   } else if (result != ArdDependencies::Result::Running) completeDependency(result == ArdDependencies::Result::Visible);
   return true;
+#else
+  _walkIndex = _dependencyDirty.firstSet();
+  if (_walkIndex >= _portal._dynamic.count()) return false;
+  completeDependency(_portal._dynamic.fieldVisibleAt(_walkIndex));
+  return true;
+#endif
 }
 #endif
 
@@ -410,7 +425,7 @@ bool ArdHomeAssistant::serviceOne(uint32_t now) {
         _serviceStage = 2;
         break;
       case 2: _serviceStage = 3;
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
         if (serviceDependencies()) return true;
 #endif
         break;
@@ -420,7 +435,7 @@ bool ArdHomeAssistant::serviceOne(uint32_t now) {
           return false;
         }
         _serviceStage = 4;
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
         {
           size_t index = _dependencyDiscovery.firstSet();
           if (index < _portal._dynamic.count()) {
@@ -470,7 +485,7 @@ bool ArdHomeAssistant::serviceOne(uint32_t now) {
         if (_discoveryRetryPending || !ArdHeap::permits(_portal._dynamic.fieldWork(_haDiscovery), _portal._dynamic.fieldBlock(_haDiscovery))) return false;
         {
           bool visible = true;
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
           if (_dependencyMask.test(_haDiscovery)) {
             if (!_dependencyKnown.test(_haDiscovery) || _dependencyDirty.test(_haDiscovery)) return false;
             visible = _dependencyVisible.test(_haDiscovery);

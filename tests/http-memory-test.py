@@ -13,7 +13,7 @@ struct HeapStub{uint32_t getFreeHeap(){++heapReads;return fakeFree();}uint32_t g
 #define ARDPORTAL_ENABLE_CONSOLE 1
 #define ARDPORTAL_ENABLE_MQTT 1
 #define ARDPORTAL_ENABLE_CONSOLE_MESSAGES 1
-struct Pages{size_t work=4000;size_t length(){return 9;}size_t fields(size_t){return 1;}size_t fieldIndex(size_t,size_t){return 0;}size_t fieldWork(size_t){return work;}size_t fieldHttpWork(size_t){return work;}size_t fieldBlock(size_t){return 2000;}};
+struct Pages{size_t work=4000;size_t length(){return 9;}size_t fields(size_t){return 1;}size_t fieldIndex(size_t,size_t){return 0;}size_t fieldWork(size_t){return work;}size_t fieldHttpWork(size_t){return work;}size_t fieldHttpBlock(size_t){return 2000;}};
 struct ArdPortal{
  unsigned _httpDynamicMode=1;bool _httpPortalTail=false;size_t _httpDynamicPageOffset=0,_httpDynamicPageIndex=0,_httpDynamicField=0;String _httpDynamicText;
  struct {Pages pages;} _dynamic;

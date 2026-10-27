@@ -44,7 +44,15 @@ bool ArdPortal::beginAppConfigPageRegistration(const String* source, const __Fla
   _appConfigRegistrationError = {};
   _appConfigPageRegistrationProcessed = _appConfigPageRegistrationTotal = 0;
   if (!source && !flash) return appConfigRegistrationFailed("input", "", F(ARD_LANG_NATIVE_NULL_DEFINITION));
-  if (_dynamic.pages.length() >= 16) return appConfigRegistrationFailed("limits", "", F(ARD_LANG_NATIVE_PAGE_LIMIT_16));
+#if !ARDPORTAL_ENABLE_GROUPS
+  if (_dynamic.pages.length() >= ArdAppConfigMaxPages) {
+#if ARDPORTAL_APP_CONFIG_MAX_PAGES == 16
+    return appConfigRegistrationFailed("limits", "", F(ARD_LANG_NATIVE_PAGE_LIMIT_16));
+#else
+    return appConfigRegistrationFailed("limits", "", String(F(ARD_LANG_NATIVE_PAGE_LIMIT)) + String(ArdAppConfigMaxPages));
+#endif
+  }
+#endif
   const auto heapBefore = ArdHeap::sample();
   std::unique_ptr<ArdAppConfigPageRegistration> work(new (std::nothrow) ArdAppConfigPageRegistration());
   if (!work) return appConfigRegistrationFailed("registry", "", F(ARD_LANG_NATIVE_OUT_OF_MEMORY_ALLOCATING_REGISTRATION));
@@ -158,22 +166,89 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
     if (event == ArdAppConfigPageScanner::Complete) {
       if (scanning) {
         const V& header = work.header;
+#if ARDPORTAL_ENABLE_GROUPS
+        const bool isGroup = !work.scanner.fieldsSeen && header.hasOwnProperty("group");
+        const V& definition = isGroup ? header["group"] : header;
+        if ((isGroup && header.length() != 1) || (!isGroup && header.hasOwnProperty("group") && !ArdDynamicPages::identifier(header["group"].asString()))) {
+          failAppConfigPageRegistration("group", "", F(ARD_LANG_NATIVE_INVALID_ID_USE_1_48_ASCII_LETTERS_DIGITS_OR));
+          return;
+        }
+#else
+        const V& definition = header;
         if (!work.scanner.fieldsSeen || !work.scanner.fieldCount) {
           failAppConfigPageRegistration("page", "", F(ARD_LANG_NATIVE_FIELDS_MUST_BE_A_NONEMPTY_ARRAY));
           return;
         }
-        if (!ArdDynamicPages::identifier(header["id"].asString())) {
+#endif
+        if (!ArdDynamicPages::identifier(definition["id"].asString())) {
           failAppConfigPageRegistration("page", "", F(ARD_LANG_NATIVE_INVALID_ID_USE_1_48_ASCII_LETTERS_DIGITS_OR));
           return;
         }
-        if (!ArdDynamicPages::title(header)) {
+#if !ARDPORTAL_ENABLE_DEPENDENCIES
+        if (header.hasOwnProperty("visibleWhen")) {
+          failed("page", "", ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED);
+          return;
+        }
+#endif
+        if (header.hasOwnProperty("visible") && header["visible"].type() != V::Type::Boolean) {
+          failed("page", "", "visible must be a boolean");
+          return;
+        }
+#if !ARDPORTAL_ENABLE_VISIBILITY
+        if (header.hasOwnProperty("visible")) {
+          failed("page", "", ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED);
+          return;
+        }
+#endif
+        if (!ArdDynamicPages::title(definition)) {
           failAppConfigPageRegistration("page", "", F(ARD_LANG_NATIVE_INVALID_NAME_NAMES_1_80_BYTES));
           return;
         }
-        if (header.hasOwnProperty("order") && !header["order"].isInteger()) {
+        if (definition.hasOwnProperty("order") && !definition["order"].isInteger()) {
           failAppConfigPageRegistration("page", "", F(ARD_LANG_NATIVE_ORDER_MUST_BE_AN_INTEGER));
           return;
         }
+#if ARDPORTAL_ENABLE_GROUPS
+        if (isGroup) {
+          V catalog = _json.parse(_dynamic.groupCatalog);
+          if (!catalog.isValid() || catalog.type() != V::Type::Array || _dynamic.groupCount >= 16) {
+            failAppConfigPageRegistration("group", "", F(ARD_LANG_NATIVE_PAGE_LIMIT_16));
+            return;
+          }
+          for (size_t i = 0; i < catalog.length(); ++i)
+            if (catalog[i]["id"].asString() == definition["id"].asString()) {
+              failAppConfigPageRegistration("group", "", F(ARD_LANG_NATIVE_DUPLICATE_PAGE_ID));
+              return;
+            }
+          // Move the validated metadata instead of copying every name twice.
+          V& group = work.header["group"];
+          catalog[int(catalog.length())] = std::move(group);
+          ArdJSON::Limits limits;
+          limits.escapeHtml = true;
+          limits.maxOutputBytes = 16384;
+          String encoded = _json.stringify(catalog, false, nullptr, limits);
+          if (!encoded.length()) {
+            failAppConfigPageRegistration("group", "", F(ARD_LANG_NATIVE_OUT_OF_MEMORY_COPYING_PAGE_METADATA));
+            return;
+          }
+          _dynamic.groupCatalog = std::move(encoded);
+          ++_dynamic.groupCount;
+          finishAppConfigPageRegistration(true);
+          return;
+        }
+        if (_dynamic.pages.length() >= ArdAppConfigMaxPages) {
+#if ARDPORTAL_APP_CONFIG_MAX_PAGES == 16
+          failAppConfigPageRegistration("limits", "", F(ARD_LANG_NATIVE_PAGE_LIMIT_16));
+#else
+          failed("limits", "", String(F(ARD_LANG_NATIVE_PAGE_LIMIT)) + String(ArdAppConfigMaxPages));
+#endif
+          return;
+        }
+        if (!work.scanner.fieldsSeen || !work.scanner.fieldCount) {
+          failAppConfigPageRegistration("page", "", F(ARD_LANG_NATIVE_FIELDS_MUST_BE_A_NONEMPTY_ARRAY));
+          return;
+        }
+#endif
         for (size_t i = 0; i < _dynamic.pages.length(); ++i)
           if (_dynamic.pages.id(i) == header["id"].asString()) {
             failAppConfigPageRegistration("page", "", F(ARD_LANG_NATIVE_DUPLICATE_PAGE_ID));
@@ -193,14 +268,22 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
         }
         work.entry->id = header["id"].asString();
         work.entry->sourceLength = work.length;
+        work.entry->visible = !header.hasOwnProperty("visible") || header["visible"].asBool();
+        bool copied = work.entry->id == header["id"].asString();
+#if ARDPORTAL_ENABLE_DEPENDENCIES
         if (header.hasOwnProperty("visibleWhen")) work.entry->condition = _json.stringify(header["visibleWhen"]);
-        if (work.entry->id != header["id"].asString() || (header.hasOwnProperty("visibleWhen") && !work.entry->condition.length())) {
+        copied = copied && (!header.hasOwnProperty("visibleWhen") || work.entry->condition.length());
+#endif
+        if (!copied) {
           failAppConfigPageRegistration("registry", "", F(ARD_LANG_NATIVE_OUT_OF_MEMORY_COPYING_PAGE_METADATA));
           return;
         }
         V menu = V::object();
-        for (const char* key : { "id", "name", "names", "order", "visibleWhen" })
+        for (const char* key : { "id", "name", "names", "order", "visibleWhen", "visible" })
           if (header.hasOwnProperty(key)) menu[key] = header[key];
+#if ARDPORTAL_ENABLE_GROUPS
+        if (header.hasOwnProperty("group")) menu["group"] = header["group"];
+#endif
         if (!header.hasOwnProperty("order")) menu["order"] = int(_dynamic.pages.length());
         ArdJSON::Limits limits;
         limits.maxNodes = 4096;
@@ -345,6 +428,10 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
       work.checksMask |= ArdAppConfigFieldMask::forField(index);
     }
     if (value.hasOwnProperty("visibleWhen")) work.checksMask |= ArdAppConfigFieldMask::forField(index);
+#if ARDPORTAL_ENABLE_VISIBILITY
+    meta.visible = !value.hasOwnProperty("visible") || value["visible"].asBool();
+    if (!meta.visible || !work.entry->visible) work.dependencyMask |= ArdAppConfigFieldMask::forField(meta.index);
+#endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     meta.dependent = value.hasOwnProperty("visibleWhen") || work.header.hasOwnProperty("visibleWhen");
     if (meta.dependent) {

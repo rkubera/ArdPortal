@@ -282,6 +282,10 @@ Result step(Stack& stack, size_t& depth, ArdAppConfigFieldMask& active,
   }
   const V field = load(frame.index);
   if (!field.isValid() || field.isUndefined()) return Result::Invalid;
+  if ((field.hasOwnProperty("visible") && !field["visible"].asBool()) || (field.hasOwnProperty("_pageVisible") && !field["_pageVisible"].asBool())) {
+    frame.edge = 3;
+    return Result::Running;
+  }
   const V& rule = field[frame.edge ? "visibleWhen" : "_pageVisibleWhen"];
   size_t ordinal = frame.cursor;
   const V* reference = leaf(rule, ordinal);

@@ -37,19 +37,20 @@ public:
       ARDPORTAL_NO_THROW_ALLOCATION uint32_t offset = 0;
       uint16_t length = 0, index = 0, idOffset = 0;
       bool extended : 1, persist : 1, transient : 1;
-      uint8_t sourceNodes = 0;
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
       bool dependent : 1;
+      bool visible : 1;
 #endif
+      uint8_t sourceNodes = 0;
       /**
        * @brief Initialize this instance and its owned state.
        * @return No value.
        */
       Field()
         : extended(false), persist(false), transient(false)
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
           ,
-          dependent(false)
+          dependent(false), visible(true)
 #endif
       {
       }
@@ -59,13 +60,22 @@ public:
 #if ARDPORTAL_ENABLE_DEPENDENCIES
       ArdDependencies::Edges edges;
 #endif
-      String id, source, menu, headerPrefix, ids, condition;
+      String id, source, menu, headerPrefix, ids;
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+      String condition;
+#endif
       const __FlashStringHelper* flash = nullptr;
       std::unique_ptr<Field[]> fields;
-      size_t count = 0, jsonLength = 0, sourceLength = 0;
+      // A page shares the global limit of 1024 fields. Keep visibility in spare count bits.
+      static_assert(ArdAppConfigMaxFields < (1U << 11), "Page field count must fit its compact index");
+      uint16_t count : 11;
+      uint16_t visible : 1;
+      size_t jsonLength = 0, sourceLength = 0;
+      Entry()
+        : count(0), visible(true) {}
     };
   private:
-    std::unique_ptr<Entry> entries[16];
+    std::unique_ptr<Entry> entries[ArdAppConfigMaxPages];
     size_t size = 0;
   public:
     ArdJsonCodec codec;
@@ -127,7 +137,7 @@ public:
     const char* fieldId(size_t p, size_t f) const {
       return entries[p]->ids.c_str() + entries[p]->fields[f].idOffset;
     }
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
     /**
      * @brief Mark or test a field in the dependency mask.
      * @param p Source or destination byte pointer.
@@ -135,7 +145,7 @@ public:
      * @return True on success; false if validation, resource allocation or the operation fails.
      */
     bool dependent(size_t p, size_t f) const {
-      return entries[p]->fields[f].dependent;
+      return entries[p]->fields[f].dependent || !fieldVisible(p, f);
     }
 #endif
     /**
@@ -216,6 +226,7 @@ public:
           }
       return false;
     }
+#if ARDPORTAL_ENABLE_DEPENDENCIES
     /** @brief Parse only visibility rules for an HTTP condition response. */
     V fieldConditions(size_t p, size_t f) const {
       const auto& e = *entries[p];
@@ -228,9 +239,14 @@ public:
             if (key == "visibleWhen") result[key] = codec.parse(slices.slice(start, bytes));
             return result.isValid();
           })) return V();
+#if ARDPORTAL_ENABLE_VISIBILITY
+      if (!meta.visible) result["visible"] = false;
+      if (!e.visible) result["_pageVisible"] = false;
+#endif
       if (e.condition.length()) result["_pageVisibleWhen"] = codec.parse(e.condition);
       return result.isValid() ? result : V();
     }
+#endif
     /** @brief Stream a basic definition from its immutable, validated source. */
     String fieldHttpText(size_t p, size_t f) const {
       const Entry& entry = *entries[p];
@@ -269,6 +285,15 @@ public:
 #endif
       return result;
     }
+    /** @brief Largest source/output allocation for streaming; no full field DOM. */
+    size_t fieldHttpBlock(size_t index) const {
+      for (size_t p = 0; p < size; ++p) {
+        const auto& e = *entries[p];
+        if (e.count && index >= e.fields[0].index && index - e.fields[0].index < e.count)
+          return ArdHeap::fieldBlock(e.fields[index - e.fields[0].index].length);
+      }
+      return 1024;
+    }
     /** @brief Aggregate source/output buffers for definition streaming, without DOM nodes. */
     size_t fieldHttpWork(size_t index) const {
       for (size_t p = 0; p < size; ++p) {
@@ -295,7 +320,13 @@ public:
         value["extended"] = true;
         if (!value.hasOwnProperty("persist")) value["persist"] = entry.fields[f].persist;
       }
+#if ARDPORTAL_ENABLE_VISIBILITY
+      if (value.hasOwnProperty("visible") || !entry.fields[f].visible) value["visible"] = entry.fields[f].visible;
+      if (!entry.visible) value["_pageVisible"] = false;
+#endif
+#if ARDPORTAL_ENABLE_DEPENDENCIES
       if (entry.condition.length()) value["_pageVisibleWhen"] = codec.parse(entry.condition);
+#endif
       return value;
     }
     /**
@@ -374,9 +405,55 @@ public:
      * @param index Zero-based element or field index.
      * @return Reference to the requested stored value or component.
      */
+    bool fieldVisible(size_t p, size_t f) const {
+#if ARDPORTAL_ENABLE_VISIBILITY
+      return entries[p]->visible && entries[p]->fields[f].visible;
+#else
+      (void)p;
+      (void)f;
+      return true;
+#endif
+    }
+#if ARDPORTAL_ENABLE_DEPENDENCIES
+    bool hasDependencies(size_t p) const {
+      for (size_t f = 0; f < fields(p); ++f)
+        if (entries[p]->fields[f].dependent) return true;
+      return false;
+    }
+#endif
+    bool pageVisible(size_t index) const {
+      return entries[index]->visible;
+    }
+    bool setPageVisible(const String& id, bool visible, bool& changed) {
+      for (size_t p = 0; p < size; ++p)
+        if (entries[p]->id == id) {
+          changed = entries[p]->visible != visible;
+          entries[p]->visible = visible;
+          return true;
+        }
+      return false;
+    }
+    bool setFieldVisible(const String& id, bool visible, bool& changed) {
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
+      for (size_t p = 0; p < size; ++p)
+        for (size_t f = 0; f < fields(p); ++f)
+          if (id == fieldId(p, f)) {
+            changed = entries[p]->fields[f].visible != visible;
+            entries[p]->fields[f].visible = visible;
+            return true;
+          }
+#else
+      (void)id;
+      (void)visible;
+      (void)changed;
+#endif
+      return false;
+    }
+#if ARDPORTAL_ENABLE_DEPENDENCIES
     V pageCondition(size_t index) const {
       return entries[index]->condition.length() ? codec.parse(entries[index]->condition) : V();
     }
+#endif
     /**
      * @brief Measure the serialized page navigation catalog length.
      * @return The serialized page navigation catalog length.
@@ -412,6 +489,11 @@ public:
     }
   };
   PageStore pages;
+#if ARDPORTAL_ENABLE_GROUPS
+  // Bounded metadata only; groups do not consume page or field slots.
+  String groupCatalog = "[]";
+  size_t groupCount = 0;
+#endif
   /**
    * @brief Validate a page or field identifier against its length and character rules.
    * @param id Page, field or language identifier.
@@ -493,7 +575,7 @@ public:
     String id, source;
     const __FlashStringHelper* flash = nullptr;
     uint16_t index = 0;
-    bool extended = false, persist = false, transient = false, dependent = false;
+    bool extended = false, persist = false, transient = false, dependent = false, visible = true;
     std::unique_ptr<Entity> next;
   };
 #if ARDPORTAL_ENABLE_DEPENDENCIES
@@ -566,6 +648,9 @@ public:
       value["extended"] = true;
       if (!value.hasOwnProperty("persist")) value["persist"] = entity.persist;
     }
+#if ARDPORTAL_ENABLE_VISIBILITY
+    if (value.hasOwnProperty("visible") || !entity.visible) value["visible"] = entity.visible;
+#endif
     return value;
   }
   /**
@@ -624,17 +709,27 @@ public:
       if (e->index == index) return entityValue(*e);
     return V();
   }
+#endif
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
   /**
    * @brief Read the dependent field at the requested index.
    * @param index Zero-based element or field index.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
+  bool fieldVisibleAt(size_t index) const {
+    for (size_t p = 0; p < pages.length(); ++p)
+      for (size_t f = 0; f < pages.fields(p); ++f)
+        if (pages.fieldIndex(p, f) == index) return pages.fieldVisible(p, f);
+    for (const Entity* e = entities.get(); e; e = e->next.get())
+      if (e->index == index) return e->visible;
+    return false;
+  }
   bool dependentAt(size_t index) const {
     for (size_t p = 0; p < pages.length(); ++p)
       for (size_t f = 0; f < pages.fields(p); ++f)
         if (pages.fieldIndex(p, f) == index) return pages.dependent(p, f);
     for (const Entity* e = entities.get(); e; e = e->next.get())
-      if (e->index == index) return e->dependent;
+      if (e->index == index) return e->dependent || !e->visible;
     return false;
   }
 #endif
@@ -841,9 +936,19 @@ public:
           }
         }
 #endif
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
+    if (f.hasOwnProperty("visible") && f["visible"].type() != T::Boolean) return fail("field", id, "visible must be a boolean");
+#if !ARDPORTAL_ENABLE_VISIBILITY
+    if (f.hasOwnProperty("visible")) return fail("field", id, "visibility is disabled");
+#endif
+#if !ARDPORTAL_ENABLE_DEPENDENCIES
+    if (f.hasOwnProperty("visibleWhen")) return fail("field", id, ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED);
+#endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     if (checkDependencies && f.hasOwnProperty("visibleWhen") && !validCondition(f["visibleWhen"], fields)) return fail("field", id, ARD_LANG_NATIVE_INVALID_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD);
+#endif
 #else
+    if (f.hasOwnProperty("visible")) return fail("field", id, "visibility is disabled");
     // Reject unsupported dependencies rather than exposing conditional fields.
     if (f.hasOwnProperty("visibleWhen")) return fail("field", id, ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED);
 #endif
@@ -864,6 +969,9 @@ public:
     if (page["fields"].type() != T::Array || !page["fields"].length()) return fail("page", "", ARD_LANG_NATIVE_FIELDS_MUST_BE_A_NONEMPTY_ARRAY);
     if (count() + page["fields"].length() > ArdAppConfigMaxFields) return fail("limits", "", ARD_LANG_NATIVE_FIELD_LIMIT_1024);
     const V& fields = page["fields"];
+#if !ARDPORTAL_ENABLE_DEPENDENCIES
+    if (page.hasOwnProperty("visibleWhen")) return fail("page", "", ARD_LANG_NATIVE_DEPENDENCIES_ARE_DISABLED);
+#endif
 #if ARDPORTAL_ENABLE_DEPENDENCIES
     if (page.hasOwnProperty("visibleWhen") && !validCondition(page["visibleWhen"], fields)) return fail("page", "", ARD_LANG_NATIVE_INVALID_VISIBLEWHEN_CONDITION_OR_REFERENCED_FIELD);
 #else
@@ -902,6 +1010,7 @@ public:
       entry->persist = fields[0]["persist"].asBool();
       entry->transient = ArdControl::transient(fields[0]);
       entry->dependent = fields[0].hasOwnProperty("visibleWhen");
+      entry->visible = !fields[0].hasOwnProperty("visible") || fields[0]["visible"].asBool();
 #if ARDPORTAL_ENABLE_DEPENDENCIES
       auto resolve = [&](const String& id) {
         return indexOf(id);

@@ -14,7 +14,7 @@ const fields=[{id:'mode'},{id:'enabled'},{id:'object'},
 const binding=field=>({field,container:{hidden:true},node:{disabled:true},write(value){this.lastWritten=value},enabled:true,read(){return 'manual'}});
 const bindings=fields.map(binding),page={id:'a',fields};let sends=0,resolveRead;
 const ctx=vm.createContext({appSnapshotPage:'a',activeDynamicId:'a',appSnapshotRevision:0,dynamicDefinitions:[page],dynamicBindings:bindings,dynamicQueue:new Map(),dynamicActionId:0,
- flushDynamic(){++sends;return Promise.resolve()},request:async()=>({json:()=>new Promise(resolve=>resolveRead=resolve)}),appError:'',notice:{textContent:''},showNotice(){},t:x=>x,localized:()=>'',document:{querySelector(){return {hidden:false}}}});
+ flushDynamic(){++sends;return Promise.resolve()},updateGroupMenu(){},request:async path=>({json:()=>path==='/api/page-conditions'?{}:new Promise(resolve=>resolveRead=resolve)}),appError:'',notice:{textContent:''},showNotice(){},t:x=>x,localized:()=>'',document:{querySelector(){return {hidden:false}}}});
 vm.runInContext(source.slice(start,end),ctx);
 const run=text=>vm.runInContext(text,ctx);
 run('appPreviewValues={mode:"auto",enabled:false,object:{level:2},manual:"yes",cycle:true};previewDynamicVisibility()');
@@ -26,6 +26,9 @@ assert.equal(sends,1);assert.equal(bindings[3].container.hidden,false);assert.eq
 assert.equal(bindings[8].container.hidden,true);assert.equal(bindings[9].container.hidden,true);
 run('appPreviewValues.object={level:"2"};previewDynamicVisibility()');assert.equal(bindings[5].container.hidden,true);
 page.visibleWhen=leaf('enabled',true);run('previewDynamicVisibility()');assert.equal(bindings[3].container.hidden,true);delete page.visibleWhen;
+// Runtime visibility wins over local previews, including upstream controllers.
+fields[0]._runtimeVisible=false;run('previewDynamicVisibility()');assert.equal(bindings[3].container.hidden,true);assert.equal(bindings[4].container.hidden,true);
+fields[0]._runtimeVisible=true;run('previewDynamicVisibility()');assert.equal(bindings[3].container.hidden,false);
 // A hidden group is shown if at least one member becomes visible.
 const group={hidden:true};bindings[3].group=group;bindings[5].group=group;run('previewDynamicVisibility()');assert.equal(group.hidden,false);
 // A snapshot for another page must never preview this page.

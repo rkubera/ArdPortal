@@ -518,6 +518,11 @@ public:
    */
 #endif
   bool setAppConfigStateValue(const char* key, const ArdJSON::JSONVar& value, bool publishMqtt = true);
+#if ARDPORTAL_ENABLE_VISIBILITY
+  /** @brief Set runtime visibility; returns false for an unknown identifier. */
+  bool setFieldVisible(const char* id, bool visible);
+  bool setPageVisible(const char* id, bool visible);
+#endif
   /**
    * @brief Mark an application field for MQTT state publication.
    * @param key Configuration key or JSON object member name.

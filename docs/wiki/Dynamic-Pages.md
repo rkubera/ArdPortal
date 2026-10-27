@@ -8,6 +8,20 @@ Register JSON page definitions with `startAppConfigPageRegistration(definition)`
 
 Use static `PROGMEM` definitions with `FPSTR()` to keep page source text in flash. The portal loads the active page and automatically adds newly registered pages to its navigation. Application values use the integrated configuration storage.
 
+The page limit defaults to **16**. Override it before including the library:
+
+```cpp
+#define ARDPORTAL_APP_CONFIG_MAX_PAGES 32
+#include <ArdPortal.h>
+```
+
+Use the same value in every translation unit that includes ArdPortal. Supported
+values are integers from 1 to 1024; the shared limit of 1024 fields/entities and
+available RAM still apply. On ESP8266/ESP32 the registry reserves four bytes per
+page slot, so increasing 16 to 32 reserves 64 additional bytes of static RAM.
+Page definitions and field indexes allocate additional memory when registered.
+The independent group limit remains 16.
+
 The shared page/entity definition budget defaults to 256 KiB and can be overridden
 in bytes before
 including the library:
@@ -170,6 +184,8 @@ The same sketch is available as
 | `name` | Recommended default title | Required unless a nonempty `names` object supplies titles. `Home`/`home` places the form on Start. |
 | `names` | Optional | Language-code-to-title object, e.g. `{"en":"Settings","de":"Einstellungen"}`. No separate `default` language key is needed; use `name`. |
 | `order` | Optional integer | Position among dynamic links; defaults to the zero-based registration position. Equal values preserve registration order. Does not reorder built-in pages. |
+| `group` | Optional string | Navigation group ID; requires `ARDPORTAL_ENABLE_GROUPS=1`. See [Navigation groups](#navigation-groups-optional). |
+| `visible` | Optional boolean, default `true` | Initial page visibility; change it at runtime with `setPageVisible(pageId, visible)`. Requires `ARDPORTAL_ENABLE_VISIBILITY=1`. |
 | `fields` | Required nonempty array | Field definitions; field IDs are globally unique, not page-local. |
 | `visibleWhen` | Optional | A dependency rule applying to the menu link, content, all fields and HA entities. See [Dependent fields and pages](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields). |
 
@@ -178,6 +194,7 @@ The same sketch is available as
 | `id`, `type`, `name`, `names` | All fields | Identifier, enabled control type, default/localized title. Titles follow the page rules. |
 | `default` | All fields | Initial JSON value; must satisfy type/range/schema rules. Missing values use the control's default, not automatically an empty string for every type. |
 | `persist` | Basic and descriptor-based fields | `false` keeps Portal/MQTT/API setting changes in RAM; state setters are always RAM-only. Omission uses the field preset/default policy. |
+| `visible` | All fields | Optional boolean, default `true`; change it with `setFieldVisible(fieldId, visible)`. Page visibility and dependency conditions still apply. |
 | `visibleWhen` | All fields | A field's own condition, combined with its page condition and upstream visibility. See [Dependent fields and pages](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields). |
 | `icon` | HA entities | Optional `mdi:...` override (5–80 bytes); omitted uses the switch preset icon or HA defaults for other types. |
 | `ha` | HA entities | Discovery overrides; identity/name/device/availability remain managed by the library. Ignored by HA when HA is disabled. |
@@ -258,7 +275,7 @@ IDs contain 1–48 ASCII letters, digits, underscores or hyphens. Field IDs must
 unique across all pages; they are application keys and MQTT command names.
 `availability` and `status` are reserved; climate command suffixes must not collide
 with other field IDs. The completion callback reports `false` for invalid definitions, duplicate IDs,
-unsupported controls or resource limits. Only immediate rejection returns `false` from `startAppConfigPageRegistration()`. Limits: 16 pages, 1024 fields in total across all pages,
+unsupported controls or resource limits. Only immediate rejection returns `false` from `startAppConfigPageRegistration()`. Limits: 16 pages by default (`ARDPORTAL_APP_CONFIG_MAX_PAGES`), 1024 fields in total across all pages,
 256 KiB of total definitions by default (configurable; no separate 32 KiB page limit), 80-byte labels, 16 select options, 128-byte editable
 text values (512 bytes for read-only text),
 and the 8 KiB application configuration payload. The 1024-field limit
@@ -363,6 +380,113 @@ For conditional pages and fields, see [Dependent fields](https://github.com/rkub
 For field values and composite schemas, see [Controls](https://github.com/rkubera/ArdPortal/wiki/Controls).
 
 ![Example dynamic sensor settings page](https://raw.githubusercontent.com/wiki/rkubera/ArdPortal/assets/Demo8.png)
+
+
+### Navigation groups (optional)
+
+Enable groups before including the library (use the same flags in every translation unit):
+
+```cpp
+#define ARDPORTAL_ENABLE_GROUPS 1
+#include <ArdPortal.h>
+```
+
+Register an independent group through `startAppConfigPageRegistration()` and wait
+for its completion callback before registering the next definition:
+
+```json
+{
+  "group": {
+    "id": "settings",
+    "name": "Ustawienia",
+    "names": { "en": "Settings", "pl": "Ustawienia" },
+    "order": 10
+  }
+}
+```
+
+Register each member page as a separate definition, using the group's ID:
+
+```json
+{
+  "id": "network_settings",
+  "name": "Network",
+  "group": "settings",
+  "order": 10,
+  "fields": [
+    {"id": "network_note", "type": "edit", "name": "Note"}
+  ]
+}
+```
+
+Here `settings` is the group ID and `network_settings` is the page ID.
+Navigation groups are separate from the scene field's `group` object: a page
+uses a string group ID, while a scene uses an object to group scene buttons.
+A grouped page named `Home` remains a group tab; it is not embedded on Start.
+
+The main menu displays the group instead of its member
+pages. Clicking it opens the first visible page. Member pages have individual
+URLs (`/p/<page-id>`) and appear as tabs. Group and page `order` values are
+optional integers; omitted values use registration positions, and equal values
+retain registration order. Groups without visible members are hidden.
+
+Groups may be registered before or after their pages. A page referencing a group
+that has not been registered is accessible by URL but absent from navigation.
+Group identifiers must be unique among groups. Group definitions contain only
+the root `group` object, without `fields`.
+
+The flag defaults to `0`: group registration is rejected and page `group`
+metadata is ignored, preserving ordinary navigation. Group code and metadata
+storage are compiled out. When enabled, the registry stores only compact metadata,
+with at most 16 groups and 16 KiB of serialized group metadata, independently of
+the page and field limits. Group source JSON is released after registration.
+
+## Programmatic visibility
+
+`ARDPORTAL_ENABLE_VISIBILITY` defaults to `1` and works independently of
+`ARDPORTAL_ENABLE_DEPENDENCIES`. Pages and fields accept an optional boolean
+`"visible"` property, defaulting to `true` when omitted. Use JSON booleans
+`true` / `false`, not strings or numbers:
+
+```json
+{
+  "id": "advanced_settings",
+  "name": "Advanced",
+  "group": "settings",
+  "visible": false,
+  "fields": [
+    {"id": "advanced_option", "type": "edit", "name": "Option", "visible": true}
+  ]
+}
+```
+
+After successful registration, show this page or hide its field:
+
+```cpp
+portal.setFieldVisible("advanced_option", false);
+portal.setPageVisible("advanced_settings", true);
+```
+
+Call these after the page/field registration succeeds, from setup, loop or a
+callback. They return `false` for a null/unknown identifier. Changes are held in
+RAM; restarting restores the visibility declared in the registered JSON.
+Setting an existing ID to its current visibility also returns `true`.
+`setPageVisible()` takes a **page ID**, not a group ID. Groups have no separate
+visibility setter or supported `visible` / `visibleWhen` configuration: their
+menu link disappears when all member pages are hidden, and reappears when a
+member becomes visible. The group link points to the first visible member;
+hidden members are also hidden in the tab bar.
+
+Changes notify connected portal clients without a reload or restart. A control
+is visible only when its own and its page's `visible` flags and any `visibleWhen`
+rules all permit it. Hiding a controller also makes dependent references to it
+false. Local edit previews cannot override programmatic hiding. Hidden fields
+retain their values. HA discovery follows visibility, as with dependencies;
+Zigbee and Matter endpoints remain registered.
+
+Define `ARDPORTAL_ENABLE_VISIBILITY 0` before including `ArdPortal.h` to remove
+the setters; definitions containing `visible` are then rejected. Dynamic pages
+disabled also forces this feature off.
 
 ---
 

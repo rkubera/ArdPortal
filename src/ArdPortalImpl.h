@@ -1352,6 +1352,9 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     appendJsonBool(out, F(",\"filesystemMounted\":"), _storageMounted);
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
     appendJsonNumber(out, F(",\"appConfigPageCount\":"), _dynamic.pages.length());
+#if ARDPORTAL_ENABLE_GROUPS
+    appendJsonNumber(out, F(",\"appConfigGroupCount\":"), _dynamic.groupCount);
+#endif
 #endif
 #if ARDPORTAL_ENABLE_ZIGBEE
     out += F(",\"zigbee\":true");

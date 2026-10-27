@@ -2,6 +2,21 @@
 
 [Documentation home](https://github.com/rkubera/ArdPortal/wiki/Home) · [All topics](https://github.com/rkubera/ArdPortal/wiki/Home#start-here) · [Source](https://github.com/rkubera/ArdPortal)
 
+## `visible` and `visibleWhen`
+
+`visible` is a boolean initial flag changed at runtime with `setFieldVisible()`
+or `setPageVisible()`. It requires `ARDPORTAL_ENABLE_VISIBILITY` (default `1`).
+`visibleWhen` is a condition based on registered field values and requires
+`ARDPORTAL_ENABLE_DEPENDENCIES`. Both can be used together: the field flag,
+page flag and dependency rules must all allow visibility. A runtime `true` flag
+cannot override a false condition. Hiding a referenced field also makes a
+condition referring to it false, even if its stored value still matches.
+
+Navigation groups automatically hide when no member page is visible. Apply
+visibility to member pages, not to the group definition.
+See [Programmatic visibility](https://github.com/rkubera/ArdPortal/wiki/Dynamic-Pages#programmatic-visibility)
+and [Defines](https://github.com/rkubera/ArdPortal/wiki/Defines#programmatic-visibility).
+
 ## One field definition, multiple conditions
 
 Each field ID is globally unique. Define D once and put its visibility expression

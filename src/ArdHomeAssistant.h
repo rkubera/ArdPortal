@@ -51,7 +51,7 @@ private:
   uint16_t _haDiscovery = 0;
   bool _haOnline = false;
   uint8_t _serviceStage = 0;
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
   ArdAppConfigFieldMask _dependencyMask = 0, _dependencyDirty = 0, _dependencyKnown = 0, _dependencyVisible = 0, _dependencyDiscovery = 0;
 #endif
   /**
@@ -79,19 +79,24 @@ private:
    * @return True if a work unit was performed; false if there is no eligible work.
    */
   bool serviceOne(uint32_t now);
-#if ARDPORTAL_ENABLE_DEPENDENCIES
+#if ARDPORTAL_ENABLE_DEPENDENCIES || ARDPORTAL_ENABLE_VISIBILITY
   /**
    * @brief Invalidate only direct and transitive dependents of a changed controller.
    * @param key Changed application field ID.
    * @return No value; unrelated telemetry does not disturb traversal.
    */
+#if ARDPORTAL_ENABLE_DEPENDENCIES
   void dependencyChanged(const String& key);
+#endif
+  size_t _walkIndex = 0;
+#if ARDPORTAL_ENABLE_DEPENDENCIES
   uint32_t _dependencyRetryAt = 0;
   bool _dependencyRetryPending = false;
   using DependencyFrame = ArdDependencies::Frame;
   ArdDependencies::Stack _walk;
-  size_t _walkDepth = 0, _walkIndex = 0;
+  size_t _walkDepth = 0;
   ArdAppConfigFieldMask _walkActive = 0, _walkComplete = 0, _walkVisible = 0;
+#endif
   /**
    * @brief Advance dependency-driven visibility and state changes.
    * @return True on success; false if validation, resource allocation or the operation fails.

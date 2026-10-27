@@ -20,7 +20,7 @@ GROUPS={
 # @param features Feature selections used to evaluate the asset guard.
 # @return True if the feature expression is enabled for the chosen controls.
 def condition_enabled(condition, controls=None, features=None):
- values={'ARDPORTAL_ENABLE_ZIGBEE':0,'ARDPORTAL_ENABLE_MATTER':0,'ARDPORTAL_ENABLE_MATTER_CONSOLE':0,'ARDPORTAL_ENABLE_DEPENDENCIES':1,'ARDPORTAL_ENABLE_DYNAMIC_PAGES':1}
+ values={'ARDPORTAL_ENABLE_GROUPS':0,'ARDPORTAL_ENABLE_ZIGBEE':0,'ARDPORTAL_ENABLE_MATTER':0,'ARDPORTAL_ENABLE_MATTER_CONSOLE':0,'ARDPORTAL_ENABLE_VISIBILITY':1,'ARDPORTAL_ENABLE_DEPENDENCIES':1,'ARDPORTAL_ENABLE_DYNAMIC_PAGES':1}
  values.update({PREFIX+c.upper():int(controls is None or c in controls) for c in CONTROLS})
  values.update({'ARDPORTAL_CONTROL_SUPPORT_'+g:int(any(values[PREFIX+c.upper()] for c in cs)) for g,cs in GROUPS.items()})
  if features:values.update({'ARDPORTAL_ENABLE_'+k:int(v) for k,v in features.items()})
@@ -115,6 +115,14 @@ def emit_chunks(name,parts,gzip_array):
 # @param gzip_array Asset encoder.
 # @return Conditional C++ asset declarations.
 def emit_selected(name,source,controls,features,gzip_array):
+    # Whole-stream compression keeps the disabled profile as small as before;
+    # groups add no split DEFLATE blocks or metadata when compiled out.
+    if 'ARDPORTAL_ENABLE_GROUPS' in source and 'GROUPS' not in features and features.get('DYNAMIC_PAGES',1):
+        return (['#if ARDPORTAL_ENABLE_GROUPS'] +
+                emit_selected(name,source,controls,{**features,'GROUPS':1},gzip_array) +
+                ['#else'] +
+                emit_selected(name,source,controls,{**features,'GROUPS':0},gzip_array) +
+                ['#endif'])
     native=[key for key in ['ZIGBEE','MATTER'] if 'ARDPORTAL_ENABLE_'+key in source]
     if not native:
         return emit_chunks(name,[('1',selected(source,controls,features))],gzip_array)
@@ -134,18 +142,22 @@ def emit_selected(name,source,controls,features,gzip_array):
 
 def emit_profile_chunks(name, source, gzip_array):
     lines=['#if !ARDPORTAL_ENABLE_DYNAMIC_PAGES']
-    lines += emit_selected(name,source,[],{'DYNAMIC_PAGES':0,'DEPENDENCIES':0},gzip_array)
+    lines += emit_selected(name,source,[],{'DYNAMIC_PAGES':0,'DEPENDENCIES':0,'VISIBILITY':0},gzip_array)
     lines += ['#elif ARDPORTAL_CONTROL_PROFILE_FULL']
     lines += ['#if ARDPORTAL_ENABLE_DEPENDENCIES']
     lines += emit_selected(name,source,None,{},gzip_array)
-    lines += ['#else']
+    lines += ['#elif ARDPORTAL_ENABLE_VISIBILITY']
     lines += emit_selected(name,source,None,{'DEPENDENCIES':0},gzip_array)
+    lines += ['#else']
+    lines += emit_selected(name,source,None,{'DEPENDENCIES':0,'VISIBILITY':0},gzip_array)
     lines += ['#endif']
     lines += ['#elif ARDPORTAL_CONTROL_PROFILE_BASIC']
     lines += ['#if ARDPORTAL_ENABLE_DEPENDENCIES']
     lines += emit_selected(name,source,['slider','text','select','edit'],{},gzip_array)
-    lines += ['#else']
+    lines += ['#elif ARDPORTAL_ENABLE_VISIBILITY']
     lines += emit_selected(name,source,['slider','text','select','edit'],{'DEPENDENCIES':0},gzip_array)
+    lines += ['#else']
+    lines += emit_selected(name,source,['slider','text','select','edit'],{'DEPENDENCIES':0,'VISIBILITY':0},gzip_array)
     lines += ['#endif']
     lines += ['#else']
     if 'function appendConsoleLine(' in source:

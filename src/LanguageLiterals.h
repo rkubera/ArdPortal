@@ -232,6 +232,7 @@
 #define ARD_LANG_NATIVE_OUTPUT_LIMIT "output limit"
 #define ARD_LANG_NATIVE_PACKET_REJECTED "packet rejected"
 #define ARD_LANG_NATIVE_PACKET_TOO_LARGE "packet too large"
+#define ARD_LANG_NATIVE_PAGE_LIMIT "page limit: "
 #define ARD_LANG_NATIVE_PAGE_LIMIT_16 "page limit: 16"
 #define ARD_LANG_NATIVE_PAGE_MUST_BE_AN_OBJECT "page must be an object"
 #define ARD_LANG_NATIVE_RECEIVE_BUFFER_FULL "receive buffer full"

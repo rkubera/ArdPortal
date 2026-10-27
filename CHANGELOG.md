@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Keep conditional controls and empty scene groups hidden until the first visibility snapshot, avoiding an expanded-form flash on large dynamic pages.
+
+- Reduce programmatic visibility RAM/flash costs: pack field/page flags, exclude dependency graph state and browser previews when dependencies are disabled, and evaluate plain visibility from metadata without parsing field JSON.
+
+- Add independent `ARDPORTAL_ENABLE_VISIBILITY` (default `1`), optional field/page `visible` (default `true`) and runtime `setFieldVisible()` / `setPageVisible()`, combined with existing visibility rules.
+
+- Add `ARDPORTAL_APP_CONFIG_MAX_PAGES` (default `16`, range 1–1024), including unique browser page IDs beyond 16 pages and build-time protection against inconsistent limits across translation units.
+
+- Add opt-in `ARDPORTAL_ENABLE_GROUPS` (default `0`): independent multilingual JSON groups with ordered page tabs and conditional visibility; exclude group code and storage when disabled.
+
 ## 0.9.0 — 2026-10-26
 
 ### Added

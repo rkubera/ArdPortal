@@ -186,6 +186,8 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | `portalAndAppConfigStorageOK()` / `portalAndAppConfigError()` | Last portal storage result/error, not a standalone filesystem handle. |
 | `startAppConfigPageRegistration(String)` / `startAppConfigPageRegistration(FPSTR(...))` | Queue registration: small pages (≤2048 bytes/8 fields) finish in one loop pass, larger pages cooperatively. `true` means accepted pending work; use state/progress and `onAppConfigPageRegistrationFinished(bool)`. |
 | `addAppConfigEntity(String)` / `addAppConfigEntity(FPSTR(...))` | Register one HA-only field using the same definition schema. It has no portal page/menu/control, and shares IDs, commands, state and the 1024-field/configurable definition budgets (256 KiB by default) with panel fields. Requires HA and dynamic AppConfig support; otherwise returns false. |
+| `setFieldVisible(id, visible)` | Set a registered control's RAM-only visibility; returns false for null/unknown ID. Available with `ARDPORTAL_ENABLE_VISIBILITY` (default `1`). |
+| `setPageVisible(id, visible)` | Set a registered page's RAM-only visibility using its page ID, not its navigation group ID. Groups follow member-page visibility automatically. Combined with field visibility and any `visibleWhen` rules. Same feature flag and return behavior. |
 | `setAppConfigStateValue(key, value, publishMqtt=true)` | RAM-only update of a registered nontransient field; validates type/state, triggers change callback and live portal revision when changed; optionally queues MQTT state. |
 | `queueAppConfigStatePublish(key)` | Queue the current registered nontransient field state even if unchanged. Works as a dirty flag while disconnected; returns false without MQTT/dynamic pages or for unknown/transient fields. |
 | `emitAppConfigEvent(key, value)` | Validate a registered event/device_trigger/tag payload and update its RAM state/revision. With MQTT enabled, requires a connection and free emission FIFO slot to queue a nonretained message; without MQTT it updates local event state only. |
@@ -294,7 +296,7 @@ but do not need a dynamic page. Pass a single field object, not a page containin
 `fields`. All supported controls use the same validation,
 MQTT topic namespace, callbacks, state setters and persistence rules as panel
 fields. Entity IDs must be unique across the entire application. HA-only entities
-have their own source registry, consume no slots from the 16 panel pages, and do
+have their own source registry, consume no slots from the configured panel-page limit, and do
 not appear in `/api/pages` or the portal menu. Their current values remain available
 through `getAppConfigValue()` and the complete `/api/app` values endpoint. The 1024-field and configurable source
 budgets cover both registries together. `ARDPORTAL_ENABLE_HA` and

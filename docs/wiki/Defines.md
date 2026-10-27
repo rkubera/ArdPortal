@@ -40,7 +40,9 @@ accept only `0` or `1`:
 | `ARDPORTAL_ENABLE_LOG_CALLBACK` | Defaults to `0`. Set `1` to enable `onLog()` for sketch-owned output independently of WWW. |
 | `ARDPORTAL_ENABLE_CONSOLE` | Removes Console while keeping MQTT and HA enabled. |
 | `ARDPORTAL_ENABLE_DYNAMIC_PAGES` | Removes dynamic forms, field renderers/validation and their HTTP/MQTT handling; forces all control flags, HA and dependencies off. |
-| `ARDPORTAL_ENABLE_DEPENDENCIES` | Removes `visibleWhen` evaluation, conditional portal visibility and HA discovery removal/recreation. |
+| `ARDPORTAL_ENABLE_DEPENDENCIES` | Removes `visibleWhen` rules. Programmatic visibility remains independently available. |
+| `ARDPORTAL_ENABLE_GROUPS` | Defaults to `0`. Set `1` to enable independent navigation groups and member-page tabs. See [Navigation groups](#navigation-groups). |
+| `ARDPORTAL_ENABLE_VISIBILITY` | Defaults to `1`. Enables optional boolean `visible` on fields/pages and runtime `setFieldVisible()` / `setPageVisible()`. Independent of dependencies; disabled with dynamic pages. |
 
 To omit dynamic forms entirely, add `#define ARDPORTAL_ENABLE_DYNAMIC_PAGES 0`
 before `ArdPortal.h`. It defaults to `1`. `startAppConfigPageRegistration()`, `setAppConfigStateValue()`
@@ -441,3 +443,79 @@ WebSockets; native Zigbee keeps only its bounded SDK event/traffic queues.
 Disabling the callback removes its handler pointer and dispatch guard entirely.
 This API does not intercept arbitrary `Serial` or SDK ESP_LOG output.
 See `examples/UsbDiagnostics/UsbDiagnostics.ino`.
+
+### Navigation groups
+
+`ARDPORTAL_ENABLE_GROUPS` defaults to `0`. Set it to `1` to register independent
+JSON groups and display their pages as tabs.
+
+```cpp
+#define ARDPORTAL_ENABLE_GROUPS 1
+#include <ArdPortal.h>
+```
+
+Register a group with `{"group":{"id":"settings","name":"Settings"}}`
+through `startAppConfigPageRegistration()`, then register member pages with
+`"group":"settings"` alongside their page properties. Wait for each registration
+callback before starting the next job. Groups can also be registered after their
+pages. An unregistered group leaves its member pages accessible by URL but absent
+from navigation.
+
+The group replaces its member pages in the main menu and links to its first
+visible page; members appear as tabs with their own `/p/<page-id>` URLs. A group
+with no visible members is hidden. Group and page `order` values control their
+positions; equal values preserve registration order. Navigation groups do not
+change scene field grouping.
+
+With `0`, independent group registration is rejected and page `group` metadata
+is ignored, so pages use ordinary navigation. Group code and metadata storage
+are compiled out. With `1`, up to 16 groups share a 16 KiB serialized metadata
+limit, separately from page and field limits.
+
+See [Dynamic Pages](https://github.com/rkubera/ArdPortal/wiki/Dynamic-Pages#navigation-groups-optional)
+for complete JSON examples.
+
+### Programmatic visibility
+
+`ARDPORTAL_ENABLE_VISIBILITY` defaults to `1`. It enables the boolean `visible`
+property on pages and fields (omitted means `true`) and these runtime methods:
+
+```cpp
+portal.setPageVisible("advanced_settings", true);
+portal.setFieldVisible("advanced_option", false);
+```
+
+Call the methods after successful registration. They return `false` for a null
+or unknown ID and `true` for an existing ID, including when no change is needed.
+Changes are RAM-only; restart restores the JSON defaults. Connected portal
+clients update without a reload. Hidden fields keep their values.
+
+Visibility combines the field flag, its page flag and any `visibleWhen` rules:
+all must allow the field. Setting `visible=true` does not bypass a false
+condition. This feature is independent of `ARDPORTAL_ENABLE_DEPENDENCIES`;
+programmatic visibility works with dependencies disabled. HA discovery follows
+visibility; Zigbee and Matter endpoints remain registered.
+
+Set `ARDPORTAL_ENABLE_VISIBILITY=0` to compile out the setters and programmatic
+visibility handling. Registration then rejects an explicit `visible` property,
+even `visible:true`. Disabling dynamic pages forces visibility off as well.
+Groups have no visibility flag or setter; hide/show their member pages instead.
+
+Use identical feature flags in every translation unit. In PlatformIO, place
+project-wide definitions in `build_flags`, for example:
+
+```ini
+build_flags =
+    -DARDPORTAL_ENABLE_GROUPS=1
+    -DARDPORTAL_ENABLE_VISIBILITY=1
+```
+
+See [Dynamic Pages](https://github.com/rkubera/ArdPortal/wiki/Dynamic-Pages#programmatic-visibility)
+and [Dependent Fields](https://github.com/rkubera/ArdPortal/wiki/Dependent-Fields).
+
+### Page registration limit
+
+`ARDPORTAL_APP_CONFIG_MAX_PAGES` defaults to `16`. Set an integer from `1` to
+`1024` before including ArdPortal (use the same value in every translation unit).
+This configures page slots independently of the group limit and the shared
+1024-field/entity limit. See [Dynamic Pages](Dynamic-Pages.md).
