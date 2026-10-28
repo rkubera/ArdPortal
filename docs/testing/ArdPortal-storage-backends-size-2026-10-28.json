@@ -1,0 +1,138 @@
+{
+  "date": "2026-10-28",
+  "example": "DynamicPages",
+  "measurement": "Clean Arduino CLI application .bin files; same sketch except sketch-local ARDPORTAL_USE_LITTLEFS=1 in LittleFS variant. Baseline src is byte-identical to the previously measured file-opt2 snapshot.",
+  "baseline_snapshot": "/tmp/ardportal-storage-baseline",
+  "native_snapshot": "/tmp/ardportal-storage-size/native1",
+  "littlefs_snapshot": "/tmp/ardportal-storage-size/little1",
+  "results": [
+    {
+      "board": "esp8266",
+      "flash_before_bytes": 584912,
+      "flash_delta_default_bytes": -400,
+      "flash_ardfs_bytes": 584512,
+      "flash_littlefs_bytes": 607520,
+      "versions": {
+        "before": {
+          "flash_bytes": 584912,
+          "image_sha256": "8eaed3d62ff273fe992994d1d3048bd0d5da5762d0eb34d9715ffb95195125a0",
+          "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-file-opt2.log",
+          "image": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-file-opt2-output/DynamicPages.ino.bin",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          },
+          "static_ram_bytes": 43504
+        },
+        "ardfs": {
+          "flash_bytes": 584512,
+          "image_sha256": "26fec5a184c3ec7a85c28fe0773fa7a53ca969bdbc11302fcfa7859edf0d1d53",
+          "log": "/tmp/ardportal-storage-size/native1-esp8266.log",
+          "image": "/tmp/ardportal-storage-size/native1-esp8266-output/DynamicPages.ino.bin",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          },
+          "static_ram_bytes": 43516
+        },
+        "littlefs": {
+          "flash_bytes": 607520,
+          "image_sha256": "91d606bfe11603c65c09fdfbbb437e3adf285e962846a571afc65be178eeb707",
+          "log": "/tmp/ardportal-storage-size/little1-esp8266.log",
+          "image": "/tmp/ardportal-storage-size/little1-esp8266-output/DynamicPages.ino.bin",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          },
+          "static_ram_bytes": 44028
+        }
+      }
+    },
+    {
+      "board": "esp32",
+      "flash_before_bytes": 1275344,
+      "flash_delta_default_bytes": -320,
+      "flash_ardfs_bytes": 1275024,
+      "flash_littlefs_bytes": 1310032,
+      "versions": {
+        "before": {
+          "flash_bytes": 1275344,
+          "image_sha256": "30a4a6b794dcfd969b4efcb47ad76053bddc0efc6d85a7e7e83b43dc80089ea9",
+          "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-file-opt2.log",
+          "image": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-file-opt2-output/DynamicPages.ino.bin",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          },
+          "static_ram_bytes": 57508
+        },
+        "ardfs": {
+          "flash_bytes": 1275024,
+          "image_sha256": "c2bdea3dd4d59d89b57730fba99e8f3c0301744969150f04b4bc47751db1e9ef",
+          "log": "/tmp/ardportal-storage-size/native1-esp32.log",
+          "image": "/tmp/ardportal-storage-size/native1-esp32-output/DynamicPages.ino.bin",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          },
+          "static_ram_bytes": 57508
+        },
+        "littlefs": {
+          "flash_bytes": 1310032,
+          "image_sha256": "329c8e31a7e7a01a84ca7cacf35615aa91220e0fee43239bb38e56bd75649dfb",
+          "log": "/tmp/ardportal-storage-size/little1-esp32.log",
+          "image": "/tmp/ardportal-storage-size/little1-esp32-output/DynamicPages.ino.bin",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          },
+          "static_ram_bytes": 57636
+        }
+      }
+    }
+  ],
+  "exclusion_verified": {
+    "esp8266": {
+      "native_backend_symbols_in_littlefs_elf": false,
+      "native_backend_headers_in_littlefs_dependencies": false
+    },
+    "esp32": {
+      "native_backend_symbols_in_littlefs_elf": false,
+      "native_backend_headers_in_littlefs_dependencies": false
+    }
+  },
+  "tests": [
+    "tests/run-config-memory.sh (ASan/UBSan): passed",
+    "tests/run-littlefs-storage.sh (ASan/UBSan): ESP8266/ESP32 API variants, interruption at 20 core-I/O points, Portal/AppConfig persistence, factory reset, HTTP formatting, backend info and header exclusion passed",
+    "Focused flash-text/network-api/factory-reset-callback/page-stream/runtime-state tests: passed"
+  ],
+  "limits": [
+    "LittleFS core metadata/GC operations remain synchronous.",
+    "No conversion of the native ArdFS on-flash format; LittleFS mount never autoformats.",
+    "ESP32 default app partition has 934 B program-storage headroom with this example (binary file size includes additional image overhead)."
+  ]
+}

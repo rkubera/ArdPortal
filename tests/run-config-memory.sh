@@ -26,7 +26,7 @@ for test_name in json-patch json-stream journal-selection stream dynamic-patch d
   if [[ "$test_name" == no-www-wifi ]]; then flags+=(-DARDPORTAL_ENABLE_WWW=0); fi
   if [[ "$test_name" == messages-only ]]; then flags+=(-DARDPORTAL_ENABLE_CONSOLE_MESSAGES=1); fi
   if [[ "$test_name" != json-patch && "$test_name" != json-stream ]]; then
-    source_files+=(src/ArdFS.cpp)
+    source_files+=(src/ArdStorage.cpp)
     flags+=(-DESP8266 -DARDFS_HOST_TEST)
   fi
   source_files+=(src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp)
@@ -38,7 +38,7 @@ for dependencies in 0 1; do
     "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined \
       -DESP8266 -DARDFS_HOST_TEST -DARDPORTAL_TEST_ALLOCATE=testAllocate -DARDPORTAL_TEST_VISIBILITY \
       -DARDPORTAL_ENABLE_DEPENDENCIES="$dependencies" -DARDPORTAL_ENABLE_VISIBILITY="$visibility" \
-      -Itests/memory-host -Isrc tests/memory-host/dynamic-patch.cpp src/ArdFS.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/visibility"
+      -Itests/memory-host -Isrc tests/memory-host/dynamic-patch.cpp src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/visibility"
     "$test_dir/visibility"
   done
 done
@@ -46,17 +46,17 @@ for www in 0 1; do
   for mqtt in 0 1; do
     "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined \
       -DESP8266 -DARDFS_HOST_TEST -DARDPORTAL_ENABLE_WWW=$www -DARDPORTAL_ENABLE_MQTT=$mqtt \
-      -Itests/memory-host -Isrc tests/memory-host/log-callback.cpp src/ArdFS.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/log-callback"
+      -Itests/memory-host -Isrc tests/memory-host/log-callback.cpp src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/log-callback"
     "$test_dir/log-callback"
   done
 done
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -Itests/memory-host -Isrc tests/memory-host/ardfs.cpp src/ArdFS.cpp src/ArdFSVolume.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/power-cut"
+"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -Itests/memory-host -Isrc tests/memory-host/ardfs.cpp src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/power-cut"
 "$test_dir/power-cut"
-"${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -DFS_PHYS_SIZE=262144U -Itests/memory-host -Isrc tests/memory-host/raw-file.cpp src/ArdFS.cpp src/ArdFSVolume.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/raw-file"
+"${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -DFS_PHYS_SIZE=262144U -Itests/memory-host -Isrc tests/memory-host/raw-file.cpp src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/raw-file"
 "$test_dir/raw-file"
-"${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -DFS_PHYS_SIZE=262144U -Itests/memory-host -Isrc tests/memory-host/large-journal.cpp src/ArdFS.cpp src/ArdFSVolume.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/large-journal"
+"${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -DFS_PHYS_SIZE=262144U -Itests/memory-host -Isrc tests/memory-host/large-journal.cpp src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/large-journal"
 "$test_dir/large-journal"
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -Itests/memory-host -Isrc tests/memory-host/async-storage-example.cpp src/ArdFS.cpp src/ArdFSVolume.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/async-storage-example"
+"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -Itests/memory-host -Isrc tests/memory-host/async-storage-example.cpp src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/async-storage-example"
 "$test_dir/async-storage-example"
 for enabled in 0 1; do
   "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DARDPORTAL_ENABLE_CLASSES="$enabled" -Itests/host -Isrc tests/control-classes-test.cpp src/JsonStream.cpp src/JsonDocumentStream.cpp -o "$test_dir/control-classes-$enabled"
@@ -64,11 +64,11 @@ for enabled in 0 1; do
 done
 "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
   -DESP8266 -DFS_PHYS_SIZE=524288U -DARDPORTAL_TEST_ALLOCATE=testAllocate \
-  -Itests/memory-host -Isrc tests/memory-host/volume-index.cpp src/ArdFSVolume.cpp -o "$test_dir/volume-index"
+  -Itests/memory-host -Isrc tests/memory-host/volume-index.cpp -o "$test_dir/volume-index"
 "$test_dir/volume-index"
 echo 'PASS: incremental settings, Portal/MQTT persistence, bounded journal writes and recovery'
 
 "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
   -DESP8266 -DFS_PHYS_SIZE=524288U -DARDPORTAL_TEST_ALLOCATE=testAllocate \
-  -Itests/memory-host -Isrc tests/memory-host/volume-operations.cpp src/ArdFSVolume.cpp -o "$test_dir/volume-operations"
+  -Itests/memory-host -Isrc tests/memory-host/volume-operations.cpp -o "$test_dir/volume-operations"
 "$test_dir/volume-operations"

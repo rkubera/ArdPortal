@@ -13,6 +13,7 @@ run_test() {
 }
 
 run_test bash tests/run-config-memory.sh
+run_test bash tests/run-littlefs-storage.sh
 run_test bash tests/run-topic-templates.sh
 run_test bash tests/run-zigbee.sh
 

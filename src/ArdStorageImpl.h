@@ -1,16 +1,13 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
-#include "LanguageLiterals.h"
-#include "ArdFS.h"
-#define ARDUI_DEFINE_STORAGE_MESSAGES
+#pragma once
 #include "Language.h"
-#undef ARDUI_DEFINE_STORAGE_MESSAGES
-
 /**
  * @brief Initialize the component and prepare its runtime state.
  * @return No value.
  */
-void ArdFS::begin() {
+template<class Volume, class FileHandle>
+void ArdStorage<Volume, FileHandle>::begin() {
   if (_mountDone || _phase != Phase::Idle) return;
   _phase = Phase::Mount;
 }
@@ -20,7 +17,8 @@ void ArdFS::begin() {
  * @param callback Completion or event handler supplied to this operation.
  * @return True if the operation was accepted; loop() later reports its result through callback. False if busy or input cannot be accepted.
  */
-bool ArdFS::start(const String& path, Callback&& callback) {
+template<class Volume, class FileHandle>
+bool ArdStorage<Volume, FileHandle>::start(const String& path, Callback&& callback) {
   if (!_mountDone || !_mounted || busy() || !callback || path.length() < 2 || path.length() > 64 || path[0] != '/' || path.indexOf("..") >= 0) return false;
   _rawFile = _sourceFailed = false;
   _path = path;
@@ -43,7 +41,8 @@ bool ArdFS::start(const String& path, Callback&& callback) {
   _phase = Phase::OpenRead;
   return true;
 }
-bool ArdFS::writeJsonConfig(const String& path, size_t length, JsonSource source, Callback callback) {
+template<class Volume, class FileHandle>
+bool ArdStorage<Volume, FileHandle>::writeJsonConfig(const String& path, size_t length, JsonSource source, Callback callback) {
   if (!length || length > _volume.maxFileBytes(path.length() + 8) || !source || !start(path, std::move(callback))) return false;
   _writing = true;
   _source = std::move(source);
@@ -51,14 +50,16 @@ bool ArdFS::writeJsonConfig(const String& path, size_t length, JsonSource source
   _sourceAt = 0;
   return true;
 }
-bool ArdFS::readJsonConfig(const String& path, FileSink sink, Callback callback, bool repair) {
+template<class Volume, class FileHandle>
+bool ArdStorage<Volume, FileHandle>::readJsonConfig(const String& path, FileSink sink, Callback callback, bool repair) {
   if (!sink || !start(path, std::move(callback))) return false;
   _writing = false;
   _repairRequested = repair;
   _sink = std::move(sink);
   return true;
 }
-bool ArdFS::writeFile(const String& path, size_t length, FileSource source, Callback callback) {
+template<class Volume, class FileHandle>
+bool ArdStorage<Volume, FileHandle>::writeFile(const String& path, size_t length, FileSource source, Callback callback) {
   if (length == SIZE_MAX || !source || !start(path, std::move(callback))) return false;
   _writing = true;
   _rawFile = true;
@@ -71,7 +72,8 @@ bool ArdFS::writeFile(const String& path, size_t length, FileSource source, Call
   _phase = Phase::OpenWrite;
   return true;
 }
-bool ArdFS::readFile(const String& path, FileSink sink, Callback callback) {
+template<class Volume, class FileHandle>
+bool ArdStorage<Volume, FileHandle>::readFile(const String& path, FileSink sink, Callback callback) {
   if (!sink || !start(path, std::move(callback))) return false;
   _writing = false;
   _rawFile = true;
@@ -79,17 +81,20 @@ bool ArdFS::readFile(const String& path, FileSink sink, Callback callback) {
   _phase = Phase::OpenFileRead;
   return true;
 }
-bool ArdFS::remove(const String& path, Callback callback) {
+template<class Volume, class FileHandle>
+bool ArdStorage<Volume, FileHandle>::remove(const String& path, Callback callback) {
   return rename(path, String(), std::move(callback));
 }
-bool ArdFS::rename(const String& source, const String& destination, Callback callback) {
+template<class Volume, class FileHandle>
+bool ArdStorage<Volume, FileHandle>::rename(const String& source, const String& destination, Callback callback) {
   if (destination.length() && (destination.length() < 2 || destination.length() > 64 || destination[0] != '/' || destination.indexOf("..") >= 0)) return false;
   if (!start(source, std::move(callback))) return false;
   _file = _volume.mutate(source.c_str(), destination.length() ? destination.c_str() : nullptr);
   _phase = Phase::PrepareMutation;
   return true;
 }
-void ArdFS::resetJournalOutput() {
+template<class Volume, class FileHandle>
+void ArdStorage<Volume, FileHandle>::resetJournalOutput() {
   _journalStage = 0;
   _journalHeaderAt = 0;
   _sourceAt = 0;
@@ -97,14 +102,16 @@ void ArdFS::resetJournalOutput() {
   _escapeAt = _escapeLength = 0;
   _raw = String();
 }
-String ArdFS::sourcePart(size_t offset, size_t maximum) {
+template<class Volume, class FileHandle>
+String ArdStorage<Volume, FileHandle>::sourcePart(size_t offset, size_t maximum) {
   size_t count = _sourceLength - offset;
   if (count > maximum) count = maximum;
   String part = _source(offset, count);
   if (part.length() != count) { _sourceFailed = true; return String(); }
   return part;
 }
-bool ArdFS::openSlot(ArdFSFile& file, int slot, OpenMode mode, ArdUILanguageData::Key failure) {
+template<class Volume, class FileHandle>
+bool ArdStorage<Volume, FileHandle>::openSlot(FileHandle& file, int slot, OpenMode mode, ArdUILanguageData::Key failure) {
   const String path = slotPath(slot);
   if (path.length() != _path.length() + (slot ? 8 : 0)) { fail(ArdUILanguage::Key::s_198); return false; }
   if (mode == OpenMode::Scan) {
@@ -117,7 +124,8 @@ bool ArdFS::openSlot(ArdFSFile& file, int slot, OpenMode mode, ArdUILanguageData
   if (!file) { fail(failure); return false; }
   return true;
 }
-size_t ArdFS::journalOutput() {
+template<class Volume, class FileHandle>
+size_t ArdStorage<Volume, FileHandle>::journalOutput() {
   if (_rawFile) {
     if (_sourceAt == _sourceLength) return 0;
     String part = sourcePart(_sourceAt, 256);
@@ -182,7 +190,8 @@ size_t ArdFS::journalOutput() {
  * @param callback Completion or event handler supplied to this operation.
  * @return True if the operation was accepted; loop() later reports its result through callback. False if busy or input cannot be accepted.
  */
-bool ArdFS::format(Callback callback) {
+template<class Volume, class FileHandle>
+bool ArdStorage<Volume, FileHandle>::format(Callback callback) {
   if (!_mountDone || busy() || !callback) return false;
 #if defined(ESP8266)
   if (ESP.getFlashChipSize() > ESP.getFlashChipRealSize()) return false;
@@ -199,7 +208,8 @@ bool ArdFS::format(Callback callback) {
  * @param data Data buffer or value used by the operation.
  * @return The checksum covering the journal generation and document bytes.
  */
-uint32_t ArdFS::checksum(uint32_t generation, const String& data) {
+template<class Volume, class FileHandle>
+uint32_t ArdStorage<Volume, FileHandle>::checksum(uint32_t generation, const String& data) {
   ArdCooperativeBudget budget;
   uint32_t crc = UINT32_MAX;
   for (size_t i = 0; i < data.length() + 4; ++i) {
@@ -217,11 +227,13 @@ uint32_t ArdFS::checksum(uint32_t generation, const String& data) {
  * @param changed Whether persistent contents changed during this operation.
  * @return No value.
  */
-void ArdFS::fail(ArdUILanguageData::Key message) {
+template<class Volume, class FileHandle>
+void ArdStorage<Volume, FileHandle>::fail(ArdUILanguageData::Key message) {
   _file.close();
   finish(false, ArdUILanguage::storageText(message));
 }
-void ArdFS::finish(bool ok, const String& error, bool changed) {
+template<class Volume, class FileHandle>
+void ArdStorage<Volume, FileHandle>::finish(bool ok, const String& error, bool changed) {
   const bool delivering = _phase == Phase::OpenPayload || _phase == Phase::ReadPayload || _phase == Phase::DeliverPayload;
   if (_repairing && !ok && !delivering) {
     _file.close(); _repairFile.close();
@@ -265,7 +277,8 @@ void ArdFS::finish(bool ok, const String& error, bool changed) {
  * @brief Advance the component work; call repeatedly from the Arduino main loop.
  * @return No value.
  */
-void ArdFS::loop() {
+template<class Volume, class FileHandle>
+void ArdStorage<Volume, FileHandle>::loop() {
   uint8_t chunk[256];
   switch (_phase) {
     case Phase::Mount:

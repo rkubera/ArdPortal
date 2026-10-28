@@ -115,3 +115,10 @@ The C++ resource generators apply the same formatter before writing or checking
 headers. Install `clang-format-14`, use the formatter bundled with Arduino IDE 2
 on macOS, or set `CLANG_FORMAT` to the formatter executable. The generated data
 and embedded HTML/JavaScript/Python strings retain their original bytes.
+
+### LittleFS storage bridge
+
+Run `bash tests/run-littlefs-storage.sh` for sanitizer-enabled tests of both core
+API variants, journal validation/repair/deduplication, interrupted writes, raw
+files, mutations, format/mount errors, native-header exclusion and Portal config /
+AppConfig persistence using a sketch-local backend define.

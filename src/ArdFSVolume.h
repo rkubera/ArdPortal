@@ -181,7 +181,7 @@ public:
    */
   ArdFSFile open(const char*, const char*, size_t length = SIZE_MAX, bool deferred = false);
   // Mutations copy live files to the other bank before atomic publication.
-  // Empty destination removes source; an existing destination is rejected.
+  // A null destination removes source; an existing destination is rejected.
   ArdFSFile mutate(const char* source, const char* destination = nullptr);
   size_t fileCount() const { return _mounted ? _entries.count : 0; }
   bool fileInfo(size_t index, String& path, size_t& size) const;
@@ -275,3 +275,5 @@ private:
    */
   static uint32_t crc(const void*, size_t, uint32_t = 0xffffffff);
 };
+
+#include "ArdFSVolumeImpl.h"

@@ -111,7 +111,7 @@ loss do not pass through this callback. Clear it with `portal.onBeforeRestart(nu
 
 ### ArdFS storage format
 
-ArdFS is implemented in `ArdFSVolume.cpp`, with its own disk format and flash
+ArdFS is implemented in `ArdFSVolumeImpl.h`, with its own disk format and flash
 backend. The format is a flat document store;
 paths identify documents and do not create directories. It supports up to 32
 physical files (journal records count separately), on a region of at least 64 KiB.
@@ -238,6 +238,61 @@ The portal does not expose its owned ArdFS instance. Store application settings
 through `setAppConfigValue()` when using a portal. Starting a second `ArdFS`
 instance for arbitrary documents on the portal's partition is unsupported; it
 can invalidate the first instance's filesystem state.
+
+### Selecting LittleFS for ArdPortal
+
+The native ArdFS backend remains the default. To use LittleFS for **all Portal
+storage operations**, put this before the main include:
+
+```cpp
+#define ARDPORTAL_USE_LITTLEFS 1
+#include <ArdPortal.h>
+```
+
+Set the flag to `0` (or omit it) for ArdFS. Only `0` and `1` are accepted. This is
+a sketch-local flag: it does not require a build-wide compiler definition.
+Use the same selection in every translation unit that includes Portal declarations.
+See `examples/LittleFS/LittleFS.ino`.
+
+`ArdPortalStorage` selects the appropriate specialization of the shared transaction
+engine. The LittleFS variant does not include, compile or link `ArdFSVolume`,
+`ArdFSFile` or their native flash driver. Native implementation headers are only
+included by `ArdFS.h`; no native filesystem `.cpp` is compiled unconditionally.
+Application code that explicitly includes/uses standalone `ArdFS` still requests
+that backend independently of the Portal selection.
+
+The adapter handles PortalConfig and AppConfig, alternating JSON copies,
+generation/CRC validation, legacy plain JSON, deduplication, startup repair,
+ordinary saves, factory reset saves and `/api/storage/format`. The information API
+reports `storageBackend: "LittleFS"`. MQTT/HTTP persistence callbacks and restart
+handling use the same transaction engine and retain their existing behavior.
+It also exposes the engine's raw-file, remove/rename and capacity methods.
+Temporary `.ardtmp` paths are reserved for uncommitted writes and omitted from
+file enumeration. These temporary files can remain after an interrupted operation;
+the next write to that path replaces them. Enumeration lists root files.
+
+LittleFS writes the new copy to a temporary file, flushes/closes it and renames it
+over the selected destination. It never deletes the destination before rename.
+Payload reads/writes and JSON processing advance in slices of at most 256 bytes.
+LittleFS `begin`, `format`, `flush`, `rename` and its internal garbage collection
+are synchronous core operations; this backend cannot promise the native ArdFS
+limit of one sector erase per loop. Callbacks still run from `portal.loop()`.
+
+On ESP8266 it uses the board's standard LittleFS region. On ESP32 it uses the
+Arduino LittleFS defaults (`spiffs` partition label, `/littlefs` mount point).
+The LittleFS partition must already be formatted, or use the Portal storage
+format action explicitly after an initial mount failure. The bridge disables
+automatic formatting on a mount error to preserve existing files.
+
+Switching the backend does **not** convert an ArdFS volume into LittleFS. Export
+settings before reformatting/replacing the volume, then import them afterward.
+A readable LittleFS volume containing `/ardportal.json` (and optionally its
+journal copy) is read using the same JSON validation/repair rules. Never mount
+the same flash region simultaneously with both filesystem drivers.
+
+The shared engine avoids compiling two storage implementations. LittleFS itself
+adds firmware from the board core; see the measured native/LittleFS image sizes
+in `docs/testing/ArdPortal-storage-backends-size-2026-10-28.md`.
 
 ### Using ArdFS alongside LittleFS
 

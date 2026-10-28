@@ -1306,7 +1306,7 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     }
     closeMqtt();
     _httpWaitingStorage = true;
-    if (!_storage.format([this](const ArdFS::Result& result) {
+    if (!_storage.format([this](const ArdPortalStorage::Result& result) {
           _storageMounted = _storage.mounted();
           _storageOK = false;
           _storageError = result.error;
@@ -1712,7 +1712,7 @@ String ArdPortal::infoJson() {
   out += String(int(mqttState()));
   appendJsonText(out, F(",\"ip\":"), localIP().toString());
   appendJsonText(out, F(",\"apIp\":"), apIP().toString());
-  appendJsonText(out, F(",\"storageBackend\":"), "ArdFS");
+  appendJsonText(out, F(",\"storageBackend\":"), ARDPORTAL_USE_LITTLEFS ? "LittleFS" : "ArdFS");
   appendJsonText(out, F(",\"jsonBackend\":"), "ArdJSON");
   appendJsonBool(out, F(",\"filesystemMounted\":"), _storageMounted);
   appendJsonBool(out, F(",\"configurationReady\":"), _configurationReady);
@@ -2228,7 +2228,7 @@ bool validApp(const ArdJSON::JSONVar& value) {
  * @param result Operation result to inspect or return.
  * @return No value.
  */
-void ArdPortal::finishLoad(const ArdFS::Result& result) {
+void ArdPortal::finishLoad(const ArdPortalStorage::Result& result) {
   bool restored = false;
   _storageMounted = _storage.mounted();
   _storageError = result.error;
@@ -2279,11 +2279,11 @@ void ArdPortal::serviceStorage(uint32_t now) {
     if (!_loadParser || !_storage.readJsonConfig(
           "/ardportal.json", [this](size_t offset, const uint8_t* bytes, size_t length) {
             return _loadParser && _loadParser->input(offset, bytes, length);
-          }, [this](const ArdFS::Result& result) {
+          }, [this](const ArdPortalStorage::Result& result) {
             finishLoad(result);
           },
           true)) {
-      ArdFS::Result result;
+      ArdPortalStorage::Result result;
       result.error = _storage.error();
       if (!result.error.length()) result.error = ArdUILanguage::text(ArdUILanguage::Key::s_166);
       finishLoad(result);
@@ -2329,10 +2329,10 @@ void ArdPortal::serviceStorage(uint32_t now) {
         "/ardportal.json", bytes, [this](size_t offset, size_t maximum) {
           return saveDocumentSlice(offset, maximum);
         },
-        [this](const ArdFS::Result& result) {
+        [this](const ArdPortalStorage::Result& result) {
           finishSave(result);
         })) {
-    ArdFS::Result result;
+    ArdPortalStorage::Result result;
     result.error = _storage.mounted() ? ArdUILanguage::text(ArdUILanguage::Key::s_169) : ArdUILanguage::text(ArdUILanguage::Key::s_170);
     finishSave(result);
   }
@@ -2610,7 +2610,7 @@ void ArdPortal::notifyConfig() {
  * @param result Operation result to inspect or return.
  * @return No value.
  */
-void ArdPortal::finishSave(const ArdFS::Result& result) {
+void ArdPortal::finishSave(const ArdPortalStorage::Result& result) {
   _saveDocumentPrefix = String();
   _saveDocumentAppBytes = 0;
 #if ARDPORTAL_ENABLE_MQTT
