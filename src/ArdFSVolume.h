@@ -84,22 +84,31 @@ public:
   bool close();
 private:
   friend class ArdFSVolume;
+  // One allocation per handle. Only writers carry flash work buffers/state.
   struct Handle {
-    ARDPORTAL_NO_THROW_ALLOCATION ArdFSVolume* volume;
+    ARDPORTAL_NO_THROW_ALLOCATION
+    ArdFSVolume* volume = nullptr;
+    uint32_t address = 0, length = 0;
+    size_t offset = 0;
+    bool writing = false;
+  };
+  struct Writer : Handle {
     String path;
-    uint32_t address = 0, bank = 0, record = 0, capacity = 0, length = 0;
+    uint32_t bank = 0, record = 0, capacity = 0;
     size_t expected = SIZE_MAX;
     uint32_t checksum = 0xffffffff;
     bool failed = false, committed = false, compacting = false;
-    size_t offset = 0;
-    bool writing = false;
     uint8_t prepareStage = 0, reserveStage = 0, finishStage = 0, flushStage = 0;
     uint32_t workAt = 0, extent = 0, verified = 0, verifiedBody = 0;
     size_t copyIndex = 0, copyAt = 0, copyCount = 0;
     uint8_t header[32] = {}, bytes[256] = {};
-    std::unique_ptr<Handle> copy;
+    std::unique_ptr<Writer> copy;
+    Writer() { writing = true; }
   };
-  std::unique_ptr<Handle> _handle;
+  struct HandleDeleter {
+    void operator()(Handle* handle) const noexcept;
+  };
+  std::unique_ptr<Handle, HandleDeleter> _handle;
 };
 // ArdFS uses its own append-only records and two atomic compaction banks.
 class ArdFSVolume {
@@ -237,9 +246,9 @@ private:
    */
   bool eraseRaw(uint32_t, size_t);
   // Reserve an erased record, stream its body, then publish its commit marker.
-  int prepareStep(ArdFSFile::Handle&);
-  int reserveStep(ArdFSFile::Handle&);
-  int finishRecordStep(ArdFSFile::Handle&);
+  int prepareStep(ArdFSFile::Writer&);
+  int reserveStep(ArdFSFile::Writer&);
+  int finishRecordStep(ArdFSFile::Writer&);
   int publishStep(uint32_t address, const uint8_t* header, uint8_t* scratch, uint8_t& stage);
   static uint32_t makeHeader(uint8_t* bytes, uint32_t magic, uint32_t a, uint32_t b, uint32_t c);
   /**

@@ -439,5 +439,41 @@
         }
       }
     }
+  },
+  "separate_read_write_handles": {
+    "date": "2026-10-28",
+    "sizes_from": "target DWARF, ArdFSVolume.cpp.o",
+    "allocator_metadata_included": false,
+    "whole_program_peak_heap_measured": false,
+    "targets": {
+      "esp8266": {
+        "read_before": 380,
+        "read_after": 20,
+        "saved_per_reader": 360,
+        "writer_before": 380,
+        "writer_after": 380,
+        "static_ram": 43504,
+        "firmware_bytes": 584592,
+        "firmware_sha256": "3b94925c645decde626cd6f19d52a24563c94a05b0416ecffd6b984d4318c783",
+        "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-pass25.log"
+      },
+      "esp32": {
+        "read_before": 384,
+        "read_after": 20,
+        "saved_per_reader": 364,
+        "writer_before": 384,
+        "writer_after": 384,
+        "static_ram": 57508,
+        "firmware_bytes": 1275088,
+        "firmware_sha256": "bba1d5343ee934db62f7757ad4181da7a85d6badf2ba1cd20d409936cb328e61",
+        "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-pass25.log"
+      }
+    },
+    "validation": {
+      "config_memory_suite": "passed with address/undefined sanitizers",
+      "raw_file_power_cuts": 2988,
+      "large_json_power_cuts": 4208,
+      "handle_allocation_and_moves": "passed"
+    }
   }
 }

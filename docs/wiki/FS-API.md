@@ -434,6 +434,11 @@ application-level alternating JSON envelopes.
 | `flush()` | Synchronously drain verification/commit steps; bool success |
 | `close()` | Release the handle and abandon an uncommitted write; bool success |
 
+Read handles allocate only the volume pointer, address, length, cursor and access
+flag. The 256-byte transfer buffer, record header and commit/compaction state are
+allocated only for writers. Each handle still uses one allocation; writer size
+and the on-flash format are unchanged.
+
 File handles cannot be copied. Do not mount independently overlapping volumes
 alongside the portal. Formatting affects all files in that volume.
 

@@ -306,7 +306,7 @@ bool ArdFSVolume::exists(const char* path) {
   return found;
 }
 // Reserve the successor marker first; then inspect/erase the record in steps.
-int ArdFSVolume::reserveStep(ArdFSFile::Handle& h) {
+int ArdFSVolume::reserveStep(ArdFSFile::Writer& h) {
   switch (h.reserveStage) {
     case 0:
       h.extent = aligned(Header + h.path.length() + h.capacity);
@@ -340,7 +340,7 @@ int ArdFSVolume::reserveStep(ArdFSFile::Handle& h) {
   }
 }
 
-int ArdFSVolume::prepareStep(ArdFSFile::Handle& h) {
+int ArdFSVolume::prepareStep(ArdFSFile::Writer& h) {
   switch (h.prepareStage) {
     case 0:
       {
@@ -371,7 +371,7 @@ int ArdFSVolume::prepareStep(ArdFSFile::Handle& h) {
         while (h.copyIndex < _entries.count && _entries.at(h.copyIndex)->path == h.path) ++h.copyIndex;
         if (h.copyIndex == _entries.count) { h.prepareStage = 8; return 0; }
         const Entry& e = *_entries.at(h.copyIndex);
-        h.copy.reset(new (std::nothrow) ArdFSFile::Handle);
+        h.copy.reset(new (std::nothrow) ArdFSFile::Writer);
         if (!h.copy) return -1;
         auto& copy = *h.copy;
         copy.volume = this;
@@ -439,7 +439,7 @@ int ArdFSVolume::prepareStep(ArdFSFile::Handle& h) {
   }
 }
 
-int ArdFSVolume::finishRecordStep(ArdFSFile::Handle& h) {
+int ArdFSVolume::finishRecordStep(ArdFSFile::Writer& h) {
   switch (h.finishStage) {
     case 0:
       h.verified = makeHeader(h.header, RecordMagic, aligned(Header + h.path.length() + h.length), h.path.length(), h.length);
@@ -479,13 +479,13 @@ ArdFSFile ArdFSVolume::open(const char* path, const char* mode, size_t length, b
     _error = -22;
     return f;
   }
-  f._handle.reset(new (std::nothrow) ArdFSFile::Handle);
+  if (*mode == 'w') f._handle.reset(new (std::nothrow) ArdFSFile::Writer);
+  else f._handle.reset(new (std::nothrow) ArdFSFile::Handle);
   if (!f._handle) { _error = -12; return f; }
   auto& h = *f._handle;
   h.volume = this;
-  h.writing = *mode == 'w';
   if (h.writing) {
-    // Readers only need the resolved address and length; avoid a path copy.
+    auto& h = static_cast<ArdFSFile::Writer&>(*f._handle);
     h.path = path;
     if (h.path.length() != strlen(path)) { f._handle.reset(); _error = -12; return f; }
     if (!exists(path) && _entries.count >= 32) { f._handle.reset(); _error = -28; return f; }
@@ -515,6 +515,12 @@ ArdFSFile ArdFSVolume::open(const char* path, const char* mode, size_t length, b
   return f;
 }
 
+void ArdFSFile::HandleDeleter::operator()(Handle* handle) const noexcept {
+  if (!handle) return;
+  if (handle->writing) delete static_cast<Writer*>(handle);
+  else delete handle;
+}
+
 ArdFSFile::operator bool() const { return bool(_handle); }
 size_t ArdFSFile::size() const { return _handle ? _handle->length : 0; }
 int ArdFSFile::read(uint8_t* p, size_t n) {
@@ -527,7 +533,7 @@ int ArdFSFile::read(uint8_t* p, size_t n) {
 }
 size_t ArdFSFile::write(const uint8_t* p, size_t n) {
   if (!_handle || !_handle->writing) return 0;
-  auto& h = *_handle;
+  auto& h = static_cast<Writer&>(*_handle);
   if (h.failed || h.committed || h.prepareStage != 10 || h.finishStage != 0 || n > h.capacity - h.length) { h.failed = true; return 0; }
   if (!h.volume->writeRaw(h.address + h.length, p, n)) { h.failed = true; return 0; }
   h.checksum = ArdFSVolume::crc(p, n, h.checksum);
@@ -536,8 +542,8 @@ size_t ArdFSFile::write(const uint8_t* p, size_t n) {
 }
 int ArdFSFile::prepareStep() {
   if (!_handle) return -1;
-  auto& h = *_handle;
-  if (!h.writing) return 1;
+  if (!_handle->writing) return 1;
+  auto& h = static_cast<Writer&>(*_handle);
   if (h.failed) return -1;
   int status = h.volume->prepareStep(h);
   if (status < 0) { h.failed = true; h.volume->_error = -5; }
@@ -545,8 +551,9 @@ int ArdFSFile::prepareStep() {
 }
 int ArdFSFile::flushStep() {
   if (!_handle) return -1;
-  auto& h = *_handle;
-  if (!h.writing || h.committed) return 1;
+  if (!_handle->writing) return 1;
+  auto& h = static_cast<Writer&>(*_handle);
+  if (h.committed) return 1;
   if (h.failed || h.prepareStage != 10 || (h.expected != SIZE_MAX && h.length != h.expected)) return -1;
   auto& v = *h.volume;
   switch (h.flushStage) {
@@ -589,7 +596,7 @@ bool ArdFSFile::flush() {
 }
 bool ArdFSFile::close() {
   if (_handle && _handle->writing) {
-    auto& h = *_handle;
+    auto& h = static_cast<Writer&>(*_handle);
     // An abandoned body has no published header. Force compaction before another
     // live append, otherwise a reboot could stop scanning before that append.
     if (!h.committed && !h.compacting) h.volume->_next = h.volume->_bankSize;

@@ -61,6 +61,35 @@ also passed separately rebuilt sanitizer tests for all 32 index entries,
 compaction/remount, allocation failure and 164 raw-I/O power-cut points plus
 54 startup-repair cuts.
 
+## Separate read/write handles — 2026-10-28
+
+Read handles now contain only the volume pointer, resolved address, file length,
+cursor and writer tag. A derived writer owns the path, record/commit/compaction
+state, 32-byte header and 256-byte work buffer. A tagged deleter destroys the
+correct allocation without virtual dispatch or an extra allocation. Compaction
+copies remain writer allocations. Public API and on-flash format are unchanged.
+
+Target DWARF in `ArdFSVolume.cpp.o` confirms these allocation payload sizes
+(excluding allocator metadata/rounding):
+
+| Target | Previous read | New read | Saved per read handle | Writer before/after |
+| --- | ---: | ---: | ---: | ---: |
+| ESP8266 | 380 B | 20 B | 360 B | 380 B |
+| ESP32 | 384 B | 20 B | 364 B | 384 B |
+
+Clean DynamicPages images are 584,592 B on ESP8266 (−16 B against the preceding
+read-path change) and 1,275,088 B on ESP32 (+64 B). Static RAM remains
+43,504 / 57,508 B. These are per-handle heap savings, not a measurement of
+whole-program peak heap. Snapshots and clean build logs are under `optimized25`
+and the board `pass25` directories in the same temporary artifact directory.
+
+The allocation regression test verifies that readers request at most 64 B on the
+host and that each reader/writer still uses one allocation. It also exercises
+read/write rejection, reader flush/prepare, move construction/assignment,
+replacement of an open reader, repeated close and release of the writer guard.
+The full sanitizer-enabled `tests/run-config-memory.sh` suite passed, including
+2,988 raw-file and 4,208 large-JSON power-cut points, repair, OOM and compaction.
+
 ## Application firmware (`DynamicPages.ino.bin`)
 
 | Target | Before (bytes) | After (bytes) | Difference | Change |

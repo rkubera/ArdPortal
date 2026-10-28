@@ -9,7 +9,11 @@ std::vector<uint8_t> ardfsTestFlash(FS_PHYS_SIZE, 0xff);
 int ardfsFlashCalls = 0, ardfsFailAt = -1, ardfsPrograms = 0, ardfsErases = 0;
 bool ardfsPowerOff = false, ardfsTornOperation = false;
 int allocationCountdown = -1;
+size_t lastAllocationBytes = 0;
+unsigned allocationCalls = 0;
 void* testAllocate(size_t bytes) noexcept {
+  lastAllocationBytes = bytes;
+  ++allocationCalls;
   if (allocationCountdown == 0) return nullptr;
   if (allocationCountdown > 0) --allocationCountdown;
   return std::malloc(bytes);
@@ -37,6 +41,31 @@ int main() {
     verify(volume, 99);
   }
   { ArdFSVolume volume; assert(volume.begin()); verify(volume, 99); }
+  // A read must allocate only the small cursor, never a writer's work buffers.
+  // Exercise both deletion paths through moves and replacement of an open handle.
+  {
+    ArdFSVolume volume; assert(volume.begin());
+    unsigned calls = allocationCalls;
+    auto reader = volume.open("/file-7", "r");
+    const size_t readerBytes = lastAllocationBytes;
+    assert(reader && allocationCalls == calls + 1 && readerBytes <= 64);
+    assert(reader.prepareStep() == 1 && reader.flushStep() == 1);
+    uint8_t b = 0;
+    assert(reader.write(&b, 1) == 0);
+    auto moved = std::move(reader);
+    assert(!reader && moved.read(&b, 1) == 1 && b == 99);
+    calls = allocationCalls;
+    auto writer = volume.open("/file-7", "w", 1, true);
+    assert(writer && allocationCalls == calls + 1);
+    assert(lastAllocationBytes >= readerBytes + 256);
+    assert(writer.read(&b, 1) == -1);
+    moved = std::move(writer);
+    assert(!writer && moved.close() && moved.close());
+    // Closing the moved writer must release the volume's single-writer guard.
+    writer = volume.open("/file-7", "w", 1, true);
+    assert(writer);
+    printf("Handle allocations: reader=%zu B, writer=%zu B\n", readerBytes, lastAllocationBytes);
+  }
   const auto stable = ardfsTestFlash;
   // Index allocation failures must leave a mount failure distinguishable from
   // an invalid/empty volume, with no formatting or writes.
