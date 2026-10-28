@@ -65,7 +65,7 @@ Check JSON values with `isValid()` and check Boolean returns from registration a
 | Serialized PortalConfig | 5120 bytes | `MaxPortalConfigBytes`, includes escaped CA and other settings |
 | Serialized AppConfig | 8192 bytes | `MaxAppConfigBytes`, includes keys/JSON syntax |
 | Combined config payload | 13376 bytes | `MaxConfigDocumentBytes` |
-| ArdFS standalone JSON document | 14336 bytes | `ArdFS::MaxBytes` |
+| ArdFS standalone JSON document | No fixed byte cap | Both journal copies, escaped payloads and metadata must fit one flash bank; streaming validation retains only structural/key metadata |
 | CA certificate text | 4096 bytes | Portal validation, also must fit escaped PortalConfig |
 | Field ID | 1–48 ASCII bytes | Letters, digits, underscore and hyphen |
 | Label | 80 bytes | Schema validation; UTF-8 bytes, not characters |

@@ -1,0 +1,443 @@
+{
+  "date": "2026-10-27",
+  "cli_version": "1.5.1",
+  "baseline_commit": "e5fbd54586fad652253b782ce4e7ffb5e633a8d2",
+  "example": "DynamicPages",
+  "results": [
+    {
+      "board": "esp8266",
+      "binary_delta_bytes": 10512,
+      "binary_delta_percent": 1.7988664677052817,
+      "static_ram_delta_bytes": 608,
+      "versions": {
+        "before": {
+          "binary_bytes": 584368,
+          "binary_sha256": "f31d7b8c6f73b5ef183806cb108c493b62f117c8566f20e31f19c855b6c74f7c",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-before-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 43008,
+          "flash_code_bytes": 542924,
+          "iram_with_cache_bytes": 61387,
+          "core_version": "3.1.2",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          }
+        },
+        "after": {
+          "binary_bytes": 594880,
+          "binary_sha256": "8836d84459100a54745c1a2675abfcc7a463c6e28285f4b9248f4208c00c7537",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-after-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 43616,
+          "flash_code_bytes": 553512,
+          "iram_with_cache_bytes": 61387,
+          "core_version": "3.1.2",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          }
+        },
+        "optimized": {
+          "binary_bytes": 584592,
+          "binary_sha256": "cc6fca9f85e5ec8feccbafbbac6c47612fb06fe9d63e38e93210b26ca4e0edb9",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-pass21-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 43504,
+          "flash_code_bytes": 543204,
+          "iram_with_cache_bytes": 61339,
+          "core_version": "3.1.2",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          }
+        },
+        "optimized_previous": {
+          "binary_bytes": 587600,
+          "binary_sha256": "7493406eb73ac9b4605f05b1eba1f9786fc83855cef764e1b90421ca35a13415",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-clean-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 43528,
+          "flash_code_bytes": 546152,
+          "iram_with_cache_bytes": 61387,
+          "core_version": "3.1.2",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          }
+        },
+        "optimized_before_esp8266_tuning": {
+          "binary_bytes": 586144,
+          "binary_sha256": "f5e847128a70e931a937faff89284737c5dca9be614e7f6428091f85015d4dd3",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-pass3-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 43520,
+          "flash_code_bytes": 544708,
+          "iram_with_cache_bytes": 61387,
+          "core_version": "3.1.2",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          }
+        },
+        "optimized_before_header_init": {
+          "binary_bytes": 585376,
+          "binary_sha256": "4a82af46b825349050d87f31411cc03c62f639f5c8b7f2bd3e5b8a4c05611d6a",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-pass10-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 43504,
+          "flash_code_bytes": 543988,
+          "iram_with_cache_bytes": 61339,
+          "core_version": "3.1.2",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          }
+        },
+        "optimized_before_frame_cleanup": {
+          "binary_bytes": 585040,
+          "binary_sha256": "98c8730f8bc67325450880a75fcdc03328e29177891b68247c38928090ede423",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-pass14-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 43504,
+          "flash_code_bytes": 543652,
+          "iram_with_cache_bytes": 61339,
+          "core_version": "3.1.2",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          }
+        },
+        "optimized_before_open_slot": {
+          "binary_bytes": 584848,
+          "binary_sha256": "1f9c18bc5baabcb5f72acfc28aaf6e517005f537b5933fc0d4f1564a1e8ae0f5",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-pass15-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 43504,
+          "flash_code_bytes": 543460,
+          "iram_with_cache_bytes": 61339,
+          "core_version": "3.1.2",
+          "settings": {
+            "build.f_cpu": "80000000L",
+            "build.flash_size": "1M",
+            "build.flash_freq": "40",
+            "build.flash_mode": "dout",
+            "compiler.cpp.flags": "-c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/warnings/none-cppflags\"  -Os -g -free -fipa-pta -Werror=return-type -mlongcalls -mtext-section-literals -fno-rtti -falign-functions=4 -std=gnu++17 -MMD -ffunction-sections -fdata-sections -fno-exceptions  -DMMU_IRAM_SIZE=0x8000 -DMMU_ICACHE_SIZE=0x8000 "
+          }
+        }
+      },
+      "optimization_saved_bytes": 10288,
+      "remaining_growth_bytes": 224,
+      "remaining_growth_percent": 0.03833200996632259,
+      "growth_removed_percent": 97.86910197869102,
+      "esp8266_tuning_saved_bytes": 768,
+      "index_pass_saved_bytes": 1456,
+      "header_init_saved_bytes": 336,
+      "frame_cleanup_saved_bytes": 192,
+      "open_slot_saved_bytes": 256
+    },
+    {
+      "board": "esp32",
+      "binary_delta_bytes": 10864,
+      "binary_delta_percent": 0.8508452063205644,
+      "static_ram_delta_bytes": 688,
+      "versions": {
+        "before": {
+          "binary_bytes": 1276848,
+          "binary_sha256": "c2d385b19824a24a7ba9f05311cb55082ca86985df0322d35677cdf62c13eb20",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-before-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 57012,
+          "flash_code_bytes": 1276598,
+          "app_partition_limit_bytes": 1310720,
+          "core_version": "3.3.12",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          }
+        },
+        "after": {
+          "binary_bytes": 1287712,
+          "binary_sha256": "94e9e6645fd7c9e4083b2cd2c48a211104d86e2524c3875107aed1dbfa1694ba",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-after-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 57700,
+          "flash_code_bytes": 1287470,
+          "app_partition_limit_bytes": 1310720,
+          "core_version": "3.3.12",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          }
+        },
+        "optimized": {
+          "binary_bytes": 1275024,
+          "binary_sha256": "10801d3646278f9b10c59aa09e285642da893bee06bcdcea63e7df6510bc052b",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-pass21-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 57508,
+          "flash_code_bytes": 1274774,
+          "app_partition_limit_bytes": 1310720,
+          "core_version": "3.3.12",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          }
+        },
+        "optimized_previous": {
+          "binary_bytes": 1278496,
+          "binary_sha256": "3ab28e171a029afd208229516761f8e290be6fcda5c947e3153b06b4078357b2",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-clean-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 57532,
+          "flash_code_bytes": 1278254,
+          "app_partition_limit_bytes": 1310720,
+          "core_version": "3.3.12",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          }
+        },
+        "optimized_before_esp8266_tuning": {
+          "binary_bytes": 1276768,
+          "binary_sha256": "87484d0317a7e89933d6195bdad0f5e126173d3d7b897f6c9322c5c7214b2cd8",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-pass3-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 57524,
+          "flash_code_bytes": 1276522,
+          "app_partition_limit_bytes": 1310720,
+          "core_version": "3.3.12",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          }
+        },
+        "optimized_before_header_init": {
+          "binary_bytes": 1276080,
+          "binary_sha256": "0c42e0254a9c8436389bb79b87c6b81c091032fbc40c907a8d54b34e7ff99d63",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-pass10-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 57508,
+          "flash_code_bytes": 1275826,
+          "app_partition_limit_bytes": 1310720,
+          "core_version": "3.3.12",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          }
+        },
+        "optimized_before_frame_cleanup": {
+          "binary_bytes": 1275504,
+          "binary_sha256": "bafadf5f8e821444f9518dda45ba3ae3729f63ab1f03ff2e18262f6c13419394",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-pass14-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 57508,
+          "flash_code_bytes": 1275262,
+          "app_partition_limit_bytes": 1310720,
+          "core_version": "3.3.12",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          }
+        },
+        "optimized_before_open_slot": {
+          "binary_bytes": 1275408,
+          "binary_sha256": "017d139955f3a85c55c408faf60696a2833660c509f8ab6d13502ed771527a79",
+          "binary_path": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-pass15-output/DynamicPages.ino.bin",
+          "static_ram_bytes": 57508,
+          "flash_code_bytes": 1275166,
+          "app_partition_limit_bytes": 1310720,
+          "core_version": "3.3.12",
+          "settings": {
+            "build.f_cpu": "240000000L",
+            "build.flash_size": "4MB",
+            "build.flash_freq": "80m",
+            "build.flash_mode": "dio",
+            "build.partitions": "default",
+            "compiler.cpp.flags": "-MMD -c \"@/Users/radoslawkubera/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/flags/cpp_flags\" -w -Os -Werror=return-type",
+            "compiler.optimization_flags": "-Os"
+          }
+        }
+      },
+      "optimization_saved_bytes": 12688,
+      "remaining_growth_bytes": -1824,
+      "remaining_growth_percent": -0.14285177248975603,
+      "growth_removed_percent": 116.78939617083947,
+      "esp8266_tuning_saved_bytes": 688,
+      "index_pass_saved_bytes": 1728,
+      "header_init_saved_bytes": 576,
+      "frame_cleanup_saved_bytes": 96,
+      "open_slot_saved_bytes": 384
+    }
+  ],
+  "source_fingerprints": {
+    "before": "7cbabf437dfcff303e39fa2faa50534580d074a122d09bd5a4916fa3fc3f505c",
+    "after": "2c295d058647ec652150ee16f2cb310bbd7af82555b9fd7f465c6305dd7805d0",
+    "optimized": "12aa4b5750f26a370d6eaf84f3a9a6a2baf73095719c52d66037c62757398de4"
+  },
+  "source_files_changed": [
+    "src/ArdFS.cpp",
+    "src/ArdFS.h",
+    "src/ArdFSStorageLimits.h",
+    "src/ArdFSVolume.cpp",
+    "src/ArdFSVolume.h",
+    "src/ArdJSON.h",
+    "src/ArdPortalDeclarations.h",
+    "src/ArdPortalImpl.h",
+    "src/JournalReader.cpp",
+    "src/JournalReader.h",
+    "src/JsonDocumentStream.cpp",
+    "src/JsonDocumentStream.h",
+    "src/JsonStream.cpp",
+    "src/JsonStream.h"
+  ],
+  "optimization": {
+    "implementation": "Shared non-template syntax engine for DOM and streaming parsing, shared journal dispatch, reused validation state, factored failure paths. Bounded linked file index replaces vector relocation; all index allocations precede commit, transfer/verification states shared and callbacks moved. Small-offset flag/String layout for Xtensa; shared syntax/CRC sizing pass; scalar polynomial CRC combination; output uses existing byte buffer; internal callback parameter passed by rvalue reference. Shared bank/record header construction and publication; parser limits applied at construction without reset; one out-of-line syntax-engine constructor; ESP8266 aligned reads use the uint32_t core overload. Unified frame-key cleanup with trivial frame-array destruction; compact numeric transitions/terminal-state mask; threshold-based uint32 overflow check. Shared checked slot opening/existence probe for journal scan, payload delivery, repair, write and verification.",
+    "preserved": "Streaming I/O, syntax/UTF-8/duplicate-key validation, envelope/CRC format, two-copy recovery and repair.",
+    "measurement": "Final optimized builds use --clean and fresh build directories. Sketch dependency files verified to reference optimized21/src. Intermediate cached trials discarded."
+  },
+  "optimized_source_hashes": {
+    "src/ArdFS.cpp": "0d3b26e84ff2d259b6b4c433cd8c47853e31b12ab7d82e4bf0ebaba81f6708e0",
+    "src/ArdFS.h": "e8c060599d115ee52a9a1415b8b3658007e99b02a79a599f5e9f934aa2b3f34f",
+    "src/ArdFSStorageLimits.h": "35f2aaaf59e2c27da08d8c1f315f8d1bd6966741780d0d95825f55fbac17a684",
+    "src/ArdFSVolume.cpp": "4c89003a0e514a65db47fe96173f0fc49454eb79c8b72cd18ede47e33d036f34",
+    "src/ArdFSVolume.h": "4e0e57ec248ef4c2a3b7ac23097d076bf4cd49c2fbd99eeb61fdac34921c1fe7",
+    "src/ArdJSON.h": "f60dbad25141fcf071d62cced4c4f7c915fe2269cccb5cfcae2e047988bbb5bb",
+    "src/ArdPortalDeclarations.h": "05bf84ac06b6bc86c65287db593384489819f5fe1bc0ee461430737d9999f16f",
+    "src/ArdPortalImpl.h": "0480de0ef3d33eb907452735d61d93ed3706fd7c0b87e0dd6a879d98bb16d39e",
+    "src/JournalReader.cpp": "59614b25eb2ef3b1a794804c3b278382086e132a1d4b329a1f698c8e275faad4",
+    "src/JournalReader.h": "94ef96da52c6f62438425f9bd799b055fc30c9080d309f1f259ee5995aab179b",
+    "src/JsonDocumentStream.cpp": "efdbd5d28bbdaed959926858fa3272b1c06cfd5331133fe3ff0c8f8a9eea0b6d",
+    "src/JsonDocumentStream.h": "c87e7db12bd8fa3f916e87e7e9205b636d8e47fd7ffc3cd734e85dc5d5f9b7b3",
+    "src/JsonStream.cpp": "56a48494ba5f6ef34ebce80eb743dc3194b940064a08a19a12fa7e78068d772c",
+    "src/JsonStream.h": "1e811cb62ccc508370f5ef0d1e9a5be21b798d16353eda882e3e82ce9b6c2946"
+  },
+  "last_optimization_date": "2026-10-28",
+  "esp8266_analysis": {
+    "baseline_flash_read_function_bytes": 149,
+    "prior_optimized_flash_read_function_bytes": 149,
+    "baseline_loop_bytes": 4830,
+    "prior_optimized_loop_bytes": 3270,
+    "esp32_baseline_loop_bytes": 7125,
+    "esp32_prior_optimized_loop_bytes": 3979,
+    "inference": "Different savings from the pre-existing generated loop explain much of the different net growth; the raw ESP8266 flash reader did not grow.",
+    "state_bytes_before_layout": 960,
+    "state_bytes_after_layout": 944,
+    "crc_scratch_arrays_removed_bytes": 256
+  },
+  "header_init_validation": {
+    "flash_format": "Byte-identical 65536-byte images versus optimized10 after 40 writes with varying lengths, compaction and remount every fifth write.",
+    "flash_read_overload": "uint8_t overload remains linked elsewhere; no binary-size saving attributed to the aligned overload change."
+  },
+  "frame_cleanup_validation": {
+    "deep_metadata": "Repeated reset, EOF failure, duplicate-key rejection and destruction with open keyed objects beyond inline frame capacity.",
+    "unicode": "All scalar encodings/surrogates plus exhaustive lead/second-byte pairs at lengths 1..4 checked against independent ArdJSON UTF-8 validation.",
+    "rejected_utf8_trials": {
+      "esp8266_reference_bytes": 584848,
+      "range_validator_bytes": 584912,
+      "compact_range_validator_bytes": 584896,
+      "reason": "Correct, but both produced larger ESP8266 firmware; reverted."
+    }
+  },
+  "open_slot_trials": {
+    "esp8266_before_bytes": 584848,
+    "open_helper_only_bytes": 584704,
+    "open_and_read_helpers_bytes": 584768,
+    "scan_open_and_read_helpers_bytes": 584640,
+    "kept_scan_open_helper_bytes": 584592,
+    "rejected": "The common chunk-read helper increased ESP8266 code size; retained the smaller existing read paths."
+  },
+  "read_path_allocation_audit": {
+    "date": "2026-10-28",
+    "change": "Only writer handles copy paths; read handles use resolved address and length",
+    "whole_program_peak_heap_measured": false,
+    "trials": {
+      "22": {
+        "retained": false,
+        "images": {
+          "esp8266": {
+            "bytes": 584704,
+            "sha256": "237934c9fafbcebe7db06e1b34baecd67dda047e95bb723d0b397c28b20a61f9",
+            "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-pass22.log"
+          },
+          "esp32": {
+            "bytes": 1275120,
+            "sha256": "549bb58703c29709118c9966cf034857db45f418e730e85034aa899b284888e5",
+            "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-pass22.log"
+          }
+        }
+      },
+      "23": {
+        "retained": false,
+        "images": {
+          "esp8266": {
+            "bytes": 584592,
+            "sha256": "65be0d4fd78b1f87a2f55633ad70854c24ed5b5deda240cf859dd7d2c062a0fa",
+            "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-pass23.log"
+          },
+          "esp32": {
+            "bytes": 1275024,
+            "sha256": "b9669fe855ef7111e4a0144b0f40139cb6856a0e2c01f677731f45a0e13afd08",
+            "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-pass23.log"
+          }
+        }
+      },
+      "24": {
+        "retained": true,
+        "images": {
+          "esp8266": {
+            "bytes": 584608,
+            "sha256": "9d7ea4a6243432e0416dc546249efc1bdde3b077410a3754f49633289a865f4c",
+            "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-pass24.log"
+          },
+          "esp32": {
+            "bytes": 1275024,
+            "sha256": "f62cf25c4e2d46e45e5b1d16af25d4fc890dfb63d1f61787f1ec3ab5da6b44a3",
+            "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-pass24.log"
+          }
+        }
+      }
+    }
+  }
+}

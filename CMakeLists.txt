@@ -3,6 +3,7 @@
 # ESP-IDF component; Arduino IDE continues to use library.properties.
 idf_component_register(
     SRCS "src/ArdFS.cpp" "src/ArdFSVolume.cpp"
+         "src/JsonStream.cpp" "src/JournalReader.cpp" "src/JsonDocumentStream.cpp"
     INCLUDE_DIRS "src"
     REQUIRES arduino-esp32 esp_matter espressif__network_provisioning espressif__qrcode
 )

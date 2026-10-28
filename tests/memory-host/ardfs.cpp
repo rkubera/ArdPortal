@@ -1,5 +1,6 @@
 #include "Arduino.h"
 #include "../../src/ArdFS.h"
+#include "ConfigTestIO.h"
 #include <cassert>
 #include <fstream>
 
@@ -26,7 +27,7 @@ String load() {
   ArdFS fs;
   mount(fs);
   String value;
-  assert(fs.read("/config.json", [&](const ArdFS::Result& r) {
+  assert(readConfigText(fs, "/config.json", [&](const auto& r) {
     assert(r.ok && r.found);
     value = r.data;
   }));
@@ -148,7 +149,7 @@ void repairPowerCuts() {
   {
     ArdFS fs;
     mount(fs);
-    assert(fs.write("/config.json", expected, [](const ArdFS::Result& r) {
+    assert(writeConfigText(fs, "/config.json", expected, [](const auto& r) {
       assert(r.ok);
     }));
     drain(fs);
@@ -159,8 +160,8 @@ void repairPowerCuts() {
     ArdFS fs;
     mount(fs);
     ardfsFlashCalls = 0;
-    assert(fs.read(
-      "/config.json", [&](const ArdFS::Result& r) {
+    assert(readConfigText(fs,
+      "/config.json", [&](const auto& r) {
         assert(r.ok && r.redundant && r.repaired && r.data == expected);
       },
       true));
@@ -178,8 +179,8 @@ void repairPowerCuts() {
         ardfsFlashCalls = 0;
         ardfsFailAt = cut;
         ardfsTornOperation = torn;
-        assert(fs.read(
-          "/config.json", [](const ArdFS::Result&) {}, true));
+        assert(readConfigText(fs,
+          "/config.json", [](const auto&) {}, true));
         drain(fs);
       }
       ardfsPowerOff = false;
@@ -188,8 +189,8 @@ void repairPowerCuts() {
       {
         ArdFS fs;
         mount(fs);
-        assert(fs.read(
-          "/config.json", [&](const ArdFS::Result& r) {
+        assert(readConfigText(fs,
+          "/config.json", [&](const auto& r) {
             assert(r.ok && r.redundant && r.data == expected);
           },
           true));
@@ -216,7 +217,7 @@ int main() {
   {
     ArdFS fs;
     mount(fs);
-    assert(fs.write("/config.json", oldValue, [](const ArdFS::Result& r) {
+    assert(writeConfigText(fs, "/config.json", oldValue, [](const auto& r) {
       assert(r.ok && r.changed);
     }));
     drain(fs);
@@ -227,11 +228,11 @@ int main() {
     ArdFS fs;
     mount(fs);
     ardfsFlashCalls = 0;
-    assert(fs.writeJson(
+    assert(fs.writeJsonConfig(
       "/config.json", newValue.length(), [&](size_t at, size_t maximum) {
         return newValue.substring(at, at + maximum);
       },
-      [](const ArdFS::Result& r) {
+      [](const auto& r) {
         assert(r.ok && r.changed);
       }));
     drain(fs);
@@ -249,11 +250,11 @@ int main() {
         ardfsFlashCalls = 0;
         ardfsFailAt = cut;
         ardfsTornOperation = torn;
-        assert(fs.writeJson(
+        assert(fs.writeJsonConfig(
           "/config.json", newValue.length(), [&](size_t at, size_t maximum) {
             return newValue.substring(at, at + maximum);
           },
-          [](const ArdFS::Result&) {}));
+          [](const auto&) {}));
         drain(fs);
         // Reads/programs/erases remain failed during teardown: no extra commit after power loss.
       }
@@ -271,7 +272,7 @@ int main() {
     mount(fs);
     for (int i = 0; i < 6; ++i) {
       prior = "{\"count\":" + String(i) + "}";
-      assert(fs.write("/config.json", prior, [](const ArdFS::Result& r) {
+      assert(writeConfigText(fs, "/config.json", prior, [](const auto& r) {
         assert(r.ok);
       }));
       drain(fs);
@@ -283,7 +284,7 @@ int main() {
     ArdFS fs;
     mount(fs);
     ardfsFlashCalls = 0;
-    assert(fs.write("/config.json", newValue, [](const ArdFS::Result& r) {
+    assert(writeConfigText(fs, "/config.json", newValue, [](const auto& r) {
       assert(r.ok);
     }));
     drain(fs);
@@ -301,7 +302,7 @@ int main() {
         ardfsFlashCalls = 0;
         ardfsFailAt = cut;
         ardfsTornOperation = torn;
-        assert(fs.write("/config.json", newValue, [](const ArdFS::Result&) {}));
+        assert(writeConfigText(fs, "/config.json", newValue, [](const auto&) {}));
         drain(fs);
       }
       ardfsPowerOff = false;
@@ -314,16 +315,16 @@ int main() {
     ArdFS fs;
     mount(fs);
     int writes = ardfsPrograms, erases = ardfsErases;
-    assert(fs.write("/config.json", oldValue, [](const ArdFS::Result& r) {
+    assert(writeConfigText(fs, "/config.json", oldValue, [](const auto& r) {
       assert(r.ok && !r.changed);
     }));
     drain(fs);
     assert(ardfsPrograms == writes && ardfsErases == erases && fs.skipped() == 1);
-    assert(fs.write("/second.json", "{\"value\":2}", [](const ArdFS::Result& r) {
+    assert(writeConfigText(fs, "/second.json", "{\"value\":2}", [](const auto& r) {
       assert(r.ok);
     }));
     drain(fs);
-    assert(fs.read("/second.json", [](const ArdFS::Result& r) {
+    assert(readConfigText(fs, "/second.json", [](const auto& r) {
       assert(r.ok && r.data == "{\"value\":2}");
     }));
     drain(fs);
@@ -333,7 +334,7 @@ int main() {
   {
     ArdFS fs;
     mount(fs);
-    assert(fs.write("/ardportal.json", snapshot, [](const ArdFS::Result& r) {
+    assert(writeConfigText(fs, "/ardportal.json", snapshot, [](const auto& r) {
       assert(r.ok);
     }));
     drain(fs);
@@ -342,7 +343,7 @@ int main() {
   {
     ArdFS fs;
     mount(fs);
-    assert(fs.read("/ardportal.json", [&](const ArdFS::Result& r) {
+    assert(readConfigText(fs, "/ardportal.json", [&](const auto& r) {
       assert(r.ok && r.found && r.data == snapshot);
     }));
     drain(fs);

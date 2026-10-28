@@ -9,13 +9,15 @@
 #include "ArdFSVolume.h"
 #endif
 #include <functional>
+namespace ArdUILanguageData { enum class Key : uint16_t; }
 #include "JsonCodec.h"
+#include "JournalReader.h"
 #include "JournalStream.h"
 
-// Cooperative JSON storage. Each loop advances one phase; transfers use at most
-// 256 bytes. writeJson() validates envelopes and computes CRC incrementally;
-// read()/write() retain their legacy full-document JSON path. Core flash operations
-// and producer callbacks remain synchronous.
+// Cooperative JSON and raw-file storage, including mount, format and repair.
+// Each loop transfers at most 256 logical bytes or erases one flash sector.
+// Streaming JSON validation retains structural/key metadata, not payload values.
+// Individual core flash operations and application callbacks remain synchronous.
 // One transaction at a time; use separate paths for unrelated documents.
 class ArdFS {
 public:
@@ -23,7 +25,7 @@ public:
     bool ok = false, found = false, changed = false, recovered = false;
     bool redundant = false, repaired = false;
     uint8_t repairAttempts = 0;
-    String data, error;
+    String error;
   };
   using Callback = std::function<void(const Result&)>;
   /**
@@ -36,32 +38,28 @@ public:
    * @return No value.
    */
   void loop();
-  /**
-   * @brief Request or perform a read through the component API.
-   * @param path Journal file path.
-   * @param callback Completion handler; failed repair still returns the verified source in data.
-   * @param repair Restore a missing or invalid alternate from the verified source before completion.
-   * @return True if the operation was accepted; loop() later reports its result through callback. False if busy or input cannot be accepted.
-   */
-  bool read(const String& path, Callback callback, bool repair = false);
-  /**
-   * @brief Request or perform a write through the component API.
-   * @param path Journal file path.
-   * @param json JSON document text to persist.
-   * @param callback Completion or event handler supplied to this operation.
-   * @return True if the operation was accepted; loop() later reports its result through callback. False if busy or input cannot be accepted.
-   */
-  bool write(const String& path, const String& json, Callback callback);
-  // The source must be a validated JSON serialization and remain immutable until completion.
+  // The source must remain immutable until completion. Syntax is checked incrementally.
   // Each call returns exactly min(maximum,length-offset) bytes, or empty on failure.
   using JsonSource = std::function<String(size_t offset, size_t maximum)>;
-  /** @brief Queue a streamed, validated JSON document for journaled storage.
+  /** @brief Queue a JSON document for incremental validation and streamed journaled storage.
    * @param path Journal file path.
    * @param length Exact serialized byte count.
    * @param source Immutable source returning requested slices until callback completion; empty signals failure.
    * @param callback Receives completion/error from loop().
    * @return True if accepted, not confirmation that data has been committed. */
-  bool writeJson(const String& path, size_t length, JsonSource source, Callback callback);
+  bool writeJsonConfig(const String& path, size_t length, JsonSource source, Callback callback);
+
+  // Raw files have no JSON envelope or document-size limit. Capacity is bounded
+  // by one flash bank and the other live files. Sources must remain immutable;
+  // verification requests the bytes again. Embedded NUL bytes are supported.
+  using FileSource = JsonSource;
+  using FileSink = std::function<bool(size_t offset, const uint8_t* bytes, size_t length)>;
+  /** @brief Validate both JSON copies, then stream the selected payload to the sink. */
+  bool readJsonConfig(const String& path, FileSink sink, Callback callback, bool repair = false);
+  /** @brief Queue a raw binary file write of a known length; completion is reported from loop(). */
+  bool writeFile(const String& path, size_t length, FileSource source, Callback callback);
+  /** @brief Stream a raw file to a sink; false from the sink aborts with an error. */
+  bool readFile(const String& path, FileSink sink, Callback callback);
 
   /**
    * @brief Queue formatting of the storage volume; existing records will be discarded.
@@ -111,6 +109,7 @@ public:
   uint32_t skipped() const {
     return _skipped;
   }
+  // SIZE_MAX means no fixed document limit; usable capacity depends on the volume.
   static constexpr size_t MaxBytes = ArdFSMaxDocumentBytes;
 private:
   enum class Phase { Mount,
@@ -118,43 +117,62 @@ private:
                      Format,
                      Remount,
                      Idle,
+                     OpenFileRead,
+                     ReadFile,
                      OpenRead,
                      Read,
                      Validate,
+                     OpenPayload,
+                     ReadPayload,
+                     DeliverPayload,
+                     ReadRepair,
+                     WriteRepair,
                      Prepare,
                      RepairWait,
                      SourceCrc,
                      OpenWrite,
+                     PrepareWrite,
                      Write,
                      Flush,
                      CloseWrite,
                      OpenVerify,
                      Verify,
                      CloseVerify };
+  // Xtensa L8UI has an 8-bit byte offset. Keep flags and frequently addressed
+  // Strings ahead of the large parser and transfer buffers.
   Phase _phase = Phase::Idle;
   bool _mountDone = false, _mounted = false, _writing = false, _formatRequested = false;
-  bool _valid[2] = { false, false }, _present[2] = { false, false }, _match[2] = { false, false };
-  uint32_t _generation[2] = { 0, 0 }, _commits = 0, _skipped = 0;
-  int _slot = 0, _best = -1;
-  size_t _offset = 0, _expected = 0;
-  String _path, _input, _buffer, _bestData, _error;
-  ArdJsonCodec _json;
-  ArdFSVolume _volume;
-  ArdFSFile _file;
+  bool _valid[2] = {false, false}, _present[2] = {false, false}, _match[2] = {false, false};
+  bool _rawFile = false;
+  bool _legacy[2] = {false, false}, _legacyMatch = false;
+  bool _repairFailed = false, _repairDone = false;
+  bool _repairRequested = false, _repairing = false;
+  bool _sourceMatch = false, _sourceFailed = false;
+  uint8_t _repairAttempts = 0, _journalStage = 0;
+  char _escape[6] = {};
+  String _path, _error, _repairError, _rawSourceCompare, _sourceCompare, _raw, _journalHeader;
+  ArdFSFile _file, _repairFile;
   Callback _callback;
   JsonSource _source;
-  ArdJournalStream _journal;
-  bool _repairRequested = false, _repairing = false;
-  uint8_t _repairAttempts = 0;
+  FileSink _sink;
+  uint32_t _generation[2] = {0, 0}, _commits = 0, _skipped = 0;
+  int _slot = 0, _best = -1;
+  size_t _offset = 0, _expected = 0;
+  size_t _decodedSize = 0, _payloadAt = 0, _decodedAt = 0;
+  uint32_t _runningFileCrc = UINT32_MAX, _fileCrc[2] = {0, 0};
+  size_t _rawCompareAt = 0;
+  size_t _length[2] = {0, 0}, _physicalLength[2] = {0, 0};
   uint32_t _repairRetrySince = 0;
-  bool _sourceLegacy = false, _sourceMatch = false, _sourceFailed = false;
   size_t _sourceLength = 0, _sourceAt = 0, _sourceCompareAt = 0, _escapedLength = 0, _journalHeaderAt = 0, _rawAt = 0, _escapeAt = 0, _escapeLength = 0;
-  uint8_t _journalStage = 0;
   uint32_t _sourceCrc = 0, _sourceGeneration = 0;
-  String _sourceCompare, _raw, _journalHeader;
-  char _escape[6] = {};
+  ArdFSVolume _volume;
+  ArdJournalReader _reader;
+  uint8_t _decoded[260] = {};
   void resetJournalOutput();
-  String journalOutput();
+  size_t journalOutput();
+  String sourcePart(size_t offset, size_t maximum);
+  enum class OpenMode : uint8_t { Read, Write, Scan };
+  bool openSlot(ArdFSFile& file, int slot, OpenMode mode, ArdUILanguageData::Key failure);
 
   /**
    * @brief Choose the primary or journal path for a configuration slot.
@@ -170,7 +188,7 @@ private:
    * @param callback Completion or event handler supplied to this operation.
    * @return True if the operation was accepted; loop() later reports its result through callback. False if busy or input cannot be accepted.
    */
-  bool start(const String& path, Callback callback);
+  bool start(const String& path, Callback&& callback);
   /**
    * @brief Complete the operation and report its stored result.
    * @param ok Whether the completed operation succeeded.
@@ -178,6 +196,7 @@ private:
    * @param changed Whether persistent contents changed during this operation.
    * @return No value.
    */
+  void fail(ArdUILanguageData::Key message);
   void finish(bool ok, const String& error = "", bool changed = false);
   /**
    * @brief Compute the checksum covering the journal generation and document bytes.

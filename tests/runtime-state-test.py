@@ -56,4 +56,4 @@ int main(){
 with tempfile.TemporaryDirectory(prefix='ardportal-runtime-test-') as tmp:
  tmp=Path(tmp);(tmp/'test.cpp').write_text(fixture+func+main)
  for matter in (0,1):
-  subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror',f'-DARDPORTAL_ENABLE_MATTER={matter}','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),'-o',str(tmp/'test')],check=True);subprocess.run([str(tmp/'test')],check=True)
+  subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror',f'-DARDPORTAL_ENABLE_MATTER={matter}','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),str(root/'src/JsonStream.cpp'), str(root/'src/JsonDocumentStream.cpp'), '-o',str(tmp/'test')],check=True);subprocess.run([str(tmp/'test')],check=True)

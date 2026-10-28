@@ -28,6 +28,6 @@ int main(){
 '''
 with tempfile.TemporaryDirectory(prefix='ardportal-matter-traffic-') as directory:
  cpp=Path(directory)/'test.cpp';cpp.write_text(source);exe=Path(directory)/'test'
- subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'src'),'-I'+str(root/'tests/host'),str(cpp),'-o',str(exe)],check=True)
+ subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'src'),'-I'+str(root/'tests/host'),str(cpp),str(root/'src/JsonStream.cpp'), str(root/'src/JsonDocumentStream.cpp'), '-o',str(exe)],check=True)
  subprocess.run([str(exe)],check=True)
 print('PASS: human Matter actions, accepted/rejected commands, named controls, units, climate targets and color/brightness')

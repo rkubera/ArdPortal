@@ -4,7 +4,6 @@
 #include <Arduino.h>
 #include "ArdAllocation.h"
 #include <memory>
-#include <vector>
 #if defined(ESP32)
 #include <esp_partition.h>
 #endif
@@ -28,7 +27,10 @@ public:
    * Input: ArdFSFile&&.
    * @return Reference to this instance after assignment; deleted overloads cannot be called.
    */
-  ArdFSFile& operator=(ArdFSFile&&) = default;
+  ArdFSFile& operator=(ArdFSFile&& other) noexcept {
+    if (this != &other) { close(); _handle = std::move(other._handle); }
+    return *this;
+  }
   /**
    * @brief Disallow copying or moving this resource-owning instance.
    * Input: const ArdFSFile&.
@@ -48,7 +50,7 @@ public:
    */
   explicit operator bool() const;
   /**
-   * @brief Read the buffered file length.
+   * @brief Read the file length.
    * @return Number of file bytes, or zero for a closed handle.
    */
   size_t size() const;
@@ -60,20 +62,24 @@ public:
    */
   int read(uint8_t*, size_t);
   /**
-   * @brief Append bytes to the writable file buffer.
+   * @brief Write bytes directly to the uncommitted flash record.
    * Input: const uint8_t* p, the source buffer.
    * Input: size_t n, the number of bytes to transfer or erase.
    * @return Number of bytes appended, or zero when the write cannot be accepted.
    */
   size_t write(const uint8_t*, size_t);
   /**
-   * @brief Commit dirty buffered file contents to the journal.
+   * @brief Verify and commit the streamed flash record.
    * @return True on a successful commit or when no commit is needed; false on failure.
    */
   bool flush();
+  // Cooperative steps: -1 = error, 0 = pending, 1 = complete.
+  // Each step performs at most one bounded transfer or one sector erase.
+  int prepareStep();
+  int flushStep();
   /**
-   * @brief Flush the file if needed and release its handle.
-   * @return Whether the flush completed successfully.
+   * @brief Release the handle; an uncommitted write is abandoned.
+   * @return True after releasing the handle.
    */
   bool close();
 private:
@@ -81,9 +87,17 @@ private:
   struct Handle {
     ARDPORTAL_NO_THROW_ALLOCATION ArdFSVolume* volume;
     String path;
-    String data;
+    uint32_t address = 0, bank = 0, record = 0, capacity = 0, length = 0;
+    size_t expected = SIZE_MAX;
+    uint32_t checksum = 0xffffffff;
+    bool failed = false, committed = false, compacting = false;
     size_t offset = 0;
-    bool writing = false, dirty = false;
+    bool writing = false;
+    uint8_t prepareStage = 0, reserveStage = 0, finishStage = 0, flushStage = 0;
+    uint32_t workAt = 0, extent = 0, verified = 0, verifiedBody = 0;
+    size_t copyIndex = 0, copyAt = 0, copyCount = 0;
+    uint8_t header[32] = {}, bytes[256] = {};
+    std::unique_ptr<Handle> copy;
   };
   std::unique_ptr<Handle> _handle;
 };
@@ -119,6 +133,7 @@ public:
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool begin();
+  int beginStep();
   /**
    * @brief Unmount the volume and release its active state.
    * @return No value.
@@ -126,12 +141,15 @@ public:
   void end() {
     _mounted = false;
     _entries.clear();
+    _mountStage = _formatStage = 0;
+    _scanPath = String();
   }
   /**
    * @brief Format the storage volume, discarding its existing records.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool format();
+  int formatStep();
   /**
    * @brief Check whether the mounted journal contains the requested path.
    * Input: const char* path, the journal file path.
@@ -142,9 +160,15 @@ public:
    * @brief Open a journal path for the requested access mode.
    * Input: const char* path, the journal file path.
    * Input: const char* mode, the read or write access mode.
+   * Input: size_t length, exact write length; omitted reserves available capacity.
+   * Input: bool deferred, true to prepare the writer through prepareStep().
    * @return File handle; its boolean conversion is false when opening fails.
    */
-  ArdFSFile open(const char*, const char*);
+  ArdFSFile open(const char*, const char*, size_t length = SIZE_MAX, bool deferred = false);
+  // Upper bound for one record; other live files and sector rounding may reduce it.
+  size_t maxFileBytes(size_t pathBytes) const {
+    return _mounted && pathBytes && pathBytes <= 72 ? _bankSize - 4096 - 32 - pathBytes : 0;
+  }
   /**
    * @brief Read the last storage error code.
    * @return The last storage error code.
@@ -155,12 +179,31 @@ public:
 private:
   friend class ArdFSFile;
   struct Entry {
+    ARDPORTAL_NO_THROW_ALLOCATION
     String path;
     uint32_t address, length;
+    Entry* next = nullptr;
   };
-  std::vector<Entry> _entries;
-  bool _mounted = false, _configured = false;
+  // A bounded index needs neither contiguous growth nor relocation of paths.
+  struct Index {
+    Entry* head = nullptr;
+    size_t count = 0;
+    ~Index() { clear(); }
+    void clear();
+    Entry* find(const char* path) const;
+    Entry* at(size_t index) const;
+    bool set(const String& path, uint32_t address, uint32_t length);
+    void merge(Index& other);
+  };
+  Index _entries;
+  bool _mounted = false, _configured = false, _writer = false;
+  Index _staged;
   int _error = 0;
+  uint8_t _mountStage = 0, _formatStage = 0;
+  uint8_t _bankHeaders[2][32] = {};
+  uint32_t _scanExtent = 0, _scanName = 0, _scanLength = 0, _scanAt = 0;
+  uint32_t _scanCrc = 0, _scanExpected = 0, _formatAt = 0;
+  String _scanPath;
   uint32_t _address = 0, _size = 0, _bankSize = 0, _active = 0, _generation = 0, _next = 0;
 #if defined(ESP32)
   const esp_partition_t* _partition = nullptr;
@@ -193,38 +236,12 @@ private:
    * @return True if the aligned sector range was erased; false for invalid alignment, bounds or a flash error.
    */
   bool eraseRaw(uint32_t, size_t);
-  /**
-   * @brief Scan committed journal records and rebuild the live file index.
-   * Input: uint32_t address, the byte offset within the volume.
-   * Input: std::vector<Entry>&.
-   * Input: uint32_t&.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool scan(uint32_t, std::vector<Entry>&, uint32_t&);
-  /**
-   * @brief Append new file contents to the journal, compacting the bank when necessary.
-   * Input: const String&.
-   * Input: const String&.
-   * @return True when the record is committed; false on space, allocation or flash failure.
-   */
-  bool commit(const String&, const String&);
-  /**
-   * @brief Append the supplied data or journal record to the current destination.
-   * Input: uint32_t address, the byte offset within the volume.
-   * Input: uint32_t&.
-   * Input: const String&.
-   * Input: const String&.
-   * Input: std::vector<Entry>&.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool append(uint32_t, uint32_t&, const String&, const String&, std::vector<Entry>&);
-  /**
-   * @brief Copy live records to the alternate bank and atomically commit a new generation with the replacement file.
-   * Input: const String&.
-   * Input: const String&.
-   * @return True when the new bank is committed; false on allocation or flash failure.
-   */
-  bool compact(const String&, const String&);
+  // Reserve an erased record, stream its body, then publish its commit marker.
+  int prepareStep(ArdFSFile::Handle&);
+  int reserveStep(ArdFSFile::Handle&);
+  int finishRecordStep(ArdFSFile::Handle&);
+  int publishStep(uint32_t address, const uint8_t* header, uint8_t* scratch, uint8_t& stage);
+  static uint32_t makeHeader(uint8_t* bytes, uint32_t magic, uint32_t a, uint32_t b, uint32_t c);
   /**
    * @brief Update the journal CRC-32 checksum over a byte range.
    * Input: const void* bytes, the source buffer.

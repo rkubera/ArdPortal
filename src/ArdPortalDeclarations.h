@@ -25,6 +25,7 @@ enum class Key : uint16_t;
 #include "ArdFS.h"
 #include "ArdJSON.h"
 #include "JsonCodec.h"
+#include "JsonDocumentStream.h"
 #include "AppConfigRegistrationError.h"
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
 #include "DynamicPages.h"
@@ -1122,6 +1123,7 @@ private:
 #endif
   PortalConfig _config, _pending;
   ArdFS _storage;
+  std::unique_ptr<ArdJSON::StreamParser> _loadParser;
   ArdJsonCodec _json;
 #if ARDPORTAL_ENABLE_WWW
   DNSServer _dns;

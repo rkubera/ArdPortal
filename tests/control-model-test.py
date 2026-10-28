@@ -22,7 +22,7 @@ def compile_run(work, name, body, flags=()):
     source.write_text('#include <cassert>\n#define ARDPORTAL_DEFINE_CONTROL_DATA\n#include "ControlModel.h"\n#include "HaEntities.h"\nuint32_t fakeMillis=0;\nusing V=ArdJSON::JSONVar;\nint main(){\n' + body + '\n}\n')
     subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-Wall', '-Wextra', '-Werror', '-Os',
                     '-fsanitize=address,undefined', '-I'+str(ROOT/'tests/host'), '-I'+str(ROOT/'src'),
-                    *flags, str(source), '-o', str(target)], check=True)
+                    *flags, str(source), str(ROOT/'src/JsonStream.cpp'), str(ROOT/'src/JsonDocumentStream.cpp'), '-o', str(target)], check=True)
     subprocess.run([str(target)], check=True)
     return target.read_bytes()
 

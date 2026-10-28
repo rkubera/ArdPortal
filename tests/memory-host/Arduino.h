@@ -197,6 +197,10 @@ struct EspStub {
     return 24000;
   }
   int restarts = 0;
+  bool flashRead(uint32_t address, uint32_t* bytes, size_t size) {
+    if (reinterpret_cast<uintptr_t>(bytes) & 3U) return false;
+    return flashRead(address, reinterpret_cast<uint8_t*>(bytes), size);
+  }
   bool flashRead(uint32_t address, uint8_t* bytes, size_t size) {
     if ((address & 3U) || (size & 3U) || !ardfsFlashRange(address, size) || ardfsFlashFailure()) return false;
     memcpy(bytes, ardfsTestFlash.data() + address - 0x100000U, size);

@@ -33,6 +33,8 @@ struct ArdFSFile {
     data->insert(data->end(), bytes, bytes + length);
     return length;
   }
+  int prepareStep() { return 1; }
+  int flushStep() { return flush() ? 1 : -1; }
   bool flush() {
     return !failFileWrite;
   }
@@ -41,9 +43,12 @@ struct ArdFSFile {
   }
 };
 struct ArdFSVolume {
+  size_t maxFileBytes(size_t) const { return 1024 * 1024; }
   int lastError() const {
-    return 0;
+    return failMount ? -5 : 0;
   }
+  int beginStep() { return begin() ? 1 : -1; }
+  int formatStep() { return format() ? 1 : -1; }
   bool begin() {
     return !failMount;
   }
@@ -60,7 +65,7 @@ struct ArdFSVolume {
     failMount = false;
     return true;
   }
-  ArdFSFile open(const char* path, const char* mode) {
+  ArdFSFile open(const char* path, const char* mode, size_t = SIZE_MAX, bool = false) {
     if (*mode == 'w') {
       ++fakeOpenWrites;
       fakeFiles[path].clear();

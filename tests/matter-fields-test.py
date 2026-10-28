@@ -88,6 +88,6 @@ source = source.replace('int main() {', 'int main() {\n' + example_checks)
 with tempfile.TemporaryDirectory(prefix="ardportal-matter-fields-") as directory:
     path = Path(directory)
     (path/"test.cpp").write_text(source)
-    subprocess.run([os.environ.get("CXX", "c++"), "-std=c++17", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined", "-I"+str(root/"tests/host"), "-I"+str(root/"src"), str(path/"test.cpp"), "-o", str(path/"test")], check=True)
+    subprocess.run([os.environ.get("CXX", "c++"), "-std=c++17", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined", "-I"+str(root/"tests/host"), "-I"+str(root/"src"), str(path/"test.cpp"), str(root/'src/JsonStream.cpp'), str(root/'src/JsonDocumentStream.cpp'), "-o", str(path/"test")], check=True)
     subprocess.run([str(path/"test")], check=True)
 print("Matter field mappings passed")

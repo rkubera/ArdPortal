@@ -81,6 +81,6 @@ with tempfile.TemporaryDirectory(prefix='ardportal-dht-readings-') as directory:
     (path / 'test.cpp').write_text(source)
     subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-Wall', '-Wextra', '-Werror',
                     '-fsanitize=address,undefined', '-I' + str(ROOT / 'tests/host'), '-I' + str(ROOT / 'src'),
-                    str(path / 'test.cpp'), '-o', str(path / 'test')], check=True)
+                    str(path / 'test.cpp'), str(ROOT/'src/JsonStream.cpp'), str(ROOT/'src/JsonDocumentStream.cpp'), '-o', str(path / 'test')], check=True)
     subprocess.run([str(path / 'test')], check=True)
 print('PASS: DHT numeric/default/null readings, calibration, rounding, humidity bounds and readiness')

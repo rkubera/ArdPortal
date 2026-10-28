@@ -101,6 +101,6 @@ int main(){
 with tempfile.TemporaryDirectory(prefix='ardportal-matter-dimmer-') as directory:
     path=Path(directory)
     (path/'test.cpp').write_text(fixture+source[a:b]+source[source.index("inline bool ArdMatter::publish("):]+main)
-    subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(path/'test.cpp'),'-o',str(path/'test')],check=True)
+    subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(path/'test.cpp'),str(root/'src/JsonStream.cpp'), str(root/'src/JsonDocumentStream.cpp'), '-o',str(path/'test')],check=True)
     subprocess.run([str(path/'test')],check=True)
 print('PASS: actual Matter dimmer callback preserves off state and remembered brightness')

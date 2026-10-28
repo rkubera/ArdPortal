@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include "CooperativeBudget.h"
 #include "ArdAllocation.h"
+#include "JsonStream.h"
 #include <memory>
 #include <new>
 #include <type_traits>
@@ -26,6 +27,7 @@ struct Limits {
   unsigned maxDepth = 16;   // Parser and writer also enforce a hard ceiling of 32.
 };
 class Parser;
+class StreamParser;
 class Writer;
 class ObjectKey;
 class JSONVar {
@@ -424,6 +426,7 @@ private:
    */
   void clear();
   friend class Parser;
+  friend class StreamParser;
   friend class Writer;
 };
 // Common immutable object keys share flash storage. Other keys own exact bytes,
@@ -1091,289 +1094,46 @@ inline bool validUtf8(const String& text) {
   }
   return true;
 }
+// DOM construction and storage validation share the same incremental grammar.
+class StreamParser {
+public:
+  ARDPORTAL_NO_THROW_ALLOCATION
+  explicit StreamParser(const Limits& limits = Limits());
+  void reset(const Limits& limits = Limits());
+  bool input(size_t offset, const uint8_t* bytes, size_t length);
+  JSONVar take();
+  const char* error() const { return _error; }
+  size_t offset() const { return _offset; }
+  size_t nodes() const { return _nodes; }
+private:
+  ArdJsonStream _syntax{16, false};
+  Limits _limits;
+  ArdCooperativeBudget _budget;
+  JSONVar _root;
+  JSONVar* _containers[33] = {};
+  JSONVar* _current = nullptr;
+  String _key;
+  size_t _bytes = 0, _nodes = 0, _offset = 0;
+  const char* _error = nullptr;
+  bool fail(const char* error);
+  bool append(String& text, uint8_t b, bool stringLimit = true);
+  JSONVar* value(unsigned depth);
+  bool consume(ArdJsonStream::Event event, uint8_t b, unsigned depth);
+  static bool dispatch(void* context, ArdJsonStream::Event event, uint8_t b, unsigned depth);
+  static const char* syntaxError(ArdJsonStream::Error error);
+};
 class Parser {
 public:
-  /**
-   * @brief Initialize this instance and its owned state.
-   * @param input Source text or bytes to process.
-   * @param limits JSON parsing or serialization resource limits.
-   * @return No value.
-   */
-  Parser(const String& input, const Limits& limits)
-    : _input(input), _limits(limits) {}
-  /**
-   * @brief Parse JSON text with the supplied resource limits.
-   * @return Parsed JSON value, or Undefined with error text when input is invalid or a resource limit is exceeded.
-   */
-  JSONVar parse() {
-    JSONVar value;
-    if (_input.length() > _limits.maxInputBytes) {
-      fail(ARD_LANG_NATIVE_INPUT_LIMIT);
-      return value;
-    }
-    if (!readValue(value, 0)) return JSONVar();
-    whitespace();
-    if (_offset != _input.length()) {
-      fail(ARD_LANG_NATIVE_TRAILING_DATA);
-      return JSONVar();
-    }
-    return value;
-  }
-  /**
-   * @brief Expose the most recent error reported by this component.
-   * @return Reference to the last error text; empty when no error is recorded.
-   */
-  const char* error() const {
-    return _error;
-  }
-  /**
-   * @brief Read the current position in the source or output.
-   * @return The current position in the source or output.
-   */
-  size_t offset() const {
-    return _offset;
-  }
-  /**
-   * @brief Read the number of JSON nodes consumed or required.
-   * @return The number of JSON nodes consumed or required.
-   */
-  size_t nodes() const {
-    return _nodes;
-  }
+  Parser(const String& input, const Limits& limits) : _input(input), _limits(limits) {}
+  JSONVar parse();
+  const char* error() const { return _error; }
+  size_t offset() const { return _offset; }
+  size_t nodes() const { return _nodes; }
 private:
-  ArdCooperativeBudget _budget;
   const String& _input;
   const Limits& _limits;
   size_t _offset = 0, _nodes = 0;
   const char* _error = nullptr;
-  /**
-   * @brief Record the parser or writer failure and stop further processing.
-   * @param error Output error text; populated when the operation fails.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool fail(const char* error) {
-    if (!_error) _error = error;
-    return false;
-  }
-  /**
-   * @brief Read the current parser character without advancing its cursor.
-   * @return Current character, or the parser end-of-input sentinel.
-   */
-  char peek() const {
-    return _offset < _input.length() ? _input[_offset] : 0;
-  }
-  /**
-   * @brief Skip JSON whitespace at the current input position.
-   * @return No value.
-   */
-  void whitespace() {
-    while (peek() == ' ' || peek() == '\t' || peek() == '\r' || peek() == '\n') {
-      ++_offset;
-      if ((_offset & 127) == 0) _budget.checkpoint();
-    }
-  }
-  /**
-   * @brief Check take.
-   * @param c Current character or running CRC state, according to its type.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool take(char c) {
-    whitespace();
-    if (_offset >= _input.length() || peek() != c) return false;
-    ++_offset;
-    return true;
-  }
-  /**
-   * @brief Append output bytes while enforcing the writer output budget.
-   * @param out Output destination populated by this operation.
-   * @param c Current character or running CRC state, according to its type.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool put(String& out, char c) {
-    size_t size = out.length();
-    out += c;
-    return out.length() == size + 1 || fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
-  }
-  /**
-   * @brief Decode four hexadecimal digits from a JSON Unicode escape.
-   * @param code Protocol, language or error code.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool hex4(uint32_t& code) {
-    code = 0;
-    for (unsigned i = 0; i < 4; ++i) {
-      char c = peek();
-      unsigned digit;
-      if (c >= '0' && c <= '9') digit = c - '0';
-      else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
-      else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
-      else return fail(ARD_LANG_NATIVE_INVALID_UNICODE_ESCAPE);
-      ++_offset;
-      code = (code << 4) | digit;
-    }
-    return true;
-  }
-  /**
-   * @brief Encode a decoded Unicode code point into UTF-8.
-   * @param out Output destination populated by this operation.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool unicode(String& out) {
-    uint32_t code;
-    if (!hex4(code)) return false;
-    if (code >= 0xd800 && code <= 0xdbff) {
-      if (peek() != '\\') return fail(ARD_LANG_NATIVE_MISSING_LOW_SURROGATE);
-      ++_offset;
-      if (peek() != 'u') return fail(ARD_LANG_NATIVE_MISSING_LOW_SURROGATE);
-      ++_offset;
-      uint32_t low;
-      if (!hex4(low) || low < 0xdc00 || low > 0xdfff) return fail(ARD_LANG_NATIVE_INVALID_LOW_SURROGATE);
-      code = 0x10000 + ((code - 0xd800) << 10) + low - 0xdc00;
-    } else if (code >= 0xdc00 && code <= 0xdfff) return fail(ARD_LANG_NATIVE_UNPAIRED_SURROGATE);
-    if (code < 0x80) return put(out, char(code));
-    if (code < 0x800) return put(out, char(0xc0 | (code >> 6))) && put(out, char(0x80 | (code & 63)));
-    if (code < 0x10000) return put(out, char(0xe0 | (code >> 12))) && put(out, char(0x80 | ((code >> 6) & 63))) && put(out, char(0x80 | (code & 63)));
-    return put(out, char(0xf0 | (code >> 18))) && put(out, char(0x80 | ((code >> 12) & 63))) && put(out, char(0x80 | ((code >> 6) & 63))) && put(out, char(0x80 | (code & 63)));
-  }
-  /**
-   * @brief Parse or serialize a JSON string and its escaping.
-   * @param out Output destination populated by this operation.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool string(String& out) {
-    if (!take('"')) return fail(ARD_LANG_NATIVE_EXPECTED_STRING);
-    out = "";
-    while (_offset < _input.length()) {
-      if ((_offset & 127) == 0) _budget.checkpoint();
-      uint8_t c = _input[_offset++];
-      if (c == '"') return validUtf8(out) || fail(ARD_LANG_NATIVE_INVALID_UTF_8);
-      if (c < 32) return fail(ARD_LANG_NATIVE_UNESCAPED_CONTROL_CHARACTER);
-      if (c == '\\') {
-        if (_offset == _input.length()) return fail(ARD_LANG_NATIVE_UNFINISHED_ESCAPE);
-        char escape = _input[_offset++];
-        switch (escape) {
-          case '"':
-          case '\\':
-          case '/':
-            if (!put(out, escape)) return false;
-            break;
-          case 'b':
-            if (!put(out, '\b')) return false;
-            break;
-          case 'f':
-            if (!put(out, '\f')) return false;
-            break;
-          case 'n':
-            if (!put(out, '\n')) return false;
-            break;
-          case 'r':
-            if (!put(out, '\r')) return false;
-            break;
-          case 't':
-            if (!put(out, '\t')) return false;
-            break;
-          case 'u':
-            if (!unicode(out)) return false;
-            break;
-          default: return fail(ARD_LANG_NATIVE_INVALID_ESCAPE);
-        }
-      } else if (!put(out, char(c))) return false;
-      if (out.length() > _limits.maxStringBytes) return fail(ARD_LANG_NATIVE_STRING_LIMIT);
-    }
-    return fail(ARD_LANG_NATIVE_UNTERMINATED_STRING);
-  }
-  /**
-   * @brief Convert a decimal or hexadecimal digit to its numeric value.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool digit() const {
-    return peek() >= '0' && peek() <= '9';
-  }
-  /**
-   * @brief Parse or serialize a JSON number while preserving its numeric lexeme.
-   * @param value Input value, or output destination when passed by mutable reference.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool number(JSONVar& value) {
-    size_t start = _offset;
-    if (peek() == '-') ++_offset;
-    if (peek() == '0') ++_offset;
-    else {
-      if (peek() < '1' || peek() > '9') return fail(ARD_LANG_NATIVE_INVALID_NUMBER);
-      while (digit()) {
-        ++_offset;
-        if ((_offset & 127) == 0) _budget.checkpoint();
-      }
-    }
-    if (peek() == '.') {
-      ++_offset;
-      if (!digit()) return fail(ARD_LANG_NATIVE_MISSING_FRACTION);
-      while (digit()) {
-        ++_offset;
-        if ((_offset & 127) == 0) _budget.checkpoint();
-      }
-    }
-    if (peek() == 'e' || peek() == 'E') {
-      ++_offset;
-      if (peek() == '+' || peek() == '-') ++_offset;
-      if (!digit()) return fail(ARD_LANG_NATIVE_MISSING_EXPONENT);
-      while (digit()) {
-        ++_offset;
-        if ((_offset & 127) == 0) _budget.checkpoint();
-      }
-    }
-    value._type = JSONVar::Type::Number;
-    value._text = _input.substring(start, _offset);
-    if (value._text.length() != _offset - start) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
-    return true;
-  }
-  /**
-   * @brief Read value.
-   * @param value Input value, or output destination when passed by mutable reference.
-   * @param depth Current JSON nesting depth.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool readValue(JSONVar& value, unsigned depth) {
-    if (depth > _limits.maxDepth || depth > 32) return fail(ARD_LANG_NATIVE_DEPTH_LIMIT);
-    if (++_nodes > _limits.maxNodes) return fail(ARD_LANG_NATIVE_NODE_LIMIT);
-    if ((_nodes & 31) == 0) _budget.checkpoint();
-    whitespace();
-    char c = peek();
-    if (c == '"') {
-      value._type = JSONVar::Type::String;
-      return string(value._text);
-    }
-    if (c == '-' || digit()) return number(value);
-    if (c == '{' || c == '[') {
-      bool object = c == '{';
-      ++_offset;
-      value = object ? JSONVar::object() : JSONVar::array();
-      char end = object ? '}' : ']';
-      if (take(end)) return true;
-      do {
-        String key;
-        if (object) {
-          if (!string(key) || !take(':')) return fail(ARD_LANG_NATIVE_EXPECTED_OBJECT_MEMBER);
-          if (value.hasOwnProperty(key)) return fail(ARD_LANG_NATIVE_DUPLICATE_KEY);
-        }
-        if (value.length() >= MaxContainerElements) return fail(ARD_LANG_NATIVE_CONTAINER_LIMIT);
-        JSONVar::Member* item = value.append(key);
-        if (!item) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
-        if (!readValue(item->value, depth + 1)) return false;
-        if (take(end)) return true;
-      } while (take(','));
-      return fail(ARD_LANG_NATIVE_EXPECTED_COMMA_OR_CLOSING_BRACKET);
-    }
-    const char* literal = c == 't' ? "true" : c == 'f' ? "false"
-                                            : c == 'n' ? "null"
-                                                       : nullptr;
-    if (!literal) return fail(ARD_LANG_NATIVE_EXPECTED_VALUE);
-    size_t size = strlen(literal);
-    if (size > _input.length() - _offset || memcmp(_input.c_str() + _offset, literal, size) != 0) return fail(ARD_LANG_NATIVE_INVALID_LITERAL);
-    _offset += size;
-    value = c == 'n' ? JSONVar(nullptr) : JSONVar(c == 't');
-    return true;
-  }
 };
 class Writer {
 public:

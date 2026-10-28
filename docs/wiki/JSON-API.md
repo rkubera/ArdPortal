@@ -19,6 +19,8 @@ ArdJSON does **not** persist values. Its trees occupy RAM and disappear on resta
 ## Standalone JSON API
 
 `ArdJSON.h` is independent of the portal/filesystem and uses only Arduino/STL.
+Parsing shares the streaming syntax engine used by ArdFS. Arduino and the supplied CMake target compile the implementation automatically. Custom native builds must also compile `src/JsonStream.cpp` and `src/JsonDocumentStream.cpp`; including the header alone is sufficient only for value/serialization operations.
+
 It provides `JSON.parse`, `JSON.stringify`, `JSON.typeof_`
 and `JSONVar` values:
 
