@@ -43,6 +43,20 @@ struct ArdFSFile {
   }
 };
 struct ArdFSVolume {
+  size_t fileCount() const { return fakeFiles.size(); }
+  bool fileInfo(size_t index, String& path, size_t& size) const {
+    if (index >= fakeFiles.size()) return false;
+    auto it = fakeFiles.begin(); std::advance(it, index);
+    path = it->first.c_str(); size = it->second.size(); return true;
+  }
+  size_t totalBytes() const { return 1024 * 1024; }
+  size_t usedBytes() const { size_t n = 0; for (auto& e : fakeFiles) n += e.second.size(); return n; }
+  size_t freeBytes() const { return totalBytes() - usedBytes(); }
+  ArdFSFile mutate(const char* source, const char* destination = nullptr) {
+    if (!fakeFiles.count(source) || (destination && fakeFiles.count(destination))) return {};
+    if (destination) { fakeFiles[destination] = fakeFiles[source]; fakeFiles.erase(source); return { &fakeFiles[destination], 0 }; }
+    remove(source); static std::vector<uint8_t> empty; return { &empty, 0 };
+  }
   size_t maxFileBytes(size_t) const { return 1024 * 1024; }
   int lastError() const {
     return failMount ? -5 : 0;

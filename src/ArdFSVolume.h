@@ -54,6 +54,9 @@ public:
    * @return Number of file bytes, or zero for a closed handle.
    */
   size_t size() const;
+  // Absolute read cursor, including EOF. Writers remain append-only.
+  bool seek(size_t position);
+  size_t position() const;
   /**
    * @brief Read bytes from the file handle and advance its cursor.
    * Input: uint8_t* p, the destination buffer.
@@ -94,6 +97,8 @@ private:
   };
   struct Writer : Handle {
     String path;
+    // Points into the stable live index until the new bank is published.
+    const String* mutationSource = nullptr;
     uint32_t bank = 0, record = 0, capacity = 0;
     size_t expected = SIZE_MAX;
     uint32_t checksum = 0xffffffff;
@@ -103,6 +108,7 @@ private:
     size_t copyIndex = 0, copyAt = 0, copyCount = 0;
     uint8_t header[32] = {}, bytes[256] = {};
     std::unique_ptr<Writer> copy;
+    const String* copyPath(const String& source) const;
     Writer() { writing = true; }
   };
   struct HandleDeleter {
@@ -174,6 +180,15 @@ public:
    * @return File handle; its boolean conversion is false when opening fails.
    */
   ArdFSFile open(const char*, const char*, size_t length = SIZE_MAX, bool deferred = false);
+  // Mutations copy live files to the other bank before atomic publication.
+  // Empty destination removes source; an existing destination is rejected.
+  ArdFSFile mutate(const char* source, const char* destination = nullptr);
+  size_t fileCount() const { return _mounted ? _entries.count : 0; }
+  bool fileInfo(size_t index, String& path, size_t& size) const;
+  // Bank capacity and sector-rounded live record usage, excluding bank header.
+  size_t totalBytes() const { return _mounted ? _bankSize - 4096 : 0; }
+  size_t usedBytes() const;
+  size_t freeBytes() const { return totalBytes() - usedBytes(); }
   // Upper bound for one record; other live files and sector rounding may reduce it.
   size_t maxFileBytes(size_t pathBytes) const {
     return _mounted && pathBytes && pathBytes <= 72 ? _bankSize - 4096 - 32 - pathBytes : 0;

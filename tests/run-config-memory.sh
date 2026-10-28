@@ -67,3 +67,8 @@ done
   -Itests/memory-host -Isrc tests/memory-host/volume-index.cpp src/ArdFSVolume.cpp -o "$test_dir/volume-index"
 "$test_dir/volume-index"
 echo 'PASS: incremental settings, Portal/MQTT persistence, bounded journal writes and recovery'
+
+"${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+  -DESP8266 -DFS_PHYS_SIZE=524288U -DARDPORTAL_TEST_ALLOCATE=testAllocate \
+  -Itests/memory-host -Isrc tests/memory-host/volume-operations.cpp src/ArdFSVolume.cpp -o "$test_dir/volume-operations"
+"$test_dir/volume-operations"

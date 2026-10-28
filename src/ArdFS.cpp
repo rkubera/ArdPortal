@@ -79,6 +79,16 @@ bool ArdFS::readFile(const String& path, FileSink sink, Callback callback) {
   _phase = Phase::OpenFileRead;
   return true;
 }
+bool ArdFS::remove(const String& path, Callback callback) {
+  return rename(path, String(), std::move(callback));
+}
+bool ArdFS::rename(const String& source, const String& destination, Callback callback) {
+  if (destination.length() && (destination.length() < 2 || destination.length() > 64 || destination[0] != '/' || destination.indexOf("..") >= 0)) return false;
+  if (!start(source, std::move(callback))) return false;
+  _file = _volume.mutate(source.c_str(), destination.length() ? destination.c_str() : nullptr);
+  _phase = Phase::PrepareMutation;
+  return true;
+}
 void ArdFS::resetJournalOutput() {
   _journalStage = 0;
   _journalHeaderAt = 0;
@@ -287,6 +297,18 @@ void ArdFS::loop() {
         return;
       }
     case Phase::Idle: return;
+    case Phase::PrepareMutation:
+    case Phase::FlushMutation:
+      {
+        const bool preparing = _phase == Phase::PrepareMutation;
+        int status = preparing ? _file.prepareStep() : _file.flushStep();
+        if (status < 0) { fail(ArdUILanguage::Key::s_204); return; }
+        if (status == 1) {
+          if (preparing) { _best = 0; _phase = Phase::FlushMutation; }
+          else { _file.close(); ++_commits; finish(true, "", true); }
+        }
+        return;
+      }
     case Phase::OpenFileRead:
       if (!openSlot(_file, 0, OpenMode::Read, ArdUILanguage::Key::s_199)) return;
       _expected = _file.size();

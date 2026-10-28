@@ -524,3 +524,30 @@ its attempt count. Standalone `readJsonConfig(path, sink, callback)` retains its
 pass `true` as the fourth argument to request repair. Startup repair uses the read
 completion/ready path, not the per-value failure callback for a new configuration
 batch. The existing storage error/status API exposes a failed repair.
+
+### File management and capacity
+
+`ArdFS::remove(path, callback)` and `rename(source, destination, callback)` queue
+physical file operations. Call `loop()` until completion and check `result.ok`.
+The destination must not exist. These operations reuse cooperative bank compaction:
+each loop transfers at most 256 bytes or erases one sector. The bank is published
+atomically, including deletion of the last file. Renaming copies file contents,
+so total completion time depends on all live files, while each step stays bounded.
+JSON documents use two physical paths (`path` and `path + ".journal"`); these
+methods operate on one physical path and do not rename/remove a JSON pair together.
+
+`fileCount()` and `fileInfo(index, path, size)` enumerate physical files from RAM,
+including journal copies. Order is unspecified and can change after a mutation;
+check the boolean result of `fileInfo()`. `totalBytes()` reports one usable bank,
+`usedBytes()` counts live records rounded to sectors (including path/header), and
+`freeBytes()` is their difference after reclaiming obsolete records. These are
+zero before mounting. Free bytes include the metadata needed for new records;
+they are not a guarantee that a payload of that exact size will fit. The 32-file
+limit also applies. These queries perform no flash I/O.
+
+`ArdFSFile::seek(position)` sets an absolute read offset in `[0, size()]` and
+`position()` returns the current cursor. Invalid seeks leave it unchanged.
+Writers remain append-only and reject seeking. No flash I/O is needed for seek.
+Low-level `ArdFSVolume::mutate(source, destination)` returns a deferred operation
+handle (omit destination to delete); advance `prepareStep()` then `flushStep()`
+until each returns 1, or abort on -1. Use the `ArdFS` callback API for cooperative application code.

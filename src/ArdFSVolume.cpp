@@ -349,10 +349,12 @@ int ArdFSVolume::prepareStep(ArdFSFile::Writer& h) {
         h.bank = _active;
         h.record = _next;
         _staged.clear();
-        if (_next > _bankSize || extent > _bankSize - _next) {
-          uint32_t required = extent;
-          for (const Entry* e = _entries.head; e; e = e->next)
-            if (e->path != h.path) required += aligned(Header + e->path.length() + e->length);
+        if (h.mutationSource || _next > _bankSize || extent > _bankSize - _next) {
+          uint32_t required = h.mutationSource ? 0 : extent;
+          for (const Entry* e = _entries.head; e; e = e->next) {
+            const String* target = h.copyPath(e->path);
+            if (target) required += aligned(Header + target->length() + e->length);
+          }
           if (required > _bankSize - Sector) return -1;
           h.compacting = true;
           h.bank = _active ? 0 : _bankSize;
@@ -368,15 +370,16 @@ int ArdFSVolume::prepareStep(ArdFSFile::Writer& h) {
     case 2:
       {
         // At most 32 paths; metadata work is independent of file sizes.
-        while (h.copyIndex < _entries.count && _entries.at(h.copyIndex)->path == h.path) ++h.copyIndex;
+        while (h.copyIndex < _entries.count && !h.copyPath(_entries.at(h.copyIndex)->path)) ++h.copyIndex;
         if (h.copyIndex == _entries.count) { h.prepareStage = 8; return 0; }
         const Entry& e = *_entries.at(h.copyIndex);
         h.copy.reset(new (std::nothrow) ArdFSFile::Writer);
         if (!h.copy) return -1;
         auto& copy = *h.copy;
         copy.volume = this;
-        copy.path = e.path;
-        if (copy.path != e.path) return -1;
+        const String& target = *h.copyPath(e.path);
+        copy.path = target;
+        if (copy.path != target) return -1;
         copy.bank = h.bank;
         copy.record = h.record;
         copy.capacity = copy.length = e.length;
@@ -422,6 +425,11 @@ int ArdFSVolume::prepareStep(ArdFSFile::Writer& h) {
       }
     case 8:
       {
+        if (h.mutationSource) {
+          // Terminate the copied log, including an empty bank after deletion.
+          if (h.record < _bankSize && !eraseRaw(h.bank + h.record, Sector)) return -1;
+          h.prepareStage = 10; return 1;
+        }
         int status = reserveStep(h);
         if (status < 0) return -1;
         if (status == 1) {
@@ -534,7 +542,7 @@ int ArdFSFile::read(uint8_t* p, size_t n) {
 size_t ArdFSFile::write(const uint8_t* p, size_t n) {
   if (!_handle || !_handle->writing) return 0;
   auto& h = static_cast<Writer&>(*_handle);
-  if (h.failed || h.committed || h.prepareStage != 10 || h.finishStage != 0 || n > h.capacity - h.length) { h.failed = true; return 0; }
+  if (h.mutationSource || h.failed || h.committed || h.prepareStage != 10 || h.finishStage != 0 || n > h.capacity - h.length) { h.failed = true; return 0; }
   if (!h.volume->writeRaw(h.address + h.length, p, n)) { h.failed = true; return 0; }
   h.checksum = ArdFSVolume::crc(p, n, h.checksum);
   h.length += n;
@@ -559,6 +567,7 @@ int ArdFSFile::flushStep() {
   switch (h.flushStage) {
     case 0:
       {
+        if (h.mutationSource) { h.flushStage = 1; return 0; }
         // Reserve all index memory before any commit marker is published.
         v._staged.find(h.path.c_str())->length = h.length;
         int status = v.finishRecordStep(h);
@@ -584,7 +593,7 @@ int ArdFSFile::flushStep() {
         v._entries.clear();
       }
       v._entries.merge(v._staged);
-      v._next = h.record + aligned(Header + h.path.length() + h.length);
+      v._next = h.record + (h.mutationSource ? 0 : aligned(Header + h.path.length() + h.length));
       h.committed = true;
       return 1;
   }
@@ -605,4 +614,51 @@ bool ArdFSFile::close() {
   }
   _handle.reset();
   return true;
+}
+
+size_t ArdFSFile::position() const { return _handle ? (_handle->writing ? _handle->length : _handle->offset) : 0; }
+bool ArdFSFile::seek(size_t position) {
+  if (!_handle || _handle->writing || position > _handle->length) return false;
+  _handle->offset = position;
+  return true;
+}
+size_t ArdFSVolume::usedBytes() const {
+  size_t used = 0;
+  if (_mounted) for (const Entry* e = _entries.head; e; e = e->next)
+    used += aligned(Header + e->path.length() + e->length);
+  return used;
+}
+bool ArdFSVolume::fileInfo(size_t index, String& path, size_t& size) const {
+  const Entry* e = _mounted ? _entries.at(index) : nullptr;
+  if (!e) return false;
+  path = e->path;
+  if (path != e->path) return false;
+  size = e->length;
+  return true;
+}
+ArdFSFile ArdFSVolume::mutate(const char* source, const char* destination) {
+  ArdFSFile f;
+  if (!_mounted || _writer || !source || !*source || strlen(source) > 72 ||
+      (destination && (!*destination || strlen(destination) > 72))) { _error = -22; return f; }
+  if (!_entries.find(source)) { _error = -2; return f; }
+  if (destination && _entries.find(destination)) { _error = -17; return f; }
+  f._handle.reset(new (std::nothrow) ArdFSFile::Writer);
+  if (!f._handle) { _error = -12; return f; }
+  auto& h = static_cast<ArdFSFile::Writer&>(*f._handle);
+  h.mutationSource = &_entries.find(source)->path;
+  if (destination) h.path = destination;
+  if ((destination && h.path != destination)) {
+    f._handle.reset(); _error = -12; return f;
+  }
+  h.volume = this; h.expected = 0;
+  _writer = true; _error = 0;
+  return f;
+}
+
+const String* ArdFSFile::Writer::copyPath(const String& source) const {
+  if (mutationSource) {
+    if (&source != mutationSource) return &source;
+    return path.length() ? &path : nullptr;
+  }
+  return source == path ? nullptr : &source;
 }

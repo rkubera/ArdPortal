@@ -224,5 +224,21 @@ int main() {
     drain(fs);
   }
   verify(0, 0);
+  {
+    ArdFS fs; mount(fs);
+    bool done = false;
+    const size_t initialCount = fs.fileCount();
+    const int before = ardfsFlashCalls;
+    assert(fs.rename("/binary", "/renamed", [&](const ArdFS::Result& r) { assert(r.ok && r.found && r.changed); done = true; }));
+    assert(!done && ardfsFlashCalls == before);
+    assert(!fs.remove("/other", [](const ArdFS::Result&) {}));
+    drain(fs); assert(done);
+    assert(fs.fileCount() == initialCount && fs.freeBytes() + fs.usedBytes() == fs.totalBytes());
+    done = false;
+    assert(fs.remove("/renamed", [&](const ArdFS::Result& r) { assert(r.ok && r.changed); done = true; }));
+    drain(fs); assert(done && fs.fileCount() == initialCount - 1);
+    assert(fs.remove("/missing", [](const ArdFS::Result& r) { assert(!r.ok && !r.changed); }));
+    drain(fs);
+  }
   puts("PASS: raw binary files above JSON/journal limits, bounded I/O per loop, stepped erase/verify/compaction, aborted and empty files");
 }

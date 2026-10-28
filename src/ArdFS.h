@@ -60,6 +60,14 @@ public:
   bool writeFile(const String& path, size_t length, FileSource source, Callback callback);
   /** @brief Stream a raw file to a sink; false from the sink aborts with an error. */
   bool readFile(const String& path, FileSink sink, Callback callback);
+  // Raw physical paths; JSON journal copies must be managed separately.
+  bool remove(const String& path, Callback callback);
+  bool rename(const String& source, const String& destination, Callback callback);
+  size_t fileCount() const { return _volume.fileCount(); }
+  bool fileInfo(size_t index, String& path, size_t& size) const { return _volume.fileInfo(index, path, size); }
+  size_t totalBytes() const { return _volume.totalBytes(); }
+  size_t usedBytes() const { return _volume.usedBytes(); }
+  size_t freeBytes() const { return _volume.freeBytes(); }
 
   /**
    * @brief Queue formatting of the storage volume; existing records will be discarded.
@@ -117,6 +125,8 @@ private:
                      Format,
                      Remount,
                      Idle,
+                     PrepareMutation,
+                     FlushMutation,
                      OpenFileRead,
                      ReadFile,
                      OpenRead,
