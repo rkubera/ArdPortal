@@ -4,6 +4,8 @@ extern std::map<std::string, std::vector<uint8_t>> fakeFiles;
 extern bool failFileWrite, failRename;
 extern bool failMount, failFormat;
 inline size_t fakeWriteCalls = 0, fakeOpenWrites = 0, fakeMaxTransfer = 0;
+template<class Volume, class FileHandle> class ArdStorage;
+struct ArdFSVolume;
 struct ArdFSFile {
   std::vector<uint8_t>* data = nullptr;
   size_t offset = 0;
@@ -33,6 +35,11 @@ struct ArdFSFile {
     data->insert(data->end(), bytes, bytes + length);
     return length;
   }
+private:
+  friend class ArdStorage<ArdFSVolume, ArdFSFile>;
+  size_t queueWrite(const uint8_t* bytes, size_t n) { return write(bytes, n); }
+public:
+  int writeStep() { return 1; }
   int prepareStep() { return 1; }
   int flushStep() { return flush() ? 1 : -1; }
   bool flush() {

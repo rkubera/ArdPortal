@@ -120,7 +120,7 @@ bool ArdStorage<Volume, FileHandle>::openSlot(FileHandle& file, int slot, OpenMo
     if (!_present[slot]) return true;
   }
   const bool writing = mode == OpenMode::Write;
-  file = _volume.open(path.c_str(), writing ? "w" : "r", writing ? _expected : SIZE_MAX, writing);
+  file = _volume.open(path.c_str(), writing ? "w" : "r", writing ? _expected : SIZE_MAX, true);
   if (!file) { fail(failure); return false; }
   return true;
 }
@@ -470,6 +470,9 @@ void ArdStorage<Volume, FileHandle>::loop() {
       return;
     case Phase::ReadRepair:
       {
+        int pending = _file.writeStep();
+        if (pending < 0) { fail(ArdUILanguage::Key::s_204); return; }
+        if (!pending) return;
         if (!_repairFile) {
           if (!openSlot(_repairFile, _best, OpenMode::Read, ArdUILanguage::Key::s_199)) return;
           _runningFileCrc = UINT32_MAX;
@@ -489,7 +492,7 @@ void ArdStorage<Volume, FileHandle>::loop() {
         return;
       }
     case Phase::WriteRepair:
-      if (_file.write(_decoded, _decodedSize) != _decodedSize) { fail(ArdUILanguage::Key::s_204); return; }
+      if (_file.queueWrite(_decoded, _decodedSize) != _decodedSize) { fail(ArdUILanguage::Key::s_204); return; }
       _offset += _decodedSize;
       _phase = Phase::ReadRepair;
       return;
@@ -577,6 +580,11 @@ void ArdStorage<Volume, FileHandle>::loop() {
     case Phase::Verify:
       {
         const bool verify = _phase == Phase::Verify;
+        if (!verify) {
+          int pending = _file.writeStep();
+          if (pending < 0) { fail(ArdUILanguage::Key::s_204); return; }
+          if (!pending) return;
+        }
         const size_t count = journalOutput();
         if (_sourceFailed) { fail(ArdUILanguage::Key::s_198); return; }
         if (!count) {
@@ -585,7 +593,7 @@ void ArdStorage<Volume, FileHandle>::loop() {
           return;
         }
         if (verify ? (_file.read(chunk, count) != int(count) || memcmp(chunk, _decoded, count))
-                   : _file.write(_decoded, count) != count) {
+                   : _file.queueWrite(_decoded, count) != count) {
           fail(ArdUILanguage::Key::s_204); return;
         }
         _offset += count;

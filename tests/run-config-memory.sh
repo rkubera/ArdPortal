@@ -50,7 +50,7 @@ for www in 0 1; do
     "$test_dir/log-callback"
   done
 done
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -Itests/memory-host -Isrc tests/memory-host/ardfs.cpp src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/power-cut"
+"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -DARDPORTAL_TEST_ALLOCATE=testAllocate -Itests/memory-host -Isrc tests/memory-host/ardfs.cpp src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/power-cut"
 "$test_dir/power-cut"
 "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined -DESP8266 -DFS_PHYS_SIZE=262144U -Itests/memory-host -Isrc tests/memory-host/raw-file.cpp src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/raw-file"
 "$test_dir/raw-file"
@@ -72,3 +72,15 @@ echo 'PASS: incremental settings, Portal/MQTT persistence, bounded journal write
   -DESP8266 -DFS_PHYS_SIZE=524288U -DARDPORTAL_TEST_ALLOCATE=testAllocate \
   -Itests/memory-host -Isrc tests/memory-host/volume-operations.cpp -o "$test_dir/volume-operations"
 "$test_dir/volume-operations"
+
+"${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+  -DESP8266 -DFS_PHYS_SIZE=262144U -DARDPORTAL_TEST_ALLOCATE=testAllocate \
+  -Itests/memory-host -Isrc tests/memory-host/sector-buffer.cpp -o "$test_dir/sector-buffer"
+"$test_dir/sector-buffer"
+
+for geometry in 262144 524288; do
+  "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+    -DESP8266 -DFS_PHYS_SIZE="${geometry}U" \
+    -Itests/memory-host -Isrc tests/memory-host/bad-sectors.cpp -o "$test_dir/bad-sectors"
+  "$test_dir/bad-sectors"
+done

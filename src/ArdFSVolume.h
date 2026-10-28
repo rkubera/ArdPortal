@@ -8,6 +8,7 @@
 #include <esp_partition.h>
 #endif
 
+template<class Volume, class FileHandle> class ArdStorage;
 class ArdFSVolume;
 class ArdFSFile {
 public:
@@ -65,7 +66,7 @@ public:
    */
   int read(uint8_t*, size_t);
   /**
-   * @brief Write bytes directly to the uncommitted flash record.
+   * @brief Accept bytes into the uncommitted sector buffer; flush commits them.
    * Input: const uint8_t* p, the source buffer.
    * Input: size_t n, the number of bytes to transfer or erase.
    * @return Number of bytes appended, or zero when the write cannot be accepted.
@@ -79,6 +80,8 @@ public:
   // Cooperative steps: -1 = error, 0 = pending, 1 = complete.
   // Each step performs at most one bounded transfer or one sector erase.
   int prepareStep();
+  // Drain queued bytes/verify a full sector; -1 error, 0 pending, 1 ready.
+  int writeStep();
   int flushStep();
   /**
    * @brief Release the handle; an uncommitted write is abandoned.
@@ -87,7 +90,10 @@ public:
   bool close();
 private:
   friend class ArdFSVolume;
-  // One allocation per handle. Only writers carry flash work buffers/state.
+  friend class ArdStorage<ArdFSVolume, ArdFSFile>;
+  // Engine-only input queue; application writes use write().
+  size_t queueWrite(const uint8_t*, size_t);
+  // Readers own only the cursor. Writers also allocate one shared 4 KiB sector buffer.
   struct Handle {
     ARDPORTAL_NO_THROW_ALLOCATION
     ArdFSVolume* volume = nullptr;
@@ -95,20 +101,38 @@ private:
     size_t offset = 0;
     bool writing = false;
   };
+  template<size_t N> struct Buffer {
+    ARDPORTAL_NO_THROW_ALLOCATION
+    uint8_t data[N];
+  };
+  using SectorBuffer = Buffer<4096>;
+  using MapBuffer = Buffer<256>;
+  struct MapCommit { uint16_t slot; uint8_t stage; bool mirror; };
   struct Writer : Handle {
-    String path;
+    const char* path;
+    uint8_t pathLength = 0;
     // Points into the stable live index until the new bank is published.
-    const String* mutationSource = nullptr;
+    const char* mutationSource = nullptr;
     uint32_t bank = 0, record = 0, capacity = 0;
     size_t expected = SIZE_MAX;
     uint32_t checksum = 0xffffffff;
-    bool failed = false, committed = false, compacting = false;
+    bool failed = false, committed = false, compacting = false, reusingBank = false;
     uint8_t prepareStage = 0, reserveStage = 0, finishStage = 0, flushStage = 0;
-    uint32_t workAt = 0, extent = 0, verified = 0, verifiedBody = 0;
-    size_t copyIndex = 0, copyAt = 0, copyCount = 0;
-    uint8_t header[32] = {}, bytes[256] = {};
+    uint32_t workAt = 0, extent = 0, verified = 0;
+    size_t copyIndex = 0;
     std::unique_ptr<Writer> copy;
-    const String* copyPath(const String& source) const;
+    std::unique_ptr<SectorBuffer> ownedBuffer;
+    SectorBuffer* sectorBuffer = nullptr;
+    uint32_t sectorAddress = 0, sectorPhysical = 0;
+    uint16_t sectorUsed = 0, sectorAt = 0, pendingAt = 0, pendingSize = 0;
+    uint8_t sectorStage = 0, sectorRetries = 0;
+    bool sectorFinal = false, sectorDone = false;
+    uint8_t initialBadCount = 0;
+    MapCommit map = {};
+    uint8_t bytes[256];
+    const char* copyPath(const char* source) const;
+    static Writer* create(const char* path);
+    bool allocateBuffer();
     Writer() { writing = true; }
   };
   struct HandleDeleter {
@@ -155,9 +179,11 @@ public:
    */
   void end() {
     _mounted = false;
+    _working = false;
+    _formatBuffer.reset();
     _entries.clear();
     _mountStage = _formatStage = 0;
-    _scanPath = String();
+    _scanEntry.reset();
   }
   /**
    * @brief Format the storage volume, discarding its existing records.
@@ -186,12 +212,12 @@ public:
   size_t fileCount() const { return _mounted ? _entries.count : 0; }
   bool fileInfo(size_t index, String& path, size_t& size) const;
   // Bank capacity and sector-rounded live record usage, excluding bank header.
-  size_t totalBytes() const { return _mounted ? _bankSize - 4096 : 0; }
+  size_t totalBytes() const { return _mounted ? bankLimit(_maps[_active != 0]) - 4096 : 0; }
   size_t usedBytes() const;
   size_t freeBytes() const { return totalBytes() - usedBytes(); }
   // Upper bound for one record; other live files and sector rounding may reduce it.
   size_t maxFileBytes(size_t pathBytes) const {
-    return _mounted && pathBytes && pathBytes <= 72 ? _bankSize - 4096 - 32 - pathBytes : 0;
+    return _mounted && pathBytes && pathBytes <= 72 ? bankLimit(_maps[_active != 0]) - 4096 - 32 - pathBytes : 0;
   }
   /**
    * @brief Read the last storage error code.
@@ -204,8 +230,10 @@ private:
   friend class ArdFSFile;
   struct Entry {
     ARDPORTAL_NO_THROW_ALLOCATION
-    String path;
+    char* path;
     uint32_t address, length;
+    uint8_t pathLength;
+    static Entry* create(size_t nameLength);
     Entry* next = nullptr;
   };
   // A bounded index needs neither contiguous growth nor relocation of paths.
@@ -216,19 +244,46 @@ private:
     void clear();
     Entry* find(const char* path) const;
     Entry* at(size_t index) const;
-    bool set(const String& path, uint32_t address, uint32_t length);
+    bool set(const char* path, uint32_t address, uint32_t length);
+    bool insert(Entry* entry);
     void merge(Index& other);
   };
-  Index _entries;
+  struct BankMap {
+    uint16_t bad[32];
+    uint8_t count, metadataBad;
+    bool modern, valid;
+    uint16_t slot;
+    uint32_t generation, revision;
+  };
   bool _mounted = false, _configured = false, _writer = false;
-  Index _staged;
+  bool _working = false, _headerObserved = false;
+  uint8_t _headerErrors[2] = {};
+  uint16_t _headerScan = 0;
   int _error = 0;
   uint8_t _mountStage = 0, _formatStage = 0;
-  uint8_t _bankHeaders[2][32] = {};
+  uint32_t _workBank = 0;
+  uint32_t _address = 0, _size = 0, _bankSize = 0, _active = 0, _generation = 0, _next = 0;
   uint32_t _scanExtent = 0, _scanName = 0, _scanLength = 0, _scanAt = 0;
   uint32_t _scanCrc = 0, _scanExpected = 0, _formatAt = 0;
-  String _scanPath;
-  uint32_t _address = 0, _size = 0, _bankSize = 0, _active = 0, _generation = 0, _next = 0;
+  std::unique_ptr<Entry> _scanEntry;
+  Index _entries;
+  Index _staged;
+  std::unique_ptr<ArdFSFile::MapBuffer> _formatBuffer;
+  BankMap _maps[2] = {};
+  BankMap* _workMap = nullptr;
+  ArdFSFile::MapCommit _formatMap = {};
+  void clearMaps();
+  uint32_t bankLimit(const BankMap& map) const;
+  uint32_t physical(uint32_t address, size_t length) const;
+  bool retire(uint32_t address);
+  bool fitRecord(ArdFSFile::Writer&);
+  bool readPhysical(uint32_t, void*, size_t);
+  bool writePhysical(uint32_t, const void*, size_t);
+  bool erasePhysical(uint32_t);
+  bool decodeMap(uint8_t* bytes, BankMap& map, unsigned slot);
+  void encodeMap(uint8_t* bytes) const;
+  int publishMapStep(ArdFSFile::MapCommit&, uint8_t* buffer);
+  bool nextMapSector(ArdFSFile::MapCommit&);
 #if defined(ESP32)
   const esp_partition_t* _partition = nullptr;
 #endif
@@ -252,19 +307,22 @@ private:
    * Input: size_t n, the number of bytes to transfer or erase.
    * @return True if all requested bytes were written; false for invalid bounds or a flash error.
    */
-  bool writeRaw(uint32_t, const void*, size_t);
   /**
    * @brief Erase complete flash sectors, yielding between sectors.
    * Input: uint32_t address, the byte offset within the volume.
    * Input: size_t n, the number of bytes to transfer or erase.
    * @return True if the aligned sector range was erased; false for invalid alignment, bounds or a flash error.
    */
-  bool eraseRaw(uint32_t, size_t);
+  bool eraseRaw(uint32_t);
   // Reserve an erased record, stream its body, then publish its commit marker.
   int prepareStep(ArdFSFile::Writer&);
-  int reserveStep(ArdFSFile::Writer&);
+  int terminateStep(ArdFSFile::Writer&);
   int finishRecordStep(ArdFSFile::Writer&);
-  int publishStep(uint32_t address, const uint8_t* header, uint8_t* scratch, uint8_t& stage);
+  void startSectorBuffer(ArdFSFile::Writer&);
+  static void bufferInput(ArdFSFile::Writer&, const uint8_t*, size_t);
+  int writeBufferedStep(ArdFSFile::Writer&, bool final = false);
+  int drainSectorStep(ArdFSFile::Writer&);
+  int publishStep(uint32_t address, const uint8_t* header, uint8_t* scratch, uint8_t& stage, size_t length);
   static uint32_t makeHeader(uint8_t* bytes, uint32_t magic, uint32_t a, uint32_t b, uint32_t c);
   /**
    * @brief Update the journal CRC-32 checksum over a byte range.

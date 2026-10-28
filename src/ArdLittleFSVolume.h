@@ -8,6 +8,7 @@
 // Thin filesystem adapter for the shared cooperative storage engine.
 // LittleFS core calls (mount, format, flush, rename) are synchronous. Payload
 // transfers remain bounded by the engine; a temporary file protects the old copy.
+template<class Volume, class FileHandle> class ArdStorage;
 class ArdLittleFSVolume;
 class ArdLittleFSFile {
 public:
@@ -42,6 +43,7 @@ public:
     if (written != count) _failed = true;
     return written;
   }
+  int writeStep() { return 1; }
   int prepareStep() { return _open ? 1 : -1; }
   int flushStep() {
     if (!_open || _failed) return -1;
@@ -66,6 +68,8 @@ public:
   bool close() { _file.close(); _open = false; return true; }
 private:
   friend class ArdLittleFSVolume;
+  friend class ArdStorage<ArdLittleFSVolume, ArdLittleFSFile>;
+  size_t queueWrite(const uint8_t* bytes, size_t n) { return write(bytes, n); }
   enum Mode : uint8_t { Read, Write, Remove, Rename };
   fs::File _file;
   String _path, _other;

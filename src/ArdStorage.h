@@ -171,9 +171,10 @@ private:
   uint32_t _repairRetrySince = 0;
   size_t _sourceLength = 0, _sourceAt = 0, _sourceCompareAt = 0, _escapedLength = 0, _journalHeaderAt = 0, _rawAt = 0, _escapeAt = 0, _escapeLength = 0;
   uint32_t _sourceCrc = 0, _sourceGeneration = 0;
-  Volume _volume;
   ArdJournalReader _reader;
   uint8_t _decoded[260] = {};
+  // Keep hot parser offsets independent of the backend volume size.
+  Volume _volume;
   void resetJournalOutput();
   size_t journalOutput();
   String sourcePart(size_t offset, size_t maximum);

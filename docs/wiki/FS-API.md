@@ -56,9 +56,9 @@ portal settings saves and explicit `flushPortalAndAppConfig()` bypass these dela
 dynamic control edits retain the debounce. Logs, uptime, connection
 states, NTP time and write statistics are not persisted.
 
-A mount with no valid committed bank header triggers automatic formatting and a
-remount, including on a new board; this can remove files when both bank headers
-are damaged. Allocation, flash I/O, index capacity and flash layout errors abort
+A partition verified completely erased is formatted automatically on first use.
+Missing or damaged bank headers on a nonempty partition report a mount error
+without formatting. Allocation, flash I/O, index capacity and flash layout errors abort
 mounting without formatting or selecting an older committed bank. Likewise, an
 allocation failure while validating configuration copies reports an error instead
 of silently restoring an older value. Genuine invalid CRCs still allow recovery
@@ -123,8 +123,8 @@ named `ardfs`, then `littlefs`, then the standard `spiffs` partition. Partition
 labels do not determine the bytes stored inside. Encrypted ESP32 partitions are
 currently unsupported. Only one storage instance may own a partition at a time.
 
-ArdFS uses its own disk format. Mount failure triggers automatic formatting,
-which can erase existing contents on its partition. ArdFS does not provide an
+ArdFS uses its own disk format. Automatic initialization is limited to a
+completely erased partition; explicit formatting removes its stored files. ArdFS does not provide an
 Arduino `File` API; the public methods store journaled JSON documents or stream raw files.
 
 ### Standalone storage
@@ -298,8 +298,8 @@ in `docs/testing/ArdPortal-storage-backends-size-2026-10-28.md`.
 
 They use different disk formats. They must not mount or write the same flash
 area, including through two different partition labels referencing overlapping
-addresses. ArdFS mount failure triggers formatting, so trying to open a LittleFS
-partition with ArdFS can erase it.
+addresses. ArdFS automatically formats only a completely erased partition. Ambiguous
+mount errors preserve flash and report failure; explicit formatting remains destructive.
 
 On ESP8266, ArdFS uses the selected Arduino filesystem region. Standard LittleFS
 usually targets that same region: do not start both against the default layout.
@@ -358,7 +358,14 @@ the JSON methods add slot selection and the generation/CRC envelope before
 that writer. Both copies, escaped payloads, record alignment and the other live
 files must fit in one bank. JSON syntax validation shares the bounded CRC/escaped-length pass before any destination is changed.
 
-The file layer writes chunks directly to flash without buffering the whole file.
+The file layer buffers one physical 4 KiB sector, without buffering the whole file.
+Data sectors are erased lazily when their retained image is ready to program.
+Final commit rereads the complete path and payload and verifies their CRC.
+The successor marker is checked after any final-sector retirement has changed
+the physical mapping. Formatting uses a separate 256-byte metadata buffer.
+If a compaction is abandoned after preparing a newer bank generation, its
+metadata erasure is verified before that bank can be reused for another write.
+A failed verification stops the operation before existing records are overwritten.
 The producer must support repeated offset reads and remain immutable until
 completion. Source callbacks and individual hardware operations remain synchronous.
 
@@ -433,16 +440,30 @@ new record, without the JSON API's comparison/skip step. Do not use a raw path
 that belongs to a journaled JSON document or its `.journal` copy.
 
 File size is limited by flash capacity, not by a full-file RAM buffer. All live
-files must fit in one of the two banks, including the 4 KiB bank header and each
+files must fit in one of the two banks, including two 4 KiB metadata sectors per bank and each
 record's sector-aligned metadata and payload. A single file therefore cannot
 use the entire partition. The volume still supports at most 32 physical paths.
 
-`ArdFSFile::write()` now writes directly to the uncommitted flash record.
+`ArdFSFile::write()` accepts bytes into a dynamic 4 KiB sector buffer. The
+active writer and its compaction copies share one allocation, released after
+successful commit or on close;
+read handles allocate no sector buffer. The complete current sector stays in RAM
+until incremental program and read-back verification succeed. A failed program or verification retries that uncommitted sector from the buffer.
+After two failed attempts at the same physical location, the writer retires that
+sector in the pending bank map, skips to the next healthy physical sector and
+replays the cached data. Erase failures in unused destination space are retired
+too. A missing spare, a full map or an unrecoverable commit/metadata error fails
+the operation instead of overwriting an existing committed file. Source callbacks are not re-entered for a
+sector retry; their existing repeated-offset contract for JSON validation,
+deduplication and end-to-end verification still applies.
 `flush()` checks the data against the producer checksum and publishes the
 commit marker; `close()` abandons any uncommitted write. Reads and compaction
 also use bounded buffers. Compaction publishes its new bank only after copying
-the other live files and committing the replacement. The existing on-flash
-format remains readable.
+the other live files and committing the replacement. Version-1 ArdFS banks remain
+readable. The first successful write migrates an old bank through the other bank
+to version 2, preserving the old snapshot until publication. Version 2 reserves
+one additional 4 KiB metadata sector per bank; migration can fail safely if the
+live files no longer fit. Older firmware does not understand version-2 banks.
 
 After mounting, `writeFile()` and `readFile()` only queue work. Their `loop()`
 phases perform at most one logical transfer of up to 256 bytes or erase one
@@ -457,12 +478,43 @@ also run synchronously and must return promptly. Mount scanning and explicit
 formatting also advance through bounded steps from `ArdFS::loop()`.
 
 The low-level API keeps synchronous `begin()`, `format()`, `open(..., "w", length)` and `flush()` for
-compatibility. Use `open(path, "w", length, true)`, call `prepareStep()` once per
-application turn until it returns 1, then write data. Complete a write by calling
-`flushStep()` once per turn until it returns 1. Both step methods return 0 while
-pending and -1 on error. `beginStep()` and `formatStep()` provide the same
-step contract for mounting and formatting. Do not write while preparation or commit is pending.
-`ArdFS` uses this cooperative path automatically for raw and JSON writes.
+compatibility. Application code writes through `write()` and finishes with `flush()`.
+For cooperative raw/JSON transactions, use the higher-level `ArdFS` operations;
+they automatically prepare, queue input and commit in bounded steps.
+`queueWrite()` is private to the storage engine and is not an application API.
+The public step methods return 0 while pending, 1 when complete and -1 on error.
+Do not write while preparation or commit is pending.
+
+## Bad-sector maps and fragmented input
+
+Each version-2 bank has its own ordered list of up to 32 retired data sectors,
+a bank generation and a map revision. Logical file addresses are translated
+through that bank's map. Adding a failed sector in the unused write tail does
+not move already committed records. Compaction constructs the other bank with
+its own map; it never applies a destination map to source-bank reads.
+
+Maps are checksummed, committed and mirrored in two reserved metadata sectors.
+Normal publication replaces the older copy, verifies/commits it, then refreshes
+the mirror. Publication never erases the only valid map copy. If one metadata
+sector fails, the surviving sector uses an append-only emergency log; torn log
+entries are skipped. A failed metadata sector can be excluded while publishing
+in the other one. Interrupted/uncommitted map revisions are ignored on mount.
+No automatic format is attempted after an ambiguous corruption or I/O failure.
+Only a partition verified completely erased is initialized automatically.
+
+Retiring a data sector removes 4 KiB from that bank's usable capacity. Existing
+unreadable committed data cannot be reconstructed without another valid copy;
+read errors do not silently retire or reinterpret committed file data.
+
+A writer can accept arbitrary consecutive fragments across application turns,
+including an unknown final length through low-level `open(path, "w")`. Its buffer
+retains the partial sector until more bytes arrive or `flush()` finalizes the
+file. Input slices must remain valid only until `write()` accepts them. Drain
+`writeStep()` between slices to keep flash work cooperative. Fragment boundaries
+are independent of physical sector boundaries. Interrupted/abandoned writes
+preserve the previous committed version. Writers remain append-only within a
+new record; modifying the middle of an already committed file is a future API
+operation and must preserve copy-on-write publication.
 
 ## Low-level volume and file API
 
@@ -483,7 +535,8 @@ application-level alternating JSON envelopes.
 | `ArdFSFile::operator bool()` | Whether the handle is open |
 | `size()` | File byte length |
 | `read(uint8_t* destination, size_t count)` | Number read; negative on failure |
-| `write(const uint8_t* source, size_t count)` | Bytes appended; zero on refusal |
+| `write(const uint8_t* source, size_t count)` | Bytes accepted into the buffer; zero on refusal; not confirmation of flash persistence |
+| `writeStep()` | Drain queued bytes/program and verify a full sector; -1 error, 0 pending, 1 ready for another slice |
 | `prepareStep()` | One preparation/compaction step; -1 error, 0 pending, 1 ready |
 | `flushStep()` | One verification/commit step; -1 error, 0 pending, 1 committed |
 | `flush()` | Synchronously drain verification/commit steps; bool success |
@@ -491,8 +544,8 @@ application-level alternating JSON envelopes.
 
 Read handles allocate only the volume pointer, address, length, cursor and access
 flag. The 256-byte transfer buffer, record header and commit/compaction state are
-allocated only for writers. Each handle still uses one allocation; writer size
-and the on-flash format are unchanged.
+allocated only for writers. Writers additionally allocate one dynamic 4 KiB sector
+buffer, shared with compaction copies. Read handles remain independent of the sector buffer.
 
 File handles cannot be copied. Do not mount independently overlapping volumes
 alongside the portal. Formatting affects all files in that volume.

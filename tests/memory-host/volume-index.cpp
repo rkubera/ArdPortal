@@ -9,9 +9,10 @@ std::vector<uint8_t> ardfsTestFlash(FS_PHYS_SIZE, 0xff);
 int ardfsFlashCalls = 0, ardfsFailAt = -1, ardfsPrograms = 0, ardfsErases = 0;
 bool ardfsPowerOff = false, ardfsTornOperation = false;
 int allocationCountdown = -1;
-size_t lastAllocationBytes = 0;
+size_t lastAllocationBytes = 0, previousAllocationBytes = 0;
 unsigned allocationCalls = 0;
 void* testAllocate(size_t bytes) noexcept {
+  previousAllocationBytes = lastAllocationBytes;
   lastAllocationBytes = bytes;
   ++allocationCalls;
   if (allocationCountdown == 0) return nullptr;
@@ -56,15 +57,15 @@ int main() {
     assert(!reader && moved.read(&b, 1) == 1 && b == 99);
     calls = allocationCalls;
     auto writer = volume.open("/file-7", "w", 1, true);
-    assert(writer && allocationCalls == calls + 1);
-    assert(lastAllocationBytes >= readerBytes + 256);
+    assert(writer && allocationCalls == calls + 2);
+    assert(lastAllocationBytes == 4096 && previousAllocationBytes >= readerBytes + 256);
     assert(writer.read(&b, 1) == -1);
     moved = std::move(writer);
     assert(!writer && moved.close() && moved.close());
     // Closing the moved writer must release the volume's single-writer guard.
     writer = volume.open("/file-7", "w", 1, true);
     assert(writer);
-    printf("Handle allocations: reader=%zu B, writer=%zu B\n", readerBytes, lastAllocationBytes);
+    printf("Handle allocations: reader=%zu B, writer=%zu B + sector buffer=%zu B\n", readerBytes, previousAllocationBytes, lastAllocationBytes);
   }
   const auto stable = ardfsTestFlash;
   // Index allocation failures must leave a mount failure distinguishable from

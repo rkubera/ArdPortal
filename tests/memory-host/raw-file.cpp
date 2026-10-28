@@ -50,7 +50,7 @@ void verify(uint8_t seed, size_t length = Length) {
 }
 int main() {
   String::reserveLimitForTest() = 256;
-  // A write reaches flash before flush; close abandons it and preserves the old file.
+  // A short write stays buffered; close abandons it and preserves the old file.
   {
     ArdFSVolume volume;
     assert(volume.format() && volume.begin());
@@ -70,7 +70,7 @@ int main() {
     String part = bytes(0, 256, 0);
     int programs = ardfsPrograms;
     assert(file.write(reinterpret_cast<const uint8_t*>(part.c_str()), 256) == 256);
-    assert(ardfsPrograms > programs);
+    assert(ardfsPrograms == programs);
     assert(!file.flush()); // Short producer cannot commit.
     file.close();
     assert(!volume.exists("/direct"));
@@ -102,16 +102,10 @@ int main() {
     assert(part.reserve(256));
     for (size_t i = 0; i < 256; ++i) part += char(0x5a);
     assert(file.write(reinterpret_cast<const uint8_t*>(part.c_str()), 256) == 256);
-    // Find the freshly written body and simulate a flash bit error.
-    bool corrupted = false;
-    for (size_t offset = 0; offset + 256 <= ardfsTestFlash.size(); ++offset) {
-      if (!memcmp(ardfsTestFlash.data() + offset, part.c_str(), 256)) {
-        ardfsTestFlash[offset + 1] ^= 1;
-        corrupted = true;
-        break;
-      }
-    }
-    assert(corrupted && !file.flush());
+    // A permanent program failure exhausts the bounded cached-sector retries.
+    ESP.programFailuresForTest = -1;
+    assert(!file.flush());
+    ESP.programFailuresForTest = 0;
     file.close();
     assert(!volume.exists("/corrupt"));
   }

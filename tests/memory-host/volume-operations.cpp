@@ -59,5 +59,29 @@ int main() {
     assert(x.fileCount() <= 1);
     if (x.exists("/a")) { auto f = x.open("/a", "r"); uint8_t b[3]; assert(f.read(b, 3) == 3 && b[2] == 3); }
   }
-  puts("PASS: mutations, remount, seek, listing, capacity and rename power cuts");
+  // Names at the public limit must survive temporary caller buffers and remounts.
+  {
+    ArdFSVolume x; assert(x.format() && x.begin());
+    char name[74]; memset(name, 'a', 72); name[0] = '/'; name[72] = 0;
+    const String saved(name);
+    auto f = x.open(name, "w", 1, true); assert(f);
+    memset(name, 'b', 72);
+    int status; do { status = f.prepareStep(); } while (!status);
+    uint8_t byte = 91;
+    assert(status == 1 && f.write(&byte, 1) == 1 && f.flush()); f.close();
+    x.end(); assert(x.begin() && x.exists(saved.c_str()));
+    String listed; size_t length = 0;
+    assert(x.fileInfo(0, listed, length) && listed == saved && length == 1);
+    name[0] = '/'; name[72] = 0;
+    const String renamed(name);
+    auto operation = x.mutate(saved.c_str(), name); assert(operation);
+    memset(name, 'c', 72);
+    do { status = operation.prepareStep(); } while (!status);
+    assert(status == 1 && operation.flush()); operation.close();
+    x.end(); assert(x.begin() && !x.exists(saved.c_str()) && x.exists(renamed.c_str()));
+    name[0] = '/'; name[72] = 'c'; name[73] = 0;
+    assert(!x.open(name, "w", 1) && !x.mutate(renamed.c_str(), name));
+    assert(mutate(x, renamed.c_str())); x.end(); assert(x.begin() && x.fileCount() == 0);
+  }
+  puts("PASS: mutations, remount, seek, listing, capacity, owned 72-byte paths and rename power cuts");
 }

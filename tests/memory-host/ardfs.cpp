@@ -10,6 +10,12 @@ EspStub ESP;
 std::vector<uint8_t> ardfsTestFlash(65536, 0xff);
 int ardfsFlashCalls = 0, ardfsFailAt = -1, ardfsPrograms = 0, ardfsErases = 0;
 bool ardfsPowerOff = false, ardfsTornOperation = false;
+size_t allocationCountdown = SIZE_MAX;
+void* testAllocate(size_t bytes) noexcept {
+  if (!allocationCountdown) return nullptr;
+  if (allocationCountdown != SIZE_MAX) --allocationCountdown;
+  return std::malloc(bytes);
+}
 
 void drain(ArdFS& fs) {
   for (int i = 0; i < 2000 && fs.busy(); ++i) {
@@ -50,20 +56,20 @@ void mountFailureRegression() {
   }
   const auto committed = ardfsTestFlash;
   const int erases = ardfsErases, programs = ardfsPrograms;
-  String::reserveFailCountdownForTest() = 0;
+  allocationCountdown = 0;
   {
     ArdFSVolume volume;
     assert(!volume.begin());
     assert(volume.lastError() == -12);
   }
-  String::reserveFailCountdownForTest() = 0;
+  allocationCountdown = 0;
   {
     ArdFS fs;
     fs.begin();
     drain(fs);
     assert(!fs.mounted());
   }
-  String::reserveFailCountdownForTest() = SIZE_MAX;
+  allocationCountdown = SIZE_MAX;
   ardfsFlashCalls = 0;
   ardfsFailAt = 3;
   {

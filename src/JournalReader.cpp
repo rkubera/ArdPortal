@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #include "JournalReader.h"
+#include "ArdCRC.h"
 
 void ArdJournalReader::reset() {
     json.reset(); generation = expectedCrc = 0; crc = UINT32_MAX; length = 0;
@@ -8,24 +9,11 @@ void ArdJournalReader::reset() {
     seen = field = keySize = 0; number = 0; dataString = keyBad = false;
   }
 
-// Reflected CRC-32 polynomials: bit 31 is the multiplicative identity.
 uint32_t ArdJournalReader::multiply(uint32_t left, uint32_t right) {
-  uint32_t result = 0;
-  for (uint32_t bit = uint32_t(1) << 31; bit; bit >>= 1) {
-    if (left & bit) result ^= right;
-    right = (right >> 1) ^ (0xedb88320U & (0U - (right & 1)));
-  }
-  return result;
+  return ArdCRC::multiply(left, right);
 }
 uint32_t ArdJournalReader::combine(uint32_t left, uint32_t right, size_t bytes) {
-  if (!bytes) return left;
-  uint32_t power = uint32_t(1) << 23; // x^8: append one zero byte.
-  do {
-    if (bytes & 1) left = multiply(power, left);
-    bytes >>= 1;
-    if (bytes) power = multiply(power, power);
-  } while (bytes);
-  return left ^ right;
+  return ArdCRC::combine(left, right, bytes);
 }
 
 bool ArdJournalReader::event(ArdJsonStream::Event e, uint8_t b, unsigned depth, const Sink& emit) {
