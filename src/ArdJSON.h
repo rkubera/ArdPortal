@@ -131,7 +131,11 @@ public:
    * @param other Instance whose state is copied, moved or exchanged.
    * @return No value.
    */
-  void swap(JSONVar& other) noexcept;
+#if defined(__GNUC__)
+  __attribute__((noinline))
+#endif
+  void
+  swap(JSONVar& other) noexcept;
   /**
    * @brief Create an empty JSON object.
    * @return An empty JSON object.
@@ -409,6 +413,13 @@ private:
    * @return Pointer to the requested data, or nullptr when unavailable.
    */
   Member* append(const String& key);
+  template<class = void>
+#if defined(__GNUC__)
+  __attribute__((noinline))
+#endif
+  void
+  eraseMember(std::unique_ptr<Member>* slot);
+
   /**
    * @brief Locate an object member by its key.
    * @param key Configuration key or JSON object member name.
@@ -605,6 +616,12 @@ struct JSONVar::Member {
   JSONVar value;
   std::unique_ptr<Member> next;
 };
+template<class Tag>
+void JSONVar::eraseMember(std::unique_ptr<Member>* slot) {
+  auto removed = std::move(*slot);
+  *slot = std::move(removed->next);
+  --_size;
+}
 inline size_t JSONVar::memberAllocationBytes() {
   return sizeof(Member) + 2 * sizeof(void*);
 }
@@ -642,9 +659,7 @@ inline bool JSONVar::applyObjectPatch(JSONVar&& patch, bool eraseUndefined) {
     while (*found && !(*found)->key.matches(item->key)) found = &(*found)->next;
     if (eraseUndefined && item->value.isUndefined()) {
       if (*found) {
-        auto removed = std::move(*found);
-        *found = std::move(removed->next);
-        --_size;
+        eraseMember(found);
       }
     } else if (*found) (*found)->value = std::move(item->value);
     else {
@@ -1062,9 +1077,7 @@ inline bool JSONVar::remove(const String& key) {
   auto* slot = &_children;
   while (*slot && !(*slot)->key.matches(key)) slot = &(*slot)->next;
   if (!*slot) return false;
-  auto removed = std::move(*slot);
-  *slot = std::move(removed->next);
-  --_size;
+  eraseMember(slot);
   return true;
 }
 /**
@@ -1076,9 +1089,7 @@ inline bool JSONVar::remove(size_t index) {
   if (_type != Type::Array || index >= _size) return false;
   auto* slot = &_children;
   while (index--) slot = &(*slot)->next;
-  auto removed = std::move(*slot);
-  *slot = std::move(removed->next);
-  --_size;
+  eraseMember(slot);
   return true;
 }
 

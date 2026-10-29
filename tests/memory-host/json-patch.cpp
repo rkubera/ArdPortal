@@ -99,4 +99,19 @@ int main() {
   for (size_t at = 0; at < measured; ++at)
     slices += JSON.stringifyObjectPatchSlice(exact, exactPatch, at, 1);
   assert(slices == expected && exact.length() == 4 && exactPatch.length() == 4);
+
+  JSONVar removeObject = JSON.parse("{\"first\":{\"nested\":[1,2]},\"middle\":true,\"last\":[3]}");
+  JSONVar removeArray = JSON.parse("[{\"key\":[1,2]},3,4]");
+  assert(removeObject.isValid() && removeArray.isValid());
+  allocationBudget = 0;
+  assert(removeObject.remove(String("middle")) && removeObject.length() == 2);
+  assert(removeObject.remove(String("first")) && removeObject.length() == 1);
+  assert(removeObject.remove(String("last")) && removeObject.length() == 0);
+  assert(!removeObject.remove(String("missing")) && removeObject.isValid());
+  assert(removeArray.remove(size_t(1)) && removeArray.length() == 2);
+  assert(removeArray[size_t(1)].asDouble() == 4);
+  assert(removeArray.remove(size_t(0)) && removeArray.length() == 1);
+  assert(removeArray.remove(size_t(0)) && removeArray.length() == 0);
+  assert(!removeArray.remove(size_t(0)) && removeArray.isValid());
+  allocationBudget = -1;
 }
