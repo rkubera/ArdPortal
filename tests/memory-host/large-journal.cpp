@@ -23,7 +23,11 @@ void drain(ArdFS& fs) {
   }
   assert(!fs.busy());
 }
-void mount(ArdFS& fs) { fs.begin(); drain(fs); assert(fs.mounted()); }
+void mount(ArdFS& fs) {
+  fs.begin();
+  drain(fs);
+  assert(fs.mounted());
+}
 constexpr size_t Length = 32 * 1024 + 27;
 // No complete JSON string is needed by this source; its length exceeds the old limits.
 String document(size_t at, size_t n, uint8_t revision) {
@@ -46,8 +50,14 @@ void save(ArdFS& fs, uint8_t revision, bool changed = true) {
   const size_t reserveLimit = String::reserveLimitForTest();
   String::reserveLimitForTest() = 256;
   bool completed = false;
-  assert(fs.writeJsonConfig("/large.json", Length, [revision](size_t at, size_t n) { return document(at, n, revision); },
-    [&](const auto& r) { assert(r.ok && r.changed == changed); completed = true; }));
+  assert(fs.writeJsonConfig(
+    "/large.json", Length, [revision](size_t at, size_t n) {
+      return document(at, n, revision);
+    },
+    [&](const auto& r) {
+      assert(r.ok && r.changed == changed);
+      completed = true;
+    }));
   drain(fs);
   assert(completed);
   String::reserveLimitForTest() = reserveLimit;
@@ -57,7 +67,12 @@ ConfigTestResult load(bool repair = false) {
   mount(fs);
   ConfigTestResult result;
   bool completed = false;
-  assert(readConfigText(fs, "/large.json", [&](const auto& r) { result = r; completed = true; }, repair));
+  assert(readConfigText(
+    fs, "/large.json", [&](const auto& r) {
+      result = r;
+      completed = true;
+    },
+    repair));
   drain(fs);
   assert(completed);
   return result;
@@ -68,16 +83,19 @@ void streamLoad(uint8_t revision, bool repair = false, bool expectRepair = false
   mount(fs);
   size_t received = 0;
   bool completed = false;
-  assert(fs.readJsonConfig("/large.json", [&](size_t at, const uint8_t* bytes, size_t n) {
-    assert(at == received && n <= 256);
-    String expected = document(at, n, revision);
-    assert(!memcmp(bytes, expected.c_str(), n));
-    received += n;
-    return true;
-  }, [&](const auto& r) {
-    assert(r.ok && r.found && r.repaired == expectRepair);
-    completed = true;
-  }, repair));
+  assert(fs.readJsonConfig(
+    "/large.json", [&](size_t at, const uint8_t* bytes, size_t n) {
+      assert(at == received && n <= 256);
+      String expected = document(at, n, revision);
+      assert(!memcmp(bytes, expected.c_str(), n));
+      received += n;
+      return true;
+    },
+    [&](const auto& r) {
+      assert(r.ok && r.found && r.repaired == expectRepair);
+      completed = true;
+    },
+    repair));
   drain(fs);
   assert(completed && received == Length);
   String::reserveLimitForTest() = SIZE_MAX;
@@ -94,25 +112,37 @@ int main() {
   // Generated and text-backed producers deduplicate against each other.
   save(fs, 1, false);
   String text = fullDocument(1);
-  assert(writeConfigText(fs, "/large.json", text, [](const auto& r) { assert(r.ok && !r.changed); }));
+  assert(writeConfigText(fs, "/large.json", text, [](const auto& r) {
+    assert(r.ok && !r.changed);
+  }));
   drain(fs);
   text = fullDocument(2);
-  assert(writeConfigText(fs, "/large.json", text, [](const auto& r) { assert(r.ok && r.changed); }));
+  assert(writeConfigText(fs, "/large.json", text, [](const auto& r) {
+    assert(r.ok && r.changed);
+  }));
   drain(fs);
   assert(load().data == text);
   // Sink cancellation reports failure without changing either physical copy.
   {
     const auto before = ardfsTestFlash;
     size_t received = 0;
-    assert(fs.readJsonConfig("/large.json", [&](size_t, const uint8_t*, size_t n) { received += n; return false; },
-      [](const auto& r) { assert(!r.ok); }));
+    assert(fs.readJsonConfig(
+      "/large.json", [&](size_t, const uint8_t*, size_t n) {
+        received += n;
+        return false;
+      },
+      [](const auto& r) {
+        assert(!r.ok);
+      }));
     drain(fs);
     assert(received > 0 && received <= 256 && ardfsTestFlash == before);
   }
   // Invalid JSON is still refused before changing either journal slot.
   const auto valid = ardfsTestFlash;
   text = "{\"duplicate\":1,\"duplicate\":2}";
-  assert(writeConfigText(fs, "/large.json", text, [](const auto& r) { assert(!r.ok); }));
+  assert(writeConfigText(fs, "/large.json", text, [](const auto& r) {
+    assert(!r.ok);
+  }));
   drain(fs);
   assert(ardfsTestFlash == valid);
   String::reserveLimitForTest() = 256;
@@ -127,23 +157,31 @@ int main() {
     mount(writer);
     const auto before = ardfsTestFlash;
     constexpr size_t tooLarge = 104 * 1024;
-    assert(writer.writeJsonConfig("/large.json", tooLarge, [](size_t at, size_t n) {
-      String part;
-      assert(part.reserve(n));
-      for (size_t i = 0; i < n; ++i)
-        part += at + i == 0 || at + i == tooLarge - 1 ? '"' : 'x';
-      return part;
-    }, [](const auto& r) { assert(!r.ok); }));
+    assert(writer.writeJsonConfig(
+      "/large.json", tooLarge, [](size_t at, size_t n) {
+        String part;
+        assert(part.reserve(n));
+        for (size_t i = 0; i < n; ++i)
+          part += at + i == 0 || at + i == tooLarge - 1 ? '"' : 'x';
+        return part;
+      },
+      [](const auto& r) {
+        assert(!r.ok);
+      }));
     drain(writer);
     assert(ardfsTestFlash == before);
     // Leading JSON whitespace expands sixfold in the journal string; account
     // for that expansion before starting a physical write.
-    assert(writer.writeJsonConfig("/large.json", Length, [](size_t at, size_t n) {
-      String part;
-      assert(part.reserve(n));
-      for (size_t i = 0; i < n; ++i) part += at + i == Length - 1 ? '0' : '\n';
-      return part;
-    }, [](const auto& r) { assert(!r.ok); }));
+    assert(writer.writeJsonConfig(
+      "/large.json", Length, [](size_t at, size_t n) {
+        String part;
+        assert(part.reserve(n));
+        for (size_t i = 0; i < n; ++i) part += at + i == Length - 1 ? '0' : '\n';
+        return part;
+      },
+      [](const auto& r) {
+        assert(!r.ok);
+      }));
     drain(writer);
     assert(ardfsTestFlash == before);
   }
@@ -196,7 +234,7 @@ int main() {
     calls = ardfsFlashCalls;
   }
   const String older = fullDocument(2), newer = fullDocument(3);
-  for (bool torn : {false, true}) {
+  for (bool torn : { false, true }) {
     for (int cut = 1; cut <= calls; ++cut) {
       ardfsTestFlash = fullBank;
       {
@@ -205,7 +243,10 @@ int main() {
         ardfsFlashCalls = 0;
         ardfsFailAt = cut;
         ardfsTornOperation = torn;
-        assert(writer.writeJsonConfig("/large.json", Length, [](size_t at, size_t n) { return document(at, n, 3); },
+        assert(writer.writeJsonConfig(
+          "/large.json", Length, [](size_t at, size_t n) {
+            return document(at, n, 3);
+          },
           [](const auto&) {}));
         drain(writer);
       }

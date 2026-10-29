@@ -11,27 +11,64 @@
 // rejection. A hash collision rejects input rather than accepting a duplicate.
 class ArdJsonStream {
 public:
-  enum class Event { Object, Array, EndObject, EndArray, Key, KeyByte, EndKey,
-                     String, StringByte, EndString, Number, NumberByte, EndNumber, Literal };
-  enum class Error : uint8_t { None, Value, String, Member, Separator, Trailing,
-    Number, Fraction, Exponent, Literal, Escape, Unicode, LowSurrogate,
-    UnpairedSurrogate, MissingSurrogate, Utf8, Control, UnfinishedEscape,
-    UnterminatedString, Depth, Container, Duplicate, Memory };
+  enum class Event { Object,
+                     Array,
+                     EndObject,
+                     EndArray,
+                     Key,
+                     KeyByte,
+                     EndKey,
+                     String,
+                     StringByte,
+                     EndString,
+                     Number,
+                     NumberByte,
+                     EndNumber,
+                     Literal };
+  enum class Error : uint8_t { None,
+                               Value,
+                               String,
+                               Member,
+                               Separator,
+                               Trailing,
+                               Number,
+                               Fraction,
+                               Exponent,
+                               Literal,
+                               Escape,
+                               Unicode,
+                               LowSurrogate,
+                               UnpairedSurrogate,
+                               MissingSurrogate,
+                               Utf8,
+                               Control,
+                               UnfinishedEscape,
+                               UnterminatedString,
+                               Depth,
+                               Container,
+                               Duplicate,
+                               Memory };
   bool failed = false, outOfMemory = false;
   Error error = Error::None;
   struct Listener {
     void* context;
     bool (*invoke)(void*, Event, uint8_t, unsigned);
-    bool operator()(Event e, uint8_t b, unsigned depth) const { return invoke(context, e, b, depth); }
+    bool operator()(Event e, uint8_t b, unsigned depth) const {
+      return invoke(context, e, b, depth);
+    }
   };
   template<class Emit> void input(uint8_t b, Emit& emit) {
-    const Listener listener{const_cast<void*>(static_cast<const void*>(&emit)),
-      [](void* context, Event e, uint8_t c, unsigned depth) { return (*static_cast<Emit*>(context))(e, c, depth); }};
+    const Listener listener{ const_cast<void*>(static_cast<const void*>(&emit)),
+                             [](void* context, Event e, uint8_t c, unsigned depth) {
+                               return (*static_cast<Emit*>(context))(e, c, depth);
+                             } };
     inputByte(b, listener);
   }
   template<class Emit> bool finish(Emit& emit) {
-    const Listener listener{const_cast<void*>(static_cast<const void*>(&emit)),
-      [](void* context, Event e, uint8_t b, unsigned depth) { return (*static_cast<Emit*>(context))(e, b, depth); }};
+    const Listener listener{ const_cast<void*>(static_cast<const void*>(&emit)),
+                             [](void* context, Event e, uint8_t b, unsigned depth) {
+                               return (*static_cast<Emit*>(context))(e, b, depth);
+                             } };
     return finishInput(listener);
   }
 
@@ -49,14 +86,28 @@ private:
     uint16_t items = 0;
     uint8_t state = 0;
     bool object = false;
-    void clear() { while (keys) { Key* next = keys->next; delete keys; keys = next; } items = 0; }
+    void clear() {
+      while (keys) {
+        Key* next = keys->next;
+        delete keys;
+        keys = next;
+      }
+      items = 0;
+    }
   };
   Frame _frames[17];
   std::unique_ptr<Frame[]> _overflow;
   uint8_t _maxDepth = 16;
   bool _checkKeys = true;
-  Frame& frame(unsigned index) { return index < 17 ? _frames[index] : _overflow[index - 17]; }
-  bool fail(Error reason) { if (!failed) error = reason; failed = true; outOfMemory = error == Error::Memory; return false; }
+  Frame& frame(unsigned index) {
+    return index < 17 ? _frames[index] : _overflow[index - 17];
+  }
+  bool fail(Error reason) {
+    if (!failed) error = reason;
+    failed = true;
+    outOfMemory = error == Error::Memory;
+    return false;
+  }
   uint8_t _depth = 0, _token = 0, _number = 0, _literalAt = 0;
   uint8_t _escape = 0, _hex = 0, _utfLeft = 0;
   uint16_t _unicode = 0, _high = 0;

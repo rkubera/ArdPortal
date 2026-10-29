@@ -1102,11 +1102,17 @@ public:
   void reset(const Limits& limits = Limits());
   bool input(size_t offset, const uint8_t* bytes, size_t length);
   JSONVar take();
-  const char* error() const { return _error; }
-  size_t offset() const { return _offset; }
-  size_t nodes() const { return _nodes; }
+  const char* error() const {
+    return _error;
+  }
+  size_t offset() const {
+    return _offset;
+  }
+  size_t nodes() const {
+    return _nodes;
+  }
 private:
-  ArdJsonStream _syntax{16, false};
+  ArdJsonStream _syntax{ 16, false };
   Limits _limits;
   ArdCooperativeBudget _budget;
   JSONVar _root;
@@ -1124,11 +1130,18 @@ private:
 };
 class Parser {
 public:
-  Parser(const String& input, const Limits& limits) : _input(input), _limits(limits) {}
+  Parser(const String& input, const Limits& limits)
+    : _input(input), _limits(limits) {}
   JSONVar parse();
-  const char* error() const { return _error; }
-  size_t offset() const { return _offset; }
-  size_t nodes() const { return _nodes; }
+  const char* error() const {
+    return _error;
+  }
+  size_t offset() const {
+    return _offset;
+  }
+  size_t nodes() const {
+    return _nodes;
+  }
 private:
   const String& _input;
   const Limits& _limits;

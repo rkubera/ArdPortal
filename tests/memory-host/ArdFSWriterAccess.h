@@ -9,8 +9,11 @@ public:
   }
   static std::vector<uint16_t> sectors(ArdFSFile& file) {
     if (!file) return {};
-    if (file._handle->writing) { auto* e=static_cast<ArdFSFile::Writer&>(*file._handle).entry; return {e->sectors,e->sectors+e->count}; }
-    return {file._handle->sectors(), file._handle->sectors() + file._handle->count};
+    if (file._handle->writing) {
+      auto* e = static_cast<ArdFSFile::Writer&>(*file._handle).entry;
+      return { e->sectors, e->sectors + e->count };
+    }
+    return { file._handle->sectors(), file._handle->sectors() + file._handle->count };
   }
   static size_t queueWrite(ArdFSFile& file, const uint8_t* bytes, size_t count) {
     return file.queueWrite(bytes, count);

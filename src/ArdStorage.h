@@ -3,7 +3,9 @@
 #pragma once
 #include <Arduino.h>
 #include <functional>
-namespace ArdUILanguageData { enum class Key : uint16_t; }
+namespace ArdUILanguageData {
+enum class Key : uint16_t;
+}
 #include "JsonCodec.h"
 #include "JournalReader.h"
 #include "JournalStream.h"
@@ -19,7 +21,10 @@ class ArdStorage {
 public:
   // The volume is placed after parser state for code size; close its handles
   // explicitly before reverse member destruction reaches the volume itself.
-  ~ArdStorage() { _file.close(); _repairFile.close(); }
+  ~ArdStorage() {
+    _file.close();
+    _repairFile.close();
+  }
   struct Result {
     bool ok = false, found = false, changed = false, recovered = false;
     bool redundant = false, repaired = false;
@@ -62,11 +67,21 @@ public:
   // Raw physical paths; JSON journal copies must be managed separately.
   bool remove(const String& path, Callback callback);
   bool rename(const String& source, const String& destination, Callback callback);
-  size_t fileCount() const { return _volume.fileCount(); }
-  bool fileInfo(size_t index, String& path, size_t& size) const { return _volume.fileInfo(index, path, size); }
-  size_t totalBytes() const { return _volume.totalBytes(); }
-  size_t usedBytes() const { return _volume.usedBytes(); }
-  size_t freeBytes() const { return _volume.freeBytes(); }
+  size_t fileCount() const {
+    return _volume.fileCount();
+  }
+  bool fileInfo(size_t index, String& path, size_t& size) const {
+    return _volume.fileInfo(index, path, size);
+  }
+  size_t totalBytes() const {
+    return _volume.totalBytes();
+  }
+  size_t usedBytes() const {
+    return _volume.usedBytes();
+  }
+  size_t freeBytes() const {
+    return _volume.freeBytes();
+  }
 
   /**
    * @brief Queue formatting of the storage volume; existing records will be discarded.
@@ -119,8 +134,12 @@ public:
   // SIZE_MAX means no fixed document limit; usable capacity depends on the volume.
   static constexpr size_t MaxBytes = SIZE_MAX;
 private:
-  template<class V> static auto needsRemount(const V& volume, int) -> decltype(volume.requiresRemount()) { return volume.requiresRemount(); }
-  template<class V> static bool needsRemount(const V&, long) { return false; }
+  template<class V> static auto needsRemount(const V& volume, int) -> decltype(volume.requiresRemount()) {
+    return volume.requiresRemount();
+  }
+  template<class V> static bool needsRemount(const V&, long) {
+    return false;
+  }
   enum class Phase { Mount,
                      End,
                      Format,
@@ -153,9 +172,9 @@ private:
   // Strings ahead of the large parser and transfer buffers.
   Phase _phase = Phase::Idle;
   bool _mountDone = false, _mounted = false, _writing = false, _formatRequested = false;
-  bool _valid[2] = {false, false}, _present[2] = {false, false}, _match[2] = {false, false};
+  bool _valid[2] = { false, false }, _present[2] = { false, false }, _match[2] = { false, false };
   bool _rawFile = false;
-  bool _legacy[2] = {false, false}, _legacyMatch = false;
+  bool _legacy[2] = { false, false }, _legacyMatch = false;
   bool _repairFailed = false, _repairDone = false;
   bool _repairRequested = false, _repairing = false;
   bool _sourceMatch = false, _sourceFailed = false;
@@ -166,13 +185,13 @@ private:
   Callback _callback;
   JsonSource _source;
   FileSink _sink;
-  uint32_t _generation[2] = {0, 0}, _commits = 0, _skipped = 0;
+  uint32_t _generation[2] = { 0, 0 }, _commits = 0, _skipped = 0;
   int _slot = 0, _best = -1;
   size_t _offset = 0, _expected = 0;
   size_t _decodedSize = 0, _payloadAt = 0, _decodedAt = 0;
-  uint32_t _runningFileCrc = UINT32_MAX, _fileCrc[2] = {0, 0};
+  uint32_t _runningFileCrc = UINT32_MAX, _fileCrc[2] = { 0, 0 };
   size_t _rawCompareAt = 0;
-  size_t _length[2] = {0, 0}, _physicalLength[2] = {0, 0};
+  size_t _length[2] = { 0, 0 }, _physicalLength[2] = { 0, 0 };
   uint32_t _repairRetrySince = 0;
   size_t _sourceLength = 0, _sourceAt = 0, _sourceCompareAt = 0, _escapedLength = 0, _journalHeaderAt = 0, _rawAt = 0, _escapeAt = 0, _escapeLength = 0;
   uint32_t _sourceCrc = 0, _sourceGeneration = 0;
@@ -183,7 +202,9 @@ private:
   void resetJournalOutput();
   size_t journalOutput();
   String sourcePart(size_t offset, size_t maximum);
-  enum class OpenMode : uint8_t { Read, Write, Scan };
+  enum class OpenMode : uint8_t { Read,
+                                  Write,
+                                  Scan };
   bool openSlot(FileHandle& file, int slot, OpenMode mode, ArdUILanguageData::Key failure);
 
   /**

@@ -5,9 +5,12 @@
 #endif
 constexpr int ESP_OK = 0, ESP_FAIL = -1;
 constexpr int ESP_PARTITION_TYPE_DATA = 1, ESP_PARTITION_SUBTYPE_ANY = 0, ESP_PARTITION_SUBTYPE_DATA_SPIFFS = 0x82;
-struct esp_partition_t { uint32_t size; bool encrypted; };
+struct esp_partition_t {
+  uint32_t size;
+  bool encrypted;
+};
 inline const esp_partition_t* esp_partition_find_first(int, int, const char*) {
-  static const esp_partition_t partition = {FS_PHYS_SIZE, false};
+  static const esp_partition_t partition = { FS_PHYS_SIZE, false };
   return &partition;
 }
 inline int esp_partition_read(const esp_partition_t* p, size_t at, void* bytes, size_t n) {

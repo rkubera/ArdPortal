@@ -59,12 +59,14 @@ int main() {
   if (FS_PHYS_SIZE == 3145728U) {
     assert(v.format() && v.begin());
     assert(save(v, "/cold", 300U * 4092 + 4 - 32 - 5 - 600, 77));
-    bool wrapped=false; uint16_t previous=0;
-    for (unsigned j=0;j<600;++j) {
-      assert(save(v,"/hot",1,j)); uint16_t id=root(v,"/hot");
-      assert(id<2 || (id>=302 && id<384));
-      if (j && id<previous) wrapped=true;
-      previous=id;
+    bool wrapped = false;
+    uint16_t previous = 0;
+    for (unsigned j = 0; j < 600; ++j) {
+      assert(save(v, "/hot", 1, j));
+      uint16_t id = root(v, "/hot");
+      assert(id < 2 || (id >= 302 && id < 384));
+      if (j && id < previous) wrapped = true;
+      previous = id;
     }
     assert(wrapped);
     check(v, "/cold", 300U * 4092 + 4 - 32 - 5 - 600, 77);
@@ -114,7 +116,7 @@ int main() {
   auto* header = ardfsTestFlash.data() + 16 * 4096;
   memcpy(header, ardfsTestFlash.data(), 256);
   ArdFSDetail::put(header + 8, 0);
-  ArdFSDetail::put(header + 180,16*4096);
+  ArdFSDetail::put(header + 180, 16 * 4096);
   header[32] = 11;
   for (unsigned j = 0; j < 11; ++j) ArdFSDetail::put16(header + 36 + j * 2, j + 2);
   auto checksum = [](const uint8_t* h) {

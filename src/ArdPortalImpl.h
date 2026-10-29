@@ -2279,7 +2279,8 @@ void ArdPortal::serviceStorage(uint32_t now) {
     if (!_loadParser || !_storage.readJsonConfig(
           "/ardportal.json", [this](size_t offset, const uint8_t* bytes, size_t length) {
             return _loadParser && _loadParser->input(offset, bytes, length);
-          }, [this](const ArdPortalStorage::Result& result) {
+          },
+          [this](const ArdPortalStorage::Result& result) {
             finishLoad(result);
           },
           true)) {

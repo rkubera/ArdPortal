@@ -20,12 +20,16 @@ void drain(ArdFS& fs) {
       assert(ardfsErases - erases <= 1);
       assert(ardfsPrograms - programs <= 1);
       if (ardfsErases != erases || ardfsPrograms != programs)
-        assert(ardfsFlashCalls - calls <= 1); // No transfer combined with an erase/write.
+        assert(ardfsFlashCalls - calls <= 1);  // No transfer combined with an erase/write.
     }
   }
   assert(!fs.busy());
 }
-void mount(ArdFS& fs) { fs.begin(); drain(fs); assert(fs.mounted()); }
+void mount(ArdFS& fs) {
+  fs.begin();
+  drain(fs);
+  assert(fs.mounted());
+}
 String bytes(size_t offset, size_t length, uint8_t seed) {
   assert(length <= 256);
   String result;
@@ -39,12 +43,16 @@ void verify(uint8_t seed, size_t length = Length) {
   ArdFS fs;
   mount(fs);
   size_t received = 0;
-  assert(fs.readFile("/binary", [&](size_t offset, const uint8_t* data, size_t n) {
-    assert(offset == received && n <= 256);
-    for (size_t i = 0; i < n; ++i) assert(data[i] == uint8_t((offset + i + seed) % 256));
-    received += n;
-    return true;
-  }, [&](const ArdFS::Result& r) { assert(r.ok && r.found); }));
+  assert(fs.readFile(
+    "/binary", [&](size_t offset, const uint8_t* data, size_t n) {
+      assert(offset == received && n <= 256);
+      for (size_t i = 0; i < n; ++i) assert(data[i] == uint8_t((offset + i + seed) % 256));
+      received += n;
+      return true;
+    },
+    [&](const ArdFS::Result& r) {
+      assert(r.ok && r.found);
+    }));
   drain(fs);
   assert(received == length);
 }
@@ -70,8 +78,8 @@ int main() {
     String part = bytes(0, 256, 0);
     int programs = ardfsPrograms;
     assert(file.write(reinterpret_cast<const uint8_t*>(part.c_str()), 256) == 256);
-    assert(ardfsPrograms == programs + 1); // Only the sector type is durable; payload remains buffered.
-    assert(!file.flush()); // Short producer cannot commit.
+    assert(ardfsPrograms == programs + 1);  // Only the sector type is durable; payload remains buffered.
+    assert(!file.flush());                  // Short producer cannot commit.
     file.close();
     assert(!volume.exists("/direct"));
   }
@@ -79,9 +87,14 @@ int main() {
     ArdFS fs;
     mount(fs);
     const int calls = ardfsFlashCalls;
-    assert(fs.writeFile("/binary", Length, [](size_t offset, size_t n) { return bytes(offset, n, 7); },
-      [](const ArdFS::Result& r) { assert(r.ok && r.changed); }));
-    assert(ardfsFlashCalls == calls); // Queuing performs no flash I/O.
+    assert(fs.writeFile(
+      "/binary", Length, [](size_t offset, size_t n) {
+        return bytes(offset, n, 7);
+      },
+      [](const ArdFS::Result& r) {
+        assert(r.ok && r.changed);
+      }));
+    assert(ardfsFlashCalls == calls);  // Queuing performs no flash I/O.
     drain(fs);
   }
   verify(7);
@@ -89,8 +102,13 @@ int main() {
     ArdFS fs;
     mount(fs);
     const auto before = ardfsTestFlash;
-    assert(fs.writeFile("/oversized", FS_PHYS_SIZE, [](size_t o, size_t n) { return bytes(o, n, 1); },
-      [](const ArdFS::Result& r) { assert(!r.ok); }));
+    assert(fs.writeFile(
+      "/oversized", FS_PHYS_SIZE, [](size_t o, size_t n) {
+        return bytes(o, n, 1);
+      },
+      [](const ArdFS::Result& r) {
+        assert(!r.ok);
+      }));
     drain(fs);
     assert(ardfsTestFlash == before);
     // A producer checksum mismatch must prevent the commit marker.
@@ -114,21 +132,35 @@ int main() {
   {
     ArdFS fs;
     mount(fs);
-    assert(fs.writeFile("/other", OtherLength, [](size_t o, size_t n) { return bytes(o, n, 5); },
-      [](const ArdFS::Result& r) { assert(r.ok); }));
+    assert(fs.writeFile(
+      "/other", OtherLength, [](size_t o, size_t n) {
+        return bytes(o, n, 5);
+      },
+      [](const ArdFS::Result& r) {
+        assert(r.ok);
+      }));
     drain(fs);
     for (uint8_t seed = 8; seed < 12; ++seed) {
-      assert(fs.writeFile("/binary", Length, [seed](size_t o, size_t n) { return bytes(o, n, seed); },
-        [](const ArdFS::Result& r) { assert(r.ok); }));
+      assert(fs.writeFile(
+        "/binary", Length, [seed](size_t o, size_t n) {
+          return bytes(o, n, seed);
+        },
+        [](const ArdFS::Result& r) {
+          assert(r.ok);
+        }));
       drain(fs);
       verify(seed);
     }
     size_t received = 0;
-    assert(fs.readFile("/other", [&](size_t o, const uint8_t* data, size_t n) {
-      for (size_t i = 0; i < n; ++i) assert(data[i] == uint8_t(o + i + 5));
-      received += n;
-      return true;
-    }, [](const ArdFS::Result& r) { assert(r.ok); }));
+    assert(fs.readFile(
+      "/other", [&](size_t o, const uint8_t* data, size_t n) {
+        for (size_t i = 0; i < n; ++i) assert(data[i] == uint8_t(o + i + 5));
+        received += n;
+        return true;
+      },
+      [](const ArdFS::Result& r) {
+        assert(r.ok);
+      }));
     drain(fs);
     assert(received == OtherLength);
   }
@@ -137,15 +169,25 @@ int main() {
   {
     ArdFS fs;
     mount(fs);
-    assert(fs.writeFile("/binary", Length, [](size_t o, size_t n) { return bytes(o, n, 8); },
-      [](const ArdFS::Result& r) { assert(r.ok); }));
+    assert(fs.writeFile(
+      "/binary", Length, [](size_t o, size_t n) {
+        return bytes(o, n, 8);
+      },
+      [](const ArdFS::Result& r) {
+        assert(r.ok);
+      }));
     drain(fs);
   }
   {
     ArdFS fs;
     mount(fs);
-    assert(fs.writeFile("/other", OtherLength, [](size_t o, size_t n) { return bytes(o, n, 5); },
-      [](const ArdFS::Result& r) { assert(r.ok); }));
+    assert(fs.writeFile(
+      "/other", OtherLength, [](size_t o, size_t n) {
+        return bytes(o, n, 5);
+      },
+      [](const ArdFS::Result& r) {
+        assert(r.ok);
+      }));
     drain(fs);
   }
   const auto fullBank = ardfsTestFlash;
@@ -154,12 +196,17 @@ int main() {
     ArdFS fs;
     mount(fs);
     ardfsFlashCalls = 0;
-    assert(fs.writeFile("/binary", Length, [](size_t o, size_t n) { return bytes(o, n, 9); },
-      [](const ArdFS::Result& r) { assert(r.ok); }));
+    assert(fs.writeFile(
+      "/binary", Length, [](size_t o, size_t n) {
+        return bytes(o, n, 9);
+      },
+      [](const ArdFS::Result& r) {
+        assert(r.ok);
+      }));
     drain(fs);
     calls = ardfsFlashCalls;
   }
-  for (bool torn : {false, true}) {
+  for (bool torn : { false, true }) {
     for (int cut = 1; cut <= calls; ++cut) {
       ardfsTestFlash = fullBank;
       {
@@ -168,7 +215,10 @@ int main() {
         ardfsFlashCalls = 0;
         ardfsFailAt = cut;
         ardfsTornOperation = torn;
-        assert(fs.writeFile("/binary", Length, [](size_t o, size_t n) { return bytes(o, n, 9); },
+        assert(fs.writeFile(
+          "/binary", Length, [](size_t o, size_t n) {
+            return bytes(o, n, 9);
+          },
           [](const ArdFS::Result&) {}));
         drain(fs);
       }
@@ -186,12 +236,16 @@ int main() {
         ArdFS fs;
         mount(fs);
         size_t received = 0;
-        assert(fs.readFile("/other", [&](size_t o, const uint8_t* data, size_t n) {
-          assert(o == received);
-          for (size_t i = 0; i < n; ++i) assert(data[i] == uint8_t(o + i + 5));
-          received += n;
-          return true;
-        }, [](const ArdFS::Result& r) { assert(r.ok); }));
+        assert(fs.readFile(
+          "/other", [&](size_t o, const uint8_t* data, size_t n) {
+            assert(o == received);
+            for (size_t i = 0; i < n; ++i) assert(data[i] == uint8_t(o + i + 5));
+            received += n;
+            return true;
+          },
+          [](const ArdFS::Result& r) {
+            assert(r.ok);
+          }));
         drain(fs);
         assert(received == OtherLength);
       }
@@ -204,34 +258,55 @@ int main() {
   {
     ArdFS fs;
     mount(fs);
-    assert(fs.writeFile("/binary", Length, [](size_t o, size_t n) {
-      return o >= 512 ? String() : bytes(o, n, 9);
-    }, [](const ArdFS::Result& r) { assert(!r.ok); }));
+    assert(fs.writeFile(
+      "/binary", Length, [](size_t o, size_t n) {
+        return o >= 512 ? String() : bytes(o, n, 9);
+      },
+      [](const ArdFS::Result& r) {
+        assert(!r.ok);
+      }));
     drain(fs);
   }
   verify(7);
   {
     ArdFS fs;
     mount(fs);
-    assert(fs.writeFile("/binary", 0, [](size_t, size_t) { assert(false); return String(); },
-      [](const ArdFS::Result& r) { assert(r.ok); }));
+    assert(fs.writeFile(
+      "/binary", 0, [](size_t, size_t) {
+        assert(false);
+        return String();
+      },
+      [](const ArdFS::Result& r) {
+        assert(r.ok);
+      }));
     drain(fs);
   }
   verify(0, 0);
   {
-    ArdFS fs; mount(fs);
+    ArdFS fs;
+    mount(fs);
     bool done = false;
     const size_t initialCount = fs.fileCount();
     const int before = ardfsFlashCalls;
-    assert(fs.rename("/binary", "/renamed", [&](const ArdFS::Result& r) { assert(r.ok && r.found && r.changed); done = true; }));
+    assert(fs.rename("/binary", "/renamed", [&](const ArdFS::Result& r) {
+      assert(r.ok && r.found && r.changed);
+      done = true;
+    }));
     assert(!done && ardfsFlashCalls == before);
     assert(!fs.remove("/other", [](const ArdFS::Result&) {}));
-    drain(fs); assert(done);
+    drain(fs);
+    assert(done);
     assert(fs.fileCount() == initialCount && fs.freeBytes() + fs.usedBytes() == fs.totalBytes());
     done = false;
-    assert(fs.remove("/renamed", [&](const ArdFS::Result& r) { assert(r.ok && r.changed); done = true; }));
-    drain(fs); assert(done && fs.fileCount() == initialCount - 1);
-    assert(fs.remove("/missing", [](const ArdFS::Result& r) { assert(!r.ok && !r.changed); }));
+    assert(fs.remove("/renamed", [&](const ArdFS::Result& r) {
+      assert(r.ok && r.changed);
+      done = true;
+    }));
+    drain(fs);
+    assert(done && fs.fileCount() == initialCount - 1);
+    assert(fs.remove("/missing", [](const ArdFS::Result& r) {
+      assert(!r.ok && !r.changed);
+    }));
     drain(fs);
   }
   puts("PASS: raw binary files above JSON/journal limits, bounded I/O per loop, stepped erase/verify/compaction, aborted and empty files");

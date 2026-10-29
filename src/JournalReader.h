@@ -25,13 +25,18 @@ struct ArdJournalReader {
 
   bool event(ArdJsonStream::Event e, uint8_t b, unsigned depth, const Sink& emit);
   template<class Emit> void input(uint8_t b, Emit& emit) {
-    const Sink sink{const_cast<void*>(static_cast<const void*>(&emit)),
-      [](void* context, uint8_t c, size_t at) { return (*static_cast<Emit*>(context))(c, at); }};
+    const Sink sink{ const_cast<void*>(static_cast<const void*>(&emit)),
+                     [](void* context, uint8_t c, size_t at) {
+                       return (*static_cast<Emit*>(context))(c, at);
+                     } };
     inputByte(b, sink);
   }
   void inputByte(uint8_t b, const Sink& sink);
   bool finish();
 private:
-  struct Context { ArdJournalReader* reader; const Sink* sink; };
+  struct Context {
+    ArdJournalReader* reader;
+    const Sink* sink;
+  };
   static bool dispatch(void* pointer, ArdJsonStream::Event e, uint8_t b, unsigned depth);
 };

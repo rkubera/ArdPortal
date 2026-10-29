@@ -49,7 +49,8 @@ ConfigTestResult load(int failSlot = -1, bool repair = false) {
   drain(fs);
   ConfigTestResult result;
   bool done = false;
-  assert(readConfigText(fs,
+  assert(readConfigText(
+    fs,
     "/test.json", [&](const auto& r) {
       result = r;
       done = true;
@@ -95,7 +96,9 @@ int main() {
     // Stream comparison also aborts on allocation failure in the newest slot;
     // it must not mistake an unreadable latest version for a corrupt record.
     saved = true;
-    assert(writeConfigText(writer, "/test.json", "{\"relay\":false,\"revision\":12}", [&](const auto& r) { saved = r.ok; }));
+    assert(writeConfigText(writer, "/test.json", "{\"relay\":false,\"revision\":12}", [&](const auto& r) {
+      saved = r.ok;
+    }));
     for (int i = 0; i < 10000 && writer.busy(); ++i) {
       String::reserveFailCountdownForTest() = writer._phase == ArdFS::Phase::Read && writer._slot == newest ? 0 : SIZE_MAX;
       writer.loop();
@@ -155,7 +158,7 @@ int main() {
   // Legacy objects and noncanonical envelopes use the same bounded reader/repair.
   fakeFiles.clear();
   const String legacy = "{\"legacy\":\"payload\"}";
-  fakeFiles["/test.json"] = {legacy.c_str(), legacy.c_str() + legacy.length()};
+  fakeFiles["/test.json"] = { legacy.c_str(), legacy.c_str() + legacy.length() };
   auto legacyRepaired = load(-1, true);
   assert(legacyRepaired.ok && legacyRepaired.repaired && legacyRepaired.redundant && legacyRepaired.data == legacy);
   assert(fakeFiles["/test.json"] == fakeFiles["/test.json.journal"]);
@@ -166,24 +169,35 @@ int main() {
   noncanonical["generation"] = 91;
   noncanonical["journal"] = 1;
   String wrapper = ArdJSON::JSON.stringify(noncanonical, true);
-  fakeFiles["/test.json.journal"] = {wrapper.c_str(), wrapper.c_str() + wrapper.length()};
+  fakeFiles["/test.json.journal"] = { wrapper.c_str(), wrapper.c_str() + wrapper.length() };
   ArdFS streaming;
-  streaming.begin(); drain(streaming);
+  streaming.begin();
+  drain(streaming);
   const auto verifiedSource = fakeFiles["/test.json.journal"];
   String delivered;
-  assert(streaming.readJsonConfig("/test.json", [&](size_t at, const uint8_t* bytes, size_t n) {
-    assert(at == delivered.length() && n <= 256);
-    return delivered.concat(reinterpret_cast<const char*>(bytes), n);
-  }, [](const auto& r) { assert(r.ok && r.repaired && r.redundant); }, true));
+  assert(streaming.readJsonConfig(
+    "/test.json", [&](size_t at, const uint8_t* bytes, size_t n) {
+      assert(at == delivered.length() && n <= 256);
+      return delivered.concat(reinterpret_cast<const char*>(bytes), n);
+    },
+    [](const auto& r) {
+      assert(r.ok && r.repaired && r.redundant);
+    },
+    true));
   drain(streaming);
   assert(delivered == newer && fakeFiles["/test.json.journal"] == verifiedSource);
   fakeFiles.erase("/test.json");
   failFileWrite = true;
   delivered = String();
-  assert(streaming.readJsonConfig("/test.json", [&](size_t at, const uint8_t* bytes, size_t n) {
-    assert(at == delivered.length());
-    return delivered.concat(reinterpret_cast<const char*>(bytes), n);
-  }, [](const auto& r) { assert(!r.ok && r.found && !r.repaired && r.repairAttempts == 3); }, true));
+  assert(streaming.readJsonConfig(
+    "/test.json", [&](size_t at, const uint8_t* bytes, size_t n) {
+      assert(at == delivered.length());
+      return delivered.concat(reinterpret_cast<const char*>(bytes), n);
+    },
+    [](const auto& r) {
+      assert(!r.ok && r.found && !r.repaired && r.repairAttempts == 3);
+    },
+    true));
   drain(streaming);
   failFileWrite = false;
   assert(delivered == newer && fakeFiles["/test.json.journal"] == verifiedSource);
@@ -191,13 +205,15 @@ int main() {
   // would not. An unchanged write must still validate and deduplicate it.
   fakeFiles.clear();
   String largeLegacy(std::string(200000, '\n') + "{}");
-  fakeFiles["/test.json"] = {largeLegacy.c_str(), largeLegacy.c_str() + largeLegacy.length()};
+  fakeFiles["/test.json"] = { largeLegacy.c_str(), largeLegacy.c_str() + largeLegacy.length() };
   ArdFS deduplicating;
-  deduplicating.begin(); drain(deduplicating);
+  deduplicating.begin();
+  drain(deduplicating);
   const size_t opens = fakeOpenWrites;
   bool completed = false;
   assert(writeConfigText(deduplicating, "/test.json", largeLegacy, [&](const auto& r) {
-    assert(r.ok && !r.changed); completed = true;
+    assert(r.ok && !r.changed);
+    completed = true;
   }));
   drain(deduplicating);
   assert(completed && deduplicating.skipped() == 1 && fakeOpenWrites == opens);
@@ -205,7 +221,8 @@ int main() {
   const auto unchanged = fakeFiles;
   completed = false;
   assert(writeConfigText(deduplicating, "/test.json", "{broken}", [&](const auto& r) {
-    assert(!r.ok); completed = true;
+    assert(!r.ok);
+    completed = true;
   }));
   drain(deduplicating);
   assert(completed && fakeFiles == unchanged && fakeOpenWrites == opens);

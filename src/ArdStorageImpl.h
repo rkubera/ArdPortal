@@ -9,7 +9,10 @@
 template<class Volume, class FileHandle>
 void ArdStorage<Volume, FileHandle>::begin() {
   if (_phase != Phase::Idle || (_mountDone && mounted())) return;
-  if (_mountDone) { _volume.end(); _mountDone = _mounted = false; }
+  if (_mountDone) {
+    _volume.end();
+    _mountDone = _mounted = false;
+  }
   _phase = Phase::Mount;
 }
 /**
@@ -108,21 +111,33 @@ String ArdStorage<Volume, FileHandle>::sourcePart(size_t offset, size_t maximum)
   size_t count = _sourceLength - offset;
   if (count > maximum) count = maximum;
   String part = _source(offset, count);
-  if (part.length() != count) { _sourceFailed = true; return String(); }
+  if (part.length() != count) {
+    _sourceFailed = true;
+    return String();
+  }
   return part;
 }
 template<class Volume, class FileHandle>
 bool ArdStorage<Volume, FileHandle>::openSlot(FileHandle& file, int slot, OpenMode mode, ArdUILanguageData::Key failure) {
   const String path = slotPath(slot);
-  if (path.length() != _path.length() + (slot ? 8 : 0)) { fail(ArdUILanguage::Key::s_198); return false; }
+  if (path.length() != _path.length() + (slot ? 8 : 0)) {
+    fail(ArdUILanguage::Key::s_198);
+    return false;
+  }
   if (mode == OpenMode::Scan) {
     _present[slot] = _volume.exists(path.c_str());
-    if (_volume.lastError() && _volume.lastError() != -2) { fail(failure); return false; }
+    if (_volume.lastError() && _volume.lastError() != -2) {
+      fail(failure);
+      return false;
+    }
     if (!_present[slot]) return true;
   }
   const bool writing = mode == OpenMode::Write;
   file = _volume.open(path.c_str(), writing ? "w" : "r", writing ? _expected : SIZE_MAX, true);
-  if (!file) { fail(failure); return false; }
+  if (!file) {
+    fail(failure);
+    return false;
+  }
   return true;
 }
 template<class Volume, class FileHandle>
@@ -236,7 +251,8 @@ template<class Volume, class FileHandle>
 void ArdStorage<Volume, FileHandle>::finish(bool ok, const String& error, bool changed) {
   const bool delivering = _phase == Phase::OpenPayload || _phase == Phase::ReadPayload || _phase == Phase::DeliverPayload;
   if (_repairing && !ok && !delivering) {
-    _file.close(); _repairFile.close();
+    _file.close();
+    _repairFile.close();
     if (_repairAttempts < 3) {
       ++_repairAttempts;
       _repairRetrySince = millis();
@@ -300,13 +316,18 @@ void ArdStorage<Volume, FileHandle>::loop() {
         return;
       }
     case Phase::End:
-      _volume.end(); _mounted = false; _phase = Phase::Format; return;
+      _volume.end();
+      _mounted = false;
+      _phase = Phase::Format;
+      return;
     case Phase::Format:
       {
         int status = _volume.formatStep();
         if (!status) return;
-        if (status < 0) { _mountDone = true; fail(ArdUILanguage::Key::s_195); }
-        else _phase = Phase::Remount;
+        if (status < 0) {
+          _mountDone = true;
+          fail(ArdUILanguage::Key::s_195);
+        } else _phase = Phase::Remount;
         return;
       }
     case Phase::Idle: return;
@@ -315,10 +336,19 @@ void ArdStorage<Volume, FileHandle>::loop() {
       {
         const bool preparing = _phase == Phase::PrepareMutation;
         int status = preparing ? _file.prepareStep() : _file.flushStep();
-        if (status < 0) { fail(ArdUILanguage::Key::s_204); return; }
+        if (status < 0) {
+          fail(ArdUILanguage::Key::s_204);
+          return;
+        }
         if (status == 1) {
-          if (preparing) { _best = 0; _phase = Phase::FlushMutation; }
-          else { _file.close(); ++_commits; finish(true, "", true); }
+          if (preparing) {
+            _best = 0;
+            _phase = Phase::FlushMutation;
+          } else {
+            _file.close();
+            ++_commits;
+            finish(true, "", true);
+          }
         }
         return;
       }
@@ -333,7 +363,11 @@ void ArdStorage<Volume, FileHandle>::loop() {
       {
         size_t n = _expected - _offset;
         if (n > sizeof(chunk)) n = sizeof(chunk);
-        if (!n) { _file.close(); finish(true); return; }
+        if (!n) {
+          _file.close();
+          finish(true);
+          return;
+        }
         if (_file.read(chunk, n) != int(n) || !_sink(_offset, chunk, n)) {
           fail(ArdUILanguage::Key::s_199);
           return;
@@ -350,7 +384,10 @@ void ArdStorage<Volume, FileHandle>::loop() {
         _sourceCompareAt = _rawCompareAt = 0;
         _runningFileCrc = UINT32_MAX;
         if (!openSlot(_file, _slot, OpenMode::Scan, ArdUILanguage::Key::s_199)) return;
-        if (!_present[_slot]) { _phase = Phase::Validate; return; }
+        if (!_present[_slot]) {
+          _phase = Phase::Validate;
+          return;
+        }
         _expected = _physicalLength[_slot] = _file.size();
         _offset = 0;
         _phase = Phase::Read;
@@ -360,11 +397,21 @@ void ArdStorage<Volume, FileHandle>::loop() {
       {
         size_t count = _expected - _offset;
         if (count > sizeof(chunk)) count = sizeof(chunk);
-        if (!count) { _file.close(); _phase = Phase::Validate; return; }
-        if (_file.read(chunk, count) != int(count)) { fail(ArdUILanguage::Key::s_199); return; }
+        if (!count) {
+          _file.close();
+          _phase = Phase::Validate;
+          return;
+        }
+        if (_file.read(chunk, count) != int(count)) {
+          fail(ArdUILanguage::Key::s_199);
+          return;
+        }
         auto compare = [&](uint8_t b, size_t at, bool& match, String& cached, size_t& cachedAt) {
           if (!_writing || !match) return true;
-          if (at >= _sourceLength) { match = false; return true; }
+          if (at >= _sourceLength) {
+            match = false;
+            return true;
+          }
           if (!cached.length() || at < cachedAt || at - cachedAt >= cached.length()) {
             cachedAt = at;
             cached = sourcePart(at, 256);
@@ -373,14 +420,17 @@ void ArdStorage<Volume, FileHandle>::loop() {
           if (b != uint8_t(cached[at - cachedAt])) match = false;
           return true;
         };
-        auto decoded = [&](uint8_t b, size_t at) { return compare(b, at, _sourceMatch, _sourceCompare, _sourceCompareAt); };
+        auto decoded = [&](uint8_t b, size_t at) {
+          return compare(b, at, _sourceMatch, _sourceCompare, _sourceCompareAt);
+        };
         for (size_t i = 0; i < count; ++i) {
           _runningFileCrc = ArdJournalStream::update(_runningFileCrc, chunk[i]);
           compare(chunk[i], _offset + i, _legacyMatch, _rawSourceCompare, _rawCompareAt);
           _reader.input(chunk[i], decoded);
         }
         if (_sourceFailed || _reader.json.outOfMemory) {
-          fail(ArdUILanguage::Key::s_198); return;
+          fail(ArdUILanguage::Key::s_198);
+          return;
         }
         _offset += count;
         return;
@@ -403,11 +453,12 @@ void ArdStorage<Volume, FileHandle>::loop() {
         else if (_best < 0) {
           if (!_present[0] && !_present[1]) finish(true);
           else fail(ArdUILanguage::Key::s_200);
-        }
-        else if (_repairRequested && (!_valid[0] || !_valid[1])) {
-          _repairing = true; _repairAttempts = 1;
+        } else if (_repairRequested && (!_valid[0] || !_valid[1])) {
+          _repairing = true;
+          _repairAttempts = 1;
           _slot = 1 - _best;
-          _expected = _physicalLength[_best]; _offset = 0;
+          _expected = _physicalLength[_best];
+          _offset = 0;
           _phase = Phase::OpenWrite;
         } else _phase = Phase::OpenPayload;
         return;
@@ -416,7 +467,8 @@ void ArdStorage<Volume, FileHandle>::loop() {
       _reader.reset();
       if (!openSlot(_file, _best, OpenMode::Read, ArdUILanguage::Key::s_199)) return;
       if (_file.size() != _physicalLength[_best]) {
-        fail(ArdUILanguage::Key::s_199); return;
+        fail(ArdUILanguage::Key::s_199);
+        return;
       }
       _offset = _payloadAt = _decodedAt = _decodedSize = 0;
       _runningFileCrc = UINT32_MAX;
@@ -429,16 +481,21 @@ void ArdStorage<Volume, FileHandle>::loop() {
         if (!n) {
           _file.close();
           if (_runningFileCrc != _fileCrc[_best] || (!_legacy[_best] && !_reader.finish()) || _payloadAt != _length[_best]) {
-            fail(ArdUILanguage::Key::s_199); return;
+            fail(ArdUILanguage::Key::s_199);
+            return;
           }
           finish(!_repairFailed, _repairFailed ? _repairError : String());
           return;
         }
-        if (_file.read(chunk, n) != int(n)) { fail(ArdUILanguage::Key::s_199); return; }
+        if (_file.read(chunk, n) != int(n)) {
+          fail(ArdUILanguage::Key::s_199);
+          return;
+        }
         _decodedAt = _decodedSize = 0;
         auto emit = [&](uint8_t b, size_t) {
           if (_decodedSize == sizeof(_decoded)) return false;
-          _decoded[_decodedSize++] = b; return true;
+          _decoded[_decodedSize++] = b;
+          return true;
         };
         for (size_t i = 0; i < n; ++i) {
           _runningFileCrc = ArdJournalStream::update(_runningFileCrc, chunk[i]);
@@ -446,7 +503,8 @@ void ArdStorage<Volume, FileHandle>::loop() {
           else _reader.input(chunk[i], emit);
         }
         if (_reader.json.failed) {
-          fail(_reader.json.outOfMemory ? ArdUILanguage::Key::s_198 : ArdUILanguage::Key::s_199); return;
+          fail(_reader.json.outOfMemory ? ArdUILanguage::Key::s_198 : ArdUILanguage::Key::s_199);
+          return;
         }
         _offset += n;
         if (_decodedSize) _phase = Phase::DeliverPayload;
@@ -457,42 +515,62 @@ void ArdStorage<Volume, FileHandle>::loop() {
         size_t n = _decodedSize - _decodedAt;
         if (n > 256) n = 256;
         if (!_sink(_payloadAt, _decoded + _decodedAt, n)) {
-          fail(ArdUILanguage::Key::s_198); return;
+          fail(ArdUILanguage::Key::s_198);
+          return;
         }
-        _decodedAt += n; _payloadAt += n;
+        _decodedAt += n;
+        _payloadAt += n;
         if (_decodedAt == _decodedSize) _phase = Phase::ReadPayload;
         return;
       }
     case Phase::RepairWait:
       if (int32_t(millis() - _repairRetrySince) < 1000) return;
-      _slot = 1 - _best; _offset = 0; _expected = _physicalLength[_best];
+      _slot = 1 - _best;
+      _offset = 0;
+      _expected = _physicalLength[_best];
       _phase = Phase::OpenWrite;
       return;
     case Phase::ReadRepair:
       {
         int pending = _file.writeStep();
-        if (pending < 0) { fail(ArdUILanguage::Key::s_204); return; }
+        if (pending < 0) {
+          fail(ArdUILanguage::Key::s_204);
+          return;
+        }
         if (!pending) return;
         if (!_repairFile) {
           if (!openSlot(_repairFile, _best, OpenMode::Read, ArdUILanguage::Key::s_199)) return;
           _runningFileCrc = UINT32_MAX;
-          if (_repairFile.size() != _expected) { fail(ArdUILanguage::Key::s_199); return; }
+          if (_repairFile.size() != _expected) {
+            fail(ArdUILanguage::Key::s_199);
+            return;
+          }
         }
         size_t n = _expected - _offset;
         if (n > 256) n = 256;
         if (!n) {
           _repairFile.close();
-          if (_runningFileCrc != _fileCrc[_best]) { fail(ArdUILanguage::Key::s_199); return; }
-          _phase = Phase::Flush; return;
+          if (_runningFileCrc != _fileCrc[_best]) {
+            fail(ArdUILanguage::Key::s_199);
+            return;
+          }
+          _phase = Phase::Flush;
+          return;
         }
-        if (_repairFile.read(_decoded, n) != int(n)) { fail(ArdUILanguage::Key::s_199); return; }
+        if (_repairFile.read(_decoded, n) != int(n)) {
+          fail(ArdUILanguage::Key::s_199);
+          return;
+        }
         for (size_t i = 0; i < n; ++i) _runningFileCrc = ArdJournalStream::update(_runningFileCrc, _decoded[i]);
         _decodedSize = n;
         _phase = Phase::WriteRepair;
         return;
       }
     case Phase::WriteRepair:
-      if (_file.queueWrite(_decoded, _decodedSize) != _decodedSize) { fail(ArdUILanguage::Key::s_204); return; }
+      if (_file.queueWrite(_decoded, _decodedSize) != _decodedSize) {
+        fail(ArdUILanguage::Key::s_204);
+        return;
+      }
       _offset += _decodedSize;
       _phase = Phase::ReadRepair;
       return;
@@ -509,7 +587,9 @@ void ArdStorage<Volume, FileHandle>::loop() {
       }
     case Phase::SourceCrc:
       {
-        auto ignore = [](ArdJsonStream::Event, uint8_t, unsigned) { return true; };
+        auto ignore = [](ArdJsonStream::Event, uint8_t, unsigned) {
+          return true;
+        };
         if (_sourceAt < _sourceLength) {
           String part = sourcePart(_sourceAt, 256);
           size_t n = part.length();
@@ -531,12 +611,16 @@ void ArdStorage<Volume, FileHandle>::loop() {
             _escapedLength += escaped;
           }
           if (_reader.json.failed) {
-            fail(_reader.json.outOfMemory ? ArdUILanguage::Key::s_198 : ArdUILanguage::Key::s_200); return;
+            fail(_reader.json.outOfMemory ? ArdUILanguage::Key::s_198 : ArdUILanguage::Key::s_200);
+            return;
           }
           _sourceAt += n;
           return;
         }
-        if (!_reader.json.finish(ignore)) { fail(ArdUILanguage::Key::s_200); return; }
+        if (!_reader.json.finish(ignore)) {
+          fail(ArdUILanguage::Key::s_200);
+          return;
+        }
         if (_best >= 0 && _match[_best]) {
           ++_skipped;
           finish(true);
@@ -582,19 +666,29 @@ void ArdStorage<Volume, FileHandle>::loop() {
         const bool verify = _phase == Phase::Verify;
         if (!verify) {
           int pending = _file.writeStep();
-          if (pending < 0) { fail(ArdUILanguage::Key::s_204); return; }
+          if (pending < 0) {
+            fail(ArdUILanguage::Key::s_204);
+            return;
+          }
           if (!pending) return;
         }
         const size_t count = journalOutput();
-        if (_sourceFailed) { fail(ArdUILanguage::Key::s_198); return; }
+        if (_sourceFailed) {
+          fail(ArdUILanguage::Key::s_198);
+          return;
+        }
         if (!count) {
-          if (_offset != _expected) { fail(verify ? ArdUILanguage::Key::s_204 : ArdUILanguage::Key::s_198); return; }
+          if (_offset != _expected) {
+            fail(verify ? ArdUILanguage::Key::s_204 : ArdUILanguage::Key::s_198);
+            return;
+          }
           _phase = verify ? Phase::CloseVerify : Phase::Flush;
           return;
         }
         if (verify ? (_file.read(chunk, count) != int(count) || memcmp(chunk, _decoded, count))
                    : _file.queueWrite(_decoded, count) != count) {
-          fail(ArdUILanguage::Key::s_204); return;
+          fail(ArdUILanguage::Key::s_204);
+          return;
         }
         _offset += count;
         return;
@@ -621,7 +715,10 @@ void ArdStorage<Volume, FileHandle>::loop() {
     case Phase::OpenVerify:
       {
         if (!openSlot(_file, _slot, OpenMode::Read, ArdUILanguage::Key::s_204)) return;
-        if (_file.size() != _expected) { fail(ArdUILanguage::Key::s_204); return; }
+        if (_file.size() != _expected) {
+          fail(ArdUILanguage::Key::s_204);
+          return;
+        }
         _offset = 0;
         resetJournalOutput();
         _phase = Phase::Verify;

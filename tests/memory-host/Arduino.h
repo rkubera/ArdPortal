@@ -204,7 +204,8 @@ struct EspStub {
   static bool badSector(const std::vector<unsigned>& sectors, uint32_t address, size_t size) {
     unsigned first = (address - 0x100000U) / 4096U;
     unsigned last = (address - 0x100000U + size - 1) / 4096U;
-    for (unsigned sector : sectors) if (sector >= first && sector <= last) return true;
+    for (unsigned sector : sectors)
+      if (sector >= first && sector <= last) return true;
     return false;
   }
   static bool consumeFault(int& remaining) {
@@ -229,8 +230,8 @@ struct EspStub {
     if (!failed && (consumeFault(programFailuresForTest) || (size && badSector(badProgramSectorsForTest, address, size)))) return false;
     if (!failed && consumeFault(silentProgramFailuresForTest)) return true;
     size_t count = failed ? (ardfsTornOperation ? size / 2 : 0) : size;
-    size_t first = failed && tornTailForTest ? size-count : 0;
-    for (size_t i = first; i < first+count; ++i) ardfsTestFlash[address - 0x100000U + i] &= bytes[i];
+    size_t first = failed && tornTailForTest ? size - count : 0;
+    for (size_t i = first; i < first + count; ++i) ardfsTestFlash[address - 0x100000U + i] &= bytes[i];
     return !failed;
   }
   bool flashEraseSector(uint32_t sector) {

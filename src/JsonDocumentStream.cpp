@@ -3,14 +3,18 @@
 #include "ArdJSON.h"
 
 namespace ArdJSON {
-StreamParser::StreamParser(const Limits& limits) : _syntax(limits.maxDepth, false), _limits(limits) {}
+StreamParser::StreamParser(const Limits& limits)
+  : _syntax(limits.maxDepth, false), _limits(limits) {}
 
 void StreamParser::reset(const Limits& limits) {
   _limits = limits;
-  _syntax.reset(limits.maxDepth, false); // The DOM checks exact keys; no second key table.
-  _root = JSONVar(); _key = String();
+  _syntax.reset(limits.maxDepth, false);  // The DOM checks exact keys; no second key table.
+  _root = JSONVar();
+  _key = String();
   for (auto& value : _containers) value = nullptr;
-  _current = nullptr; _bytes = _nodes = _offset = 0; _error = nullptr;
+  _current = nullptr;
+  _bytes = _nodes = _offset = 0;
+  _error = nullptr;
   _budget = ArdCooperativeBudget();
 }
 bool StreamParser::fail(const char* error) {
@@ -50,7 +54,7 @@ bool StreamParser::dispatch(void* context, ArdJsonStream::Event event, uint8_t b
 bool StreamParser::input(size_t offset, const uint8_t* bytes, size_t length) {
   if (_error) return false;
   if (offset != _bytes || length > _limits.maxInputBytes || _bytes > _limits.maxInputBytes - length) return fail(ARD_LANG_NATIVE_INPUT_LIMIT);
-  const ArdJsonStream::Listener emit{this, dispatch};
+  const ArdJsonStream::Listener emit{ this, dispatch };
   for (size_t i = 0; i < length; ++i) {
     _offset = _bytes + i;
     if ((_offset & 127) == 0) _budget.checkpoint();
@@ -61,9 +65,12 @@ bool StreamParser::input(size_t offset, const uint8_t* bytes, size_t length) {
   return true;
 }
 JSONVar StreamParser::take() {
-  const ArdJsonStream::Listener emit{this, dispatch};
+  const ArdJsonStream::Listener emit{ this, dispatch };
   if (!_error && !_syntax.finishInput(emit)) fail(syntaxError(_syntax.error));
-  if (_error || !_root.isValid()) { _root = JSONVar(); return JSONVar(); }
+  if (_error || !_root.isValid()) {
+    _root = JSONVar();
+    return JSONVar();
+  }
   return std::move(_root);
 }
 bool StreamParser::append(String& text, uint8_t b, bool stringLimit) {
@@ -73,19 +80,34 @@ bool StreamParser::append(String& text, uint8_t b, bool stringLimit) {
   return text.length() == before + 1 || fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
 }
 JSONVar* StreamParser::value(unsigned depth) {
-  if (depth > _limits.maxDepth || depth > 32) { fail(ARD_LANG_NATIVE_DEPTH_LIMIT); return nullptr; }
-  if (++_nodes > _limits.maxNodes) { fail(ARD_LANG_NATIVE_NODE_LIMIT); return nullptr; }
+  if (depth > _limits.maxDepth || depth > 32) {
+    fail(ARD_LANG_NATIVE_DEPTH_LIMIT);
+    return nullptr;
+  }
+  if (++_nodes > _limits.maxNodes) {
+    fail(ARD_LANG_NATIVE_NODE_LIMIT);
+    return nullptr;
+  }
   if (!depth) return &_root;
   JSONVar* parent = _containers[depth - 1];
-  if (!parent || parent->_size >= MaxContainerElements) { fail(ARD_LANG_NATIVE_CONTAINER_LIMIT); return nullptr; }
+  if (!parent || parent->_size >= MaxContainerElements) {
+    fail(ARD_LANG_NATIVE_CONTAINER_LIMIT);
+    return nullptr;
+  }
   JSONVar::Member* member = parent->_type == JSONVar::Type::Object ? parent->append(_key) : parent->append(String());
   _key = String();
-  if (!member) { fail(ARD_LANG_NATIVE_OUT_OF_MEMORY); return nullptr; }
+  if (!member) {
+    fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
+    return nullptr;
+  }
   return &member->value;
 }
 bool StreamParser::consume(ArdJsonStream::Event event, uint8_t b, unsigned depth) {
   using E = ArdJsonStream::Event;
-  if (event == E::Key) { _key = String(); return true; }
+  if (event == E::Key) {
+    _key = String();
+    return true;
+  }
   if (event == E::KeyByte) return append(_key, b);
   if (event == E::EndKey) {
     if (_containers[depth - 1]->hasOwnProperty(_key)) return fail(ARD_LANG_NATIVE_DUPLICATE_KEY);
@@ -112,12 +134,18 @@ bool StreamParser::consume(ArdJsonStream::Event event, uint8_t b, unsigned depth
   return !_error;
 }
 JSONVar Parser::parse() {
-  _offset = _nodes = 0; _error = nullptr;
-  if (_input.length() > _limits.maxInputBytes) { _error = ARD_LANG_NATIVE_INPUT_LIMIT; return JSONVar(); }
+  _offset = _nodes = 0;
+  _error = nullptr;
+  if (_input.length() > _limits.maxInputBytes) {
+    _error = ARD_LANG_NATIVE_INPUT_LIMIT;
+    return JSONVar();
+  }
   StreamParser parser(_limits);
   parser.input(0, reinterpret_cast<const uint8_t*>(_input.c_str()), _input.length());
   JSONVar value = parser.take();
-  _error = parser.error(); _offset = parser.offset(); _nodes = parser.nodes();
+  _error = parser.error();
+  _offset = parser.offset();
+  _nodes = parser.nodes();
   return value;
 }
 }

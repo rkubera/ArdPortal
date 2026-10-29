@@ -166,7 +166,8 @@ void repairPowerCuts() {
     ArdFS fs;
     mount(fs);
     ardfsFlashCalls = 0;
-    assert(readConfigText(fs,
+    assert(readConfigText(
+      fs,
       "/config.json", [&](const auto& r) {
         assert(r.ok && r.redundant && r.repaired && r.data == expected);
       },
@@ -185,7 +186,8 @@ void repairPowerCuts() {
         ardfsFlashCalls = 0;
         ardfsFailAt = cut;
         ardfsTornOperation = torn;
-        assert(readConfigText(fs,
+        assert(readConfigText(
+          fs,
           "/config.json", [](const auto&) {}, true));
         drain(fs);
       }
@@ -195,7 +197,8 @@ void repairPowerCuts() {
       {
         ArdFS fs;
         mount(fs);
-        assert(readConfigText(fs,
+        assert(readConfigText(
+          fs,
           "/config.json", [&](const auto& r) {
             assert(r.ok && r.redundant && r.data == expected);
           },
