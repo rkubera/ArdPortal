@@ -19,6 +19,15 @@ assert {entry[0] for entry in entries} <= set(profiles)
 assert 'fail-fast: false' in job and "compile-arduino.sh '${{ matrix.profile }}'" in job
 assert 'Firmware / Arduino / ${{ matrix.name }}' in job
 
+# The source-built Matter profiles use an explicit component source list.
+# Catch removed/renamed translation units before the expensive SDK CI builds.
+component = (root / 'CMakeLists.txt').read_text()
+sources = re.search(r'\bSRCS\s+(.*?)\s+INCLUDE_DIRS\b', component, re.S)
+assert sources, 'Missing ESP-IDF component sources'
+registered = set(re.findall(r'"([^"]+\.cpp)"', sources.group(1)))
+actual = {path.relative_to(root).as_posix() for path in (root / 'src').glob('*.cpp')}
+assert registered == actual, f'ESP-IDF component source mismatch: missing={actual - registered}, stale={registered - actual}'
+
 with tempfile.TemporaryDirectory(prefix='ardportal-ci-dispatch-') as directory:
     path = Path(directory)
     cli = path / 'arduino-cli'
