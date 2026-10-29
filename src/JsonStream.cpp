@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #include "JsonStream.h"
+#include "JsonUtf8.h"
 
 ArdJsonStream::ArdJsonStream(unsigned maxDepth, bool checkKeys)
   : _maxDepth(maxDepth > 32 ? 32 : maxDepth), _checkKeys(checkKeys) {}
@@ -209,25 +210,7 @@ void ArdJsonStream::beginString(const Listener& emit) {
 }
 
 bool ArdJsonStream::output(uint8_t b, const Listener& emit) {
-  if (_utfLeft) {
-    if ((b & 0xc0) != 0x80) return false;
-    _utf = (_utf << 6) | (b & 63);
-    if (!--_utfLeft && (_utf < _utfMin || _utf > 0x10ffff || (_utf >= 0xd800 && _utf <= 0xdfff))) return false;
-  } else if (b >= 0x80) {
-    if (b >= 0xc2 && b <= 0xdf) {
-      _utfLeft = 1;
-      _utf = b & 31;
-      _utfMin = 0x80;
-    } else if (b >= 0xe0 && b <= 0xef) {
-      _utfLeft = 2;
-      _utf = b & 15;
-      _utfMin = 0x800;
-    } else if (b >= 0xf0 && b <= 0xf4) {
-      _utfLeft = 3;
-      _utf = b & 7;
-      _utfMin = 0x10000;
-    } else return false;
-  }
+  if (!ArdUtf8::consume(b, _utfLeft, _utf, _utfMin)) return false;
   if (_key && _checkKeys) {
     _hash ^= b;
     _hash *= UINT64_C(1099511628211);

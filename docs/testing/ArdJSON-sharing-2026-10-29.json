@@ -1,0 +1,232 @@
+{
+  "example": "DynamicPages",
+  "baseline_sources": {
+    "src/ArdPortal.h": "2a70d2aa715d738fcd023a85a231931218a5d2acfa4612e872144860f8572a66",
+    "src/ArdFSFragmentsImpl.h": "f4115828c56d3af0a7efd038f2581b0f7d0eb32a77113d4ac9353bf90f3e0bab",
+    "src/ArdMqttImpl.h": "cbe163dca84541b99c2ca9e3391ff713f3e67d282e0f83ba97ce848adbbb0361",
+    "src/JsonDocumentStream.h": "c87e7db12bd8fa3f916e87e7e9205b636d8e47fd7ffc3cd734e85dc5d5f9b7b3",
+    "src/FlashText.h": "d54c55592899b9f83276de554b872205f0012e8b24eb17e94ea3b2b7385acec0",
+    "src/AppConfigPageScanner.h": "aafd4e121e294555b8e16af4bae04c9b94d20f722d35b4f7199566ef86106a88",
+    "src/ArdFSStorageLimits.h": "35f2aaaf59e2c27da08d8c1f315f8d1bd6966741780d0d95825f55fbac17a684",
+    "src/ArdOta.h": "9fd1249c98604af40dfa49072fe6b1046900ffd541abc00911d7f1a66602fc37",
+    "src/HaEntityData.h": "a9a539fb1e403f12cf1aa37c574c66a46eab887f90b9a53e78f5c6c5435c5c82",
+    "src/MatterDiagnostics.h": "4b9447408381a7f57aabec79d329a682cd30e0d60ebe36108e9d0d03231e9705",
+    "src/ArdZigbee.h": "d9421470150795eb197bd8d7c609df8653ef1e2e520e2697454d3371a611e9df",
+    "src/ZigbeeTime.h": "fbcc80e3a74955bf88ad2c05e3f1979c9e41f52be8332ee937f1d5358fa66bc9",
+    "src/MatterThreadTransport.h": "2d9903d6366e6756853260942615a5a0b32c36ac249f2a58823ac337f0b574f0",
+    "src/ArdAsset.h": "0fdf16e2da287d6e86bfbd7ae30a011847b205904fdbd30896aba0733038d0bf",
+    "src/JsonStream.cpp": "fac267c020e935ec23d5e3d7664a1a6283a53c17299aee1efe4159a0133f677d",
+    "src/MqttFieldTopics.h": "e5fb293511ae097064104eeeea0583c4b978962a73e3a6fbde2b41edbc60e61d",
+    "src/NetworkIo.h": "84e4030e9d59580af7516c38f093b620f47061584516be49c956118841b74bad",
+    "src/ControlData.h": "6d95ff3ca55798db582fde5c749b47c1cc11d4c8b7d64192ed73fb2d22018de5",
+    "src/ControlModel.h": "9583d7539f5afd968b89c26d8a60c3be1354ee5c321079baed819b5ac5304815",
+    "src/LanguageData.h": "4c4a880f1fb74d9c8aa48fda8b99741e167543096e02bd54931a674a229aadd3",
+    "src/CooperativeBudget.h": "fc76fecd053fd9174481d7d97da088935775f5ef0cc72823583c80e2103a65dc",
+    "src/PowerPolicy.h": "d3b342eaf4022bdf985a51217162cacf6e5cdade256a8fcf5c3a8e5b641c2694",
+    "src/PowerEvents.h": "5165c4f2ccc7ed2e43c25112b0cdf13c4615d0a19c05f13eaa08c4db14882226",
+    "src/JsonStream.h": "c036b55a9c8583e150e4aa5c6909f9afb765d0526e4cdd9b272aecf46d87ad95",
+    "src/MatterLabels.h": "65e1ffbab88160a7b4218b467f9ac95602930f37943c49a59315aed960117455",
+    "src/PowerSignals.h": "31ae7b69b2df3106d201b73b916fe124323fbcc461bd607907427e0847a0c74a",
+    "src/ArdStorage.h": "b4305ba8a94cfa72f2953595796b7c6907fef8f68ffc4f67e80724594c1e8fcf",
+    "src/ZigbeeExportApiImpl.h": "e8dfed0379de9ac9c6bb93ed357237b6fcadb81c31c57ebe78e7a4856034e2bf",
+    "src/MatterNativeImpl.h": "aa69cde8b2e2a8a49b5c568b35875d5e251ea37b4b6140fae6d4a8d3d6496395",
+    "src/ArdFS.h": "84fc251a0040b01e58ee7c837ee4cf7e383e4d0fcf6750224e94f32480f914a5",
+    "src/ArdZigbeeImpl.h": "6644430e05b788666ef0cfc22aa057a7e91975426356d684ce96333e470717ab",
+    "src/Language.h": "87727cdf65b5f22f4e715fcdf30b4e29d6cf60f529b99b235fa326f35bde9af6",
+    "src/MatterMemoryPolicy.h": "d8274a743829b015f7c1bfe786980f99b9d47bcdd4b24710646089868b70c51e",
+    "src/ArdLittleFSVolume.h": "374b5e4eecba5595de112ca219aaedb211f9ca8e3b47c089ebc3a33e35678fda",
+    "src/ArdFSVolumeImpl.h": "ca9e6c9f0732446893613f4056b8f35478dc9455c14585dd0c7d025bdf493b90",
+    "src/ZhaQuirkAssets.h": "df8aa7284f7be61d3ae484d4d59dccbcd6ec75ba61e137feb4178c735bb9ba98",
+    "src/PowerDiagnostics.h": "c64f25da07574f38c4c146c0d925479f39816a8cbeb2811f8e1dff7e2479287a",
+    "src/ArdStorageImpl.h": "9563ba270883ca4af9d816cdfae2ca002bc8800b3e1836797816c1438b5f9545",
+    "src/ArdPowerImpl.h": "12ac9c9c6f0fb69240c2addd3743721e69d9170da93e475a13f02a0feb8b962c",
+    "src/ArdAppControlsImpl.h": "034fef3bd03207f016a1511ee2e2dcdbc31c2f22cceb6523bcc2f4e58b97a331",
+    "src/ControlTime.h": "62d81769de11416a12816dbd353709fac9a024898a49b97c1c8af4f8851809f3",
+    "src/ZigbeePortalImpl.h": "9cb6b7df3adcf6fb39fa8948ed6eb42efab59f0efae3ab696fb81bdfe097c7be",
+    "src/ArdFSVolume.h": "1989f8ffb35d85435c4e425c5156f0f444a0d3481d8211eb5e6f66474482efb8",
+    "src/NetworkApiImpl.h": "36d7781975acd679aa4787dcffce94d23f2613ec113235ed1a1302a7c0b27061",
+    "src/JsonFieldSlices.h": "32fe9752320085ec0160fb3b80b66c5c65b9e27554ec52f8795527c62bf6627c",
+    "src/AppConfigPageRegistration.h": "4f767d4ba696ca68e818ec07cc08fd539c85d7a74519a0b28c1048f65fec575a",
+    "src/MatterTraffic.h": "6d7c5c468630555d55536b6a4ba38bd025f6d289403a20e2163803fc6ec8a9b5",
+    "src/ZigbeeConverterLayout.h": "80b8210e72ec2c60d03cdc40e818fe517c404399c55d36724dca9c9021cf9291",
+    "src/ZigbeeFields.h": "b8ecc4102d497c2cd5ec50dfdbada180e63665e1e6748d42d0c6b2b51298e1fd",
+    "src/JsonDocumentStream.cpp": "d0b1861b83f78236824d589de39721942749fc3fa29236ae263536d309620746",
+    "src/ZigbeeConverterAssets.h": "a52eabf3e7b604238f65288a47e8c96bb4aa86584832224542dc0abde31fc86f",
+    "src/JsonCodec.h": "5d26c6a4dcbb32542ce6c3e7d706620371cab8ef1ddcc109f79e7639e9c707f7",
+    "src/DeviceName.h": "380c3e2c1cebd4708fb2e0544030f5a9c9ce47aa11d5abb19d0db4b874e26a6b",
+    "src/DynamicPages.h": "2e63749727cf37dd9d07b0b8f9f7281b7f7a27a9760b3ba7c90ae7cb80b31ef7",
+    "src/ArdHomeAssistant.h": "ac045c020d85dca2276bbbd8aaccae2df0cb2149548a6d0864426610020876e8",
+    "src/ZigbeeOtaImage.h": "6f21bd4570a58caf4cefae5d9733ebf8057182e73abd1bc293d70bf4d24120b2",
+    "src/MqttTransport.h": "f0931e2b66431bfa5b58d3ca50b0c492d7c95117a4d3b649b1f183335bcaa0df",
+    "src/ArdPortalImpl.h": "96f65f5fb3d400cfa83c17cb803696b9c807a8c1bd4978745f92df5c52e1096c",
+    "src/HaEntities.h": "1febed2e9a3ca6e1ae8daff2fb4eb0a103a7817422be807e76b44a55ab6c73ee",
+    "src/ArdMqtt.h": "e1f6e01b2ee2f03e37386f49982ecdafce7dd682578ee61f598f249a286fc1c3",
+    "src/JournalReader.h": "ca9e6570871e385bb20aa0087866a7ea3efc58ec937eb522f3c8747c07200de2",
+    "src/ArdPortalFeatures.h": "089cf77f0704b5cc60c10e67f9f4741b3b83b418b4115cafc405caac9a718b94",
+    "src/ConfigJson.h": "d918cd5c7d64b8c4bdbe9f2d79e2630e9a7f6b353ac99535c980c6e8a13af4ab",
+    "src/MatterQr.h": "931b00c0fc6c3309945d2e9efc6970c75b589c516fdc45106ae8353d231ec4b6",
+    "src/DeviceNameCharacters.h": "ac4bdefedd36373a97577d9e6539d61b8ee3cc7a8cc64a5026a7a7dc63b91d2f",
+    "src/ArdCRC.h": "9d1f3de6fe3f4a7750e0ab1f4a5af90857563d8e1cfed0f45ae51e3b2ad71139",
+    "src/HaClassData.h": "7c331c7a2c86c9892e55672667442dfc62faa401e60fcb1da4ba3904acdb653d",
+    "src/ZigbeeConverterImpl.h": "65edc003d15d8816abd69d53e817f9bd338e9b05f402eaba4b3297e92cd3c2c6",
+    "src/ArdPortalStorage.h": "222a5b05e17bf7fa2354b4a9756364a91fdd6b73fcfe5d60a8e4738685751381",
+    "src/AppConfigPageRegistrationImpl.h": "ad579da1800c5ff2b7943ed50faaf1238761810f10f77f84e46f8c4ebbe23e93",
+    "src/HeapMemory.h": "926361a2579cc454a90b3f40f20559f049d6c24d963882ec9d5f64ebf6449373",
+    "src/ArdJSON.h": "661f11e2ab4ee52c0a537b45d271570f8311105782a50158a7d2bbcb849789f5",
+    "src/LanguageLiterals.h": "c170c43548d721911bbeb269ab51050cab91ba7262d0a1bbaaaf6e8453e92bb6",
+    "src/ZigbeeOtaImpl.h": "21cee8f077fd77da7cc91b7a40fa0140bade9764bb2add6fbf09dd5f17906b58",
+    "src/ControlClasses.h": "fb318812b4a4d6f143b35c7b527731cd0697b1aa17014830b1d39bfc67616036",
+    "src/ArdStorage.cpp": "28ca92029794f55c08f0c3168f6a6a2651fdaf3b38a415930c1cf0420e9ff4c3",
+    "src/ArdOtaImpl.h": "90861671349ddac6661ba6a0575f1ddad7401b7971f14cd3e9af7474ae5ca753",
+    "src/ControlClassData.h": "a53b885e0b73256c37b47e49e17a40079631afb08e83c0081f329dbdbd7ea17d",
+    "src/PortalAssets.h": "c66838db50a6290d9cca3cf758c18a4119b0a9bca1c9b928c439a971c6ce932a",
+    "src/AppConfigFields.h": "0b9f673162c713d5abbd95e65ce610180ecf085ded5558435b754d4ae40e1b9c",
+    "src/ArdPortalImplementation.h": "5adcc2bf50646874e3fef889ce73bd734a41d64ecdbd5237e32083a512952224",
+    "src/PortalTypes.h": "31ece21f16f8b2caa06eeddd1d903cd57e5efa83b412259a0e300ee22ad9396b",
+    "src/DynamicPortalImpl.h": "76179a7dd98eda4ea5b12611876bb98ca45cd6e2624a1cc7d317f89bd37de7df",
+    "src/ArdPortalDeclarations.h": "ab950976a893d21088221e8becc6054ed49b78fb426e39110876f7f73b9e6c59",
+    "src/ZigbeeNativeImpl.h": "ffa2df39851cbfbc695ed662f118ebd4fe51f982616f6d970d48e4b366a074d3",
+    "src/TopicTemplates.h": "ce8c3d3dfafc63b8a819217d41ae64a0ae52b35d9bb9d527aca3f34d65284e40",
+    "src/MatterFactory.h": "0638f74053f1e18b00e34b64d33a7e9f03ee43d02a09c6b1139e63d2bc7905a5",
+    "src/PowerSignalsImpl.h": "36f55974454d1ba8dd55bae65b45c73d180ca249c37cb53f07bdd87dfb57753b",
+    "src/AppConfigRegistrationError.h": "7bd7d47e8ca4831b427ef1ff47a7d1a7414260579241af5b2f525c7e03cd17bd",
+    "src/JournalReader.cpp": "0c9979c671e3c39dce187479a7b02e65f07143c9712972597c34b8df64bdb877",
+    "src/ArdMatter.h": "2b23606e78fb9f1c3dda490ed115dd4fa45184b8ec6bcf39b9598a7aee73a058",
+    "src/DependencyConditions.h": "989a8b044d77e2c6cf8a73992bb268445ebd2f2810ea4ce6ec5770423683c28a",
+    "src/MatterFields.h": "f1102cf41d15feecfc683ac77861b0b21fde394a7691e83d72813a32bf77c6c7",
+    "src/JsonUtf8.h": "169966c4b5ae24d2527d38b58617e47542bd3181e3c1924976cb39169b0ed142",
+    "src/ArdAppControls.h": "ae6a901e71bde92f497e63ac39cf19cab2184538989bab527c741afe24fe6817",
+    "src/MatterPortalImpl.h": "4dd46bc08a2307c961059a70aea7e76f8edd34fc365e997acdebd27f01f936c8",
+    "src/ArdAllocation.h": "ac5e656729e5f71b7b5907582b58f1adf81cce995105f777d72d1d0cafb146dc",
+    "src/ArdPower.h": "48a416dfb1653f3744f078fcbfa48c21b014c189b293917bc17018c04aa78a33",
+    "src/JournalStream.h": "4dd35c6ef77595e1bb7d2832b1b63cfdee66da85b0e666bcb4ef9a670d4e16c9",
+    "src/PortalPage.h": "30e5949505c1ff59ca18fe16573e1d63cc658c5b35df2bbaf1a2216f6a2cb8dd",
+    "src/WebSocketAccept.h": "18ea2cc11e5bcba57ae795a9dee9eb348ca1db07c26965c2811f7969f6e4d7f6",
+    "src/ZigbeeConsolePayload.h": "c93c3f4c00c518033b541ccdb3dab13bf9a1bb9daa293cf9d37aafb069257e21",
+    "src/ArdHomeAssistantImpl.h": "5c0fb26062b1f02a173ea540896c20e8ad9982fd5682c241d86df13b9a05fc59",
+    "src/ConsoleTimestamp.h": "bcd6a986c7c4fdff03a6da2c20d0454fe85fad31dec578b921a357e7bba48889"
+  },
+  "final_header_sha256": "6879e8f1211f5d6a52d8211656b7c5b1fd5126b13d8c1ca5fd24f42be822bb47",
+  "measurements": [
+    {
+      "target": "esp8266",
+      "variant": "before",
+      "bytes": 591840,
+      "sha256": "a9716fc8dc8bef7a5b386e9b7cdea8ab5fa1af19b26af28e23eea5ae1b50b3e7",
+      "static_ram": [
+        "43716"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp8266-before.log"
+    },
+    {
+      "target": "esp8266",
+      "variant": "swap",
+      "bytes": 591840,
+      "sha256": "a9716fc8dc8bef7a5b386e9b7cdea8ab5fa1af19b26af28e23eea5ae1b50b3e7",
+      "static_ram": [
+        "43716"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp8266-swap.log"
+    },
+    {
+      "target": "esp8266",
+      "variant": "erase",
+      "bytes": 591824,
+      "sha256": "10b2632c6f04bf6be300d6290f3e6b9dd75f4c112b7e3a440ae81637d6263bfc",
+      "static_ram": [
+        "43716"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp8266-erase.log"
+    },
+    {
+      "target": "esp8266",
+      "variant": "failure",
+      "bytes": 591840,
+      "sha256": "a9716fc8dc8bef7a5b386e9b7cdea8ab5fa1af19b26af28e23eea5ae1b50b3e7",
+      "static_ram": [
+        "43716"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp8266-failure.log"
+    },
+    {
+      "target": "esp8266",
+      "variant": "combined",
+      "bytes": 591824,
+      "sha256": "10b2632c6f04bf6be300d6290f3e6b9dd75f4c112b7e3a440ae81637d6263bfc",
+      "static_ram": [
+        "43716"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp8266-combined.log"
+    },
+    {
+      "target": "esp8266",
+      "variant": "outlined",
+      "bytes": 591968,
+      "sha256": "4bed787ef0e81c91f3cf6b9cf3c631e473b431d6e9c87cc0d66cb342ea2ae960",
+      "static_ram": [
+        "43716"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp8266-outlined.log"
+    },
+    {
+      "target": "esp32",
+      "variant": "before",
+      "bytes": 1281984,
+      "sha256": "fc628a85396a2a0b3c170aa83cb90411e099ac1cd47cdb7fd6fcc98c45e17d7c",
+      "static_ram": [
+        "57732"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp32-before.log"
+    },
+    {
+      "target": "esp32",
+      "variant": "swap",
+      "bytes": 1281824,
+      "sha256": "e9b0986017bb102266d5df6627d66c10449cfdf880b9e5cc9d4120556079c5fc",
+      "static_ram": [
+        "57732"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp32-swap.log"
+    },
+    {
+      "target": "esp32",
+      "variant": "erase",
+      "bytes": 1281984,
+      "sha256": "3ba68c770c2356ee98f17f5bac2d654cddb2f6226f85cf5c57f6645f5bf4b1ff",
+      "static_ram": [
+        "57732"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp32-erase.log"
+    },
+    {
+      "target": "esp32",
+      "variant": "failure",
+      "bytes": 1282000,
+      "sha256": "45c71f4903e8eea03ae07ec3f81c54a9e5c08339d91aaf180de25ed47729b726",
+      "static_ram": [
+        "57732"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp32-failure.log"
+    },
+    {
+      "target": "esp32",
+      "variant": "combined",
+      "bytes": 1281808,
+      "sha256": "5d5b253b2008e9388a008609ca83bf8c39468af0a535d41b97d2299ba657f233",
+      "static_ram": [
+        "57732"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp32-combined.log"
+    },
+    {
+      "target": "esp32",
+      "variant": "outlined",
+      "bytes": 1281888,
+      "sha256": "7c7f6e89bd9969ec6f24353521b2e48d4ae6f6895ee35ba79d30caa6429c826f",
+      "static_ram": [
+        "57732"
+      ],
+      "log": "/tmp/ardjson-sharing2-20261029/esp32-outlined.log"
+    }
+  ]
+}

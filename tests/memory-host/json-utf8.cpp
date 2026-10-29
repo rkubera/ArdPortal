@@ -49,8 +49,17 @@ int main() {
   for (unsigned lead = 128; lead < 256; ++lead)
     for (unsigned second = 0; second < 256; ++second) {
       const char bytes[] = { char(lead), char(second), char(0x80), char(0x80) };
-      for (size_t n = 1; n <= 4; ++n)
-        assert(accepts(bytes, n) == ArdJSON::validUtf8(String(std::string(bytes, n))));
+      for (size_t n = 1; n <= 4; ++n) {
+        // Independent lead/second-byte bounds; both consumers share a decoder.
+        bool expected = false;
+        if (second >= 0x80 && second <= 0xbf) {
+          if (n == 2) expected = lead >= 0xc2 && lead <= 0xdf;
+          if (n == 3) expected = lead >= 0xe0 && lead <= 0xef && (lead != 0xe0 || second >= 0xa0) && (lead != 0xed || second < 0xa0);
+          if (n == 4) expected = lead >= 0xf0 && lead <= 0xf4 && (lead != 0xf0 || second >= 0x90) && (lead != 0xf4 || second < 0x90);
+        }
+        assert(accepts(bytes, n) == expected);
+        assert(ArdJSON::validUtf8(String(std::string(bytes, n))) == expected);
+      }
     }
   puts("PASS: all Unicode scalars/surrogates, overlong and truncated UTF-8, every lead/second-byte pair, and U+10FFFF bounds");
 }

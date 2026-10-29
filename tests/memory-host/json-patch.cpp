@@ -64,4 +64,54 @@ int main() {
   assert(!full.applyObjectPatch(std::move(invalid)));
   allocationBudget = -1;
   assert(full.isValid());
+
+  // Shared lookup must preserve exact keys across RAM/flash storage and NULs.
+  String binaryKey = "name";
+  binaryKey += char(0);
+  binaryKey += "suffix";
+  const String longKey = "application-owned-key-longer-than-small-string-storage";
+  JSONVar exact = JSONVar::object();
+  exact["name"] = 1;
+  exact[String()] = 2;
+  exact[binaryKey] = 3;
+  exact[longKey] = 4;
+  const JSONVar& readOnly = exact;
+  allocationBudget = 0;
+  assert(readOnly.hasOwnProperty(String("name")) && readOnly["name"].asDouble() == 1);
+  assert(readOnly.hasOwnProperty(String()) && readOnly[String()].asDouble() == 2);
+  assert(readOnly.hasOwnProperty(binaryKey) && readOnly[binaryKey].asDouble() == 3);
+  assert(readOnly.hasOwnProperty(longKey) && readOnly[longKey].asDouble() == 4);
+  assert(readOnly[String("missing")].isUndefined());
+  assert(exact[binaryKey].asDouble() == 3 && exact.length() == 4);
+  allocationBudget = -1;
+  JSONVar exactPatch = JSONVar::object();
+  exactPatch["name"] = 5;
+  exactPatch[binaryKey] = JSONVar();
+  exactPatch[longKey] = 6;
+  exactPatch["added"] = true;
+  JSONVar applied = exact;
+  JSONVar copiedPatch = exactPatch;
+  assert(applied.applyObjectPatch(std::move(copiedPatch)));
+  const String expected = JSON.stringify(applied);
+  const size_t measured = JSON.measureObjectPatch(exact, exactPatch);
+  assert(measured == expected.length());
+  String slices;
+  for (size_t at = 0; at < measured; ++at)
+    slices += JSON.stringifyObjectPatchSlice(exact, exactPatch, at, 1);
+  assert(slices == expected && exact.length() == 4 && exactPatch.length() == 4);
+
+  JSONVar removeObject = JSON.parse("{\"first\":{\"nested\":[1,2]},\"middle\":true,\"last\":[3]}");
+  JSONVar removeArray = JSON.parse("[{\"key\":[1,2]},3,4]");
+  assert(removeObject.isValid() && removeArray.isValid());
+  allocationBudget = 0;
+  assert(removeObject.remove(String("middle")) && removeObject.length() == 2);
+  assert(removeObject.remove(String("first")) && removeObject.length() == 1);
+  assert(removeObject.remove(String("last")) && removeObject.length() == 0);
+  assert(!removeObject.remove(String("missing")) && removeObject.isValid());
+  assert(removeArray.remove(size_t(1)) && removeArray.length() == 2);
+  assert(removeArray[size_t(1)].asDouble() == 4);
+  assert(removeArray.remove(size_t(0)) && removeArray.length() == 1);
+  assert(removeArray.remove(size_t(0)) && removeArray.length() == 0);
+  assert(!removeArray.remove(size_t(0)) && removeArray.isValid());
+  allocationBudget = -1;
 }
