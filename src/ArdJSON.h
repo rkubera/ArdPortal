@@ -135,7 +135,14 @@ public:
   __attribute__((noinline))
 #endif
   void
-  swap(JSONVar& other) noexcept;
+  swap(JSONVar& other) noexcept {
+    std::swap(_type, other._type);
+    std::swap(_boolean, other._boolean);
+    std::swap(_failed, other._failed);
+    std::swap(_text, other._text);
+    _children.swap(other._children);
+    std::swap(_size, other._size);
+  }
   /**
    * @brief Create an empty JSON object.
    * @return An empty JSON object.
@@ -723,19 +730,6 @@ inline JSONVar JSONVar::array() {
   JSONVar value;
   value._type = Type::Array;
   return value;
-}
-/**
- * @brief Exchange the stored state with another instance.
- * @param other Instance whose state is copied, moved or exchanged.
- * @return No value.
- */
-inline void JSONVar::swap(JSONVar& other) noexcept {
-  std::swap(_type, other._type);
-  std::swap(_boolean, other._boolean);
-  std::swap(_failed, other._failed);
-  std::swap(_text, other._text);
-  _children.swap(other._children);
-  std::swap(_size, other._size);
 }
 /**
  * @brief Initialize this instance and its owned state.
