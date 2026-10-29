@@ -51,6 +51,12 @@ fields retain compact indexes instead of permanent parsed definitions.
 
 ## Handling memory errors
 
+With ESP8266 core 3.1.2, `sizeof(ArdJSON::JSONVar)` is 24 bytes; with ESP32
+core 3.3.12 it is 32 bytes. Object/array members additionally require their key,
+link and allocator metadata, plus owned string contents. Use
+`JSONVar::memberAllocationBytes()` for the conservative member allocation
+estimate used by the library. These sizes are not complete document footprints.
+
 Check JSON values with `isValid()` and check Boolean returns from registration and update methods. A rejected operation must not be treated as a successful value change. Use the Console's Messages tab, registration error details and heap metrics to diagnose memory pressure; see [Troubleshooting](https://github.com/rkubera/ArdPortal/wiki/Troubleshooting).
 
 ## Independent limits

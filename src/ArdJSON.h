@@ -6,6 +6,7 @@
 #include "CooperativeBudget.h"
 #include "ArdAllocation.h"
 #include "JsonStream.h"
+#include "JsonUtf8.h"
 #include <memory>
 #include <new>
 #include <type_traits>
@@ -32,13 +33,18 @@ class Writer;
 class ObjectKey;
 class JSONVar {
 public:
-  enum class Type { Undefined,
-                    Null,
-                    Boolean,
-                    Number,
-                    String,
-                    Object,
-                    Array };
+  // The byte tag reduces ESP8266 code and node size; ESP32 benefits from int.
+  enum class Type
+#if defined(ESP8266)
+    : uint8_t
+#endif
+  { Undefined,
+    Null,
+    Boolean,
+    Number,
+    String,
+    Object,
+    Array };
   /**
    * @brief Initialize this instance and its owned state.
    * @return No value.
@@ -183,7 +189,7 @@ public:
     uint64_t n = 0;
     for (size_t i = 0; i < _text.length(); ++i) {
       char c = _text[i];
-      if (c < '0' || c > '9' || n > (UINT64_MAX - uint64_t(c - '0')) / 10) return false;
+      if (c < '0' || c > '9' || n > UINT64_MAX / 10 || (n == UINT64_MAX / 10 && uint64_t(c - '0') > UINT64_MAX % 10)) return false;
       n = n * 10 + uint64_t(c - '0');
     }
     value = n;
@@ -420,6 +426,19 @@ private:
    * @return New member pointer, or nullptr on allocation failure.
    */
   template<class Key> Member* appendKey(const Key& key);
+  template<class = void>
+#if defined(__GNUC__)
+  __attribute__((noinline))
+#endif
+  Member*
+  findMember(const ObjectKey& key) const;
+  template<class = void>
+#if defined(__GNUC__)
+  __attribute__((noinline))
+#endif
+  Member*
+  findMember(const String& key) const;
+
   /**
    * @brief Release JSON children and text, restoring an Undefined value.
    * @return No value.
@@ -609,12 +628,7 @@ inline bool JSONVar::applyObjectPatch(JSONVar&& patch, bool eraseUndefined) {
   // Validate the resulting size before changing either object.
   size_t size = _size;
   for (const Member* item = patch._children.get(); item; item = item->next.get()) {
-    bool present = false;
-    for (const Member* old = _children.get(); old; old = old->next.get())
-      if (old->key.matches(item->key)) {
-        present = true;
-        break;
-      }
+    const bool present = findMember(item->key) != nullptr;
     if (eraseUndefined && item->value.isUndefined()) {
       if (present) --size;
     } else if (!present) ++size;
@@ -839,7 +853,7 @@ inline bool JSONVar::toDouble(double& value) const {
  * @return True with value populated for an exact signed integer in range; false otherwise.
  */
 inline bool JSONVar::toInteger(int64_t& value) const {
-  if (!isInteger() || !_text.length()) return false;
+  if (_type != Type::Number || !_text.length()) return false;
   const bool negative = _text[0] == '-';
   const uint64_t limit = uint64_t(INT64_MAX) + uint64_t(negative);
   const uint64_t quotient = limit / 10, remainder = limit % 10;
@@ -859,10 +873,7 @@ inline bool JSONVar::toInteger(int64_t& value) const {
  * @return True if the object owns the key; false for missing keys or nonobject values.
  */
 inline bool JSONVar::hasOwnProperty(const String& key) const {
-  if (_type != Type::Object) return false;
-  for (Member* item = _children.get(); item; item = item->next.get())
-    if (item->key.matches(key)) return true;
-  return false;
+  return findMember(key) != nullptr;
 }
 // Template linkage keeps the shared lookup header-only without C++ inline.
 // The compiler attribute limits firmware inlining without conflicting declarations.
@@ -880,6 +891,20 @@ JSONVar::Member* JSONVar::findMember(const char* key) const {
   const size_t length = strlen(key);
   for (Member* item = _children.get(); item; item = item->next.get())
     if (item->key.matches(key, length)) return item;
+  return nullptr;
+}
+template<class Tag>
+JSONVar::Member* JSONVar::findMember(const String& key) const {
+  if (_type != Type::Object) return nullptr;
+  for (Member* item = _children.get(); item; item = item->next.get())
+    if (item->key.matches(key)) return item;
+  return nullptr;
+}
+template<class Tag>
+JSONVar::Member* JSONVar::findMember(const ObjectKey& key) const {
+  if (_type != Type::Object) return nullptr;
+  for (Member* item = _children.get(); item; item = item->next.get())
+    if (item->key.matches(key)) return item;
   return nullptr;
 }
 /**
@@ -919,8 +944,7 @@ inline const JSONVar& JSONVar::operator[](const char* key) const {
 inline JSONVar& JSONVar::operator[](const String& key) {
   if (_type == Type::Undefined && !_failed) _type = Type::Object;
   if (_type != Type::Object || _failed) return failure();
-  for (Member* item = _children.get(); item; item = item->next.get())
-    if (item->key.matches(key)) return item->value;
+  if (Member* item = findMember(key)) return item->value;
   Member* item = append(key);
   return item ? item->value : failure();
 }
@@ -930,9 +954,7 @@ inline JSONVar& JSONVar::operator[](const String& key) {
  * @return Reference to the matching value, or the shared Undefined sentinel when absent.
  */
 inline const JSONVar& JSONVar::operator[](const String& key) const {
-  if (_type == Type::Object)
-    for (Member* item = _children.get(); item; item = item->next.get())
-      if (item->key.matches(key)) return item->value;
+  if (Member* item = findMember(key)) return item->value;
   return missing();
 }
 /**
@@ -1066,33 +1088,11 @@ inline bool JSONVar::remove(size_t index) {
  * @return True for well-formed UTF-8; false for malformed or incomplete sequences.
  */
 inline bool validUtf8(const String& text) {
-  for (size_t i = 0; i < text.length();) {
-    uint8_t first = text[i++];
-    if (first < 128) continue;
-    unsigned count;
-    uint32_t code, minimum;
-    if (first >= 0xc2 && first <= 0xdf) {
-      count = 1;
-      code = first & 31;
-      minimum = 0x80;
-    } else if (first >= 0xe0 && first <= 0xef) {
-      count = 2;
-      code = first & 15;
-      minimum = 0x800;
-    } else if (first >= 0xf0 && first <= 0xf4) {
-      count = 3;
-      code = first & 7;
-      minimum = 0x10000;
-    } else return false;
-    while (count--) {
-      if (i == text.length()) return false;
-      uint8_t c = text[i++];
-      if ((c & 0xc0) != 0x80) return false;
-      code = (code << 6) | (c & 63);
-    }
-    if (code < minimum || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return false;
-  }
-  return true;
+  uint8_t remaining = 0;
+  uint32_t code = 0, minimum = 0;
+  for (size_t i = 0; i < text.length(); ++i)
+    if (!ArdUtf8::consume(uint8_t(text[i]), remaining, code, minimum)) return false;
+  return remaining == 0;
 }
 // DOM construction and storage validation share the same incremental grammar.
 class StreamParser {
@@ -1316,15 +1316,11 @@ private:
       return string(key) && append(":") && write(value, 1);
     };
     for (const JSONVar::Member* item = base._children.get(); item; item = item->next.get()) {
-      String key = item->key.text();
-      if (key.length() != item->key.length()) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
-      const auto& value = patch.hasOwnProperty(key) ? patch[key] : item->value;
-      if (!emit(item, value)) return false;
+      const JSONVar::Member* replacement = patch.findMember(item->key);
+      if (!emit(item, replacement ? replacement->value : item->value)) return false;
     }
     for (const JSONVar::Member* item = patch._children.get(); item; item = item->next.get()) {
-      String key = item->key.text();
-      if (key.length() != item->key.length()) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
-      if (!base.hasOwnProperty(key) && !emit(item, item->value)) return false;
+      if (!base.findMember(item->key) && !emit(item, item->value)) return false;
     }
     return append("}");
   }

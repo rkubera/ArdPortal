@@ -1,0 +1,199 @@
+{
+  "date": "2026-10-29",
+  "example": "DynamicPages",
+  "clean_builds": true,
+  "retained_variant": "after",
+  "source_sha256": {
+    "before": "8092204e9b135d69c4749507f5695d98c51dd835a43cc58718323744077f1cfe",
+    "final": "055ec6f9fd83a151ae9a3a4b5faed2a5e899a34aa1cdb346c48b684285dec746"
+  },
+  "results": {
+    "esp8266-before": {
+      "bin_bytes": 592400,
+      "bin_sha256": "43f8208358d475fb3352505c173801f00672036b1594983d1cd2fed13dc35c4e",
+      "sections": null,
+      "compiler_out": "",
+      "log": "/tmp/ardjson-flash-20261029/esp8266-before.log"
+    },
+    "esp32-before": {
+      "bin_bytes": 1282480,
+      "bin_sha256": "4f662311935e3c8268f63277218c2df58ca152e398ee3c6f6e9fa154d9c1203d",
+      "sections": [
+        {
+          "name": "text",
+          "size": 1282234,
+          "max_size": 1310720
+        },
+        {
+          "name": "data",
+          "size": 57732,
+          "max_size": 327680
+        }
+      ],
+      "compiler_out": "Sketch uses 1282234 bytes (97%) of program storage space. Maximum is 1310720 bytes.\nGlobal variables use 57732 bytes (17%) of dynamic memory, leaving 269948 bytes for local variables. Maximum is 327680 bytes.\n",
+      "log": "/tmp/ardjson-flash-20261029/esp32-before.log"
+    },
+    "esp8266-after": {
+      "bin_bytes": 592384,
+      "bin_sha256": "9bebd5016cae6a1c0a1e4468d91035fb2f349cf6f0db19d0c10d14a66515807d",
+      "sections": null,
+      "compiler_out": "",
+      "log": "/tmp/ardjson-flash-20261029/esp8266-after.log"
+    },
+    "esp32-after": {
+      "bin_bytes": 1282480,
+      "bin_sha256": "fa5cd6d4eaedf893f51322843d9c7cb4e421fc696a951f0c605a48a43040c280",
+      "sections": [
+        {
+          "name": "text",
+          "size": 1282230,
+          "max_size": 1310720
+        },
+        {
+          "name": "data",
+          "size": 57732,
+          "max_size": 327680
+        }
+      ],
+      "compiler_out": "Sketch uses 1282230 bytes (97%) of program storage space. Maximum is 1310720 bytes.\nGlobal variables use 57732 bytes (17%) of dynamic memory, leaving 269948 bytes for local variables. Maximum is 327680 bytes.\n",
+      "log": "/tmp/ardjson-flash-20261029/esp32-after.log"
+    },
+    "esp8266-writer": {
+      "bin_bytes": 592384,
+      "bin_sha256": "9bebd5016cae6a1c0a1e4468d91035fb2f349cf6f0db19d0c10d14a66515807d",
+      "sections": null,
+      "compiler_out": "",
+      "log": "/tmp/ardjson-flash-20261029/esp8266-writer.log"
+    },
+    "esp32-writer": {
+      "bin_bytes": 1282480,
+      "bin_sha256": "742c1e22f0562e4e89d3fef66ceded4c6d1025e96c12548addd4f479254f216e",
+      "sections": [
+        {
+          "name": "text",
+          "size": 1282230,
+          "max_size": 1310720
+        },
+        {
+          "name": "data",
+          "size": 57732,
+          "max_size": 327680
+        }
+      ],
+      "compiler_out": "Sketch uses 1282230 bytes (97%) of program storage space. Maximum is 1310720 bytes.\nGlobal variables use 57732 bytes (17%) of dynamic memory, leaving 269948 bytes for local variables. Maximum is 327680 bytes.\n",
+      "log": "/tmp/ardjson-flash-20261029/esp32-writer.log"
+    },
+    "esp8266-double": {
+      "bin_bytes": 592384,
+      "bin_sha256": "9bebd5016cae6a1c0a1e4468d91035fb2f349cf6f0db19d0c10d14a66515807d",
+      "sections": null,
+      "compiler_out": "",
+      "log": "/tmp/ardjson-flash-20261029/esp8266-double.log"
+    },
+    "esp32-double": {
+      "bin_bytes": 1282480,
+      "bin_sha256": "c3cd018f054a26c62c8d54c92ddbcd7e8830ab2a5894e433443a1a02bd22ce2e",
+      "sections": [
+        {
+          "name": "text",
+          "size": 1282230,
+          "max_size": 1310720
+        },
+        {
+          "name": "data",
+          "size": 57732,
+          "max_size": 327680
+        }
+      ],
+      "compiler_out": "Sketch uses 1282230 bytes (97%) of program storage space. Maximum is 1310720 bytes.\nGlobal variables use 57732 bytes (17%) of dynamic memory, leaving 269948 bytes for local variables. Maximum is 327680 bytes.\n",
+      "log": "/tmp/ardjson-flash-20261029/esp32-double.log"
+    },
+    "esp8266-thresholds": {
+      "bin_bytes": 592384,
+      "bin_sha256": "a3e090e7a081444ed5a0b507303c353f89d9131347f76a75cfd051d91c3fccb4",
+      "sections": null,
+      "compiler_out": "",
+      "log": "/tmp/ardjson-flash-20261029/esp8266-thresholds.log"
+    },
+    "esp32-thresholds": {
+      "bin_bytes": 1282480,
+      "bin_sha256": "e228b1b9a279a7fe183183bdcaa83e3e753c15b98085c47ea933addf82f5e1ff",
+      "sections": [
+        {
+          "name": "text",
+          "size": 1282226,
+          "max_size": 1310720
+        },
+        {
+          "name": "data",
+          "size": 57732,
+          "max_size": 327680
+        }
+      ],
+      "compiler_out": "Sketch uses 1282226 bytes (97%) of program storage space. Maximum is 1310720 bytes.\nGlobal variables use 57732 bytes (17%) of dynamic memory, leaving 269948 bytes for local variables. Maximum is 327680 bytes.\n",
+      "log": "/tmp/ardjson-flash-20261029/esp32-thresholds.log"
+    },
+    "esp8266-final": {
+      "bin_bytes": 593664,
+      "bin_sha256": "7da314045117f36e285dc5e2bb6a3806a9bdd3b8d0afdccdda891232d8b63aef",
+      "sections": null,
+      "compiler_out": "",
+      "log": "/tmp/ardjson-flash-20261029/esp8266-final.log"
+    },
+    "esp32-final": {
+      "bin_bytes": 1284336,
+      "bin_sha256": "cb335e02ee9b4b66dcb87d669f64d68be322e053683f6540ca14e616d55b6405",
+      "sections": [
+        {
+          "name": "text",
+          "size": 1284090,
+          "max_size": 1310720
+        },
+        {
+          "name": "data",
+          "size": 57732,
+          "max_size": 327680
+        }
+      ],
+      "compiler_out": "Sketch uses 1284090 bytes (97%) of program storage space. Maximum is 1310720 bytes.\nGlobal variables use 57732 bytes (17%) of dynamic memory, leaving 269948 bytes for local variables. Maximum is 327680 bytes.\n",
+      "log": "/tmp/ardjson-flash-20261029/esp32-final.log"
+    },
+    "esp32-integers": {
+      "bin_bytes": 1282512,
+      "bin_sha256": "dbafd321b2d4471ab146634a4818b3f5a3284f1ea22d111b674aa9e16e291424",
+      "sections": [
+        {
+          "name": "text",
+          "size": 1282266,
+          "max_size": 1310720
+        },
+        {
+          "name": "data",
+          "size": 57732,
+          "max_size": 327680
+        }
+      ],
+      "compiler_out": "Sketch uses 1282266 bytes (97%) of program storage space. Maximum is 1310720 bytes.\nGlobal variables use 57732 bytes (17%) of dynamic memory, leaving 269948 bytes for local variables. Maximum is 327680 bytes.\n",
+      "log": "/tmp/ardjson-flash-20261029/esp32-integers.log"
+    },
+    "esp32-hex": {
+      "bin_bytes": 1282592,
+      "bin_sha256": "3c785fbc5b66f4adb88da849627a6e9e514d89550a62f717cd0d0dae2b482777",
+      "sections": [
+        {
+          "name": "text",
+          "size": 1282346,
+          "max_size": 1310720
+        },
+        {
+          "name": "data",
+          "size": 57732,
+          "max_size": 327680
+        }
+      ],
+      "compiler_out": "Sketch uses 1282346 bytes (97%) of program storage space. Maximum is 1310720 bytes.\nGlobal variables use 57732 bytes (17%) of dynamic memory, leaving 269948 bytes for local variables. Maximum is 327680 bytes.\n",
+      "log": "/tmp/ardjson-flash-20261029/esp32-hex.log"
+    }
+  },
+  "artifacts": "/tmp/ardjson-flash-20261029"
+}

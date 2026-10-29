@@ -7,7 +7,7 @@ trap 'rm -rf "$test_dir"' EXIT
 "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
   -Itests/memory-host -Isrc tests/memory-host/json-utf8.cpp src/JsonStream.cpp -o "$test_dir/json-utf8"
 "$test_dir/json-utf8"
-for test_name in json-patch json-stream journal-selection stream dynamic-patch dynamic-groups dynamic-page-limit-default dynamic-page-limit-32 dynamic-page-limit-groups mqtt-state-topic mqtt-state-topic-no-ha no-dynamic no-www no-www-wifi messages-only; do
+for test_name in json-patch json-stream json-numbers journal-selection stream dynamic-patch dynamic-groups dynamic-page-limit-default dynamic-page-limit-32 dynamic-page-limit-groups mqtt-state-topic mqtt-state-topic-no-ha no-dynamic no-www no-www-wifi messages-only; do
   source_name="$test_name"
   if [[ "$test_name" == no-www || "$test_name" == no-www-wifi || "$test_name" == messages-only ]]; then source_name=no-dynamic; fi
   if [[ "$test_name" == mqtt-state-topic-no-ha ]]; then source_name=mqtt-state-topic; fi
@@ -25,7 +25,7 @@ for test_name in json-patch json-stream journal-selection stream dynamic-patch d
   if [[ "$test_name" == no-www ]]; then flags+=(-DARDPORTAL_ENABLE_WIFI=0 -DARDPORTAL_ENABLE_WWW=0); fi
   if [[ "$test_name" == no-www-wifi ]]; then flags+=(-DARDPORTAL_ENABLE_WWW=0); fi
   if [[ "$test_name" == messages-only ]]; then flags+=(-DARDPORTAL_ENABLE_CONSOLE_MESSAGES=1); fi
-  if [[ "$test_name" != json-patch && "$test_name" != json-stream ]]; then
+  if [[ "$test_name" != json-patch && "$test_name" != json-stream && "$test_name" != json-numbers ]]; then
     source_files+=(src/ArdStorage.cpp)
     flags+=(-DESP8266 -DARDFS_HOST_TEST)
   fi
