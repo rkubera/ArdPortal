@@ -8,7 +8,8 @@
  */
 template<class Volume, class FileHandle>
 void ArdStorage<Volume, FileHandle>::begin() {
-  if (_mountDone || _phase != Phase::Idle) return;
+  if (_phase != Phase::Idle || (_mountDone && mounted())) return;
+  if (_mountDone) { _volume.end(); _mountDone = _mounted = false; }
   _phase = Phase::Mount;
 }
 /**
@@ -19,7 +20,7 @@ void ArdStorage<Volume, FileHandle>::begin() {
  */
 template<class Volume, class FileHandle>
 bool ArdStorage<Volume, FileHandle>::start(const String& path, Callback&& callback) {
-  if (!_mountDone || !_mounted || busy() || !callback || path.length() < 2 || path.length() > 64 || path[0] != '/' || path.indexOf("..") >= 0) return false;
+  if (!_mountDone || !mounted() || busy() || !callback || path.length() < 2 || path.length() > 64 || path[0] != '/' || path.indexOf("..") >= 0) return false;
   _rawFile = _sourceFailed = false;
   _path = path;
   if (_path != path) return false;
@@ -215,8 +216,7 @@ uint32_t ArdStorage<Volume, FileHandle>::checksum(uint32_t generation, const Str
   for (size_t i = 0; i < data.length() + 4; ++i) {
     if ((i & 255) == 0) budget.checkpoint();
     uint8_t byte = i < 4 ? uint8_t(generation >> (i * 8)) : uint8_t(data[i - 4]);
-    crc ^= byte;
-    for (int bit = 0; bit < 8; ++bit) crc = (crc >> 1) ^ (0xedb88320U & (0U - (crc & 1)));
+    crc = ArdCRC::updateByte(crc, byte);
   }
   return ~crc;
 }

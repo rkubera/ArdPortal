@@ -70,7 +70,7 @@ int main() {
     String part = bytes(0, 256, 0);
     int programs = ardfsPrograms;
     assert(file.write(reinterpret_cast<const uint8_t*>(part.c_str()), 256) == 256);
-    assert(ardfsPrograms == programs);
+    assert(ardfsPrograms == programs + 1); // Only the sector type is durable; payload remains buffered.
     assert(!file.flush()); // Short producer cannot commit.
     file.close();
     assert(!volume.exists("/direct"));

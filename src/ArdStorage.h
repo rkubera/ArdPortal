@@ -17,6 +17,9 @@ namespace ArdUILanguageData { enum class Key : uint16_t; }
 template<class Volume, class FileHandle>
 class ArdStorage {
 public:
+  // The volume is placed after parser state for code size; close its handles
+  // explicitly before reverse member destruction reaches the volume itself.
+  ~ArdStorage() { _file.close(); _repairFile.close(); }
   struct Result {
     bool ok = false, found = false, changed = false, recovered = false;
     bool redundant = false, repaired = false;
@@ -83,7 +86,7 @@ public:
    * @return True when the volume is mounted and available.
    */
   bool mounted() const {
-    return _mounted;
+    return _mounted && !needsRemount(_volume, 0);
   }
   /**
    * @brief Check whether initialization or a queued operation still requires loop() work.
@@ -116,6 +119,8 @@ public:
   // SIZE_MAX means no fixed document limit; usable capacity depends on the volume.
   static constexpr size_t MaxBytes = SIZE_MAX;
 private:
+  template<class V> static auto needsRemount(const V& volume, int) -> decltype(volume.requiresRemount()) { return volume.requiresRemount(); }
+  template<class V> static bool needsRemount(const V&, long) { return false; }
   enum class Phase { Mount,
                      End,
                      Format,

@@ -73,14 +73,56 @@ echo 'PASS: incremental settings, Portal/MQTT persistence, bounded journal write
   -Itests/memory-host -Isrc tests/memory-host/volume-operations.cpp -o "$test_dir/volume-operations"
 "$test_dir/volume-operations"
 
-"${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
-  -DESP8266 -DFS_PHYS_SIZE=262144U -DARDPORTAL_TEST_ALLOCATE=testAllocate \
-  -Itests/memory-host -Isrc tests/memory-host/sector-buffer.cpp -o "$test_dir/sector-buffer"
-"$test_dir/sector-buffer"
+for platform in ESP8266 ESP32; do
+  "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+    -D"$platform" -DFS_PHYS_SIZE=2097152U -DARDPORTAL_TEST_ALLOCATE=testAllocate \
+    -Itests/memory-host -Isrc tests/memory-host/sector-buffer.cpp -o "$test_dir/sector-buffer"
+  "$test_dir/sector-buffer"
+done
 
 for geometry in 262144 524288; do
   "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
     -DESP8266 -DFS_PHYS_SIZE="${geometry}U" \
     -Itests/memory-host -Isrc tests/memory-host/bad-sectors.cpp -o "$test_dir/bad-sectors"
   "$test_dir/bad-sectors"
+done
+
+for platform in ESP8266 ESP32; do
+  "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+    -D"$platform" -DFS_PHYS_SIZE=131072U \
+    -Itests/memory-host -Isrc tests/memory-host/fragmentation.cpp -o "$test_dir/fragmentation"
+  "$test_dir/fragmentation"
+done
+"${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+  -DESP32 -DFS_PHYS_SIZE=524288U \
+  -Itests/memory-host -Isrc tests/memory-host/bad-sectors.cpp -o "$test_dir/bad-sectors-esp32"
+"$test_dir/bad-sectors-esp32"
+
+for platform in ESP8266 ESP32; do
+  "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+    -D"$platform" -DFS_PHYS_SIZE=131072U \
+    -Itests/memory-host -Isrc tests/memory-host/storage-recovery.cpp \
+    src/ArdStorage.cpp src/JsonStream.cpp src/JournalReader.cpp src/JsonDocumentStream.cpp -o "$test_dir/storage-recovery"
+  "$test_dir/storage-recovery"
+done
+
+for platform in ESP8266 ESP32; do
+  "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+    -D"$platform" -DFS_PHYS_SIZE=131072U \
+    -Itests/memory-host -Isrc tests/memory-host/wear-leveling.cpp -o "$test_dir/wear-leveling"
+  "$test_dir/wear-leveling"
+done
+
+for platform in ESP8266 ESP32; do
+  "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+    -D"$platform" -DFS_PHYS_SIZE=3145728U \
+    -Itests/memory-host -Isrc tests/memory-host/wear-leveling.cpp -o "$test_dir/wear-scan"
+  "$test_dir/wear-scan"
+done
+
+for platform in ESP8266 ESP32; do
+  "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
+    -D"$platform" -DFS_PHYS_SIZE=131072U \
+    -Itests/memory-host -Isrc tests/memory-host/moving-metadata.cpp -o "$test_dir/moving-metadata"
+  "$test_dir/moving-metadata"
 done

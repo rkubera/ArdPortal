@@ -198,7 +198,9 @@ struct EspStub {
   }
   int restarts = 0;
   int programFailuresForTest = 0, silentProgramFailuresForTest = 0, eraseFailuresForTest = 0;
+  bool tornTailForTest = false;
   std::vector<unsigned> badProgramSectorsForTest, badEraseSectorsForTest, badReadSectorsForTest, silentEraseSectorsForTest;
+  std::vector<unsigned> eraseCountsForTest;
   static bool badSector(const std::vector<unsigned>& sectors, uint32_t address, size_t size) {
     unsigned first = (address - 0x100000U) / 4096U;
     unsigned last = (address - 0x100000U + size - 1) / 4096U;
@@ -227,13 +229,16 @@ struct EspStub {
     if (!failed && (consumeFault(programFailuresForTest) || (size && badSector(badProgramSectorsForTest, address, size)))) return false;
     if (!failed && consumeFault(silentProgramFailuresForTest)) return true;
     size_t count = failed ? (ardfsTornOperation ? size / 2 : 0) : size;
-    for (size_t i = 0; i < count; ++i) ardfsTestFlash[address - 0x100000U + i] &= bytes[i];
+    size_t first = failed && tornTailForTest ? size-count : 0;
+    for (size_t i = first; i < first+count; ++i) ardfsTestFlash[address - 0x100000U + i] &= bytes[i];
     return !failed;
   }
   bool flashEraseSector(uint32_t sector) {
     uint32_t address = sector * 4096U;
     if (ardfsPowerOff || !ardfsFlashRange(address, 4096)) return false;
     ++ardfsErases;
+    unsigned index = (address - 0x100000U) / 4096U;
+    if (index < eraseCountsForTest.size()) ++eraseCountsForTest[index];
     bool failed = ardfsFlashFailure();
     if (!failed && (consumeFault(eraseFailuresForTest) || badSector(badEraseSectorsForTest, address, 4096))) return false;
     if (!failed && badSector(silentEraseSectorsForTest, address, 4096)) return true;

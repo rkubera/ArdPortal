@@ -54,7 +54,7 @@ static uint32_t crc(const uint8_t* bytes, size_t n, uint32_t c = UINT32_MAX) {
   while (n--) { c ^= *bytes++; for (unsigned bit = 0; bit < 8; ++bit) c = (c >> 1) ^ (0xedb88320U & (0U - (c & 1))); }
   return c;
 }
-static void legacy() {
+static void legacy(bool fragmentedBadMap) {
   reset();
   auto* h = ardfsTestFlash.data();
   ArdFSDetail::put(h, ArdFSDetail::BankMagic); ArdFSDetail::put(h + 4, 1);
@@ -67,22 +67,28 @@ static void legacy() {
   for (size_t i = 0; i < 6000; ++i) h[36 + i] = uint8_t(i * 13 + 7);
   ArdFSDetail::put(h + 16, ~crc(h + 32, 6004, crc(h, 16)));
   ArdFSDetail::put(h + 24, ArdFSDetail::Commit);
+  if (fragmentedBadMap) {
+    const std::vector<uint8_t> record(ardfsTestFlash.begin() + 4096, ardfsTestFlash.begin() + 3 * 4096);
+    std::fill(ardfsTestFlash.begin(), ardfsTestFlash.end(), 255);
+    for (unsigned sector = 0; sector < 2; ++sector) {
+      h = ardfsTestFlash.data() + sector * 4096;
+      ArdFSDetail::put(h, ArdFSDetail::BankMagic); ArdFSDetail::put(h + 4, 2);
+      ArdFSDetail::put(h + 8, 17); ArdFSDetail::put(h + 12, FS_PHYS_SIZE / 2);
+      ArdFSDetail::put(h + 20, sector + 1); h[32] = 1; h[33] = 0; ArdFSDetail::put16(h + 36, 3);
+      ArdFSDetail::put(h + 16, ~crc(h, 128)); ArdFSDetail::put(h + 24, ArdFSDetail::Commit);
+    }
+    std::copy(record.begin(), record.begin() + 4096, ardfsTestFlash.begin() + 2 * 4096);
+    std::copy(record.begin() + 4096, record.end(), ardfsTestFlash.begin() + 4 * 4096);
+  }
 }
 int main() {
-  // Version-1 banks remain readable and migrate through the other bank atomically.
-  legacy(); const auto oldFormat = ardfsTestFlash;
-  int migrationOperations;
-  {
-    ArdFSVolume v; assert(v.begin()); check(v, "/old", 6000, 7);
-    int before = ardfsFlashCalls; assert(save(v, "/new", 13, 3)); migrationOperations = ardfsFlashCalls - before;
-    v.end(); assert(v.begin()); check(v, "/old", 6000, 7); check(v, "/new", 13, 3);
-  }
-  for (int cut = 1; cut <= migrationOperations; ++cut) {
-    ardfsTestFlash = oldFormat; ardfsPowerOff = false; ardfsFailAt = -1;
-    { ArdFSVolume v; assert(v.begin()); ardfsTornOperation = true; ardfsFailAt = ardfsFlashCalls + cut; save(v, "/new", 13, 3); }
-    ardfsPowerOff = false; ardfsFailAt = -1;
-    ArdFSVolume v; assert(v.begin()); check(v, "/old", 6000, 7);
-    if (v.exists("/new")) check(v, "/new", 13, 3);
+  // Unsupported V1/V2 images must fail without modifying or formatting flash.
+  for (bool badMap : {false, true}) {
+    legacy(badMap);
+    const auto oldFormat = ardfsTestFlash;
+    ArdFSVolume v;
+    assert(!v.begin() && v.lastError() == -5);
+    assert(ardfsTestFlash == oldFormat);
   }
   // Irregular append fragments, unknown final length, and a gap in a later sector.
   reset();
@@ -121,25 +127,31 @@ int main() {
     v.end(); assert(v.begin() && !v.exists("/abandoned"));
     check(v, "/keep", 6000, 12); check(v, "/after-abandon", 13, 3);
   }
-  // An abandoned published bank must not retain its newer header while records
-  // are overwritten. Cover both explicit and silently ignored metadata erases.
+  // Closing after the first catalog commit must keep that published index.
+  // Later metadata erase failures must not recycle sectors of the visible files.
   for (bool silent : {false, true}) {
     reset(); ArdFSVolume v; assert(v.format() && v.begin());
     assert(save(v, "/keep", 1, 9) && save(v, "/source", 1, 3));
+    auto revision = []() {
+      uint32_t result = 0;
+      for (unsigned at = 0; at < 8192; at += 256) {
+        const auto* h = ardfsTestFlash.data() + at;
+        if (ArdFSDetail::get(h) == ArdFSDetail::BankMagic && ArdFSDetail::get(h + 24) == ArdFSDetail::Commit)
+          result = std::max(result, ArdFSDetail::get(h + 20));
+      }
+      return result;
+    };
+    uint32_t before = revision();
     auto operation = v.mutate("/source", "/renamed"); assert(operation);
     int status; do { status = operation.prepareStep(); } while (!status); assert(status == 1);
-    const size_t bank = FS_PHYS_SIZE / 2;
-    while (ArdFSDetail::get(ardfsTestFlash.data() + bank + 24) != ArdFSDetail::Commit)
-      assert(operation.flushStep() == 0);
-    operation.close();
+    while (revision() == before) assert(operation.flushStep() == 0);
+    assert(operation.close() && !v.exists("/source") && v.exists("/renamed"));
     auto& failures = silent ? ESP.silentEraseSectorsForTest : ESP.badEraseSectorsForTest;
-    failures = {unsigned(bank / 4096), unsigned(bank / 4096 + 1)};
-    auto interrupted = v.mutate("/source", "/other"); assert(interrupted);
-    const int programs = ardfsPrograms;
-    do { status = bounded(interrupted, 0); } while (!status);
-    assert(status == -1 && ardfsPrograms == programs);
-    interrupted.close(); check(v, "/keep", 1, 9);
-    v.end(); failures.clear(); assert(v.begin()); check(v, "/keep", 1, 9);
+    failures = {0, 1}; bool failed = false;
+    for (unsigned i = 0; i < 20 && !failed; ++i) failed = !save(v, "/other", 1, i);
+    assert(!failed); check(v, "/keep", 1, 9); check(v, "/renamed", 1, 3);
+    v.end(); failures.clear(); assert(v.begin());
+    check(v, "/keep", 1, 9); check(v, "/renamed", 1, 3);
   }
   // Formatting retires physical faults and can use the second metadata sector.
   reset(); ESP.badEraseSectorsForTest = {0, 3}; ESP.badReadSectorsForTest = {0};
@@ -148,7 +160,7 @@ int main() {
   // Failed format is retryable; corrupt metadata is never treated as blank flash.
   reset();
   {
-    ArdFSVolume v; ESP.badProgramSectorsForTest = {0, 1};
+    ArdFSVolume v; for (unsigned id=0;id<FS_PHYS_SIZE/4096;++id) ESP.badProgramSectorsForTest.push_back(id);
     assert(!v.format()); ESP.badProgramSectorsForTest.clear();
     assert(v.format() && v.begin()); v.end();
     ardfsTestFlash[16] ^= 1; ardfsTestFlash[4096 + 16] ^= 1;
@@ -211,7 +223,7 @@ int main() {
       assert(file.write(bytes, n) == n); at += n;
     }
     int status; do { status = file.writeStep(); } while (!status); assert(status == 1);
-    ardfsTestFlash[3 * 4096 + 32 + 5 + 1] ^= 1;
+    ardfsTestFlash[ArdFSWriterAccess::dataAddress(file) + 1] ^= 1;
     assert(!file.flush()); file.close();
     v.end(); assert(v.begin() && !v.exists("/late")); check(v, "/keep", 1, 12);
   }
@@ -232,18 +244,20 @@ int main() {
       v.end(); assert(v.begin()); check(v, "/payload", 10000, i);
     }
   }
-  // Either metadata copy can later become unreadable after an acknowledged save.
+  // An unreadable catalog replica must not silently select an older allocation snapshot.
   for (unsigned failedHeader : {0U, 1U}) {
     reset(); ArdFSVolume v; assert(v.format() && v.begin());
     ESP.badProgramSectorsForTest = {3}; assert(save(v, "/payload", 10000, 8));
     ESP.badReadSectorsForTest = {failedHeader};
-    v.end(); assert(v.begin()); check(v, "/payload", 10000, 8);
+    const auto intact = ardfsTestFlash;
+    v.end(); assert(!v.begin() && v.lastError() == -5 && ardfsTestFlash == intact);
+    ESP.badReadSectorsForTest.clear(); v.end(); assert(v.begin()); check(v, "/payload", 10000, 8);
   }
   // If neither metadata sector accepts the new map, retain the previous file.
   reset();
   {
     ArdFSVolume v; assert(v.format() && v.begin()); assert(save(v, "/keep", 1, 5));
-    ESP.badProgramSectorsForTest = {0, 1, 3};
+    for (unsigned id=0;id<FS_PHYS_SIZE/4096;++id) ESP.badProgramSectorsForTest.push_back(id);
     assert(!save(v, "/payload", 10000, 8));
     v.end(); assert(v.begin()); check(v, "/keep", 1, 5); assert(!v.exists("/payload"));
   }
@@ -252,7 +266,7 @@ int main() {
   {
     ArdFSVolume v; assert(v.format() && v.begin()); assert(save(v, "/keep", 1, 5));
     ESP.badProgramSectorsForTest = {3};
-    assert(!save(v, "/payload", v.totalBytes() - 4096 - 40, 8));
+    assert(!save(v, "/payload", (v.totalBytes()/4096-1)*4090+4-32-8, 8));
     v.end(); assert(v.begin()); check(v, "/keep", 1, 5);
   }
   // Erase/read failures in unused sectors are skipped too.

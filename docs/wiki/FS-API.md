@@ -56,7 +56,7 @@ portal settings saves and explicit `flushPortalAndAppConfig()` bypass these dela
 dynamic control edits retain the debounce. Logs, uptime, connection
 states, NTP time and write statistics are not persisted.
 
-A partition verified completely erased is formatted automatically on first use.
+A usable filesystem region verified completely erased is formatted automatically on first use.
 Missing or damaged bank headers on a nonempty partition report a mount error
 without formatting. Allocation, flash I/O, index capacity and flash layout errors abort
 mounting without formatting or selecting an older committed bank. Likewise, an
@@ -108,6 +108,20 @@ needs its own completion handling and is not automatically serviced by ArdPortal
 
 Direct application calls to `ESP.restart()`, watchdog resets, exceptions and power
 loss do not pass through this callback. Clear it with `portal.onBeforeRestart(nullptr)`.
+
+### Formatting from Device or HTTP
+
+The Device page provides **Format flash storage** with a confirmation dialog.
+It erases all files and saved Portal/AppConfig settings in the selected storage
+volume, then restarts the device after successful format/remount. It does not
+erase the firmware or reset Zigbee/Matter pairing.
+
+The same operation is available through `POST /api/storage/format` with the
+form body `confirm=FORMAT` (`application/x-www-form-urlencoded`). The response
+waits for completion: 200 on success, 500 on storage failure, 400 for invalid
+confirmation, or 409 while configuration/maintenance work prevents the action.
+It remains available after a completed mount failure, including an unsupported
+old filesystem format. Keep calling `loop()` to advance formatting.
 
 ### ArdFS storage format
 
@@ -358,8 +372,9 @@ the JSON methods add slot selection and the generation/CRC envelope before
 that writer. Both copies, escaped payloads, record alignment and the other live
 files must fit in one bank. JSON syntax validation shares the bounded CRC/escaped-length pass before any destination is changed.
 
-The file layer buffers one physical 4 KiB sector, without buffering the whole file.
-Data sectors are erased lazily when their retained image is ready to program.
+The file layer uses a 256-byte program cache and 256-byte relocation scratch,
+shared with collection copies. It never retains a full 4 KiB sector in RAM.
+Data sectors are erased and checked before their first page is programmed.
 Final commit rereads the complete path and payload and verifies their CRC.
 The successor marker is checked after any final-sector retirement has changed
 the physical mapping. Formatting uses a separate 256-byte metadata buffer.
@@ -444,26 +459,33 @@ files must fit in one of the two banks, including two 4 KiB metadata sectors per
 record's sector-aligned metadata and payload. A single file therefore cannot
 use the entire partition. The volume still supports at most 32 physical paths.
 
-`ArdFSFile::write()` accepts bytes into a dynamic 4 KiB sector buffer. The
-active writer and its compaction copies share one allocation, released after
-successful commit or on close;
-read handles allocate no sector buffer. The complete current sector stays in RAM
-until incremental program and read-back verification succeed. A failed program or verification retries that uncommitted sector from the buffer.
+`ArdFSFile::write()` queues input in slices of at most 256 bytes and drains it
+through a 256-byte program cache. That cache and a separate 256-byte relocation
+scratch share one 512-byte allocation between the active writer and its
+compaction copies, released after successful commit or on close. The writer
+also owns its input queue and control state; the drained queue is reused for
+the generated header. 512 bytes
+is the shared buffer allocation, not total filesystem RAM. Read handles allocate
+no program cache. Each page remains cached until program/read-back succeeds.
+A failed program or verification retries that page without erasing its prefix.
 After two failed attempts at the same physical location, the writer retires that
-sector in the pending bank map, skips to the next healthy physical sector and
-replays the cached data. Erase failures in unused destination space are retired
+sector in the pending bank map, allocates another free physical sector and
+copies the previously verified prefix from flash in bounded pages and replays
+the dirty cache page. If that prefix cannot be read, the operation fails and
+the previous committed file remains visible. Erase failures in unused destination space are retired
 too. A missing spare, a full map or an unrecoverable commit/metadata error fails
 the operation instead of overwriting an existing committed file. Source callbacks are not re-entered for a
 sector retry; their existing repeated-offset contract for JSON validation,
 deduplication and end-to-end verification still applies.
+Root metadata is generated in bounded pages in its erased prefix; finalization
+does not reread and erase an entire root sector. Relocation regenerates the
+header and sector list for the new root address. New writes use format V4.
 `flush()` checks the data against the producer checksum and publishes the
 commit marker; `close()` abandons any uncommitted write. Reads and compaction
 also use bounded buffers. Compaction publishes its new bank only after copying
-the other live files and committing the replacement. Version-1 ArdFS banks remain
-readable. The first successful write migrates an old bank through the other bank
-to version 2, preserving the old snapshot until publication. Version 2 reserves
-one additional 4 KiB metadata sector per bank; migration can fail safely if the
-live files no longer fit. Older firmware does not understand version-2 banks.
+the other live files and committing the replacement. Only version-4 banks are supported. Older formats fail mounting without automatic
+formatting or migration. Existing V1–V3 installations require explicit formatting
+and re-uploading their files before use with this firmware.
 
 After mounting, `writeFile()` and `readFile()` only queue work. Their `loop()`
 phases perform at most one logical transfer of up to 256 bytes or erase one
@@ -485,36 +507,87 @@ they automatically prepare, queue input and commit in bounded steps.
 The public step methods return 0 while pending, 1 when complete and -1 on error.
 Do not write while preparation or commit is pending.
 
-## Bad-sector maps and fragmented input
+## Fragmented files and bad sectors
 
-Each version-2 bank has its own ordered list of up to 32 retired data sectors,
-a bank generation and a map revision. Logical file addresses are translated
-through that bank's map. Adding a failed sector in the unused write tail does
-not move already committed records. Compaction constructs the other bank with
-its own map; it never applies a destination map to source-bank reads.
+Version 4 stores each file in an ordered list of physical 4 KiB sectors. Deleting
+A releases its sectors for C even when B lies between the available holes. Saving
+C does not rewrite B. An open reader pins the old sectors until it closes;
+replacement writes publish a new file atomically before releasing the old one.
+Deletion publishes only metadata. Rename copies the renamed file.
 
-Maps are checksummed, committed and mirrored in two reserved metadata sectors.
-Normal publication replaces the older copy, verifies/commits it, then refreshes
-the mirror. Publication never erases the only valid map copy. If one metadata
-sector fails, the surviving sector uses an append-only emergency log; torn log
-entries are skipped. A failed metadata sector can be excluded while publishing
-in the other one. Interrupted/uncommitted map revisions are ignored on mount.
-No automatic format is attempted after an ambiguous corruption or I/O failure.
-Only a partition verified completely erased is initialized automatically.
+Each bank retains its own generation and list of up to 32 retired sectors.
+A failed write is retried in a free sector using the cached page and the
+previously verified prefix read from flash. An unreadable prefix aborts the
+write. Existing unreadable committed data cannot be reconstructed without
+another valid copy. Retirement removes 4 KiB from the affected bank's capacity.
 
-Retiring a data sector removes 4 KiB from that bank's usable capacity. Existing
-unreadable committed data cannot be reconstructed without another valid copy;
-read errors do not silently retire or reinterpret committed file data.
+Two metadata sectors normally contain mirrored, checksummed catalog logs. Their
+physical locations move through the same free-sector allocator as file data.
+Each log holds sixteen 256-byte snapshots. When a log fills, the writer reserves
+a free sector, erases and verifies it, then commits a replacement before releasing
+the old sector. Former metadata sectors can subsequently hold file data,
+including sectors 0 and 1. There is no fixed bootstrap-pointer sector.
 
-A writer can accept arbitrary consecutive fragments across application turns,
-including an unknown final length through low-level `open(path, "w")`. Its buffer
-retains the partial sector until more bytes arrive or `flush()` finalizes the
-file. Input slices must remain valid only until `write()` accepts them. Drain
-`writeStep()` between slices to keep flash work cooperative. Fragment boundaries
-are independent of physical sector boundaries. Interrupted/abandoned writes
-preserve the previous committed version. Writers remain append-only within a
-new record; modifying the middle of an already committed file is a future API
-operation and must preserve copy-on-write publication.
+Mount searches both banks in bounded steps, selecting the newest committed
+catalog by bank generation and publication sequence. It skips sectors identified
+as file roots or continuation data. Catalog sectors and sectors with an erased
+first type word may require scanning all log slots, including slots after an
+uncommitted first entry. Unknown non-erased types do not expose the remaining
+sector payload to discovery, including after a single-bit type fault. Catalogs identify
+their own physical address and pair. Data-sector types are programmed and verified
+before any user payload. This prevents file bytes that resemble valid catalogs
+from being interpreted as metadata, including during torn writes.
+
+The spare bank remains reserved. Collection is used for insufficient data or
+metadata working space; a destination pinned by a reader cannot be overwritten.
+A full log needs a temporary free sector during rotation. An abandoned log that
+fills unnoticed can fail one publication and force collection on the next attempt.
+Normal publication finishes with two copies; a fault can prevent completion even
+when the first copy has already made the complete new file durable.
+
+Mount accepts V4 only. Each continuation sector reserves four bytes for its type;
+for N sectors the payload bound is `4092*N + 4 - 32 - pathBytes - 2*N`.
+The sector table must still fit in its root: at most
+`floor((4096 - 32 - pathBytes - 2) / 2)` sectors.
+
+Catalog/file CRCs, generation and publication revisions prevent silent use of
+stale allocation snapshots. An unknown read failure during discovery fails mount
+with EIO, even when another catalog is readable: the unreadable region might
+contain a newer catalog. Known retired sectors recorded for that bank are
+excluded. No automatic format follows ambiguous corruption or I/O failure; only
+a usable filesystem region verified erased is initialized. If publication cannot resolve an
+uncertain commit, the volume is invalidated; clear the fault and call `begin()`
+to remount. Discovery is more expensive than reading two fixed metadata sectors.
+
+A writer accepts consecutive input slices, including unknown-length low-level
+`open(path, "w")` writes. Input memory is needed only until `write()` accepts it.
+Drain `writeStep()` between slices and finalize with `flush()`. This API replaces
+a whole file; in-place edits of an existing file are not supported. Physical
+fragmentation is independent of input slice boundaries.
+
+### Flash wear distribution
+
+Allocation continues from a per-bank circular cursor, skipping occupied, pinned
+and retired sectors. Cursor updates use the existing catalog publication; they
+cause no separate flash write. V4 catalogs store the cursor, erase budget and physical metadata locations.
+These fields are required; missing or invalid fields report a mount error.
+
+Transaction erase attempts, including retries and metadata erases, count toward
+a bank's maintenance budget. After `8 * (bankSectors - 2)` attempts, the next
+payload write may collect live files into the other bank even when the active
+bank still has space. This reuses normal copy-on-write publication and the shared
+512-byte cache/scratch allocation. Formatting does not count toward the budget;
+starting a bank collection resets the destination's budget.
+
+Optional collection is deferred while readers pin the destination, the known healthy destination capacity cannot hold
+the resulting files and replacement metadata. A collection required for space or recovery retains
+its existing error behavior. Deletion alone does not trigger wear maintenance.
+
+This is approximate wear distribution, not a persistent erase counter for every
+sector. Unpublished progress can be lost on power failure. Stationary files are
+moved periodically; metadata logs also rotate through available sectors.
+Collection introduces additional writes and can extend a transaction's total
+duration; individual steps remain bounded.
 
 ## Low-level volume and file API
 
@@ -530,22 +603,26 @@ application-level alternating JSON envelopes.
 | `format()` | Discard volume records; bool success |
 | `exists(path)` | C-string path; bool existence when mounted |
 | `open(path, mode, length, deferred)` | C-string path and `"r"`/`"w"`; supply exact write length for efficient reservation; move-only `ArdFSFile`, false on failure. Without length, write capacity is reserved from available bank space. `deferred=true` queues preparation for `prepareStep()`. |
-| `maxFileBytes(pathBytes)` | Upper bound for one physical record on a mounted volume; other files and sector rounding can reduce available space |
+| `maxFileBytes(pathBytes)` | Upper bound for one file on a mounted volume; other files and sector rounding can reduce available space |
 | `lastError()` | Last internal integer error code |
 | `ArdFSFile::operator bool()` | Whether the handle is open |
 | `size()` | File byte length |
 | `read(uint8_t* destination, size_t count)` | Number read; negative on failure |
 | `write(const uint8_t* source, size_t count)` | Bytes accepted into the buffer; zero on refusal; not confirmation of flash persistence |
-| `writeStep()` | Drain queued bytes/program and verify a full sector; -1 error, 0 pending, 1 ready for another slice |
+| `writeStep()` | Drain queued bytes/program and verify cache pages; -1 error, 0 pending, 1 ready for another slice |
 | `prepareStep()` | One preparation/compaction step; -1 error, 0 pending, 1 ready |
 | `flushStep()` | One verification/commit step; -1 error, 0 pending, 1 committed |
 | `flush()` | Synchronously drain verification/commit steps; bool success |
 | `close()` | Release the handle and abandon an uncommitted write; bool success |
 
-Read handles allocate only the volume pointer, address, length, cursor and access
-flag. The 256-byte transfer buffer, record header and commit/compaction state are
-allocated only for writers. Writers additionally allocate one dynamic 4 KiB sector
-buffer, shared with compaction copies. Read handles remain independent of the sector buffer.
+Read handles have a 24-byte fixed header on ESP8266/ESP32 plus two bytes per
+physical sector. They own no transfer buffer. Writers share one 512-byte
+allocation (256-byte cache plus 256-byte relocation scratch) with collection
+copies. Input queues and control state are additional; the drained input queue
+also holds the generated header during publication. The volume lazily allocates one reference
+count byte per physical sector of each initialized bank (up to two banks).
+Index entries store the path and two bytes per file sector. Unknown-length
+writers reserve a provisional sector table and shrink it when finalized.
 
 File handles cannot be copied. Do not mount independently overlapping volumes
 alongside the portal. Formatting affects all files in that volume.
@@ -637,17 +714,19 @@ batch. The existing storage error/status API exposes a failed repair.
 
 `ArdFS::remove(path, callback)` and `rename(source, destination, callback)` queue
 physical file operations. Call `loop()` until completion and check `result.ok`.
-The destination must not exist. These operations reuse cooperative bank compaction:
-each loop transfers at most 256 bytes or erases one sector. The bank is published
-atomically, including deletion of the last file. Renaming copies file contents,
-so total completion time depends on all live files, while each step stays bounded.
+The destination must not exist. Deletion publishes a catalog without copying
+payload. Rename copies the renamed file; collection may additionally copy live
+files if space is exhausted. Publication is
+atomic, including deletion of the last file. Each loop performs a bounded flash
+transfer or sector erase.
 JSON documents use two physical paths (`path` and `path + ".journal"`); these
 methods operate on one physical path and do not rename/remove a JSON pair together.
 
 `fileCount()` and `fileInfo(index, path, size)` enumerate physical files from RAM,
 including journal copies. Order is unspecified and can change after a mutation;
 check the boolean result of `fileInfo()`. `totalBytes()` reports one usable bank,
-`usedBytes()` counts live records rounded to sectors (including path/header), and
+`usedBytes()` counts occupied sectors (including reader pins, staged allocations
+and quarantined records in fragmented formats), and
 `freeBytes()` is their difference after reclaiming obsolete records. These are
 zero before mounting. Free bytes include the metadata needed for new records;
 they are not a guarantee that a payload of that exact size will fit. The 32-file

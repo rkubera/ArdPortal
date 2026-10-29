@@ -22,6 +22,10 @@ MQTT/HA topics, networking, HTTP memory, runtime state, callbacks and frontend
 behavior. Native suites use AddressSanitizer and UndefinedBehaviorSanitizer;
 CI disables leak detection to match the existing cross-platform fixtures.
 
+`python3 tests/asset-crc-test.py` compares shared CRC combination and byte
+updates against Python zlib, including empty inputs and cache/page boundaries.
+`portal-profile-assets-test.py` also checks complete gzip assets emitted by C++.
+
 The job also tests generated gateway exports with the versions listed in
 `requirements-host.txt`, zigbee-herdsman-converters 26.115.1 and the actual
 Zigbee2MQTT 2.14.2 Home Assistant Discovery mapper. To run those tests locally,
@@ -122,3 +126,37 @@ Run `bash tests/run-littlefs-storage.sh` for sanitizer-enabled tests of both cor
 API variants, journal validation/repair/deduplication, interrupted writes, raw
 files, mutations, format/mount errors, native-header exclusion and Portal config /
 AppConfig persistence using a sketch-local backend define.
+
+## Native ArdFS fragmentation
+
+`bash tests/run-config-memory.sh` includes ESP8266 and ESP32 fault-injecting
+flash fixtures. Fragmentation cases allocate a seven-sector file across three
+separate holes and assert that neighboring files are not rewritten. They cover
+bad cells, root relocation, reader pins, old-format rejection, stale catalogs,
+uncertain publication/remount, zero capacity, and every I/O interruption with
+torn operations. AddressSanitizer and UndefinedBehaviorSanitizer are enabled.
+
+## Native ArdFS small write cache
+
+`bash tests/run-config-memory.sh` exercises the writer with 4 KiB allocations
+rejected, using a shared 256-byte cache plus 256-byte relocation scratch.
+ESP8266/ESP32 fixtures cover late program failures after a verified prefix,
+a second failed relocation destination, unreadable-prefix rollback, root commit
+relocation, metadata spanning multiple pages, and unknown-length reservations
+with a metadata prefix larger than one cache page. Existing power-cut sweeps
+also run against this writer. The cache size is independent of the V4 metadata layout.
+
+The native wear-leveling fixtures additionally check circular allocation across
+restart, static-file bank cycling, reader/capacity maintenance deferral, rejection of missing wear fields, every I/O cut during maintenance, and a 300-sector
+occupied range requiring multiple bounded allocation-scan steps. Test-only erase
+counters distinguish data-sector distribution from metadata-sector wear.
+
+`moving-metadata.cpp` covers moving catalog pairs across the whole bank,
+reclamation of original header sectors for data, full/abandoned log handling,
+program/read/erase/silent-erase retirement, catalogs with no first-slot record,
+and rejection of independently constructed V1–V3 fixtures without writes. It stores CRC-valid fake
+V4 and legacy catalogs in raw payloads, including continuation sectors 0/1;
+head- and tail-only torn programs and single-bit type corruption must not
+promote payload into catalog records. Native
+header buffers carry explicit alignment; ASan/UBSan tests exercise aligned word
+access alongside arbitrary byte/sector-table reads.
