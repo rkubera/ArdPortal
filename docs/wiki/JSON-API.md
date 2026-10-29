@@ -90,7 +90,7 @@ For settings and commands, validate types and ranges before using values. Do not
 interpret `asDouble()==0` as proof that a missing/malformed field really is zero:
 
 ```cpp
-// README example: checked JSON parsing and application bounds.
+// Checked JSON parsing and application bounds.
 ArdJSON::Limits limits;
 limits.maxInputBytes = 512;
 limits.maxOutputBytes = 512;
@@ -150,6 +150,62 @@ if (patch.isObjectPatchValid() && settings.applyObjectPatch(std::move(patch))) {
   // text is {"period":120}; check error before persisting/publishing.
 }
 ```
+
+## Incremental DOM parsing
+
+`ArdJSON::StreamParser` builds a `JSONVar` tree from consecutive input slices.
+Include `ArdJSON.h` or `JsonDocumentStream.h`. The parser owns its partial tree;
+input buffers only need to remain valid during `input()`.
+
+| API | Contract |
+| --- | --- |
+| `StreamParser(const Limits& limits = Limits())` | Create a parser with per-document budgets. |
+| `void reset(const Limits& limits = Limits())` | Release the partial document and initialize a parser for another input. |
+| `bool input(size_t offset, const uint8_t* bytes, size_t length)` | Consume a slice. Offset starts at zero and must equal the total number of previously accepted bytes. Returns false on syntax, allocation or budget failure. |
+| `JSONVar take()` | Validate end of input and move out the completed tree. Returns Undefined on failure. Call once per document, then reset before reuse. |
+| `const char* error() const` | Failure description, or nullptr. |
+| `size_t offset() const` | Current byte offset for error reporting. |
+| `size_t nodes() const` | Number of DOM values encountered. |
+
+```cpp
+ArdJSON::StreamParser parser;
+const char first[] = "{\"enabled\":";
+const char second[] = "true}";
+bool accepted = parser.input(0, reinterpret_cast<const uint8_t*>(first), sizeof(first) - 1);
+if (accepted) {
+  accepted = parser.input(sizeof(first) - 1,
+                          reinterpret_cast<const uint8_t*>(second), sizeof(second) - 1);
+}
+auto value = parser.take();
+if (accepted && !parser.error() && value.isValid()) {
+  bool enabled = value["enabled"].asBool();
+  // Apply enabled to the application.
+}
+```
+
+Slice boundaries may occur inside strings, UTF-8 sequences, escapes and numbers.
+The parser retains the complete DOM, so node and string memory still grows with
+the document. Keep external side effects pending until `take()` succeeds.
+
+## Incremental syntax validation
+
+`ArdJsonStream` in `JsonStream.h` validates syntax and emits events without
+retaining payload values. Construct it with `maxDepth=16` and `checkKeys=true`
+by default. Duplicate-key detection retains 64-bit hashes for keys of currently
+open objects; a hash collision rejects input. Disabling `checkKeys` disables
+that duplicate check. The hard depth ceiling is 32.
+
+Supply a listener with signature `bool(Event event, uint8_t byte, unsigned depth)`
+to `input(byte, listener)` and `finish(listener)`. Return false to stop processing.
+`inputByte(byte, Listener)` and `finishInput(Listener)` accept an explicit
+context/function-pointer listener. Events identify container boundaries, key,
+string and number boundaries/bytes, and literals. Key/string bytes are decoded
+UTF-8; number bytes preserve the lexeme. Literal events carry `t`, `f` or `n`.
+
+Call `finish()` after the final byte to detect incomplete input. Inspect `failed`,
+`error` and `outOfMemory`. `reset(maxDepth=16, checkKeys=true)` releases retained
+key metadata and prepares another document. Listener rejection sets `failed`;
+applications should retain their own callback error when needed.
 
 `Parser`, `Writer` and `ObjectKey` are implementation classes. Prefer the public
 `JSON` facade and `JSONVar` APIs. Allocation failure does not mean a numeric value

@@ -5,6 +5,7 @@
 ## On this page
 
 - [Optional modules](#optional-modules)
+- [Storage backend](#storage-backend)
 - [Definition budget](#definition-budget)
 - [Network memory reserves](#network-memory-reserves)
 - [Zigbee](#zigbee-esp32-c5c6h2)
@@ -48,7 +49,7 @@ To omit dynamic forms entirely, add `#define ARDPORTAL_ENABLE_DYNAMIC_PAGES 0`
 before `ArdPortal.h`. It defaults to `1`. `startAppConfigPageRegistration()`, `setAppConfigStateValue()`
 and `emitAppConfigEvent()` then return false and `onAppConfigCommand()` is a no-op. Generic
 `getAppConfigValue()`, `setAppConfigValue()`, `removeAppConfigValue()` and their
-change callback remain available and persist through ArdFS. When Console is
+change callback remain available and persist through the selected storage backend. When Console is
 also disabled, WebSocket handling and buffers are omitted as well.
 
 Disabling MQTT automatically forces HA off; Console diagnostics can remain
@@ -59,7 +60,7 @@ unit, so sketch defines apply to its modules and compressed web assets on both
 ESP8266 and ESP32. Include `ArdPortal.h` only in the main `.ino`. Additional
 application `.cpp` files can include `ArdPortalDeclarations.h` for declarations;
 use the same feature defines before that include if they access portal objects.
-ArdFS remains separately compiled because it has no portal feature switches.
+The storage backend follows `ARDPORTAL_USE_LITTLEFS`.
 
 ### Optional field types
 
@@ -134,6 +135,31 @@ Compiler-selected DEFLATE blocks form a single gzip stream with one checksum
 and footer. The HTTP response has the exact total size, and the browser decodes
 it as one CSS, JavaScript or JSON document. No additional compression profile is
 needed for a custom selection of controls.
+
+## Storage backend
+
+`ARDPORTAL_USE_LITTLEFS` selects the filesystem for PortalConfig, AppConfig,
+raw files and storage maintenance on ESP8266 and ESP32.
+
+| Define | Default | Effect |
+| --- | --- | --- |
+| `ARDPORTAL_USE_LITTLEFS` | `0` | `0` selects native ArdFS; `1` selects the Arduino core LittleFS backend. Only `0` and `1` are accepted. |
+
+```cpp
+#define ARDPORTAL_USE_LITTLEFS 1
+#include <ArdPortal.h>
+```
+
+Set the flag before including Portal headers, with the same value in every
+application translation unit. The Portal configuration API and storage callbacks
+apply to either backend. Standalone `ArdFS` uses the native filesystem.
+
+LittleFS uses the board's filesystem region on ESP8266 and the default `spiffs`
+partition on ESP32. Its volume must be formatted as LittleFS. Mount failure does
+not automatically format the partition; explicit storage formatting erases its
+contents. Do not mount overlapping flash regions with multiple filesystem
+instances. See [Storage API](https://github.com/rkubera/ArdPortal/wiki/FS-API#selecting-littlefs)
+and the [LittleFS example](https://github.com/rkubera/ArdPortal/blob/main/examples/LittleFS/LittleFS.ino).
 
 ## Definition budget
 
