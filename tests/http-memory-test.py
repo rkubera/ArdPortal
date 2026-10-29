@@ -58,4 +58,4 @@ int main(){
 '''
 with tempfile.TemporaryDirectory(prefix='ardportal-http-memory-') as tmp:
  tmp=Path(tmp);(tmp/'test.cpp').write_text(fixture+func+main)
- subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),'-o',str(tmp/'test')],check=True);subprocess.run([str(tmp/'test')],check=True)
+ subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),str(root/'src/JsonStream.cpp'), str(root/'src/JsonDocumentStream.cpp'), '-o',str(tmp/'test')],check=True);subprocess.run([str(tmp/'test')],check=True)

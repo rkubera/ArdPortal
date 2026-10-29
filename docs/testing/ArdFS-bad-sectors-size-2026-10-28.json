@@ -1,0 +1,803 @@
+{
+  "date": "2026-10-28",
+  "baseline_commit": "e59072c9d6a0849e790cf0e50f71f84404d0f6e5",
+  "example": "DynamicPages",
+  "artifacts": "/tmp/ardfs-sector-size-20261028",
+  "validation": {
+    "config_memory_suite": "passed with address/undefined sanitizers",
+    "littlefs_storage_suite": "passed",
+    "map_power_cut_cases_including_torn_operations": 570,
+    "map_test_geometries": [
+      262144,
+      524288
+    ],
+    "raw_file_io_cut_points": 2518,
+    "large_json_io_cut_points": 3710,
+    "native_journal_io_cut_points": 46,
+    "startup_repair_io_cut_points": 24,
+    "legacy_migration_cuts": "passed",
+    "irregular_unknown_length_fragments": "passed",
+    "metadata_read_and_write_failover": "passed",
+    "map_entry_limit_32_and_33rd_rejection": "passed",
+    "subsequent_writes_after_map_cut": "passed",
+    "late_corruption_and_last_sector_retirement": "passed",
+    "temporary_72_byte_names": "passed",
+    "mount_oom_injection": "ArdAllocation hook replaces obsolete String reserve hook",
+    "metadata_erase_after_abandoned_publication": "passed, explicit and silent erase failures"
+  },
+  "optimization": {
+    "artifacts": "/tmp/ardfs-sector-opt-20261028",
+    "retained": "pass13",
+    "trials": {
+      "pass1": {
+        "esp8266": {
+          "firmware_bytes": 589024,
+          "sha256": "6ba9596bc095065f02742a6daf05f1d9d4d0f99a5eb426156d903df90ef53dc0",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass1.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1279472,
+          "sha256": "00859d72cefc7c723f132d090f38d2f12886d535acdc6b5c5163ae7bbddd6b3c",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass1.log"
+        }
+      },
+      "pass2": {
+        "esp8266": {
+          "firmware_bytes": 588816,
+          "sha256": "255c848d758ecef864572364028f0978fb8c86e588a7e8c4f30893c320620b0a",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass2.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1279168,
+          "sha256": "ee270f24e8aa2a40abb15a6baaaf582360ab300404cf5a40cbaa2c26a307c97a",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass2.log"
+        }
+      },
+      "pass3": {
+        "esp8266": {
+          "firmware_bytes": 588576,
+          "sha256": "82f9889553f734cfdb8a9d5910254fbd84bcadce98bd01b9ac95a8449755585f",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass3.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1279072,
+          "sha256": "a25e682d02888d6736c709c6f2a3a3877cff294266e103a74029b7e1526ac9fc",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass3.log"
+        }
+      },
+      "pass4": {
+        "esp8266": {
+          "firmware_bytes": 588576,
+          "sha256": "82f9889553f734cfdb8a9d5910254fbd84bcadce98bd01b9ac95a8449755585f",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass4.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1279072,
+          "sha256": "7c3e740194325f0bc61c8090918cdf3094df4e3ea51ddaddcae63d9be9ceace7",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass4.log"
+        }
+      },
+      "pass5": {
+        "esp8266": {
+          "firmware_bytes": 588576,
+          "sha256": "02de4ec2bbf2b9a84ef24e33e83c2025c7ee7dec6fe312b1faa7d43040ead12e",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass5.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1279040,
+          "sha256": "7ef232aac06241dd0163500d03c1f26d3f7f8e786f37f6f5a92c447f6dadc189",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass5.log"
+        }
+      },
+      "pass6": {
+        "esp8266": {
+          "firmware_bytes": 588688,
+          "sha256": "9d207611c8040e39100af9b3215865090efaa449164cab1b063ebb9e61da0ded",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass6.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1279104,
+          "sha256": "eb201de1cfce4f13c4eab79576d8b21e598ebeee5c8441ebeda9ebc1bd593048",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass6.log"
+        }
+      },
+      "pass7": {
+        "esp8266": {
+          "firmware_bytes": 588544,
+          "sha256": "715b1b8868f8709dbe854073741d47412c384a4a382ee5072ff5670a3664f7c9",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass7.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1278960,
+          "sha256": "bffd8024032162d8f18725dc6506a383e83915186bda1de6e8dc873538237e54",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass7.log"
+        }
+      },
+      "pass8": {
+        "esp8266": {
+          "firmware_bytes": 588448,
+          "sha256": "b0b25609db196f090db59b5f14b47e8c64e342083b24b55e0c21f7b2fcaa589e",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass8.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1278896,
+          "sha256": "333d075347d18f5113a4af15bbe51acd15dfe05490e53cbb378d6909c0f39fc9",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass8.log"
+        }
+      },
+      "pass9": {
+        "esp8266": {
+          "firmware_bytes": 588544,
+          "sha256": "2e0a8f50211f98e51d8ce62c4027fee9e451a8812336c0e80b9310b6e812420f",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass9.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1278960,
+          "sha256": "999c6b8d698a29aadf2ab1f6577f962b178824ceaacbaa2c4fc03a659e8d163d",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass9.log"
+        }
+      },
+      "pass10": {
+        "esp8266": {
+          "firmware_bytes": 588544,
+          "sha256": "6a51db89387c909473694cfeda507cc6981537e591dfe7a67657236f6dcad0bb",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass10.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1278896,
+          "sha256": "52ccfbcb50ff2737eb8274bd6d172219662aa9c01365867d2b2741932485f530",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass10.log"
+        }
+      },
+      "pass11": {
+        "esp8266": {
+          "firmware_bytes": 588576,
+          "sha256": "1b0c7f686ab35fa25fcff7a9562cb9babfce2be8956eff8c3318fc627ca8e484",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass11.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1278896,
+          "sha256": "9cc11c913c462970845f71c4e90f092cd73daec76f2d673bc578dcf213c3d964",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass11.log"
+        }
+      },
+      "pass12": {
+        "esp8266": {
+          "firmware_bytes": 588512,
+          "sha256": "c6107406a5ebae5ce74ad5bde1508d2b3eaf02f87f389352740e71790eab16ba",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass12.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1278944,
+          "sha256": "a5c4582db609e6bfed6993f87e3c837f97260df68f53448c5118f6826ac3ed6f",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass12.log"
+        }
+      },
+      "pass13": {
+        "esp8266": {
+          "firmware_bytes": 588480,
+          "sha256": "f75f101d3ae697a54b431bfa9a3027bbf311c37c7853cff1c774978a76dfe060",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp8266-pass13.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1278816,
+          "sha256": "7d760279737c7483ffdcf53652248ce3b5809c8bcd695847b93c36b08baa424d",
+          "log": "/tmp/ardfs-sector-opt-20261028/esp32-pass13.log"
+        }
+      }
+    },
+    "source_hashes": {
+      "src/ArdFSVolume.h": "4f39e152e6b08108a6d728fe186fe46097dc0744d5ab855c1ef8f6cd8ad33797",
+      "src/ArdFSVolumeImpl.h": "dd032259e5b8d9615795af90653c83c5c8243ab256d2abc6f4834c94f6554a6d",
+      "src/ArdStorage.h": "bc7ee11d7aa94aaddca370f2966e75acea5412db75dc03e006bc03563d4b6e95",
+      "src/ArdStorageImpl.h": "6bbababd0ed93cc95c301487bd491c1b3493f0f14f138465e2fca38a66a99ad9",
+      "src/ArdLittleFSVolume.h": "aee925990eb6ffc4a41ba3aa92876823033d69c4969bc01bbca4ec74673b2765"
+    },
+    "esp8266": {
+      "initial_complete_firmware": 589312,
+      "optimized_firmware": 588480,
+      "saved_bytes": 832,
+      "remaining_growth_bytes": 3968,
+      "remaining_growth_percent": 0.6788568925873207,
+      "static_ram_after": 43708
+    },
+    "esp32": {
+      "initial_complete_firmware": 1279584,
+      "optimized_firmware": 1278816,
+      "saved_bytes": 768,
+      "remaining_growth_bytes": 3792,
+      "remaining_growth_percent": 0.2974061664721605,
+      "static_ram_after": 57692
+    },
+    "validation": {
+      "full_config_suite": "passed with address/undefined sanitizers",
+      "littlefs_suite": "passed",
+      "portable_codec_path": "passed with byte-order macro undefined after standard headers",
+      "silent_erase_faults": "passed",
+      "resuming_writes_after_every_map_cut": "passed"
+    }
+  },
+  "initial_targets": {
+    "esp8266": {
+      "static_ram_before": 43516,
+      "static_ram_after": 43708,
+      "reader_payload_bytes": 20,
+      "writer_payload_bytes": 412,
+      "sector_buffer_bytes": 4096,
+      "variants": {
+        "before": {
+          "firmware_bytes": 584512,
+          "sha256": "26fec5a184c3ec7a85c28fe0773fa7a53ca969bdbc11302fcfa7859edf0d1d53",
+          "log": "/tmp/ardfs-sector-size-20261028/esp8266-before.log"
+        },
+        "after": {
+          "firmware_bytes": 585328,
+          "sha256": "b6b26467ab05631c6b057a9736dadb753051cf114252a0d8a8a46b6aa5ff71fa",
+          "log": "/tmp/ardfs-sector-size-20261028/esp8266-after.log"
+        },
+        "mapped": {
+          "firmware_bytes": 589040,
+          "sha256": "88d0e7a116f513b7a709cb0ae25969a814b7942951d2f86663115f0a94473958",
+          "log": "/tmp/ardfs-sector-size-20261028/esp8266-mapped.log"
+        },
+        "mapped-final": {
+          "firmware_bytes": 589392,
+          "sha256": "7043d767e39049c138f11cd19bdc3de249fbfc62054091429ffaf7b455bab89f",
+          "log": "/tmp/ardfs-sector-size-20261028/esp8266-mapped-final.log"
+        },
+        "mapped-opt": {
+          "firmware_bytes": 589280,
+          "sha256": "5f96737931fefe04ab90171f0558e84dc3fdb92605b5d465642404c419f1a498",
+          "log": "/tmp/ardfs-sector-size-20261028/esp8266-mapped-opt.log"
+        },
+        "final": {
+          "firmware_bytes": 589312,
+          "sha256": "99775b9828fac5b3996159c8d05657ebbb22fb4c02c0143c46eee8087e544297",
+          "log": "/tmp/ardfs-sector-size-20261028/esp8266-final.log"
+        }
+      },
+      "firmware_growth_bytes": 4800,
+      "firmware_growth_percent": 0.8211978539362751
+    },
+    "esp32": {
+      "static_ram_before": 57508,
+      "static_ram_after": 57700,
+      "reader_payload_bytes": 20,
+      "writer_payload_bytes": 416,
+      "sector_buffer_bytes": 4096,
+      "variants": {
+        "before": {
+          "firmware_bytes": 1275024,
+          "sha256": "31ee9bd49b6d7b4d227256cf8a8593382f4eae66ed3d98f5744f36ffcfe2a397",
+          "log": "/tmp/ardfs-sector-size-20261028/esp32-before.log"
+        },
+        "after": {
+          "firmware_bytes": 1275984,
+          "sha256": "a7457d10e172827f5e7885e8006929c58a48e06681c9720580d97198897a3cbf",
+          "log": "/tmp/ardfs-sector-size-20261028/esp32-after.log"
+        },
+        "mapped": {
+          "firmware_bytes": 1279200,
+          "sha256": "bb088f47123fb73038927f0638c3bb14f40f6a6bb28bb02f08995e4ab390f346",
+          "log": "/tmp/ardfs-sector-size-20261028/esp32-mapped.log"
+        },
+        "mapped-final": {
+          "firmware_bytes": 1279664,
+          "sha256": "083972763900366d312165e3ececa5689bd473867e51abc9c4b3b42a316b4801",
+          "log": "/tmp/ardfs-sector-size-20261028/esp32-mapped-final.log"
+        },
+        "mapped-opt": {
+          "firmware_bytes": 1279536,
+          "sha256": "37b978ba6b9e7f4081a4148c70c25325c7a31f7a9be231a241c26dafe3b6003b",
+          "log": "/tmp/ardfs-sector-size-20261028/esp32-mapped-opt.log"
+        },
+        "final": {
+          "firmware_bytes": 1279584,
+          "sha256": "434ccdad6c5cae759d1ab33d7e79dc4f4cc0a9af818379ed8a276b9225565336",
+          "log": "/tmp/ardfs-sector-size-20261028/esp32-final.log"
+        }
+      },
+      "firmware_growth_bytes": 4560,
+      "firmware_growth_percent": 0.3576403267703196
+    }
+  },
+  "initial_source_hashes": {
+    "src/ArdFSVolume.h": "0d7cacab21614f07a784b7043f298fe73ba698a68a55d55896744a7d7c4faa76",
+    "src/ArdFSVolumeImpl.h": "bf59762e08a4d003e5442f0ffd716bc0708e295d036f1993c915e45f0379c205",
+    "src/ArdStorageImpl.h": "ade7efe19d033a6df2daa1cbdeb58840da89aa770d31a67efb071cae96190258",
+    "src/ArdLittleFSVolume.h": "22ea9b7312dfda294b4400fe4dbd02cd69d7550e2caced0c45fd4000f9e498a8"
+  },
+  "source_hashes": {
+    "src/ArdFSVolume.h": "7b4bb8b21ff8b760073b9916a7bf2f20dbb2f34e087b7e84e12532304b34d458",
+    "src/ArdFSVolumeImpl.h": "170774961736289bff66edbac1cdec96a43f8f30d3367cffe826f9f35ef685be",
+    "src/ArdStorage.h": "bc7ee11d7aa94aaddca370f2966e75acea5412db75dc03e006bc03563d4b6e95",
+    "src/ArdStorageImpl.h": "42879a154e465f967584086055cd09910d9c62ba5990f5410b96e49a02056908",
+    "src/ArdLittleFSVolume.h": "8ad8c0c9766cf47d5e0589e9dd79d63514fc9d5cc0d07cc1cb4bdf0bb2b6a1b7",
+    "src/ArdCRC.h": "4e3af2fd163b20fccd5da5abaae31ad95f957574fa5d60cc5c5cf34fb408e70f",
+    "src/JournalReader.cpp": "faccb31c8f5e5a699e35ca1a7ebf52c517a1cb2eed8503061b506d1d13a92014"
+  },
+  "targets": {
+    "esp8266": {
+      "initial_complete_firmware": 589312,
+      "previous_optimized_firmware": 587744,
+      "optimized_firmware": 587728,
+      "saved_bytes": 1584,
+      "saved_this_round_bytes": 16,
+      "remaining_growth_bytes": 3216,
+      "remaining_growth_percent": 0.5502025621373042,
+      "static_ram_after": 43628,
+      "reader_payload_bytes": 20,
+      "writer_fixed_bytes": 372,
+      "writer_name_bytes": "strlen(path)+1 in the same allocation",
+      "sector_buffer_bytes": 4096,
+      "format_buffer_bytes": 256
+    },
+    "esp32": {
+      "initial_complete_firmware": 1279584,
+      "previous_optimized_firmware": 1277296,
+      "optimized_firmware": 1277088,
+      "saved_bytes": 2496,
+      "saved_this_round_bytes": 208,
+      "remaining_growth_bytes": 2064,
+      "remaining_growth_percent": 0.16187930580130255,
+      "static_ram_after": 57612,
+      "reader_payload_bytes": 20,
+      "writer_fixed_bytes": 372,
+      "writer_name_bytes": "strlen(path)+1 in the same allocation",
+      "sector_buffer_bytes": 4096,
+      "format_buffer_bytes": 256
+    }
+  },
+  "optimization_round_2": {
+    "artifacts": "/tmp/ardfs-sector-opt-more-20261028",
+    "retained": "pass14",
+    "trials": {
+      "pass1": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass1.log",
+          "firmware_bytes": 588144,
+          "sha256": "81041e840a36a8f5123d9f3ccd2600d84dad5c69ee8f69f8016aa3db591d7e39"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass1.log",
+          "firmware_bytes": 1278448,
+          "sha256": "290c51e19acc5ba10699fc10c657d8d264758a786907757acab74d2bbe7fe00d"
+        }
+      },
+      "pass2": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass2.log",
+          "firmware_bytes": 588272,
+          "sha256": "8a1d0b5eafd7f67cd4b1e3353754851dd5b7b8e526bc8335df5fbb27b0000819"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass2.log",
+          "firmware_bytes": 1278656,
+          "sha256": "12053a4822c958ed192f0d1c95351a43dcf8d23dc517ee44a523a764a7aad89b"
+        }
+      },
+      "pass3": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass3.log",
+          "firmware_bytes": 587968,
+          "sha256": "0c59ffc7783c7e3c555537f31270c2b62f4df7919bc2954e83aaf33f01195dd8"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass3.log",
+          "firmware_bytes": 1278368,
+          "sha256": "019c8e3b34c8c1447ee411acf68c0bbb6d9a5b1703c4b7261678f2476a249ed8"
+        }
+      },
+      "pass4": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass4.log",
+          "firmware_bytes": 587952,
+          "sha256": "7c76fa7bcb0b5478713ff79f12528359b8140d8badc05ccc960571a43780f918"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass4.log",
+          "firmware_bytes": 1278384,
+          "sha256": "db80097c10bcd2d13a80584fc7c35d1a115119764b9265a2eb497cd8c013bb99"
+        }
+      },
+      "pass5": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass5.log",
+          "firmware_bytes": 587952,
+          "sha256": "9c9a61147864a53850180c6fa0dcaeac52fc4aca8f8eb056380cce6b367554d3"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass5.log",
+          "firmware_bytes": 1278368,
+          "sha256": "ad47784a001bc74876a98067b8b3f75876a67756e17a8e65b6fe940be5583724"
+        }
+      },
+      "pass6": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass6.log",
+          "firmware_bytes": 587968,
+          "sha256": "3cb798257216d6bc464f8357bc7c72cc39ee9e88ae2f163774a40000792675b1"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass6.log",
+          "firmware_bytes": 1278400,
+          "sha256": "2f85ca7413e300fede4f032df0a8c0473ef0a1337336aaa6ed7a3c53f5cb95c7"
+        }
+      },
+      "pass7": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass7.log",
+          "firmware_bytes": 587904,
+          "sha256": "a992dc4e020480d42792bf764432b66ce6f645127c59daf2afd54cf67347d748"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass7.log",
+          "firmware_bytes": 1278208,
+          "sha256": "67bf9ac70ddf56a2ecc89de9fb0a3a803f80243c1262d78ba4c09771d9775309"
+        }
+      },
+      "pass8": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass8.log",
+          "firmware_bytes": 587920,
+          "sha256": "26d5ab9aa820bf5fa81f375de117d27c62bfe70022d7607b926060734d08d4e5"
+        }
+      },
+      "pass9": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass9.log",
+          "firmware_bytes": 587872,
+          "sha256": "503ddbcf5794d54e89b315ccdf20c43b6977385d8562264334f6cfdf41b62773"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass9.log",
+          "firmware_bytes": 1278000,
+          "sha256": "716cf42caa9434e598982653c1a7d1ae5e17f99774b36d2e2e243ec432d4ebf7"
+        }
+      },
+      "pass10": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass10.log",
+          "firmware_bytes": 587984,
+          "sha256": "3b94016f06b22b162fe865e20a2136bddd567149a46bd5b97f5f2f44670579a1"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass10.log",
+          "firmware_bytes": 1277600,
+          "sha256": "90cbf1180d282f5f4c835158b0739b8422403c33ba0a6eb912c57ea489036ae0"
+        }
+      },
+      "pass11": {
+        "esp8266": {
+          "success": false,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass11.log",
+          "note": "Trial failed; disk exhaustion affected passes 11/12; not used for retained measurements."
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass11.log",
+          "firmware_bytes": 1277488,
+          "sha256": "a6f74520d44101e311a24f21958ff9557d3719a3e75c28c76b14d9fecc2e6bcc"
+        }
+      },
+      "pass12": {
+        "esp8266": {
+          "success": false,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass12.log",
+          "note": "Trial failed; disk exhaustion affected passes 11/12; not used for retained measurements."
+        },
+        "esp32": {
+          "success": false,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass12.log",
+          "note": "Trial failed; disk exhaustion affected passes 11/12; not used for retained measurements."
+        }
+      },
+      "pass13": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass13.log",
+          "firmware_bytes": 587856,
+          "sha256": "98a82f04f6611786e5749c4d7349505c3475d5b3dcc8880516d376e6c963facb"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass13.log",
+          "firmware_bytes": 1277440,
+          "sha256": "0dc883de6a8ec5e09d3f58540e81957e368c2bf788bf4ac46a1f5fd4a436a986"
+        }
+      },
+      "pass14": {
+        "esp8266": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp8266-pass14.log",
+          "firmware_bytes": 587744,
+          "sha256": "de3aa6c3a4a2952f8b4cb3818bc338990699f94c857fbfa5ead0ab55e3d994cf"
+        },
+        "esp32": {
+          "success": true,
+          "log": "/tmp/ardfs-sector-opt-more-20261028/esp32-pass14.log",
+          "firmware_bytes": 1277296,
+          "sha256": "9e2f5f7e85e9101683dfc80b2bc74920bc485842aebc8f2da24154b3bed6b437"
+        }
+      }
+    },
+    "source_hashes": {
+      "src/ArdFSVolume.h": "78800d6d8bfdbd2d58d4c70d5c0d9878f50b7fc97cb8d1f78945dc2405312849",
+      "src/ArdFSVolumeImpl.h": "4714a44a3a5a473c2311a76fa3c700bec9576b0768997e899b11d3107f330101",
+      "src/ArdStorage.h": "bc7ee11d7aa94aaddca370f2966e75acea5412db75dc03e006bc03563d4b6e95",
+      "src/ArdStorageImpl.h": "42879a154e465f967584086055cd09910d9c62ba5990f5410b96e49a02056908",
+      "src/ArdLittleFSVolume.h": "aee925990eb6ffc4a41ba3aa92876823033d69c4969bc01bbca4ec74673b2765",
+      "src/ArdCRC.h": "4e3af2fd163b20fccd5da5abaae31ad95f957574fa5d60cc5c5cf34fb408e70f",
+      "src/JournalReader.cpp": "faccb31c8f5e5a699e35ca1a7ebf52c517a1cb2eed8503061b506d1d13a92014"
+    },
+    "targets": {
+      "esp8266": {
+        "initial_complete_firmware": 589312,
+        "previous_optimized_firmware": 588480,
+        "optimized_firmware": 587744,
+        "saved_bytes": 1568,
+        "saved_this_round_bytes": 736,
+        "remaining_growth_bytes": 3232,
+        "remaining_growth_percent": 0.5529398883170918,
+        "static_ram_after": 43708,
+        "reader_payload_bytes": 20,
+        "writer_fixed_bytes": 404,
+        "writer_name_bytes": "strlen(path)+1 in the same allocation",
+        "sector_buffer_bytes": 4096,
+        "format_buffer_bytes": 256
+      },
+      "esp32": {
+        "initial_complete_firmware": 1279584,
+        "previous_optimized_firmware": 1278816,
+        "optimized_firmware": 1277296,
+        "saved_bytes": 2288,
+        "saved_this_round_bytes": 1520,
+        "remaining_growth_bytes": 2272,
+        "remaining_growth_percent": 0.17819272421538732,
+        "static_ram_after": 57684,
+        "reader_payload_bytes": 20,
+        "writer_fixed_bytes": 404,
+        "writer_name_bytes": "strlen(path)+1 in the same allocation",
+        "sector_buffer_bytes": 4096,
+        "format_buffer_bytes": 256
+      }
+    },
+    "changes": [
+      "Lazy data-sector erasure replaces full record reservation scan.",
+      "One small map-commit job shared by normal writes and formatting; format buffer 256 bytes.",
+      "Names share variable-size index/writer allocations, replacing String copies and mount-time String building.",
+      "One full path+data CRC readback before record publication; expected CRC combined from caller bytes.",
+      "A single bounded physical read with splitting in logical reader.",
+      "Successor marker checked after final data-sector retirement."
+    ],
+    "validation": {
+      "suite_log": "/tmp/ardfs-more-verified-suite.log",
+      "littlefs_log": "/tmp/ardfs-more-littlefs.log",
+      "native_bad_sector_cut_points": 570,
+      "raw_file_io_cut_points": 2518,
+      "large_json_io_cut_points": 3710,
+      "full_config_suite": "passed with address/undefined sanitizers",
+      "littlefs_suite": "passed",
+      "owned_maximum_length_names": "passed",
+      "late_corruption_and_final_sector_retirement": "passed"
+    }
+  },
+  "initial_validation": {
+    "config_memory_suite": "passed with address/undefined sanitizers",
+    "littlefs_storage_suite": "passed",
+    "map_power_cut_cases_including_torn_operations": 758,
+    "raw_file_io_cut_points": 3484,
+    "large_json_io_cut_points": 4736,
+    "legacy_migration_cuts": "passed",
+    "irregular_unknown_length_fragments": "passed",
+    "metadata_read_and_write_failover": "passed",
+    "out_of_space_and_both_metadata_sectors_failing": "passed",
+    "map_entry_limit_32_and_33rd_rejection": "passed with 524288-byte host geometry",
+    "silent_noop_erase_and_successor_marker": "passed",
+    "subsequent_writes_after_map_cut": "passed"
+  },
+  "current_artifacts": "/tmp/ardfs-sector-opt3-20261028",
+  "optimization_round_3": {
+    "artifacts": "/tmp/ardfs-sector-opt3-20261028",
+    "retained": "pass7",
+    "trials": {
+      "baseline": {
+        "esp8266": {
+          "firmware_bytes": 587744,
+          "sha256": "de3aa6c3a4a2952f8b4cb3818bc338990699f94c857fbfa5ead0ab55e3d994cf",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-baseline.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1277296,
+          "sha256": "44bcc6969dfeafa7c141590df23db6ce87e18cc77f1fe7baa77175373aff5358",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-baseline.log"
+        }
+      },
+      "pass1": {
+        "esp8266": {
+          "firmware_bytes": 587728,
+          "sha256": "7fe4a95d92288b0b3c25d8e80c68ae14800b2d8164e2475fb936afd963170c1d",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-pass1.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1277264,
+          "sha256": "56039f6edc4705085bae431003bd2d2764b9e3bc20b03be426129540fd5fad56",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-pass1.log"
+        }
+      },
+      "pass2": {
+        "esp8266": {
+          "firmware_bytes": 587664,
+          "sha256": "b4aaa73f527e1df23365936dc8bcb5d9a3d8b0c61971a0c0e200c115dbec5c1d",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-pass2.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1277088,
+          "sha256": "4ebd7b66ecdf9a723360a0f80a46c1d0dd1a92860ba0aa98a39a86ebd767c123",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-pass2.log"
+        }
+      },
+      "pass3": {
+        "esp8266": {
+          "firmware_bytes": 587584,
+          "sha256": "b9c3dd4524bb06d05360e47623f4981fdf3b65831f51382ce2ff8055aa62cd02",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-pass3.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1277072,
+          "sha256": "9423350361be50731b5787ab2d0af5a7a988539de1146e1cdf49fe4bf2cbec15",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-pass3.log"
+        }
+      },
+      "pass4": {
+        "esp8266": {
+          "firmware_bytes": 587600,
+          "sha256": "a9457146358d8a5b9446bbdd46c84f7fcd32fae6284dfde04eb4ea51f6439785",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-pass4.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1277008,
+          "sha256": "ae58e14e50cae2ed1ab7d60a786422370f48e93b6a379c8730242dd99c6e07f9",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-pass4.log"
+        }
+      },
+      "pass5": {
+        "esp8266": {
+          "firmware_bytes": 587600,
+          "sha256": "66baecd647f000a428b97ea0f238dad651a8efeec0b166a38186864269e572fa",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-pass5.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1276928,
+          "sha256": "c04ea4244f3b9679af10fe556ef82a74d806277f6b36bd795bef5ca56a145153",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-pass5.log"
+        }
+      },
+      "pass6": {
+        "esp8266": {
+          "firmware_bytes": 587600,
+          "sha256": "38549caeaad3c4b0735337cc4f0e2f9607d53dbca95665be72b2db4504ca4284",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-pass6.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1276928,
+          "sha256": "10524d6d6045dadddff4fa70d9a6c68c95ea710a7a8f535630dff18b6c7bc8a1",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-pass6.log"
+        }
+      },
+      "pass7": {
+        "esp8266": {
+          "firmware_bytes": 587728,
+          "sha256": "32292a13f3a78cf5406498a484ce45772dc3e9b0877c3c5d5ecb7b327eea677e",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-pass7.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1277088,
+          "sha256": "d1ce432e936682f2711f6d7fd4c8a5efd54e0b90748c665026435d6558b4f4a6",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-pass7.log"
+        }
+      },
+      "pass8": {
+        "esp8266": {
+          "firmware_bytes": 587760,
+          "sha256": "e3e89f9e39b482cd75728a9382143647eff0a558e387a04854e838367c68388d",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-pass8.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1277136,
+          "sha256": "4be5735c2810d4effedaccf5e056008b2a07ddb39771e936161ffd5fb9558911",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-pass8.log"
+        }
+      },
+      "pass9": {
+        "esp8266": {
+          "firmware_bytes": 587776,
+          "sha256": "c57a637f152dbe9499e3104c9f83edce9c160cf334aa4d9eccd649fc4522854a",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp8266-pass9.log"
+        },
+        "esp32": {
+          "firmware_bytes": 1277104,
+          "sha256": "b6d5ef25e27d1a4078efcaf1479e5797bd9528236d64c86144e48747c55d208e",
+          "log": "/tmp/ardfs-sector-opt3-20261028/esp32-pass9.log"
+        }
+      }
+    },
+    "source_hashes": {
+      "src/ArdFSVolume.h": "7b4bb8b21ff8b760073b9916a7bf2f20dbb2f34e087b7e84e12532304b34d458",
+      "src/ArdFSVolumeImpl.h": "170774961736289bff66edbac1cdec96a43f8f30d3367cffe826f9f35ef685be",
+      "src/ArdStorage.h": "bc7ee11d7aa94aaddca370f2966e75acea5412db75dc03e006bc03563d4b6e95",
+      "src/ArdStorageImpl.h": "42879a154e465f967584086055cd09910d9c62ba5990f5410b96e49a02056908",
+      "src/ArdLittleFSVolume.h": "8ad8c0c9766cf47d5e0589e9dd79d63514fc9d5cc0d07cc1cb4bdf0bb2b6a1b7",
+      "src/ArdCRC.h": "4e3af2fd163b20fccd5da5abaae31ad95f957574fa5d60cc5c5cf34fb408e70f",
+      "src/JournalReader.cpp": "faccb31c8f5e5a699e35ca1a7ebf52c517a1cb2eed8503061b506d1d13a92014"
+    },
+    "targets": {
+      "esp8266": {
+        "initial_complete_firmware": 589312,
+        "previous_optimized_firmware": 587744,
+        "optimized_firmware": 587728,
+        "saved_bytes": 1584,
+        "saved_this_round_bytes": 16,
+        "remaining_growth_bytes": 3216,
+        "remaining_growth_percent": 0.5502025621373042,
+        "static_ram_after": 43628,
+        "reader_payload_bytes": 20,
+        "writer_fixed_bytes": 372,
+        "writer_name_bytes": "strlen(path)+1 in the same allocation",
+        "sector_buffer_bytes": 4096,
+        "format_buffer_bytes": 256
+      },
+      "esp32": {
+        "initial_complete_firmware": 1279584,
+        "previous_optimized_firmware": 1277296,
+        "optimized_firmware": 1277088,
+        "saved_bytes": 2496,
+        "saved_this_round_bytes": 208,
+        "remaining_growth_bytes": 2064,
+        "remaining_growth_percent": 0.16187930580130255,
+        "static_ram_after": 57612,
+        "reader_payload_bytes": 20,
+        "writer_fixed_bytes": 372,
+        "writer_name_bytes": "strlen(path)+1 in the same allocation",
+        "sector_buffer_bytes": 4096,
+        "format_buffer_bytes": 256
+      }
+    },
+    "changes": [
+      "Reuse verified sector storage for the record header.",
+      "Combine erase/program/read-back retry handling.",
+      "Remove separate compaction input counters and staging phase.",
+      "Keep pending tail retirements in the destination bank cache; eliminate the third persistent BankMap copy.",
+      "Reuse format/writer scratch for erase and successor-marker checks.",
+      "Cache the current physical data-sector address.",
+      "Verify metadata erasure before reusing a bank after an abandoned newer publication."
+    ],
+    "validation": {
+      "full_suite_log": "/tmp/ardfs-opt3-final-suite.log",
+      "metadata_reuse_regression": "Reproduced data loss on baseline and pass6; explicit and silent metadata erase failures are now rejected before any data rewrite.",
+      "pending_abandoned_tail_reads": "passed",
+      "bad_sector_cut_points_per_geometry": 570,
+      "raw_file_io_cut_points": 2518,
+      "large_json_io_cut_points": 3710
+    }
+  }
+}

@@ -640,6 +640,8 @@
     "ui_241": "Child",
     "ui_242": "Router",
     "ui_243": "Leader",
-    "ui_244": "Sleepy end device (MTD / ICD)"
+    "ui_244": "Sleepy end device (MTD / ICD)",
+    "ui_245": "Format flash storage",
+    "ui_246": "Delete all files and settings from flash storage and restart? This cannot be undone."
   }
 }

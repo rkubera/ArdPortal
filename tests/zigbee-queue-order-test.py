@@ -39,6 +39,6 @@ int main(){
 '''
 with tempfile.TemporaryDirectory() as d:
  path=Path(d);(path/'test.cpp').write_text(fixture)
- subprocess.run(['clang++','-std=c++17','-fsanitize=address,undefined','-I'+str(root/'tests/memory-host'),'-I'+str(root/'src'),str(path/'test.cpp'),'-o',str(path/'test')],check=True)
+ subprocess.run(['clang++','-std=c++17','-fsanitize=address,undefined','-I'+str(root/'tests/memory-host'),'-I'+str(root/'src'),str(path/'test.cpp'),str(root/'src/JsonStream.cpp'), str(root/'src/JsonDocumentStream.cpp'), '-o',str(path/'test')],check=True)
  subprocess.run([str(path/'test')],check=True)
 print('PASS: newer accepted intents remove only superseded Zigbee fields; rejected changes preserve queued persistence')

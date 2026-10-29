@@ -22,9 +22,10 @@ enum class Key : uint16_t;
 #if ARDPORTAL_ENABLE_WWW
 #include <DNSServer.h>
 #endif
-#include "ArdFS.h"
+#include "ArdPortalStorage.h"
 #include "ArdJSON.h"
 #include "JsonCodec.h"
+#include "JsonDocumentStream.h"
 #include "AppConfigRegistrationError.h"
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
 #include "DynamicPages.h"
@@ -1121,7 +1122,8 @@ private:
   String _ntpServer1, _ntpServer2;
 #endif
   PortalConfig _config, _pending;
-  ArdFS _storage;
+  ArdPortalStorage _storage;
+  std::unique_ptr<ArdJSON::StreamParser> _loadParser;
   ArdJsonCodec _json;
 #if ARDPORTAL_ENABLE_WWW
   DNSServer _dns;
@@ -1163,7 +1165,7 @@ private:
    * @param result Operation result to inspect or return.
    * @return No value.
    */
-  void finishLoad(const ArdFS::Result& result);
+  void finishLoad(const ArdPortalStorage::Result& result);
   /**
    * @brief Schedule persistence of the current portal and application configuration.
    * @param config Portal settings to validate and apply.
@@ -1178,7 +1180,7 @@ private:
    * @param result Operation result to inspect or return.
    * @return No value.
    */
-  void finishSave(const ArdFS::Result& result);
+  void finishSave(const ArdPortalStorage::Result& result);
   /**
    * @brief Notify the application of a portal configuration change and its source.
    * @return No value.

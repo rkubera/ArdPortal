@@ -36,6 +36,6 @@ with tempfile.TemporaryDirectory(prefix='ardportal-state-topic-') as tmp:
     tmp=Path(tmp)
     (tmp/'test.cpp').write_text(fixture+main)
     for ha in (0, 1):
-        subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-DARDPORTAL_ENABLE_MQTT=1','-DARDPORTAL_ENABLE_HA='+str(ha),'-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),'-o',str(tmp/'test')],check=True)
+        subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-DARDPORTAL_ENABLE_MQTT=1','-DARDPORTAL_ENABLE_HA='+str(ha),'-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(tmp/'test.cpp'),str(root/'src/JsonStream.cpp'), str(root/'src/JsonDocumentStream.cpp'), '-o',str(tmp/'test')],check=True)
         subprocess.run([str(tmp/'test')],check=True)
 print('PASS: configured state and event topics, missing/empty/$state fallbacks across entity types')

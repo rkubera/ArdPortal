@@ -5,6 +5,14 @@
 #include "AppConfigFields.h"
 #include <Arduino.h>
 
+// Storage backend: define before ArdPortal.h; native ArdFS remains the default.
+#ifndef ARDPORTAL_USE_LITTLEFS
+#define ARDPORTAL_USE_LITTLEFS 0
+#endif
+#if ARDPORTAL_USE_LITTLEFS != 0 && ARDPORTAL_USE_LITTLEFS != 1
+#error ARDPORTAL_USE_LITTLEFS must be 0 or 1
+#endif
+
 #if defined(ESP32)
 #include <soc/soc_caps.h>
 #endif

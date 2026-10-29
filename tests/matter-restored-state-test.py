@@ -54,6 +54,6 @@ int main(){
 '''
 with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp);(p/'test.cpp').write_text(fixture)
- subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(p/'test.cpp'),'-o',str(p/'test')],check=True)
+ subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(p/'test.cpp'),str(root/'src/JsonStream.cpp'), str(root/'src/JsonDocumentStream.cpp'), '-o',str(p/'test')],check=True)
  subprocess.run([str(p/'test')],check=True)
 print('PASS: restored on/off, level and RGB caches, unchanged reports and failure lock cleanup')

@@ -164,3 +164,5 @@ reading after startup or recovery. The same messages are printed to Serial at
 - `MatterPortal`: ESP32-C6, optional Matter over Wi-Fi or Thread; use the included single-app partition table and read [Matter](../docs/wiki/Matter.md).
 
 - `PortalStandby`: Zigbee connection followed by Wi-Fi/WWW suspension; a debounced GPIO button restores the portal for two minutes.
+
+- `LittleFS`: selects the LittleFS storage backend with `ARDPORTAL_USE_LITTLEFS=1` before including ArdPortal; see the FS API guide for initial formatting and migration.

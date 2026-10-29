@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include <Arduino.h>
+#include "ArdCRC.h"
 
 // Compiler-selected independent DEFLATE blocks share one gzip header/footer.
 static const char ARD_ASSET_GZIP_HEAD[] PROGMEM = "\x1f\x8b\x08\x00\x00\x00\x00\x00\x02\xff";
@@ -41,12 +42,7 @@ inline size_t ardAssetSize(const ArdAssetChunk* chunks, size_t count) {
  * @return The polynomial product modulo the CRC-32 polynomial.
  */
 inline uint32_t ardAssetCrcProduct(uint32_t a, uint32_t b) {
-  uint32_t result = 0;
-  for (uint32_t bit = 0x80000000U; bit; bit >>= 1) {
-    if (a & bit) result ^= b;
-    b = (b >> 1) ^ ((b & 1) ? 0xedb88320U : 0);
-  }
-  return result;
+  return ArdCRC::multiply(a, b);
 }
 /**
  * @brief Combine the CRC of an appended chunk with the existing asset CRC.
@@ -56,12 +52,6 @@ inline uint32_t ardAssetCrcProduct(uint32_t a, uint32_t b) {
  * @return CRC-32 of the concatenated uncompressed data.
  */
 inline uint32_t ardAssetCrcAppend(uint32_t crc, uint32_t next, uint32_t bytes) {
-  uint32_t factor = 0x40000000U;
-  for (unsigned i = 0; i < 3; ++i) factor = ardAssetCrcProduct(factor, factor);
-  while (bytes) {
-    if (bytes & 1) crc = ardAssetCrcProduct(crc, factor);
-    bytes >>= 1;
-    if (bytes) factor = ardAssetCrcProduct(factor, factor);
-  }
-  return crc ^ next;
+  // Preserve the helper's zero-length XOR behavior for arbitrary inputs.
+  return bytes ? ArdCRC::combine(crc, next, bytes) : crc ^ next;
 }

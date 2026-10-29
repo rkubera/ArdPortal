@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include "ArdCRC.h"
 struct ArdJournalStream {
   char header[128] = {};
   uint8_t headerSize = 0, state = 0, hexLeft = 0, utfLeft = 0;
@@ -14,9 +15,7 @@ struct ArdJournalStream {
   size_t length = 0;
   bool canonical = false, failed = false;
   static uint32_t update(uint32_t crc, uint8_t b) {
-    crc ^= b;
-    for (uint8_t i = 0; i < 8; ++i) crc = (crc >> 1) ^ (0xedb88320U & (0U - (crc & 1)));
-    return crc;
+    return ArdCRC::updateByte(crc, b);
   }
   static bool literal(const char*& at, const char* text) {
     size_t n = strlen(text);

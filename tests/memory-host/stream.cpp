@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include "ArdFSHostVolume.h"
 #include "../../src/ArdFS.h"
+#include "ConfigTestIO.h"
 #include <cassert>
 uint32_t fakeMillis = 0;
 SerialStub Serial;
@@ -16,7 +17,7 @@ String read() {
   fs.begin();
   drain(fs);
   String result;
-  assert(fs.read("/test.json", [&](const ArdFS::Result& r) {
+  assert(readConfigText(fs, "/test.json", [&](const auto& r) {
     assert(r.ok && r.found);
     result = r.data;
   }));
@@ -58,12 +59,12 @@ int main() {
   drain(fs);
   auto save = [&](bool changed) {
     bool done = false;
-    assert(fs.writeJson(
+    assert(fs.writeJsonConfig(
       "/test.json", json.length(), [&](size_t at, size_t n) {
         assert(n <= 256);
         return json.substring(at, at + n);
       },
-      [&](const ArdFS::Result& r) {
+      [&](const auto& r) {
         assert(r.ok && r.changed == changed);
         done = true;
       }));
@@ -94,11 +95,11 @@ int main() {
   assert(read() == json);
   // Producer allocation failure and device write failure cannot replace the good record.
   bool failed = false;
-  assert(fs.writeJson(
+  assert(fs.writeJsonConfig(
     "/test.json", json.length(), [](size_t, size_t) {
       return String();
     },
-    [&](const ArdFS::Result& r) {
+    [&](const auto& r) {
       failed = !r.ok;
     }));
   drain(fs);
@@ -106,11 +107,11 @@ int main() {
   json = "{\"new\":true}";
   failFileWrite = true;
   failed = false;
-  assert(fs.writeJson(
+  assert(fs.writeJsonConfig(
     "/test.json", json.length(), [&](size_t at, size_t n) {
       return json.substring(at, at + n);
     },
-    [&](const ArdFS::Result& r) {
+    [&](const auto& r) {
       failed = !r.ok;
     }));
   drain(fs);

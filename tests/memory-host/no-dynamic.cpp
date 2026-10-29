@@ -81,4 +81,33 @@ int main() {
   }
   assert(restored.portalAndAppConfigReady());
   assert(restored.getAppConfigValue("saved").asDouble() == 17);
+#if ARDPORTAL_USE_LITTLEFS && ARDPORTAL_ENABLE_WWW
+  assert(restored.infoJson().indexOf("\"storageBackend\":\"LittleFS\"") >= 0);
+  bool factoryCallback = false;
+  restored.onBeforeFactoryReset([&]() {
+    factoryCallback = true;
+  });
+  restored._request = "POST /api/factory-reset HTTP/1.1\r\n\r\nconfirm=RESET";
+  restored.handleBuiltinHttp("POST", "/api/factory-reset");
+  assert(factoryCallback);
+  for (int i = 0; i < 1000; ++i) {
+    fakeMillis += 10;
+    restored.serviceStorage(fakeMillis);
+  }
+  assert(restored._rebootPending && !restored.portalAndAppConfigBusy());
+  ArdPortal reset;
+  assert(reset.begin());
+  for (int i = 0; i < 1000; ++i) {
+    fakeMillis += 10;
+    reset.loop();
+  }
+  assert(reset.portalAndAppConfigReady() && !reset.getAppConfigValue("saved").isValid());
+  reset._request = "POST /api/storage/format HTTP/1.1\r\n\r\nconfirm=FORMAT";
+  reset.handleBuiltinHttp("POST", "/api/storage/format");
+  for (int i = 0; i < 1000; ++i) {
+    fakeMillis += 10;
+    reset.serviceStorage(fakeMillis);
+  }
+  assert(reset._rebootPending && littlefs_test::files.empty());
+#endif
 }

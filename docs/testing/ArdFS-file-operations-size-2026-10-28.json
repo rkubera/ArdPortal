@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-28",
+  "example": "DynamicPages",
+  "baseline": "optimized25 snapshot; only the four ArdFS source files differ",
+  "results": [
+    {
+      "board": "esp8266",
+      "before_bytes": 584592,
+      "after_bytes": 585040,
+      "delta_bytes": 448,
+      "delta_percent": 0.07663464433314175,
+      "binary_sha256": "a629ea6e796807f916a18824ef7defabd286a072301d14698367730818496602",
+      "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-file-operations.log"
+    },
+    {
+      "board": "esp32",
+      "before_bytes": 1275088,
+      "after_bytes": 1275504,
+      "delta_bytes": 416,
+      "delta_percent": 0.03262519920193744,
+      "binary_sha256": "fd00ddc8375de7a1f2842c4764ca6b38f777928e23b6bff274e187580683c5a5",
+      "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-file-operations.log"
+    }
+  ],
+  "note": "Uncalled API methods are eligible for linker garbage collection; this measures existing DynamicPages firmware, not an application exercising every new API.",
+  "optimization": {
+    "retained": "file-opt2",
+    "changes": [
+      "Borrow source path from the live index until atomic publication instead of allocating another String.",
+      "Share copy-path selection between capacity planning, skip logic and destination selection."
+    ],
+    "trials": {
+      "file-opt1": {
+        "esp8266": {
+          "binary_bytes": 584960,
+          "sha256": "5124e5f5b763bc52411d8bb9321a27dfe5cf9da1521a1a55da8b27fab2c4b2d1",
+          "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-file-opt1.log"
+        },
+        "esp32": {
+          "binary_bytes": 1275392,
+          "sha256": "cc2257e4ef8d92f19959b76cc9d1b287794e73da39e52e63685998e092c3efde",
+          "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-file-opt1.log"
+        }
+      },
+      "file-opt2": {
+        "esp8266": {
+          "binary_bytes": 584912,
+          "sha256": "8eaed3d62ff273fe992994d1d3048bd0d5da5762d0eb34d9715ffb95195125a0",
+          "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp8266-file-opt2.log"
+        },
+        "esp32": {
+          "binary_bytes": 1275344,
+          "sha256": "30a4a6b794dcfd969b4efcb47ad76053bddc0efc6d85a7e7e83b43dc80089ea9",
+          "log": "/tmp/ardfs-firmware-size-qtyn83vc/esp32-file-opt2.log"
+        }
+      }
+    }
+  }
+}

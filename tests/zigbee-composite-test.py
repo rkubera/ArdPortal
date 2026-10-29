@@ -75,5 +75,5 @@ int main(){
 '''
 with tempfile.TemporaryDirectory(prefix='ardportal-composite-test-') as work:
  work=Path(work);(work/'test.cpp').write_text(fixture+service+'\n'+mark+'\n'+main)
- subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(work/'test.cpp'),'-o',str(work/'test')],check=True)
+ subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'tests/host'),'-I'+str(root/'src'),str(work/'test.cpp'),str(root/'src/JsonStream.cpp'), str(root/'src/JsonDocumentStream.cpp'), '-o',str(work/'test')],check=True)
  subprocess.run([str(work/'test')],check=True)
