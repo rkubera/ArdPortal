@@ -4,15 +4,16 @@ import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
-source = (root / 'src/ArdMqttImpl.h').read_text()
-start = source.index('bool ArdMqtt::queuePacket(')
-method = source[start:source.index('\n/**', start)]
+source = (root / 'src/ArdMQTT.h').read_text()
+start = source.index('bool ArdMQTTClient<IO>::queuePacket(')
+method = source[start:source.index('\ntemplate<class IO>', start)]
+method = method.replace('ArdMQTTClient<IO>::', 'ArdMQTT::')
 fixture = r'''
 #include <Arduino.h>
 #include <cassert>
 #include <cstring>
 uint32_t fakeMillis=123;
-class ArdMqtt {public:
+class ArdMQTT {public:
  static constexpr size_t PacketCapacity=2048;
  String _tx;
  size_t _txSize=0,_txOffset=0;
@@ -22,7 +23,7 @@ class ArdMqtt {public:
 '''
 main = r'''
 int main() {
- ArdMqtt mqtt;
+ ArdMQTT mqtt;
  String body;
  for(size_t i=0;i<130;++i)body+=char(i);
  assert(mqtt.queuePacket(0x30,body));
@@ -38,7 +39,7 @@ int main() {
  assert(uint8_t(mqtt._tx[0])==0xc0&&uint8_t(mqtt._tx[1])==0);
  mqtt._tx=String();mqtt._txSize=0;
  String maximum;
- for(size_t i=0;i<ArdMqtt::PacketCapacity-5;++i)maximum+='x';
+ for(size_t i=0;i<ArdMQTT::PacketCapacity-5;++i)maximum+='x';
  assert(mqtt.queuePacket(0x30,maximum)&&mqtt._txSize==2046);
  mqtt._tx=String();mqtt._txSize=0;maximum+='x';
  assert(!mqtt.queuePacket(0x30,maximum)&&!mqtt._txSize&&!mqtt._tx.length());

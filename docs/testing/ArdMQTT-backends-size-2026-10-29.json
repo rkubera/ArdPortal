@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-29",
+  "baseline_commit": "7068a2bc6234651cffe1efb6e73ea39dc2e8201d",
+  "sketch": "examples/DynamicPages",
+  "esp8266": {
+    "fqbn": "esp8266:esp8266:generic",
+    "core": "3.1.2",
+    "results": [
+      {
+        "backend": "before",
+        "binary_bytes": 593056,
+        "flash_irom_bytes": 551652,
+        "static_ram_bytes": 43756
+      },
+      {
+        "backend": "ArdMQTT",
+        "binary_bytes": 592928,
+        "flash_irom_bytes": 551716,
+        "static_ram_bytes": 43580
+      },
+      {
+        "backend": "PubSubClient",
+        "binary_bytes": 594960,
+        "flash_irom_bytes": 553732,
+        "static_ram_bytes": 41592
+      }
+    ]
+  },
+  "esp32": {
+    "fqbn": "esp32:esp32:esp32",
+    "core": "3.3.12",
+    "ArdMQTT": {
+      "program_bytes": 1282926,
+      "binary_bytes": 1283168,
+      "static_ram_bytes": 57748
+    },
+    "PubSubClient": {
+      "program_bytes": 1285366,
+      "binary_bytes": 1285616,
+      "static_ram_bytes": 55756
+    },
+    "before": {
+      "program_bytes": 1282926,
+      "binary_bytes": 1283168,
+      "static_ram_bytes": 57732
+    }
+  },
+  "pubsubclient_version": "2.8",
+  "updated": "2026-10-30",
+  "mqtt_disabled_esp32": {
+    "program_bytes": 1024870,
+    "static_ram_bytes": 51484,
+    "native_client_symbols": 0,
+    "pubsubclient_symbols": 0,
+    "log_callback": true,
+    "dynamic_pages": false,
+    "web_console": true
+  }
+}

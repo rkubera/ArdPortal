@@ -42,7 +42,7 @@ enum class Key : uint16_t;
 #include "ArdAppControls.h"
 #endif
 #if ARDPORTAL_ENABLE_MQTT
-#include "ArdMqtt.h"
+#include "ArdPortalMqtt.h"
 #endif
 #if ARDPORTAL_ENABLE_HA
 #include "ArdHomeAssistant.h"

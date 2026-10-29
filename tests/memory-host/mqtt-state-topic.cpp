@@ -67,10 +67,12 @@ int main() {
   p._config.host = "broker";
   mqtt._mqttState = ArdPortal::MqttState::Connected;
   assert(mqtt._mqtt.connect(IPAddress(), 1883));
+
+  mqtt._protocol._connected = true;
   p._appControls.markDirty("pump");
   assert(p._appControls.publishState());
   // Decode the actual retained PUBLISH packet queued for the socket.
-  const String& packet = mqtt._tx;
+  const String& packet = mqtt._protocol._tx;
   assert(uint8_t(packet[0]) == 0x31);
   size_t pos = 1;
   while (uint8_t(packet[pos++]) & 128) {}

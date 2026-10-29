@@ -166,3 +166,8 @@ reading after startup or recovery. The same messages are printed to Serial at
 - `PortalStandby`: Zigbee connection followed by Wi-Fi/WWW suspension; a debounced GPIO button restores the portal for two minutes.
 
 - `LittleFS`: selects the LittleFS storage backend with `ARDPORTAL_USE_LITTLEFS=1` before including ArdPortal; see the FS API guide for initial formatting and migration.
+
+`ArdMQTT/ArdMQTT.ino` uses the standalone MQTT client with an Arduino
+`WiFiClient`, without loading ArdPortal. To use PubSubClient inside a portal
+example, install PubSubClient 2.8 and define `ARDPORTAL_USE_PUBSUBCLIENT 1`
+before including `ArdPortal.h`; leave it at `0` for the native client.

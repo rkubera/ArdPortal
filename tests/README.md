@@ -167,3 +167,21 @@ head- and tail-only torn programs and single-bit type corruption must not
 promote payload into catalog records. Native
 header buffers carry explicit alignment; ASan/UBSan tests exercise aligned word
 access alongside arbitrary byte/sector-table reads.
+
+## MQTT protocol backends
+
+```sh
+python3 tests/mqtt-client-test.py
+python3 tests/mqtt-backend-test.py
+python3 tests/mqtt-packet-test.py
+python3 tests/mqtt-api-test.py
+```
+
+The standalone client test executes CONNECT/CONNACK, publish framing, partial
+writes, SUBACK/UNSUBACK, fragmented retained binary payloads, keepalive, timeout
+and malformed-packet rejection under ASan/UBSan. The backend test checks actual
+compiler dependencies for both backend selections and disabled MQTT, validates
+the feature signature and exercises PubSubClient's header observer. Its small
+PubSubClient fixture covers only the observer; real PubSubClient 2.8 is checked
+with Arduino firmware builds. `run-config-memory.sh` also checks the selected
+native client through portal state publishing and cooperative transmission.
