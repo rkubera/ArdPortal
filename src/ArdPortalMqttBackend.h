@@ -12,7 +12,9 @@ using ArdPortalMqttBackend = ArdPubSubClient;
 class ArdMqtt;
 struct ArdPortalMqttIO {
   ArdMqtt* owner;
-  bool ready() const { return true; }
+  bool ready() const {
+    return true;
+  }
   WiFiClient& transport();
   size_t write(const uint8_t* data, size_t length);
   void stop();

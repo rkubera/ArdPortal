@@ -196,7 +196,9 @@ private:
    * @brief Return a busy response when the current operation prevents accepting a request.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
-  bool receiveBusy() const { return _protocol.receiveBusy(); }
+  bool receiveBusy() const {
+    return _protocol.receiveBusy();
+  }
   bool sendBusy() const {
 #if ARDPORTAL_USE_PUBSUBCLIENT
     return false;
@@ -300,7 +302,7 @@ private:
   ArdPortalMqttBackend _protocol;
 #else
   friend struct ArdPortalMqttIO;
-  ArdPortalMqttBackend _protocol{ArdPortalMqttIO{this}};
+  ArdPortalMqttBackend _protocol{ ArdPortalMqttIO{ this } };
 #endif
   /**
    * @brief Advance MQTT connection, protocol and reconnect work.

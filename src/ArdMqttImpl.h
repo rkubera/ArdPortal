@@ -12,8 +12,12 @@
 using ArdNetworkIo::writeChunk;
 using ArdNetworkIo::stopClient;
 #if !ARDPORTAL_USE_PUBSUBCLIENT
-inline WiFiClient& ArdPortalMqttIO::transport() { return owner->mqttTransport(); }
-inline size_t ArdPortalMqttIO::write(const uint8_t* data, size_t length) { return owner->writeMqtt(data, length); }
+inline WiFiClient& ArdPortalMqttIO::transport() {
+  return owner->mqttTransport();
+}
+inline size_t ArdPortalMqttIO::write(const uint8_t* data, size_t length) {
+  return owner->writeMqtt(data, length);
+}
 // The owning portal closes its transport immediately after loop() fails.
 inline void ArdPortalMqttIO::stop() {}
 
@@ -291,23 +295,33 @@ void ArdMqtt::serviceMqtt(uint32_t now) {
 #else
     _protocol.setTimeoutMs(_portal._options.mqttTimeoutMs);
 #endif
-    if (!_protocol.setBufferSize(PacketCapacity)) { closeMqtt(); return; }
+    if (!_protocol.setBufferSize(PacketCapacity)) {
+      closeMqtt();
+      return;
+    }
 #if ARDPORTAL_USE_PUBSUBCLIENT
     _protocol.setServer(_portal._config.host.c_str(), _portal._config.port);
 #endif
     const char* willTopic = nullptr;
     String availability;
 #if ARDPORTAL_ENABLE_HA
-    if (_portal._dynamic.count()) { availability = mqttTopic("stat", "availability"); willTopic = availability.c_str(); }
+    if (_portal._dynamic.count()) {
+      availability = mqttTopic("stat", "availability");
+      willTopic = availability.c_str();
+    }
 #endif
     if (!_protocol.connect(_clientId.c_str(), _portal._config.user.length() ? _portal._config.user.c_str() : nullptr,
                            _portal._config.mqttPassword.length() ? _portal._config.mqttPassword.c_str() : nullptr,
                            willTopic, 0, true, willTopic ? "offline" : nullptr)) {
-      closeMqtt(); return;
+      closeMqtt();
+      return;
     }
   }
   if (_mqttState != MqttState::Connecting && _mqttState != MqttState::Connected) return;
-  if (!_protocol.loop()) { closeMqtt(ARD_LANG_NATIVE_TRANSPORT_CLOSED); return; }
+  if (!_protocol.loop()) {
+    closeMqtt(ARD_LANG_NATIVE_TRANSPORT_CLOSED);
+    return;
+  }
   connectionEstablished();
 }
 
