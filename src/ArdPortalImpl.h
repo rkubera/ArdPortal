@@ -2271,7 +2271,13 @@ void ArdPortal::finishLoad(const ArdPortalStorage::Result& result) {
  * @return No value.
  */
 void ArdPortal::serviceStorage(uint32_t now) {
-  _storage.loop();
+  // Mount/format/startup must not require one application loop per flash page.
+  // Keep normal transactions single-step; bound batches by time and step count.
+  const uint32_t storageSince = millis();
+  uint8_t storageSteps = 0;
+  do {
+    _storage.loop();
+  } while ((!_configurationReady || !_storage.ready()) && _storage.busy() && ++storageSteps < 64 && uint32_t(millis() - storageSince) < 4);
   _storageMounted = _storage.mounted();
   if (!_loadStarted && _storage.ready()) {
     _loadStarted = true;

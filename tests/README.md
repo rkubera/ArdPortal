@@ -22,6 +22,13 @@ MQTT/HA topics, networking, HTTP memory, runtime state, callbacks and frontend
 behavior. Native suites use AddressSanitizer and UndefinedBehaviorSanitizer;
 CI disables leak detection to match the existing cross-platform fixtures.
 
+`python3 tests/storage-startup-test.py` checks startup and format storage
+batching, time/step bounds and clock rollover. It also runs a native 1 MiB
+volume and complete Portal first-use/reload startup with simulated application
+work between calls, while checking that normal writes remain single-step.
+`node tests/storage-format-ui-test.js` checks the indeterminate Device dialog,
+paint-before-request timing, duplicate prevention, restart handoff and errors.
+
 `python3 tests/asset-crc-test.py` compares shared CRC combination and byte
 updates against Python zlib, including empty inputs and cache/page boundaries.
 `portal-profile-assets-test.py` also checks complete gzip assets emitted by C++.

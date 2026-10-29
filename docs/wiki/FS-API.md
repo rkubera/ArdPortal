@@ -15,6 +15,14 @@ ArdPortal provides cooperative storage for journaled JSON documents and raw bina
 
 ArdPortal initializes and services its own storage. Use the [Portal configuration API](https://github.com/rkubera/ArdPortal/wiki/Portal-API) for PortalConfig and AppConfig. Do not create another storage instance on the same partition while the portal owns it.
 
+During startup and while storage is mounting or formatting, `portal.loop()`
+advances storage in batches of at most 64 steps, stopping after 4 ms between
+steps. This includes initial loading, startup redundancy repair and remounting
+after formatting. Individual flash operations and callbacks are synchronous
+and can exceed that time budget. Ordinary transactions after configuration is
+ready advance one step per `portal.loop()` call. Standalone `ArdFS::loop()`
+advances one step per call throughout its lifecycle.
+
 ## Initialization and lifecycle
 
 ```cpp
@@ -252,6 +260,11 @@ Step methods return `-1` on error, `0` while pending and `1` when that phase com
 Portal startup loads JSON with redundancy repair before marking configuration ready. Single-field application edits are staged in RAM and persisted through subsequent `portal.loop()` calls. The [Portal API](https://github.com/rkubera/ArdPortal/wiki/Portal-API) documents configuration callbacks, save scheduling and restart handling.
 
 The Device page's **Format flash storage** action erases the selected storage volume and restarts after successful format/remount. It preserves firmware and Zigbee/Matter pairing. The HTTP equivalent is `POST /api/storage/format` with form body `confirm=FORMAT`. Responses are 200 on success, 500 on storage failure, 400 for invalid confirmation and 409 when lifecycle work prevents acceptance. Continue servicing `portal.loop()` while the request completes.
+
+After confirmation, the Device page shows a formatting dialog with an
+indeterminate bar moving back and forth. It remains visible until the operation
+completes, then hands off to the restart dialog. A failed request restores the
+Device controls and displays the error without starting the restart timer.
 
 Factory reset saves default PortalConfig and an empty AppConfig, then restarts. Other files remain. Manual/OTA restart cleanup uses `onBeforeRestart()`; factory reset and storage formatting skip that callback.
 
