@@ -275,7 +275,7 @@ inline int ArdFSVolume::decodeMap(uint8_t* h, BankMap& map, uint32_t bank, uint3
     map.meta[i] = ArdFSDetail::get16(h + 176 + i * 2);
     if (map.meta[i] != UINT16_MAX && (map.meta[i] >= _bankSize / 4096 || isBad(map, map.meta[i]))) return -1;
   }
-  if (map.count + (map.meta[0] != UINT16_MAX) + (map.meta[1] != UINT16_MAX) > _bankSize / 4096) return -1;
+  if (uint32_t(map.count) + (map.meta[0] != UINT16_MAX) + (map.meta[1] != UINT16_MAX) > _bankSize / 4096) return -1;
   if (map.meta[0] == map.meta[1] || (map.meta[0] != slot / 32 && map.meta[1] != slot / 32)) return -1;
   map.rotate = false;
   map.valid = true;
