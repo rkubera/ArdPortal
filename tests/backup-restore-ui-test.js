@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const source=fs.readFileSync('src/PortalPage.h','utf8');
+const start=source.indexOf("document.querySelector('#backupConfig').onclick=");
+const end=source.indexOf('/*@endif*/',start);
+const elements={};for(const id of ['backupConfig','restoreConfigForm','restoreConfigFile','deviceTitle'])elements['#'+id]={};
+elements['#deviceTitle'].textContent='Kitchen';
+let link,options,restarts=0;
+const context={restartPending:false,formatPending:false,Date:class extends Date{constructor(...args){super(...(args.length?args:[2026,9,30,12,34,56]))}},document:{querySelector:key=>elements[key],createElement:()=>link={click(){this.clicked=true},remove(){}},body:{append(){}}},confirm:()=>true,t:key=>key,showNotice(){},beginRestart(){++restarts;},request:async(url,opts)=>{assert.equal(url,'/api/restore');options=opts;return{text:async()=> 'Saved'}}};
+vm.runInNewContext(source.slice(start,end),context);
+elements['#backupConfig'].onclick();assert.equal(link.download,'Kitchen-2026-10-30-12-34-56.json');assert.equal(link.href,'/api/backup');assert(link.clicked);
+const file={name:'backup.json'},input=elements['#restoreConfigFile'];input.files=[file];
+(async()=>{await input.onchange({target:input});assert.strictEqual(options.body,file);assert.equal(options.headers['Content-Type'],'application/json');assert(input.value===''&&!input.disabled);assert.equal(restarts,1);console.log('PASS: filename uses device and local timestamp; upload sends the File directly');})();

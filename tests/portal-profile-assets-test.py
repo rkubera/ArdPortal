@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix='ardportal-profile-assets-') as director
  for profile,controls in (('FULL',None),('BASIC',['slider','text','select','edit']),('CUSTOM',['switch','slider','text'])):
   for zigbee,matter,traffic,groups,dependencies in ((0,0,0,0,1),(1,0,0,0,1),(0,1,0,0,1),(0,1,1,0,1),(0,0,0,1,1),(0,0,0,1,0)):
    for visibility in (0,1):
-    features={'VISIBILITY':visibility,'GROUPS':groups,'DYNAMIC_PAGES':1,'DEPENDENCIES':dependencies,'ZIGBEE':zigbee,'MATTER':matter,'MATTER_CONSOLE':traffic}
+    features={'BACKUP_RESTORE':visibility,'VISIBILITY':visibility,'GROUPS':groups,'DYNAMIC_PAGES':1,'DEPENDENCIES':dependencies,'ZIGBEE':zigbee,'MATTER':matter,'MATTER_CONSOLE':traffic}
     defines={'ARDPORTAL_ENABLE_'+k:v for k,v in features.items()}
     defines.update({'ARDPORTAL_CONTROL_PROFILE_FULL':int(profile=='FULL'),'ARDPORTAL_CONTROL_PROFILE_BASIC':int(profile=='BASIC')})
     defines.update({'ARDPORTAL_ENABLE_CONTROL_'+c.upper():int(controls is None or c in controls) for c in CONTROLS})
@@ -27,6 +27,7 @@ with tempfile.TemporaryDirectory(prefix='ardportal-profile-assets-') as director
     expected=selected(script,controls,features)
     assert ("/api/groups" in compiled)==bool(groups),(profile,features)
     assert ('function previewDynamicVisibility(' in compiled)==bool(dependencies),(profile,features)
+    assert ('/api/backup' in compiled)==bool(visibility),(profile,features)
     assert compiled==expected,(profile,features,'emitted asset differs from selected source')
     assert ('function openMatterConsole(' in compiled)==bool(traffic),(profile,features)
     assert ('function appendConsoleLine(' in compiled)==bool(traffic or zigbee),(profile,features)

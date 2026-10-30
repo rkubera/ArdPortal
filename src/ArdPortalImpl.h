@@ -204,16 +204,26 @@ ArdPortal::ArdPortal(ArdPortalBuildTag<ARDPORTAL_FEATURE_MASK>)
 bool ArdPortal::validPortalConfig(const PortalConfig& c) {
   for (size_t i = 0; i < sizeof(ArdPortalJson::TextFields) / sizeof(ArdPortalJson::TextFields[0]); ++i) {
     auto entry = ArdPortalJson::field(i);
+    if (!entry.enabled) continue;
     const String& value = c.*entry.member;
     if (value.length() > entry.limit) return false;
     for (size_t j = 0; j < value.length(); ++j)
       if (value[j] == 0) return false;
   }
-  if (!ArdDeviceName::valid(c.deviceName) || (c.apBand != 24 && c.apBand != 5)) return false;
+  if (!ArdDeviceName::valid(c.deviceName)) return false;
+#if ARDPORTAL_ENABLE_WIFI
+  if ((c.apBand != 24 && c.apBand != 5) || !c.apName.length() || (c.apPassword.length() && c.apPassword.length() < 8)) return false;
+#endif
+#if ARDPORTAL_ENABLE_MQTT
+  if (!c.port || (c.mqttPassword.length() && !c.user.length())) return false;
+#endif
+#if ARDPORTAL_ENABLE_MQTT_TLS
+  if (c.mqttTls && c.host.length() && (c.caCert.indexOf("-----BEGIN CERTIFICATE-----") < 0 || c.caCert.indexOf("-----END CERTIFICATE-----") < 0)) return false;
+#endif
   auto limits = ArdPortalJson::limits();
   limits.maxOutputBytes = MaxPortalConfigBytes;
   if (!ArdJSON::JSON.measure(ArdPortalJson::value(c), nullptr, limits)) return false;
-  return c.apName.length() > 0 && (!c.apPassword.length() || c.apPassword.length() >= 8) && c.port != 0 && (!c.mqttTls || !c.host.length() || (c.caCert.indexOf("-----BEGIN CERTIFICATE-----") >= 0 && c.caCert.indexOf("-----END CERTIFICATE-----") >= 0)) && (!c.mqttPassword.length() || c.user.length());
+  return true;
 }
 
 /**
@@ -363,7 +373,7 @@ void ArdPortal::startAP() {
     }
 #endif
   }
-  _wifiState = _config.ssid.length() ? WifiState::FallbackAP : WifiState::NoCredentials;
+  _wifiState = wifiConnected() ? WifiState::Connected : (_config.ssid.length() ? (_apActive ? WifiState::FallbackAP : WifiState::Disconnected) : WifiState::NoCredentials);
   _retrySince = millis();
 #else
 #endif
@@ -461,8 +471,14 @@ void ArdPortal::serviceWifi(uint32_t now) {
     _attempting = false;
     _wifiState = WifiState::Disconnected;
     startAP();
-  } else if (_wifiAutoReconnect && !_attempting && !apInUse && !_scanning && _config.ssid.length() && uint32_t(now - _retrySince) >= _options.retryMs) connectWifi();
-  else if (!_attempting && !_apActive && uint32_t(now - _retrySince) >= _options.retryMs) startAP();
+  } else if (!_attempting && uint32_t(now - _retrySince) >= _options.retryMs) {
+    // A failed AP start must be retried before another long STA association.
+    if (!_apActive) {
+      startAP();
+      if (_apActive) return;  // Give clients a retry interval before STA retunes the radio.
+    }
+    if (_wifiAutoReconnect && !apInUse && !_scanning && _config.ssid.length()) connectWifi();
+  }
 #else
   (void)now;
 #endif
@@ -521,7 +537,7 @@ void ArdPortal::serviceScan() {
  */
 void ArdPortal::scheduleRestart(RestartReason reason) {
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  if (reason == RestartReason::FactoryReset || reason == RestartReason::StorageFormat) _zigbeeAppQueue = ArdJSON::JSONVar::object();
+  if (reason == RestartReason::FactoryReset || reason == RestartReason::StorageFormat || reason == RestartReason::ConfigurationRestore) _zigbeeAppQueue = ArdJSON::JSONVar::object();
 #endif
   _restartReason = reason;
   _beforeRestartCalled = false;
@@ -824,6 +840,12 @@ void ArdPortal::closeHttp() {
   _converterControl = nullptr;
   _converterStage = 0;
 #endif
+#if ARDPORTAL_ENABLE_BACKUP_RESTORE
+  if (_httpRestoreBytes) _loadParser.reset();
+  _httpRestoreBytes = _httpRestoreReceived = 0;
+  _httpBackupApp = ArdJSON::JSONVar();
+  _httpBackupBytes = _httpBackupOffset = 0;
+#endif
   _httpConfigUpload = false;
   _httpWaitingStorage = false;
 #if ARDPORTAL_SUPPORT_WEBSOCKET
@@ -885,6 +907,16 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
       size_t written = writeChunk(_http, chunk, length);
       _pageOffset += written;
       if (written) _httpSince = millis();
+#if ARDPORTAL_ENABLE_BACKUP_RESTORE
+    } else if (_httpBackupOffset < _httpBackupBytes) {
+      _response = configDocumentSlice(_request, _httpBackupApp, false, _httpBackupBytes - _request.length() - 1, _httpBackupOffset, 256);
+      if (!_response.length()) {
+        closeHttp();
+        return;
+      }
+      _httpBackupOffset += _response.length();
+      _responseOffset = 0;
+#endif
     } else if (_assetChunks && _assetIndex + 1 < _assetCount) {
       ArdAssetChunk next = ardAssetChunk(_assetChunks, ++_assetIndex);
       _page = next.data;
@@ -1017,6 +1049,12 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
       return;
     }
   }
+#if ARDPORTAL_ENABLE_BACKUP_RESTORE
+  if (_httpRestoreBytes) {
+    receiveConfigRestore();
+    return;
+  }
+#endif
   int split = _request.indexOf("\r\n\r\n");
   if (split < 0) {
     if (_request.length() > 1536) replyMessage(431, ArdUILanguage::Key::s_109);
@@ -1068,6 +1106,12 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
 #endif
     return;
   }
+#if ARDPORTAL_ENABLE_BACKUP_RESTORE
+  if (_request.indexOf("POST /api/restore ") == 0) {
+    startConfigRestore(bodySize, size_t(split));
+    return;
+  }
+#endif
   if (bodySize > 14336) {
     replyMessage(413, ArdUILanguage::Key::s_109);
     return;
@@ -1088,6 +1132,12 @@ void ArdPortal::handleHttp() {
     return;
   }
   String method = _request.substring(0, firstSpace), path = _request.substring(firstSpace + 1, secondSpace);
+#if ARDPORTAL_ENABLE_BACKUP_RESTORE
+  if (method == "GET" && path == "/api/backup") {
+    startConfigBackup();
+    return;
+  }
+#endif
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   if (dynamicHttp(method, path)) return;
 #endif
@@ -1361,6 +1411,7 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     appendJsonBool(out, F(",\"zigbeeConnected\":"), _zigbee.state() == ZigbeeState::Connected);
 #endif
     appendJsonBool(out, F(",\"configurationReady\":"), _configurationReady);
+    appendJsonBool(out, F(",\"restarting\":"), _rebootPending);
     appendJsonBool(out, F(",\"storageBusy\":"), portalAndAppConfigBusy());
     appendJsonText(out, F(",\"storageError\":"), _storageError);
     appendJsonNumber(out, F(",\"scanCompletedId\":"), _scanCompletedId);
@@ -1371,18 +1422,24 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
   }
   if (get && ardFlashEqual(path, F("/api/config"))) {
     String out;
-    appendJsonText(out, F("{\"ssid\":"), _config.ssid);
-    appendJsonText(out, F(",\"host\":"), _config.host);
-    appendJsonNumber(out, F(",\"port\":"), _config.port);
-    appendJsonText(out, F(",\"user\":"), _config.user);
-    appendJsonNumber(out, F(",\"mqttTls\":"), _config.mqttTls ? 1u : 0u);
-    appendJsonText(out, F(",\"caCert\":"), _config.caCert);
+    appendJsonText(out, F("{\"deviceName\":"), _config.deviceName);
+    appendJsonText(out, F(",\"deviceDescription\":"), _config.deviceDescription);
+#if ARDPORTAL_ENABLE_WIFI
+    appendJsonText(out, F(",\"ssid\":"), _config.ssid);
     appendJsonText(out, F(",\"apName\":"), _config.apName);
     appendJsonNumber(out, F(",\"apBand\":"), _config.apBand);
     appendJsonBool(out, F(",\"apDualBand\":"), ARDPORTAL_SUPPORT_DUAL_BAND_AP);
-    appendJsonText(out, F(",\"deviceName\":"), _config.deviceName);
+#endif
+#if ARDPORTAL_ENABLE_MQTT
+    appendJsonText(out, F(",\"host\":"), _config.host);
+    appendJsonNumber(out, F(",\"port\":"), _config.port);
+    appendJsonText(out, F(",\"user\":"), _config.user);
     appendJsonText(out, F(",\"mqttName\":"), ArdDeviceName::mqtt(_config.deviceName));
-    appendJsonText(out, F(",\"deviceDescription\":"), _config.deviceDescription);
+#endif
+#if ARDPORTAL_ENABLE_MQTT_TLS
+    appendJsonNumber(out, F(",\"mqttTls\":"), _config.mqttTls ? 1u : 0u);
+    appendJsonText(out, F(",\"caCert\":"), _config.caCert);
+#endif
     out += '}';
     reply(200, "application/json", out);
     return;
@@ -1441,8 +1498,8 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     values[index] = value;
     offset = end + 1;
   }
-#if !ARDPORTAL_ENABLE_MQTT
-  if (seen & 252) {
+#if !ARDPORTAL_ENABLE_MQTT_TLS
+  if (seen & (ARDPORTAL_ENABLE_MQTT ? 192 : 252)) {
     replyMessage(404, ArdUILanguage::Key::s_131);
     return;
   }
@@ -1472,18 +1529,9 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
       replyMessage(400, ArdUILanguage::Key::s_142);
       return;
     }
-#if !ARDPORTAL_ENABLE_MQTT_TLS
-    if (ardFlashEqual(values[6], F("1"))) {
-      replyMessage(400, ArdUILanguage::Key::s_211);
-      return;
-    }
-#endif
     c.mqttTls = ardFlashEqual(values[6], F("1"));
   }
   if (seen & 128) c.caCert = values[7];
-#if !ARDPORTAL_ENABLE_MQTT_TLS
-  if ((seen & 64) && !c.mqttTls) c.caCert = String();
-#endif
 #if !ARDPORTAL_ENABLE_MQTT_TLS
   if (ardFlashEqual(path, F("/api/mqtt/connect"))) {
     c.mqttTls = false;
@@ -2222,12 +2270,89 @@ bool validApp(const ArdJSON::JSONVar& value) {
   limits.maxOutputBytes = ArdPortal::MaxAppConfigBytes;
   return ArdJSON::JSON.measure(value, nullptr, limits) != 0;
 }
+bool decodeSnapshot(const ArdJSON::JSONVar& root, ArdPortalConfig& config, bool backup = false) {
+  return root.isValid() && root.type() == ArdJSON::JSONVar::Type::Object && root.length() == 2 && validApp(root["app"]) && ArdPortalJson::decodeValue(root["config"], config, backup);
 }
+}
+#if ARDPORTAL_ENABLE_WWW && ARDPORTAL_ENABLE_BACKUP_RESTORE
+bool ArdPortal::startConfigBackup() {
+  if (!_configurationReady || portalAndAppConfigBusy()) {
+    replyMessage(409, ArdUILanguage::Key::s_107);
+    return false;
+  }
+  _httpBackupApp = _appConfig;  // Stable snapshot while application callbacks keep running.
+  size_t appBytes = ArdJSON::JSON.measure(_httpBackupApp, nullptr, snapshotLimits());
+  _request = configDocumentPrefix(_config, true);
+  if (!_request.length() || !appBytes) {
+    replyMessage(500, ArdUILanguage::Key::s_107);
+    return false;
+  }
+  _httpBackupBytes = _request.length() + appBytes + 1;
+  _httpBackupOffset = 0;
+  responseHeader(200, "application/json", _httpBackupBytes);
+  return true;
+}
+bool ArdPortal::startConfigRestore(size_t bytes, size_t split) {
+  if (!bytes || bytes > MaxBackupDocumentBytes) {
+    replyMessage(bytes ? 413 : 400, ArdUILanguage::Key::s_120);
+    return false;
+  }
+  if (!_configurationReady || !_configurationWritable || portalAndAppConfigBusy() || _rebootPending || mqttTrialActive()) {
+    replyMessage(409, ArdUILanguage::Key::s_107);
+    return false;
+  }
+  if (!startConfigParser(true)) {
+    replyMessage(500, ArdUILanguage::Key::s_107);
+    return false;
+  }
+  _httpRestoreBytes = bytes;
+  _httpRestoreReceived = 0;
+  _request = _request.substring(split + 4);
+  receiveConfigRestore();
+  return true;
+}
+void ArdPortal::receiveConfigRestore() {
+  size_t count = _request.length();
+  if (count > _httpRestoreBytes - _httpRestoreReceived) count = _httpRestoreBytes - _httpRestoreReceived;
+  bool ok = _loadParser->input(_httpRestoreReceived, reinterpret_cast<const uint8_t*>(_request.c_str()), count);
+  _httpRestoreReceived += count;
+  _request = String();
+  if (!ok) {
+    _httpRestoreBytes = 0;
+    _loadParser.reset();
+    replyMessage(400, ArdUILanguage::Key::s_120);
+    return;
+  }
+  if (count) _httpSince = millis();
+  if (_httpRestoreReceived != _httpRestoreBytes) return;
+  _httpRestoreBytes = 0;
+  auto root = _loadParser->take();
+  _loadParser.reset();
+  const auto& view = root;
+  PortalConfig config;
+  if (!decodeSnapshot(view, config, true) || !validPortalConfig(config)) {
+    replyMessage(400, ArdUILanguage::Key::s_120);
+    return;
+  }
+  if (!scheduleConfig(config, view["app"], ChangeSource::Portal, true)) {
+    replyMessage(409, ArdUILanguage::Key::s_107);
+    return;
+  }
+  _restoreAfterSave = true;
+  _httpWaitingStorage = true;
+}
+#endif
 /**
  * @brief Apply the initial storage result and schedule the ready callback.
  * @param result Operation result to inspect or return.
  * @return No value.
  */
+bool ArdPortal::startConfigParser(bool backup) {
+  auto limits = snapshotLimits();
+  if (backup && ARDPORTAL_ENABLE_WWW && ARDPORTAL_ENABLE_BACKUP_RESTORE) limits.maxInputBytes = MaxBackupDocumentBytes;
+  _loadParser.reset(new (std::nothrow) ArdJSON::StreamParser(limits));
+  return bool(_loadParser);
+}
 void ArdPortal::finishLoad(const ArdPortalStorage::Result& result) {
   bool restored = false;
   _storageMounted = _storage.mounted();
@@ -2238,7 +2363,7 @@ void ArdPortal::finishLoad(const ArdPortalStorage::Result& result) {
   if (result.found && root.isValid()) {
     const ArdJSON::JSONVar& view = root;
     PortalConfig loaded;
-    if (root.isValid() && root.type() == ArdJSON::JSONVar::Type::Object && root.length() == 2 && view.hasOwnProperty("config") && validApp(view["app"]) && ArdPortalJson::decodeValue(view["config"], loaded) && validPortalConfig(loaded)) {
+    if (decodeSnapshot(view, loaded) && validPortalConfig(loaded)) {
       _config = std::move(loaded);
       _appConfig = std::move(root["app"]);
       restored = true;
@@ -2281,8 +2406,7 @@ void ArdPortal::serviceStorage(uint32_t now) {
   _storageMounted = _storage.mounted();
   if (!_loadStarted && _storage.ready()) {
     _loadStarted = true;
-    _loadParser.reset(new (std::nothrow) ArdJSON::StreamParser(snapshotLimits()));
-    if (!_loadParser || !_storage.readJsonConfig(
+    if (!startConfigParser() || !_storage.readJsonConfig(
           "/ardportal.json", [this](size_t offset, const uint8_t* bytes, size_t length) {
             return _loadParser && _loadParser->input(offset, bytes, length);
           },
@@ -2321,9 +2445,7 @@ void ArdPortal::serviceStorage(uint32_t now) {
   auto appLimits = snapshotLimits();
   appLimits.maxOutputBytes = MaxAppConfigBytes;
   _saveDocumentAppBytes = _pendingAppPatch ? ArdJSON::JSON.measureObjectPatch(_appConfig, _pendingApp, nullptr, appLimits) : ArdJSON::JSON.measure(_pendingApp, nullptr, appLimits);
-  String configJson = ArdPortalJson::encode(_pending, _json);
-  _saveDocumentPrefix = String(F("{\"config\":")) + configJson + ",\"app\":";
-  if (!configJson.length() || _saveDocumentPrefix.length() != configJson.length() + 17) _saveDocumentPrefix = String();
+  _saveDocumentPrefix = configDocumentPrefix(_pending);
 #if ARDPORTAL_ENABLE_MQTT
   const PortalConfig& active = _mqttClient.saveBaseline();
 #else
@@ -2379,11 +2501,11 @@ bool ArdPortal::scheduleConfig(const PortalConfig& config, const ArdJSON::JSONVa
 bool ArdPortal::scheduleAppPatch(ArdJSON::JSONVar patch, ChangeSource source, bool coalesceSource) {
   using V = ArdJSON::JSONVar;
   const bool defer = source == ChangeSource::Application && (_saveQueued || _saveRetryPending || _pendingReady || _deferredApp.length() || (_savePending && _saveSource != source));
-  if (!_configurationReady || !_configurationWritable || ((_saveQueued || _saveRetryPending) && !defer) || (_pendingReady && !defer) || !_storage.mounted() || otaActive() || mqttTrialActive() || (_httpWaitingStorage && !defer) || !patch.isObjectPatchValid() || _resetAfterSave || (_rebootPending && !(_beforeRestartRunning && source == ChangeSource::Application)
+  if (!_configurationReady || !_configurationWritable || ((_saveQueued || _saveRetryPending) && !defer) || (_pendingReady && !defer) || !_storage.mounted() || otaActive() || mqttTrialActive() || (_httpWaitingStorage && !defer) || !patch.isObjectPatchValid() || _resetAfterSave || _restoreAfterSave || (_rebootPending && !(_beforeRestartRunning && source == ChangeSource::Application)
 #if ARDPORTAL_ENABLE_ZIGBEE && ARDPORTAL_ENABLE_DYNAMIC_PAGES
-                                                                                                                                                                                                                                                                                         && !(_zigbeeDrainingRestart && source == ChangeSource::Zigbee)
+                                                                                                                                                                                                                                                                                                              && !(_zigbeeDrainingRestart && source == ChangeSource::Zigbee)
 #endif
-                                                                                                                                                                                                                                                                                           )
+                                                                                                                                                                                                                                                                                                                )
       || (_savePending && _saveSource != source && !coalesceSource && !defer))
     return false;
 #if (ARDPORTAL_ENABLE_ZIGBEE || ARDPORTAL_ENABLE_MATTER) && ARDPORTAL_ENABLE_DYNAMIC_PAGES
@@ -2445,29 +2567,37 @@ bool ArdPortal::scheduleAppPatch(ArdJSON::JSONVar patch, ChangeSource source, bo
   }
   return true;
 }
+String ArdPortal::configDocumentPrefix(const PortalConfig& config, bool backup) const {
+  String json = ArdPortalJson::encode(config, _json, backup);
+  String prefix = String(F("{\"config\":")) + json + ",\"app\":";
+  return json.length() && prefix.length() == json.length() + 17 ? prefix : String();
+}
 String ArdPortal::saveDocumentSlice(size_t offset, size_t maximum) const {
+  return configDocumentSlice(_saveDocumentPrefix, _pendingApp, _pendingAppPatch, _saveDocumentAppBytes, offset, maximum);
+}
+String ArdPortal::configDocumentSlice(const String& documentPrefix, const ArdJSON::JSONVar& app, bool patch, size_t appBytes, size_t offset, size_t maximum) const {
   String out;
   if (!out.reserve(maximum)) return out;
-  size_t prefix = _saveDocumentPrefix.length();
+  size_t prefix = documentPrefix.length();
   if (offset < prefix) {
     size_t n = prefix - offset;
     if (n > maximum) n = maximum;
-    out = _saveDocumentPrefix.substring(offset, offset + n);
+    out = documentPrefix.substring(offset, offset + n);
     offset += n;
     maximum -= n;
   }
-  if (maximum && offset >= prefix && offset < prefix + _saveDocumentAppBytes) {
-    size_t at = offset - prefix, n = _saveDocumentAppBytes - at;
+  if (maximum && offset >= prefix && offset < prefix + appBytes) {
+    size_t at = offset - prefix, n = appBytes - at;
     if (n > maximum) n = maximum;
     auto limits = snapshotLimits();
     limits.maxOutputBytes = MaxAppConfigBytes;
-    String part = _pendingAppPatch ? ArdJSON::JSON.stringifyObjectPatchSlice(_appConfig, _pendingApp, at, n, nullptr, limits) : ArdJSON::JSON.stringifySlice(_pendingApp, at, n, nullptr, limits);
+    String part = patch ? ArdJSON::JSON.stringifyObjectPatchSlice(_appConfig, app, at, n, nullptr, limits) : ArdJSON::JSON.stringifySlice(app, at, n, nullptr, limits);
     if (part.length() != n) return String();
     out += part;
     offset += n;
     maximum -= n;
   }
-  if (maximum && offset == prefix + _saveDocumentAppBytes) out += '}';
+  if (maximum && offset == prefix + appBytes) out += '}';
   return out;
 }
 void ArdPortal::applyPendingApp() {
@@ -2655,11 +2785,11 @@ void ArdPortal::finishSave(const ArdPortalStorage::Result& result) {
   } else
 #endif
     if (result.ok) {
-    if (_resetAfterSave) {
+    if (_resetAfterSave || _restoreAfterSave) {
+      scheduleRestart(_restoreAfterSave ? RestartReason::ConfigurationRestore : RestartReason::FactoryReset);
       _config = std::move(_pending);
       applyPendingApp();
       if (_saveHasChanges) notifyConfig();
-      scheduleRestart(RestartReason::FactoryReset);
     } else if (!_wifiConnectAfterSave && ArdPortalJson::equal(_config, _pending)) {
       applyPendingApp();
       if (_saveHasChanges) notifyConfig();
@@ -2672,7 +2802,7 @@ void ArdPortal::finishSave(const ArdPortalStorage::Result& result) {
 #endif
   } else {
 #if ARDPORTAL_ENABLE_WWW
-    if (respond) reply(500, "text/plain", result.error);
+    if (respond && !(_restoreAfterSave && retry)) reply(500, "text/plain", result.error);
 #endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     log(ArdUILanguage::text(ArdUILanguage::Key::s_176) + result.error);
@@ -2684,6 +2814,10 @@ void ArdPortal::finishSave(const ArdPortalStorage::Result& result) {
 #else
   (void)acknowledgeMqtt;
 #endif
+#endif
+#if ARDPORTAL_ENABLE_WWW && ARDPORTAL_ENABLE_BACKUP_RESTORE
+  if (_restoreAfterSave && retry) _httpWaitingStorage = respond;
+  if (!retry) _restoreAfterSave = false;
 #endif
   if (!retry) {
     _resetAfterSave = false;

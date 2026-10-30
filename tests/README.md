@@ -125,6 +125,12 @@ name. Admission/update checks can be run separately when publishing a release.
 Five generator `--check` commands verify languages, portal assets, compact
 state schemas and both gateway exporters without rewriting files. Regenerate
 changed assets locally and commit the generated headers with their sources.
+`src/PortalAssets.h` selects the generated headers in `src/portal-assets/`:
+shared styles and separate HTML/JavaScript files for each OTA, MQTT/TLS and
+console/messages combination. Regenerate all of them with
+`python3 src/tools/generate_portal_assets.py`; `--check` verifies the complete
+set, including missing or obsolete files. Each generated header stays below
+10 MiB to avoid oversized files in GitHub.
 
 Hardware validation remains separate: host tests and compilation do not establish
 RF range, physical actuator behavior, radio coexistence or complete device OTA.

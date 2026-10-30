@@ -74,6 +74,7 @@ using WiFiSleepType_t = int;
 constexpr int WIFI_NONE_SLEEP = 0, WIFI_MODEM_SLEEP = 1, WIFI_LIGHT_SLEEP = 2;
 struct WiFiStub {
   int state = 0, scans = -2, attempts = 0, apStarts = 0, disconnects = 0;
+  bool apStartResult = true;
   unsigned stations = 0;
   unsigned softAPgetStationNum() const {
     return stations;
@@ -81,7 +82,7 @@ struct WiFiStub {
   bool enableAP(bool) {
     return true;
   }
-  String apName, apPassword, hostName;
+  String apName, apPassword, hostName, staSsid, staPassword;
   void hostname(const char* name) {
     hostName = name;
   }
@@ -109,8 +110,10 @@ struct WiFiStub {
     listen = interval;
     return true;
   }
-  void begin(const char*, const char*) {
+  void begin(const char* ssid, const char* password) {
     ++attempts;
+    staSsid = ssid;
+    staPassword = password;
   }
   void disconnect(bool = false, bool = false) {
     ++disconnects;
@@ -120,7 +123,7 @@ struct WiFiStub {
     ++apStarts;
     apName = name;
     apPassword = password;
-    return true;
+    return apStartResult;
   }
   IPAddress localIP() const {
     return {};

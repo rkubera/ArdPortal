@@ -39,8 +39,8 @@ STORAGE_KEYS = {f's_{number}' for number in (194,195,196,198,199,200,204)}
 # @param dynamic Whether dynamic-page UI is included.
 # @param tls Whether MQTT TLS UI is included.
 # @return The collected UI string definitions.
-def ui_strings(strings, ota=1, mqtt=1, console=1, controls=None, dynamic=True, tls=True, zigbee=True, matter=False):
-    enabled = {'OTA': ota, 'MQTT': mqtt, 'CONSOLE': console, 'HA': True, 'DEPENDENCIES': dynamic, 'DYNAMIC_PAGES': dynamic, 'WEBSOCKET': dynamic or console, 'MQTT_TLS':tls and mqtt, 'ZIGBEE':zigbee, 'MATTER':matter}
+def ui_strings(strings, ota=1, mqtt=1, console=1, controls=None, dynamic=True, tls=True, zigbee=True, matter=False, backup=True):
+    enabled = {'BACKUP_RESTORE':backup,'OTA': ota, 'MQTT': mqtt, 'CONSOLE': console, 'HA': True, 'DEPENDENCIES': dynamic, 'DYNAMIC_PAGES': dynamic, 'WEBSOCKET': dynamic or console, 'MQTT_TLS':tls and mqtt, 'ZIGBEE':zigbee, 'MATTER':matter}
     excluded = {key for feature, keys in FEATURE_KEYS.items() if not enabled[feature] for key in keys}
     return {key: value for key, value in strings.items() if key.startswith('ui_') and key not in excluded and condition_enabled(condition_for(key), controls, enabled)}
 
@@ -59,8 +59,11 @@ def ui_payload(lines,name,strings,flags,controls=None,dynamic=True):
         if not tls:lines.append('#else')
         for guard,zigbee,matter in [('#if ARDPORTAL_ENABLE_ZIGBEE',True,False),('#elif ARDPORTAL_ENABLE_MATTER',False,True),('#else',False,False)]:
             lines.append(guard)
-            payload=json.dumps(ui_strings(strings,*flags,controls=controls,dynamic=dynamic,tls=tls,zigbee=zigbee,matter=matter),ensure_ascii=False,separators=(',',':'))
-            lines.extend(emit_chunks(name,[('1',payload)],gzip_array))
+            for backup in [True,False]:
+                lines.append('#if ARDPORTAL_ENABLE_BACKUP_RESTORE' if backup else '#else')
+                payload=json.dumps(ui_strings(strings,*flags,controls=controls,dynamic=dynamic,tls=tls,zigbee=zigbee,matter=matter,backup=backup),ensure_ascii=False,separators=(',',':'))
+                lines.extend(emit_chunks(name,[('1',payload)],gzip_array))
+            lines.append('#endif')
         lines.append('#endif')
     lines.append('#endif')
 
@@ -76,6 +79,7 @@ def feature_for(key):
 # @param key Configuration key or JSON object member name.
 # @return The C++ feature expression selecting the asset variant.
 def condition_for(key):
+    if key in {'ui_249','ui_251','ui_252'}: return 'ARDPORTAL_ENABLE_BACKUP_RESTORE'
     # Native diagnostics follow their actual consumers, not the Console UI.
     # MQTT serial logging can be enabled independently of that UI.
     if key == 's_157': return '0'  # obsolete MQTT RX prefix, no caller

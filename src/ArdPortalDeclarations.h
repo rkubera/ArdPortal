@@ -120,6 +120,7 @@ public:
   static constexpr size_t MaxPortalConfigBytes = 5 * 1024;
   static constexpr size_t MaxAppConfigBytes = 8 * 1024;
   static constexpr size_t MaxConfigDocumentBytes = 13 * 1024 + 64;
+  static constexpr size_t MaxBackupDocumentBytes = 2 * MaxPortalConfigBytes + MaxAppConfigBytes + 64;
   struct Options {
     const char* deviceName = nullptr;  // Default: ArdUI- + chip ID; also the AP SSID.
     const char* apPassword = "1234567890";
@@ -1138,6 +1139,8 @@ private:
   bool scheduleAppPatch(ArdJSON::JSONVar patch, ChangeSource source, bool coalesceSource = false);
   void applyPendingApp();
   String saveDocumentSlice(size_t offset, size_t maximum) const;
+  String configDocumentPrefix(const PortalConfig& config, bool backup = false) const;
+  String configDocumentSlice(const String& prefix, const ArdJSON::JSONVar& app, bool patch, size_t appBytes, size_t offset, size_t maximum) const;
 
   PortalConfigChangedCallback _changed;
   PortalAndAppConfigSavedCallback _saved;
@@ -1165,6 +1168,7 @@ private:
    * @param result Operation result to inspect or return.
    * @return No value.
    */
+  bool startConfigParser(bool backup = false);
   void finishLoad(const ArdPortalStorage::Result& result);
   /**
    * @brief Schedule persistence of the current portal and application configuration.
@@ -1362,6 +1366,15 @@ private:
 #endif
 #if ARDPORTAL_ENABLE_WWW
   String _request, _response;
+#if ARDPORTAL_ENABLE_BACKUP_RESTORE
+  bool _restoreAfterSave = false;
+  size_t _httpRestoreBytes = 0, _httpRestoreReceived = 0;
+  ArdJSON::JSONVar _httpBackupApp;
+  size_t _httpBackupBytes = 0, _httpBackupOffset = 0;
+  bool startConfigBackup();
+  bool startConfigRestore(size_t bytes, size_t split);
+  void receiveConfigRestore();
+#endif
   const char* _page = nullptr;
   size_t _responseOffset = 0, _pageLength = 0, _pageOffset = 0;
   const ArdAssetChunk* _assetChunks = nullptr;
@@ -1378,6 +1391,9 @@ private:
   bool _httpConfigUpload = false;
 #else
   static constexpr bool _httpConfigUpload = false;
+#endif
+#if !ARDPORTAL_ENABLE_WWW || !ARDPORTAL_ENABLE_BACKUP_RESTORE
+  static constexpr bool _restoreAfterSave = false;
 #endif
   bool _rebootPending = false, _beforeRestartCalled = false, _beforeRestartRunning = false;
   RestartReason _restartReason = RestartReason::Portal;

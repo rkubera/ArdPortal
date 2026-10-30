@@ -286,10 +286,10 @@ limited to 5 KiB (`MaxPortalConfigBytes`), including a CA certificate of up to
 budgets count JSON keys, quotes and escaping. Certificate and remaining network/
 device settings must fit together within the PortalConfig budget. Both parts,
 including the outer JSON object, fit within `MaxConfigDocumentBytes` (13376 bytes).
-Even worst-case journal escaping fits each record in seven 4 KiB sectors; two
-journal slots fit within one 64 KiB bank after its 4 KiB header. Additional ArdFS
-files consume the remaining space and can still cause capacity errors. This is a
-flash-size guarantee for the portal document, not a guarantee of available heap.
+Journal escaping and metadata also consume space. Both journal slots and other
+ArdFS files share the available flash bank; storage checks capacity before commit.
+These serialized byte budgets do not guarantee that a complete document fits in
+available heap.
 Configure at least 128 KiB of filesystem/storage space in the board flash layout
 (or ESP32 partition table) to use the full budgets. ArdPortal does not resize it.
 Field tracking uses fixed masks covering all 1024 fields, including MQTT and HA
