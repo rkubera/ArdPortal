@@ -187,7 +187,7 @@ inline bool validMaxLength(const ArdJSON::JSONVar& field) {
 inline size_t maxLength(const ArdJSON::JSONVar& field) {
   if (!validMaxLength(field)) return 0;
   return field["maxLength"].isUndefined() ? (field["type"].asString() == "edit" ? 128 : 512)
-                                         : size_t(field["maxLength"].asDouble());
+                                          : size_t(field["maxLength"].asDouble());
 }
 // Shared read-only value rules, independent of protocol discovery metadata.
 inline bool validReading(const ArdJSON::JSONVar& field, const ArdJSON::JSONVar& value) {
