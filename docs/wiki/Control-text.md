@@ -38,6 +38,7 @@
 | `type` | Required | Enabled field type. |
 | `name` | Required title¹ | Display title; may be replaced by a nonempty `names` object. |
 | `class` | **Optional** | Semantic subtype; defaults to `"text"`. See the table below. |
+| `maxLength` | **Optional** | Maximum UTF-8 bytes, integer 1–8192; default 512. Supported for plain text only. |
 | `default` | **Optional** | Plain text starts as `""`; numeric subtypes start as `null` (unknown). |
 | `persist` | **Optional** | Defaults to false for this read-only control. |
 
@@ -46,7 +47,7 @@
 
 **Appearance:** Read-only value
 
-**Value:** Plain text accepts a string (up to 512 bytes) or a number. Measurement subtypes accept JSON numbers or `null`, never numeric strings.
+**Value:** Plain text accepts a string (up to `maxLength` UTF-8 bytes, 512 by default) or a number. Measurement subtypes accept JSON numbers or `null`, never numeric strings.
 
 Update with a code setter; portal/MQTT commands cannot edit it. String values such as `"Ready"` use the same type.
 
@@ -200,3 +201,5 @@ See [Defines](Defines#typed-text-measurements). Unsupported subtype definitions
 are rejected rather than silently converted to plain text.
 
 Additional classes are listed in [Control classes](Control-Classes). Numeric classes beyond the native table use generic Analog Input in Zigbee. Date, timestamp and enum readings have no Zigbee endpoint.
+
+Example: `"maxLength": 1024` permits up to 1024 UTF-8 bytes. Longer values use more RAM and storage when persisted. MQTT still requires the complete packet, including topic and encoding overhead, to fit its 2048-byte capacity; increasing this property does not increase transport limits.

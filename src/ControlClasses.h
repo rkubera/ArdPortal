@@ -175,11 +175,25 @@ inline Model describe(const ArdJSON::JSONVar& field) {
   }
   return result;
 }
+// String limits use UTF-8 bytes, matching Arduino String::length().
+inline bool validMaxLength(const ArdJSON::JSONVar& field) {
+  const auto& limit = field["maxLength"];
+  if (limit.isUndefined()) return true;
+  const String type = field["type"].asString();
+  const Class id = classOf(field);
+  if (type != "edit" && !(type == "text" && (id == Class::None || id == Class::Text))) return false;
+  return limit.isInteger() && limit.asDouble() >= 1 && limit.asDouble() <= 8192;
+}
+inline size_t maxLength(const ArdJSON::JSONVar& field) {
+  if (!validMaxLength(field)) return 0;
+  return field["maxLength"].isUndefined() ? (field["type"].asString() == "edit" ? 128 : 512)
+                                         : size_t(field["maxLength"].asDouble());
+}
 // Shared read-only value rules, independent of protocol discovery metadata.
 inline bool validReading(const ArdJSON::JSONVar& field, const ArdJSON::JSONVar& value) {
   using V = ArdJSON::JSONVar;
   Class id = classOf(field);
-  if (!validClass(field)) return false;
+  if (!validClass(field) || !validMaxLength(field)) return false;
   if (value.isNull() && id != Class::None && id != Class::Text) return true;
 #if ARDPORTAL_ENABLE_CLASSES
   if (numeric(id)) {
@@ -205,6 +219,6 @@ inline bool validReading(const ArdJSON::JSONVar& field, const ArdJSON::JSONVar& 
     double n;
     if (value.type() == V::Type::Number) return value.toDouble(n) && std::isfinite(n);
   }
-  return text && text->length() <= 512 && strlen(text->c_str()) == text->length();
+  return text && text->length() <= maxLength(field) && strlen(text->c_str()) == text->length();
 }
 }
