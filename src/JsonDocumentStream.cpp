@@ -3,10 +3,10 @@
 #include "ArdJSON.h"
 
 namespace ArdJSON {
-StreamParser::StreamParser(const Limits& limits)
+NativeStreamParser::NativeStreamParser(const Limits& limits)
   : _syntax(limits.maxDepth, false), _limits(limits) {}
 
-void StreamParser::reset(const Limits& limits) {
+void NativeStreamParser::reset(const Limits& limits) {
   _limits = limits;
   _syntax.reset(limits.maxDepth, false);  // The DOM checks exact keys; no second key table.
   _root = JSONVar();
@@ -17,11 +17,11 @@ void StreamParser::reset(const Limits& limits) {
   _error = nullptr;
   _budget = ArdCooperativeBudget();
 }
-bool StreamParser::fail(const char* error) {
+bool NativeStreamParser::fail(const char* error) {
   if (!_error) _error = error;
   return false;
 }
-const char* StreamParser::syntaxError(ArdJsonStream::Error error) {
+const char* NativeStreamParser::syntaxError(ArdJsonStream::Error error) {
   using E = ArdJsonStream::Error;
   switch (error) {
     case E::String: return ARD_LANG_NATIVE_EXPECTED_STRING;
@@ -48,10 +48,10 @@ const char* StreamParser::syntaxError(ArdJsonStream::Error error) {
     default: return ARD_LANG_NATIVE_EXPECTED_VALUE;
   }
 }
-bool StreamParser::dispatch(void* context, ArdJsonStream::Event event, uint8_t b, unsigned depth) {
-  return static_cast<StreamParser*>(context)->consume(event, b, depth);
+bool NativeStreamParser::dispatch(void* context, ArdJsonStream::Event event, uint8_t b, unsigned depth) {
+  return static_cast<NativeStreamParser*>(context)->consume(event, b, depth);
 }
-bool StreamParser::input(size_t offset, const uint8_t* bytes, size_t length) {
+bool NativeStreamParser::input(size_t offset, const uint8_t* bytes, size_t length) {
   if (_error) return false;
   if (offset != _bytes || length > _limits.maxInputBytes || _bytes > _limits.maxInputBytes - length) return fail(ARD_LANG_NATIVE_INPUT_LIMIT);
   const ArdJsonStream::Listener emit{ this, dispatch };
@@ -64,7 +64,7 @@ bool StreamParser::input(size_t offset, const uint8_t* bytes, size_t length) {
   _offset = _bytes += length;
   return true;
 }
-JSONVar StreamParser::take() {
+JSONVar NativeStreamParser::take() {
   const ArdJsonStream::Listener emit{ this, dispatch };
   if (!_error && !_syntax.finishInput(emit)) fail(syntaxError(_syntax.error));
   if (_error || !_root.isValid()) {
@@ -73,13 +73,13 @@ JSONVar StreamParser::take() {
   }
   return std::move(_root);
 }
-bool StreamParser::append(String& text, uint8_t b, bool stringLimit) {
+bool NativeStreamParser::append(String& text, uint8_t b, bool stringLimit) {
   if (stringLimit && text.length() >= _limits.maxStringBytes) return fail(ARD_LANG_NATIVE_STRING_LIMIT);
   const size_t before = text.length();
   text += char(b);
   return text.length() == before + 1 || fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
 }
-JSONVar* StreamParser::value(unsigned depth) {
+JSONVar* NativeStreamParser::value(unsigned depth) {
   if (depth > _limits.maxDepth || depth > 32) {
     fail(ARD_LANG_NATIVE_DEPTH_LIMIT);
     return nullptr;
@@ -102,7 +102,7 @@ JSONVar* StreamParser::value(unsigned depth) {
   }
   return &member->value;
 }
-bool StreamParser::consume(ArdJsonStream::Event event, uint8_t b, unsigned depth) {
+bool NativeStreamParser::consume(ArdJsonStream::Event event, uint8_t b, unsigned depth) {
   using E = ArdJsonStream::Event;
   if (event == E::Key) {
     _key = String();
@@ -133,14 +133,14 @@ bool StreamParser::consume(ArdJsonStream::Event event, uint8_t b, unsigned depth
   }
   return !_error;
 }
-JSONVar Parser::parse() {
+JSONVar NativeParser::parse() {
   _offset = _nodes = 0;
   _error = nullptr;
   if (_input.length() > _limits.maxInputBytes) {
     _error = ARD_LANG_NATIVE_INPUT_LIMIT;
     return JSONVar();
   }
-  StreamParser parser(_limits);
+  NativeStreamParser parser(_limits);
   parser.input(0, reinterpret_cast<const uint8_t*>(_input.c_str()), _input.length());
   JSONVar value = parser.take();
   _error = parser.error();

@@ -42,6 +42,22 @@ in a temporary directory, then set `ZHC_NODE_MODULES` to that directory's
 Run `tests/zha-quirk-test.py` and `tests/zigbee-converter-test.mjs` with Python and
 Node respectively. Dependency installation must not modify the library tree.
 
+## Optional JSON backend
+
+`python3 tests/json-backend-test.py` checks the default backend without installing
+ArduinoJson. Set `ARDUINOJSON_ROOT` to a real ArduinoJson 7 library directory to
+also run both backends through syntax/UTF-8, streamed storage input, limits,
+exact numeric boundaries, patches, HTML escaping, pretty output and slice parity:
+
+```sh
+ARDUINOJSON_ROOT=/path/to/ArduinoJson python3 tests/json-backend-test.py
+```
+
+The test also checks dependency exclusion, backend selection, feature signatures
+and invalid switch values. Firmware size is measured using the same DynamicPages
+sketch and board settings for both backends; the optional ArduinoJson dependency
+is passed explicitly to Arduino CLI with `--library`.
+
 ## Arduino builds
 
 With Arduino CLI 1.5.1, install ESP8266 core 3.1.2 and Espressif ESP32 core 3.3.12

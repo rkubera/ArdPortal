@@ -1,0 +1,76 @@
+{
+  "date": "2026-10-30",
+  "example": "DynamicPages",
+  "arduinojson_version": "7.4.2",
+  "switch": "ARDPORTAL_USE_ARDUINOJSON",
+  "boards": {
+    "esp8266": "esp8266:esp8266:generic",
+    "esp32": "esp32:esp32:esp32"
+  },
+  "results": {
+    "esp8266": {
+      "before": {
+        "bin_bytes": 592624,
+        "bin_sha256": "2bfa1b13cf16f8c8a32104c070a3cfcbcd1fcba01cce25e4c7db4184a46aa156",
+        "log": "/tmp/ardportal-json-backends-20261030/esp8266-before.log"
+      },
+      "native": {
+        "bin_bytes": 592624,
+        "bin_sha256": "2bfa1b13cf16f8c8a32104c070a3cfcbcd1fcba01cce25e4c7db4184a46aa156",
+        "log": "/tmp/ardportal-json-backends-20261030/esp8266-native.log",
+        "bin_delta_bytes": 0
+      },
+      "arduinojson": {
+        "bin_bytes": 603712,
+        "bin_sha256": "db912e8af95e5b27e98d25b52096263646995b97c64e602b3c46c8bc71c68d26",
+        "log": "/tmp/ardportal-json-backends-20261030/esp8266-arduinojson.log",
+        "bin_delta_bytes": 11088
+      }
+    },
+    "esp32": {
+      "before": {
+        "bin_bytes": 1282464,
+        "bin_sha256": "13d4ac06d52886dcf8983d587d3ccd6be548c46234fbe82ea29b6ca991e2f3c1",
+        "log": "/tmp/ardportal-json-backends-20261030/esp32-before.log",
+        "program_storage_bytes": 1282214,
+        "global_ram_bytes": 57748
+      },
+      "native": {
+        "bin_bytes": 1282464,
+        "bin_sha256": "1afa6b57d76cef259fd2366195aeb2cbf5dab7bd05959d5bcf4fef665884a1a7",
+        "log": "/tmp/ardportal-json-backends-20261030/esp32-native.log",
+        "program_storage_bytes": 1282214,
+        "global_ram_bytes": 57748,
+        "bin_delta_bytes": 0
+      },
+      "arduinojson": {
+        "bin_bytes": 1293520,
+        "bin_sha256": "77669efe603163a1f8b0c90936d2c92d590806d70de2a66b68fc72aab7209fa3",
+        "log": "/tmp/ardportal-json-backends-20261030/esp32-arduinojson.log",
+        "program_storage_bytes": 1293274,
+        "global_ram_bytes": 57748,
+        "bin_delta_bytes": 11056
+      }
+    }
+  },
+  "tests": {
+    "json_backend_conformance": "passed (both backends, ASan/UBSan)",
+    "native_config_memory_suite": "passed",
+    "arduinojson_dynamic_patch_integration": "passed (ASan/UBSan)"
+  },
+  "notes": [
+    "Before and native builds need no ArduinoJson dependency.",
+    "Fresh build directories were used per variant; final ArduinoJson-only header refinements were rebuilt incrementally.",
+    "The default native firmware size is unchanged on both targets.",
+    "The optional ArduinoJson compatibility backend is larger and does not meet a no-growth requirement when that requirement is applied to the selected ArduinoJson firmware.",
+    "The JSONVar ownership model, strict syntax scanner and bounded slice/patch writer are shared. The optional backend buffers storage input and converts to/from an ArduinoJson document, increasing peak RAM."
+  ],
+  "artifacts": "/tmp/ardportal-json-backends-20261030",
+  "source_sha256": {
+    "src/ArdArduinoJson.h": "befd3f2f80b4c2ca39f5a839a5ff2e01cbac531c66451808a10cacd5014f7a75",
+    "src/ArdJSON.h": "8ba44ac5546ade22264faac40b08898ac9dc13ce1f9b89a5a802cf9a968f5dfc",
+    "src/ArdPortalFeatures.h": "26a261cf781409314823a2de3d7951483a3ab71549db4788b5599a42ee4de717",
+    "src/JsonBackendConfig.h": "9f6a5d69383d3b0e393a2f6fbdb2e257e725b6aac324110c4c67a5f89e05f37d",
+    "src/JsonDocumentStream.cpp": "b662c67093a22f48eceddc7718c3ab890febf5b7a2ce936c4b16e28e68f2a6cb"
+  }
+}
