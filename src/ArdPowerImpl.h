@@ -40,7 +40,7 @@ void ArdPortal::servicePower() {
 #endif
 #endif
 #if ARDPORTAL_ENABLE_MQTT
-  if (mqttTrialActive() || _mqttClient.trialSavePending() || _mqttClient.sendBusy() || _mqttClient._rxSize || _mqttClient.mqttTransport().available() || _mqttClient._pingPending || _mqttClient._mqttState == MqttState::Connecting) block(ArdPowerBlocker::Mqtt);
+  if (mqttTrialActive() || _mqttClient.trialSavePending() || _mqttClient.sendBusy() || _mqttClient.receiveBusy() || _mqttClient.mqttTransport().available() || _mqttClient._mqttState == MqttState::Connecting) block(ArdPowerBlocker::Mqtt);
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
   if (_config.host.length() && (_appControls._stateDirty || _appControls._mqttAckPending || _appControls._mqttAckInFlight)) block(ArdPowerBlocker::Mqtt);
 #endif

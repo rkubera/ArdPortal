@@ -113,3 +113,66 @@ See [portal screenshots](https://github.com/rkubera/ArdPortal/wiki/Screenshots),
 ## License
 
 [MIT](LICENSE). Copyright Radoslaw Kubera (rkubera on GitHub).
+
+### MQTT client backend
+
+The default MQTT protocol client is the standalone, header-only `ArdMQTT.h`.
+It depends on Arduino `Client`, without including ArdPortal, Wi-Fi or TLS.
+ArdPortal supplies its plain or verified TLS transport and keeps the existing
+`portal.mqtt()` API, reconnect policy, callbacks and configuration trials.
+
+To use [PubSubClient 2.8](https://github.com/knolleary/pubsubclient) instead,
+install that library and select it before the portal include:
+
+```cpp
+#define ARDPORTAL_USE_PUBSUBCLIENT 1
+#include <ArdPortal.h>
+```
+
+`0` (default) selects ArdMQTT. Its portal transport binding is resolved by the
+compiler, without a second `std::function` callback or an indirect writer.
+Only the selected protocol implementation is
+included; the PubSubClient build has no ArdMQTT receive buffer or packet codec.
+`ARDPORTAL_ENABLE_MQTT 0` excludes both backends. Backend selection participates
+in the cross-translation-unit feature check, so use the same flags everywhere.
+PubSubClient remains an optional dependency, like LittleFS.
+
+Both backends use a 2048-byte packet limit, QoS 0 subscriptions/publications,
+Home Assistant availability and protection against retained control commands.
+The PubSubClient adapter observes packet headers without another packet buffer.
+PubSubClient performs synchronous connect/read/write operations and does not
+track SUBACK/UNSUBACK results; the default ArdMQTT backend processes at most
+256 bytes per portal loop and tracks acknowledgements and deadlines.
+
+Standalone usage (connect the supplied Arduino transport first):
+
+```cpp
+#include <WiFiClient.h>
+#include <ArdMQTT.h>
+WiFiClient transport;
+ArdMQTT mqtt(transport);
+
+// After Wi-Fi is ready:
+// transport.connect("broker.local", 1883);
+// mqtt.setCallback([](char* topic, uint8_t* payload, unsigned int length) { ... });
+// mqtt.connect("device-id");  // Queues CONNECT; loop() processes CONNACK.
+// Call mqtt.loop() regularly; subscribe/publish after mqtt.connected().
+```
+
+Standalone ArdMQTT accepts arbitrary topics. ArdPortal continues to validate
+its `cmnd/<device>/<command>`, `get/...` and `stat/...` topic convention.
+
+Feature flags must precede `#include <ArdPortal.h>`; flags defined afterwards
+cannot remove code or pages that have already been included:
+
+```cpp
+#define ARDPORTAL_ENABLE_LOG_CALLBACK 1
+#define ARDPORTAL_ENABLE_MQTT 0
+#define ARDPORTAL_ENABLE_DYNAMIC_PAGES 0
+// Optional: hide the general web console while keeping the log callback.
+#define ARDPORTAL_ENABLE_CONSOLE 0
+#include <ArdPortal.h>
+```
+
+Disabling MQTT also excludes its TLS and Home Assistant modules. The log callback
+can still enable general diagnostics; it does not re-enable the MQTT client.

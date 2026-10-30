@@ -62,7 +62,7 @@ class ArdPortal {public:
    MqttState _mqttState=MqttState::Connected;
    unsigned incoming=0;
    Mqtt& mqttTransport(){return *this;}unsigned available(){return incoming;}
-   bool trialSavePending(){return saving;}bool sendBusy(){return sending;}
+   bool receiveBusy(){return _rxSize || _pingPending;}bool trialSavePending(){return saving;}bool sendBusy(){return sending;}
  } _mqttClient;
  struct {bool _stateDirty=false,_mqttAckPending=false,_mqttAckInFlight=false;} _appControls;
  struct {Text host;} _config;

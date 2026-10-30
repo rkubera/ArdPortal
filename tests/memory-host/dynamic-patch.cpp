@@ -262,21 +262,23 @@ int main() {
     mqtt._mqttState = ArdPortal::MqttState::Connected;
     mqtt._lastTx = fakeMillis;
     assert(mqtt._mqtt.connect(IPAddress(), 1883));
+
+    mqtt._protocol._connected = true;
     auto endpoint = mqtt._mqtt.endpoint;
     endpoint->writeLimit = 7;
     String body;
     for (size_t i = 0; i < 130; ++i) body += char(i);
-    assert(mqtt.queuePacket(0x30, body));
-    assert(mqtt._tx.length() == 133);
+    assert(mqtt._protocol.queuePacket(0x30, body));
+    assert(mqtt._protocol._tx.length() == 133);
     mqtt.serviceMqtt(++fakeMillis);
-    assert(mqtt._txSize == 133 && mqtt._txOffset == 7 && mqtt._tx.length() == 133);
-    for (size_t i = 0; i < 30 && mqtt._txSize; ++i) mqtt.serviceMqtt(++fakeMillis);
-    assert(!mqtt._txSize && !mqtt._tx.length() && endpoint->output.size() == 133);
+    assert(mqtt._protocol._txSize == 133 && mqtt._protocol._txOffset == 7 && mqtt._protocol._tx.length() == 133);
+    for (size_t i = 0; i < 30 && mqtt._protocol._txSize; ++i) mqtt.serviceMqtt(++fakeMillis);
+    assert(!mqtt._protocol._txSize && !mqtt._protocol._tx.length() && endpoint->output.size() == 133);
     assert(endpoint->output[0] == 0x30 && endpoint->output[1] == 0x82 && endpoint->output[2] == 1);
     assert(!memcmp(endpoint->output.data() + 3, body.c_str(), body.length()));
-    assert(mqtt.queuePacket(0x30, body));
+    assert(mqtt._protocol.queuePacket(0x30, body));
     mqtt.closeMqtt();
-    assert(!mqtt._txSize && !mqtt._tx.length());
+    assert(!mqtt._protocol._txSize && !mqtt._protocol._tx.length());
     WiFi.state = savedWifi;
     fakeMillis = savedMillis;
   }

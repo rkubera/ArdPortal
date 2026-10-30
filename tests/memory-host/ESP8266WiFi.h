@@ -47,7 +47,7 @@ public:
   bool flush(unsigned) {
     return true;
   }
-  void stop(unsigned) {
+  void stop(unsigned = 0) {
     abort();
   }
   void abort() {

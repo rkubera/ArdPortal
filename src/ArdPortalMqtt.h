@@ -18,6 +18,7 @@ class ArdPortal;
 #endif
 
 #include "MqttTransport.h"
+#include "ArdPortalMqttBackend.h"
 #include "ArdAllocation.h"
 
 // Owns the MQTT protocol, transport, TLS session and connection trial.
@@ -141,7 +142,7 @@ public:
     _trialCallback = std::move(callback);
   }
 private:
-  bool _autoReconnect = true, _unsubscribePending = false;
+  bool _autoReconnect = true;
   StateCallback _stateCallback;
   TrialCallback _trialCallback;
   MqttState _apiState = MqttState::Disabled;
@@ -157,7 +158,7 @@ private:
    * @param portal Owning portal instance.
    * @return No value.
    */
-  explicit ArdMqtt(ArdPortal& portal)
+  explicit __attribute__((always_inline)) ArdMqtt(ArdPortal& portal)
     : _portal(portal) {}
   ArdPortal& _portal;
   /**
@@ -195,8 +196,15 @@ private:
    * @brief Return a busy response when the current operation prevents accepting a request.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
+  bool receiveBusy() const {
+    return _protocol.receiveBusy();
+  }
   bool sendBusy() const {
-    return _txSize || _subscriptionPending;
+#if ARDPORTAL_USE_PUBSUBCLIENT
+    return false;
+#else
+    return _protocol.busy();
+#endif
   }
   /**
    * @brief Read the revision counter for completed connection trials.
@@ -288,21 +296,22 @@ private:
   uint32_t _mqttRevision = 0, _mqttTrialSince = 0;
   uint8_t _mqttResult = 0;
   String _mqttResultMessage;
-  uint32_t _mqttSince = 0, _lastTx = 0, _pingSince = 0, _txSince = 0;
+  uint32_t _mqttSince = 0, _lastTx = 0;
   uint32_t _lastServiceMs = 0, _maxServiceGapMs = 0;
-  bool _pingPending = false;
-  uint8_t _rx[PacketCapacity];
-  String _tx;  // Own only the queued packet; release it after send/disconnect.
-  size_t _rxSize = 0, _txSize = 0, _txOffset = 0;
-  uint16_t _packetId = 0, _subscriptionId = 0;
-  bool _subscriptionPending = false;
-  uint32_t _subscriptionSince = 0, _packetSince = 0;
+#if ARDPORTAL_USE_PUBSUBCLIENT
+  ArdPortalMqttBackend _protocol;
+#else
+  friend struct ArdPortalMqttIO;
+  ArdPortalMqttBackend _protocol{ ArdPortalMqttIO{ this } };
+#endif
   /**
    * @brief Advance MQTT connection, protocol and reconnect work.
    * @param now Current time used to evaluate deadlines.
    * @return No value.
    */
   void serviceMqtt(uint32_t now);
+  void receiveMessage(char* topic, uint8_t* payload, unsigned int length);
+  void connectionEstablished();
   /**
    * @brief Close the MQTT transport and clear its protocol state.
    * @param reason Restart or failure reason.
@@ -324,32 +333,13 @@ private:
    */
   bool subscribeRaw(const char* topic);
   /**
-   * @brief Queue an encoded MQTT packet for cooperative transmission.
-   * @param type JSON, control or protocol type being examined.
-   * @param body HTTP or MQTT message body.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool queuePacket(uint8_t type, const String& body);
-  /**
-   * @brief Decode and handle the completed MQTT protocol packet.
-   * @param type JSON, control or protocol type being examined.
-   * @param body HTTP or MQTT message body.
-   * @param length Number of bytes or elements to process.
-   * @return True on success; false if validation, resource allocation or the operation fails.
-   */
-  bool processPacket(uint8_t type, const uint8_t* body, size_t length);
-  /**
    * @brief Open the configured plain or TLS MQTT transport.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
   bool connectMqttTransport();
-  /**
-   * @brief Transmit a bounded portion of queued MQTT bytes.
-   * @param data Data buffer or value used by the operation.
-   * @param length Number of bytes or elements to process.
-   * @return Transmit a bounded portion of queued MQTT bytes.
-   */
+#if !ARDPORTAL_USE_PUBSUBCLIENT
   size_t writeMqtt(const uint8_t* data, size_t length);
+#endif
   /**
    * @brief Start a connection trial without committing the proposed settings.
    * @return No value.
