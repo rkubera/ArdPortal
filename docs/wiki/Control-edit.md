@@ -34,6 +34,7 @@
 | `id` | Required | Stable application key; unique across registered pages. |
 | `type` | Required | Enabled field type. |
 | `name` | Required title¹ | Display title; may be replaced by a nonempty `names` object. |
+| `maxLength` | **Optional** | Maximum UTF-8 bytes, integer 1–8192; default 128. Supported for editable text. |
 | `default` | **Optional** | Omit to use the built-in initial value. |
 
 ¹ `name` can be replaced by `names`. Other shared optional properties are listed [in the catalogue](https://github.com/rkubera/ArdPortal/wiki/Controls#required-and-optional-properties).
@@ -41,7 +42,7 @@
 
 **Appearance:** Rounded editable text input
 
-**Value:** String, at most 128 bytes
+**Value:** String, at most `maxLength` UTF-8 bytes (128 by default)
 
 Changes are sent automatically; MQTT accepts the text directly. Embedded NUL bytes are rejected.
 
@@ -49,9 +50,9 @@ Changes are sent automatically; MQTT accepts the text directly. Embedded NUL byt
 
 **MQTT component:** `text`. Requires the control’s feature flag, dynamic pages, MQTT and HA support to be enabled. ArdPortal registers MQTT Discovery and routes state/commands; the sketch implements device behavior. Action callbacks acknowledge acceptance, not physical completion.
 
-**Supported by ArdPortal:** Editable string state and commands; Discovery advertises a 0–128 length range and ArdPortal validates up to 128 UTF-8 bytes without embedded NULs.
+**Supported by ArdPortal:** Editable string state and commands; Discovery advertises a 0–`maxLength` length range. ArdPortal enforces UTF-8 bytes; Home Assistant counts characters. Embedded NULs are rejected.
 
-**Not provided by the built-in integration / limits:** No built-in password mode, regular-expression pattern, multiline HA editor, or typed numeric measurement behavior. Additional `ha` metadata does not change the 128-byte application validation limit.
+**Not provided by the built-in integration / limits:** No built-in password mode, regular-expression pattern, multiline HA editor, or typed numeric measurement behavior. Set top-level `maxLength` to change the application validation limit.
 
 Explicit `ha` properties can override Discovery metadata. They do not create additional hardware behavior, application value properties or command handlers by themselves. See [HA integration](https://github.com/rkubera/ArdPortal/wiki/Home-Assistant) for the shared setup.
 
@@ -121,3 +122,5 @@ if (!current.isUndefined() && current.isValid()) {
 The getter returns the effective field value: RAM override first, then saved AppConfig, then the definition default. A RAM-only update is lost on restart; the saved value/default becomes effective again. **Choose the persistent or RAM path for a given value.** A RAM override can mask a later persistent change for the same ID; there is no API to clear just that override. Prefer separate setting and telemetry IDs when both are needed.
 
 [Back to control catalogue](https://github.com/rkubera/ArdPortal/wiki/Controls)
+
+Example: `"maxLength": 1024` permits up to 1024 UTF-8 bytes. Longer values use more RAM and storage when persisted. MQTT still requires the complete packet, including topic and encoding overhead, to fit its 2048-byte capacity; increasing this property does not increase transport limits.

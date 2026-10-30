@@ -857,7 +857,7 @@ public:
     if (type == "text") return ArdControl::validReading(f, v);
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_EDIT
-    if (type == "edit") return ArdControl::string(v, 128);
+    if (type == "edit") return ArdControl::validMaxLength(f) && ArdControl::string(v, ArdControl::maxLength(f));
 #endif
     return false;
   }
@@ -895,6 +895,7 @@ public:
       }
     }
 #endif
+    if (!ArdControl::validMaxLength(f)) return fail("field", id, F("maxLength requires edit or plain text and an integer from 1 to 8192 (UTF-8 bytes)"));
     if (f.hasOwnProperty("mqtt") && f["mqtt"].type() != T::Object) return fail("field", id, ARD_LANG_NATIVE_MQTT_MUST_BE_AN_OBJECT);
     if (f["mqtt"].hasOwnProperty("state_topic") && f["mqtt"]["state_topic"].type() != T::String) return fail("field", id, ARD_LANG_NATIVE_MQTT_STATE_TOPIC_MUST_BE_A_STRING);
     if (f["ha"].hasOwnProperty("event_types")) return fail("field", id, F("use top-level event_types"));

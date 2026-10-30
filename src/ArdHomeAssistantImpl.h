@@ -283,7 +283,7 @@ String ArdHomeAssistant::discoveryConfig(const V& definition, String* error) con
 #if ARDPORTAL_ENABLE_CONTROL_EDIT
       if (type == "edit") {
         c["min"] = 0;
-        c["max"] = 128;
+        c["max"] = int(ArdControl::maxLength(f));
       }
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_SELECT
