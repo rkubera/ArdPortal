@@ -7,9 +7,9 @@ trap 'rm -rf "$test_dir"' EXIT
 "${CXX:-c++}" -std=c++17 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined \
   -Itests/memory-host -Isrc tests/memory-host/json-utf8.cpp src/JsonStream.cpp -o "$test_dir/json-utf8"
 "$test_dir/json-utf8"
-for test_name in json-patch json-stream json-numbers journal-selection stream dynamic-patch dynamic-groups dynamic-page-limit-default dynamic-page-limit-32 dynamic-page-limit-groups mqtt-state-topic mqtt-state-topic-no-ha no-dynamic no-www no-www-wifi messages-only; do
+for test_name in json-patch json-stream json-numbers journal-selection stream dynamic-patch dynamic-groups dynamic-page-limit-default dynamic-page-limit-32 dynamic-page-limit-groups mqtt-state-topic mqtt-state-topic-no-ha no-dynamic no-backup-restore no-www no-www-wifi messages-only; do
   source_name="$test_name"
-  if [[ "$test_name" == no-www || "$test_name" == no-www-wifi || "$test_name" == messages-only ]]; then source_name=no-dynamic; fi
+  if [[ "$test_name" == no-backup-restore || "$test_name" == no-www || "$test_name" == no-www-wifi || "$test_name" == messages-only ]]; then source_name=no-dynamic; fi
   if [[ "$test_name" == mqtt-state-topic-no-ha ]]; then source_name=mqtt-state-topic; fi
   source_files=("tests/memory-host/$source_name.cpp")
   flags=(-Itests/memory-host -Isrc)
@@ -22,6 +22,7 @@ for test_name in json-patch json-stream json-numbers journal-selection stream dy
   fi
   if [[ "$test_name" == journal-selection || "$test_name" == json-patch || "$source_name" == dynamic-patch ]]; then flags+=(-DARDPORTAL_TEST_ALLOCATE=testAllocate); fi
   if [[ "$test_name" == mqtt-state-topic-no-ha ]]; then flags+=(-DARDPORTAL_ENABLE_HA=0); fi
+  if [[ "$test_name" == no-backup-restore ]]; then flags+=(-DARDPORTAL_ENABLE_BACKUP_RESTORE=0); fi
   if [[ "$test_name" == no-www ]]; then flags+=(-DARDPORTAL_ENABLE_WIFI=0 -DARDPORTAL_ENABLE_WWW=0); fi
   if [[ "$test_name" == no-www-wifi ]]; then flags+=(-DARDPORTAL_ENABLE_WWW=0); fi
   if [[ "$test_name" == messages-only ]]; then flags+=(-DARDPORTAL_ENABLE_CONSOLE_MESSAGES=1); fi

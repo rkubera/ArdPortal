@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess,tempfile
 root=Path(__file__).resolve().parents[1]
-s=(root/'src/ArdPortalImpl.h').read_text();start=s.index('bool ArdPortal::scheduleAppPatch(');end=s.index('\nString ArdPortal::saveDocumentSlice',start)
+s=(root/'src/ArdPortalImpl.h').read_text();start=s.index('bool ArdPortal::scheduleAppPatch(');end=s.index('\n}',start)+2
 fixture=r'''
 #include <cassert>
 #include "ArdJSON.h"
@@ -16,7 +16,7 @@ struct Registry{size_t indexOf(const String& key){return key=="relay"?0:1;}Strin
 namespace ArdDeviceName{String ap(const String& name){return name;}}
 class ArdPortal{public:
  static constexpr size_t MaxAppConfigBytes=65536;
- bool _configurationWritable=true,_saveRetryPending=false,_resetAfterSave=false;
+ bool _configurationWritable=true,_saveRetryPending=false,_resetAfterSave=false,_restoreAfterSave=false;
  bool _configurationReady=true,_saveQueued=false,_pendingReady=false,_httpWaitingStorage=false,_rebootPending=false,_beforeRestartRunning=false,_zigbeeDrainingRestart=false,_savePending=false,_pendingAppPatch=false;
  struct Storage{bool mounted(){return true;}}_storage;
  struct Config{String deviceName,apName;}_pending,_config;
@@ -35,6 +35,13 @@ int main(){
  p._configurationWritable=true;p._saveRetryPending=true;patch["relay"]=false;
  assert(p.scheduleAppPatch(patch,ChangeSource::Application));assert(!p._zigbeeAppQueue.hasOwnProperty("relay"));
  assert(!p._deferredApp["relay"].asBool()&&p._pendingApp["relay"].asBool());
+ // Restored settings must not be overwritten by queued/runtime app changes.
+ p._restoreAfterSave=true;p._zigbeeAppQueue["relay"]=true;
+ for(auto source:{ChangeSource::Portal,ChangeSource::Application,ChangeSource::Zigbee}) {
+  assert(!p.scheduleAppPatch(patch,source));
+  assert(p._zigbeeAppQueue["relay"].asBool());
+  assert(!p._deferredApp["relay"].asBool()&&p._pendingApp["relay"].asBool());
+ }
 }
 '''
 with tempfile.TemporaryDirectory() as d:

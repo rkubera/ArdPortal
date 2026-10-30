@@ -59,6 +59,9 @@ int main() {
   }
   assert(portal.portalAndAppConfigReady());
   auto config = portal.getPortalConfig();
+  config.password = u8"wifi-zażółć";
+  config.apPassword = "ap-masked-pass";
+  config.caCert = "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n";
   config.deviceDescription = String("Description retained only in the active configuration after saving");
   assert(portal.setPortalConfig(config));
   for (int i = 0; i < 1000; ++i) {
@@ -73,6 +76,77 @@ int main() {
   assert(portal.getAppConfigValue("saved").asDouble() == 17);
   assert(portal.getPortalConfig().deviceDescription == config.deviceDescription);
   assert(!portal._pending.deviceDescription.length());
+  // The boot file stays plaintext, independently of the download transform.
+  String storedFile;
+  bool readDone = false;
+  assert(portal._storage.readJsonConfig(
+    "/ardportal.json", [&](size_t offset, const uint8_t* bytes, size_t length) {
+      assert(offset == storedFile.length());
+      return storedFile.concat(reinterpret_cast<const char*>(bytes), length);
+    },
+    [&](const ArdPortalStorage::Result& result) {
+      assert(result.ok && result.found);
+      readDone = true;
+    }));
+  for (int i = 0; i < 1000 && !readDone; ++i) portal.serviceStorage(fakeMillis);
+  assert(readDone);
+  auto bootDocument = ArdJSON::JSON.parse(storedFile);
+#if ARDPORTAL_ENABLE_WIFI
+  assert(bootDocument["config"]["password"].asString() == config.password);
+  assert(bootDocument["config"]["apPassword"].asString() == config.apPassword);
+#else
+  assert(!bootDocument["config"].hasOwnProperty("ssid"));
+  assert(!bootDocument["config"].hasOwnProperty("apPassword"));
+#endif
+  assert(!bootDocument["config"].hasOwnProperty("host"));
+  assert(!bootDocument["config"].hasOwnProperty("port"));
+  assert(!bootDocument["config"].hasOwnProperty("mqttTls"));
+  assert(!bootDocument["config"].hasOwnProperty("caCert"));
+#if ARDPORTAL_ENABLE_WWW && ARDPORTAL_ENABLE_BACKUP_RESTORE
+  assert(portal.startConfigBackup());
+  String backup;
+  for (size_t offset = 0; offset < portal._httpBackupBytes;) {
+    String part = portal.configDocumentSlice(portal._request, portal._httpBackupApp, false, portal._httpBackupBytes - portal._request.length() - 1, offset, 37);
+    assert(part.length() && part.length() <= 37);
+    backup += part;
+    offset += part.length();
+  }
+  // Exercise the actual HTTP writer with socket backpressure.
+  portal._http.endpoint = std::make_shared<Endpoint>();
+  auto endpoint = portal._http.endpoint;
+  endpoint->writeLimit = 7;
+  for (int i = 0; i < 10000 && endpoint->connected; ++i) portal.serviceHttpIo(fakeMillis);
+  String wire;
+  for (auto byte : endpoint->output) wire += char(byte);
+  assert(wire.substring(wire.indexOf("\r\n\r\n") + 4) == backup);
+  auto snapshot = ArdJSON::JSON.parse(backup);
+  assert(snapshot["config"]["deviceDescription"].asString() == config.deviceDescription);
+  assert(snapshot["app"]["saved"].asDouble() == 17);
+  assert(snapshot["config"]["password"].asString() != config.password);
+  assert(snapshot["config"]["apPassword"].asString() != config.apPassword);
+  assert(!snapshot["config"].hasOwnProperty("caCert"));
+  portal.closeHttp();
+  // Strict syntax rejection leaves both live settings and storage scheduling untouched.
+  portal._request = "POST /api/restore HTTP/1.1\r\n\r\n{";
+  assert(portal.startConfigRestore(1, portal._request.indexOf("\r\n\r\n")));
+  assert(portal._response.indexOf("400") >= 0 && !portal._savePending);
+  portal.closeHttp();
+  portal._http.endpoint = std::make_shared<Endpoint>();
+  portal._request = "POST /api/restore HTTP/1.1\r\n\r\n";
+  assert(portal.startConfigRestore(backup.length(), portal._request.indexOf("\r\n\r\n")));
+  for (size_t offset = 0; offset < backup.length(); ++offset) {
+    portal._http.endpoint->input.push_back(uint8_t(backup[offset]));
+    portal.serviceHttpIo(fakeMillis);
+    assert(portal._request.length() == 0);
+  }
+  assert(portal._httpWaitingStorage && portal._savePending);
+  for (int i = 0; i < 1000; ++i) {
+    fakeMillis += 10;
+    portal.serviceStorage(fakeMillis);
+  }
+  assert(portal._response.indexOf("202") >= 0);
+  portal.closeHttp();
+#endif
   ArdPortal restored;
   assert(restored.begin());
   for (int i = 0; i < 1000; ++i) {
@@ -81,6 +155,11 @@ int main() {
   }
   assert(restored.portalAndAppConfigReady());
   assert(restored.getAppConfigValue("saved").asDouble() == 17);
+#if ARDPORTAL_ENABLE_WIFI
+  assert(restored.getPortalConfig().password == config.password);
+  assert(restored.getPortalConfig().apPassword == config.apPassword);
+#endif
+  assert(!restored.getPortalConfig().caCert.length());
 #if ARDPORTAL_USE_LITTLEFS && ARDPORTAL_ENABLE_WWW
   assert(restored.infoJson().indexOf("\"storageBackend\":\"LittleFS\"") >= 0);
   bool factoryCallback = false;

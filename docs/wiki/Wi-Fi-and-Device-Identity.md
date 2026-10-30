@@ -41,6 +41,15 @@ portal access when the saved network is unavailable. They resume after the last
 station disconnects. An explicit Wi-Fi form submission still starts its requested
 connection attempt.
 
+When STA is offline, an AP driver rejection leaves the station state disconnected
+rather than claiming that fallback AP is active. After `retryMs`, the portal retries the missing AP
+before beginning another timed station connection attempt. A successful retry
+gives AP clients a full retry interval to connect before STA retunes the radio.
+The configured AP
+password is independent of the station password and is passed unchanged to the
+driver. A rejected AP configuration can therefore prevent the fallback AP even
+when the STA timeout itself works correctly.
+
 The HTTP server remains running after reboot and while Wi-Fi/MQTT are connected.
 Once Wi-Fi connects, the AP closes when it has no stations and no active HTTP
 response. Continue using the LAN IP shown by the portal. A failed MQTT
@@ -87,3 +96,13 @@ codes. Put the phone on the home Wi-Fi before adding Matter in HA; the setup AP
 is not the operational Matter network. ESP home-Wi-Fi association is needed for
 Matter Wi-Fi, while Matter Thread uses its own mesh credentials and border
 router. See [Matter AP commissioning](Matter#commissioning-while-the-portal-uses-ap-mode).
+
+## Browser restart progress
+
+Manual restart, restore, factory reset and firmware updates share the same
+indeterminate progress dialog. It probes `/api/status` every five seconds and
+opens Home only when `configurationReady` is true and `restarting` is false.
+Each probe is aborted after four seconds; no fixed restart countdown is used.
+Formatting shows that same moving bar throughout both formatting and its restart,
+without hiding it between stages. Availability probes begin after formatting
+finishes, and the dialog disappears when navigation loads the available portal.

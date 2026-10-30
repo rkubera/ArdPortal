@@ -545,3 +545,16 @@ and [Dependent Fields](https://github.com/rkubera/ArdPortal/wiki/Dependent-Field
 `1024` before including ArdPortal (use the same value in every translation unit).
 This configures page slots independently of the group limit and the shared
 1024-field/entity limit. See [Dynamic Pages](Dynamic-Pages.md).
+
+### Configuration backup and restore
+
+`ARDPORTAL_ENABLE_BACKUP_RESTORE` defaults to `1`. Set it to `0` before
+`#include <ArdPortal.h>` to omit the Device backup/restore controls, HTTP endpoints
+and their buffers. The feature requires WWW. It reuses the existing streaming
+JSON parser and configuration storage serializer.
+
+### Fields in persisted configuration and backup
+
+The portal JSON schema follows the effective feature defines. `ARDPORTAL_ENABLE_WIFI=0` omits `ssid`, `password`, `apName`, `apPassword` and `apBand`; `ARDPORTAL_ENABLE_MQTT=0` omits `host`, `port`, `user` and `mqttPassword`; `ARDPORTAL_ENABLE_MQTT_TLS=0` omits `mqttTls` and `caCert`. Feature dependencies apply (disabling Wi-Fi also disables MQTT and TLS). Device identity and application settings remain available independently.
+
+This applies to new FS saves, backups and the fields exposed by `GET /api/config`. Existing files and backups may still contain known fields for disabled features: loading ignores those fields, and the next save omits them. Missing feature fields use defaults, so re-enabling a feature does not invalidate a file saved without it. Unknown field names are still rejected. Changing defines does not itself rewrite flash. `POST /api/config` rejects fields for disabled MQTT/TLS features.

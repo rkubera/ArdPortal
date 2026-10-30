@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression tests for trusted portal HTML asset extraction."""
 import json
+import re
 import itertools
 from html.parser import HTMLParser
 from pathlib import Path
@@ -16,6 +17,26 @@ from portal_identifiers import identifier_maps
 
 
 class PortalAssetsTest(unittest.TestCase):
+    def test_generated_headers_are_split_by_feature_variant(self):
+        source = ROOT / 'src'
+        dispatcher = (source / 'PortalAssets.h').read_text()
+        self.assertLess(len(dispatcher.encode()), 16 * 1024)
+        includes = re.findall(r'^#include "(portal-assets/[^"\n]+)"$', dispatcher, re.M)
+        self.assertEqual(len(includes), len(set(includes)))
+        self.assertEqual(set(includes), {
+            path.relative_to(source).as_posix()
+            for path in (source / 'portal-assets').glob('*.h')})
+        self.assertIn('portal-assets/Styles.h', includes)
+        html = {name.removeprefix('portal-assets/Html_') for name in includes
+                if name.startswith('portal-assets/Html_')}
+        scripts = {name.removeprefix('portal-assets/Script_') for name in includes
+                   if name.startswith('portal-assets/Script_')}
+        self.assertEqual(len(html), 18)
+        self.assertEqual(html, scripts)
+        for name in includes:
+            with self.subTest(header=name):
+                self.assertLess((source / name).stat().st_size, 10 * 1024 * 1024)
+
     def test_row_renderer_is_shared_only_with_multiple_consumers(self):
         _, script, _ = portal_parts(ROOT/'src', guarded=True)
         one = selected(script, None, {'MATTER': 0, 'MATTER_CONSOLE': 0, 'ZIGBEE': 0})

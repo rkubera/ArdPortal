@@ -98,6 +98,15 @@ and a CA certificate to 4096 bytes. Available RAM, particularly with TLS on
 ESP8266, can impose lower practical limits. `ConfigJson.h` validates the portal
 schema, and `ArdJSON.h` handles JSON parsing/serialization.
 
+Only backup files mask `config.password`, `config.apPassword` and `config.caCert`
+with a fixed reversible XOR transform, without a prefix or device-specific key.
+Export masks them and import unmasks them before validation and persistence.
+The on-device FS configuration, startup loading, runtime C++ settings and portal
+editing forms keep their original plaintext format. The transform preserves valid
+UTF-8 and byte length; JSON escaping still applies. The backup input budget
+allows for the extra escapes without changing the on-device storage limits.
+This is portable obfuscation, not cryptographic protection.
+
 ### Portal configuration fields
 
 `ArdPortal::PortalConfig` is the complete network/device configuration. Application
@@ -175,7 +184,7 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | `setPortalConfigDeviceDescription(value)` / `setPortalConfigDeviceManufacturer(value)` | Merge and schedule one metadata change into the pending PortalConfig. |
 | `onPortalConfigChanged(callback)` | `void(const PortalConfig&, ChangeSource)` after a changed PortalConfig is applied. |
 | `onBeforeFactoryReset(callback)` | `void()` once after confirming an eligible factory-reset request, before replacing configuration. Runs even when settings are already default; restart and formatting skip it. |
-| `onBeforeRestart(callback)` | `void(RestartReason)` once immediately before an ArdPortal restart; factory reset and storage formatting skip it. |
+| `onBeforeRestart(callback)` | `void(RestartReason)` once immediately before an ArdPortal restart; factory reset, configuration restore and storage formatting skip it. |
 | `onPortalAndAppConfigSaved(callback)` | `void(bool ok, const String& error)` after storage completion or an identical-save skip. A successful network change can still await application. |
 | `getAppConfigValue(key)` | Copy of live RAM state first, then persisted application value, then registered default; missing unregistered key is Undefined. |
 | `setAppConfigValue(key, value)` | Persistent application update, except registered fields with `persist:false`, which use RAM state. Rejects invalid/Undefined values, invalid registered values and unavailable transactions. |
@@ -486,7 +495,7 @@ When `ARDPORTAL_ENABLE_ZIGBEE=1`, see [Zigbee network operations and callbacks](
 - `onBeforeFactoryReset`: a confirmed reset is about to replace configuration,
   independently of whether current values differ from defaults.
 - `onBeforeRestart`: runs once for manual/OTA restart after prior saves finish;
-  factory reset and formatting skip it. A save failure does not cancel restart.
+  factory reset, configuration restore and formatting skip it. A save failure does not cancel restart.
 
 Register callbacks before the operation they observe. Registrations replace the
 previous handler of that kind, and callback references are borrowed only for the
@@ -750,3 +759,30 @@ its attempt count. Standalone `readJsonConfig(path, sink, callback)` defaults to
 pass `true` as the fourth argument to request repair. Startup repair uses the read
 completion/ready path, not the per-value failure callback for a new configuration
 batch. The storage error/status API exposes a failed repair.
+
+## Configuration backup and restore
+
+With WWW enabled, `ARDPORTAL_ENABLE_BACKUP_RESTORE` defaults to `1`. Define it
+as `0` before including ArdPortal.h to remove both endpoints and the Device UI.
+
+- `GET /api/backup` streams `application/json`: `{"config":{...},"app":{...}}`.
+  It exports the committed portal and application settings, including credentials.
+  A pending save returns 409; retry after it completes.
+- `POST /api/restore` accepts that JSON directly as the request body, with
+  `Content-Length` (no multipart wrapper or chunked transfer encoding).
+  Input is parsed incrementally up to `MaxBackupDocumentBytes` (18496 bytes); both objects are
+  validated before scheduling the existing verified storage transaction.
+  After a verified commit, restore schedules a device restart and waits for the HTTP
+  response to close before rebooting. The browser shows the existing restart progress
+  bar and probes `/api/status` every five seconds. It opens Home when configuration
+  is ready and `restarting` is false. There is no fixed restart countdown. Wi-Fi reconnects during startup using
+  the restored plaintext FS settings. Invalid input or a failed write does not
+  schedule a restart. Like factory reset, restore skips `onBeforeRestart` to avoid
+  overwriting restored settings with application shutdown state.
+  Success returns 202 after storage commit; invalid input returns 400, oversized
+  input 413, busy/rejected changes 409, and storage failure 500.
+
+Device provides a backup download and a file picker for restore. Downloads use
+`device-name-YYYY-MM-DD-HH-mm-ss.json`, with the computer's local date and time.
+Settings take effect using the same callbacks and network reconnection rules as
+normal configuration changes.

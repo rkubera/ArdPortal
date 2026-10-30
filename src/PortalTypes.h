@@ -29,4 +29,5 @@ enum class ArdPortalChangeSource { Application,
 enum class ArdPortalRestartReason { Portal,
                                     FirmwareUpdate,
                                     FactoryReset,
-                                    StorageFormat };
+                                    StorageFormat,
+                                    ConfigurationRestore };
