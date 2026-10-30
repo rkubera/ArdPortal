@@ -36,20 +36,23 @@ public:
     // ArduinoJson accepts duplicate keys, trailing bytes and some non-JSON
     // numbers. Keep the same strict syntax contract as the native backend.
     ArdJsonStream syntax(_limits.maxDepth, true);
-    ArduinoJsonCheck check{_limits};
+    ArduinoJsonCheck check{ _limits };
     const ArdJsonStream::Listener listener{ &check, [](void* context, ArdJsonStream::Event event, uint8_t, unsigned depth) {
-      return static_cast<ArduinoJsonCheck*>(context)->event(event, depth);
-    } };
+                                             return static_cast<ArduinoJsonCheck*>(context)->event(event, depth);
+                                           } };
     ArdCooperativeBudget budget;
     for (size_t i = 0; i < _input.length(); ++i) {
       if ((i & 127) == 0) budget.checkpoint();
       syntax.inputByte(uint8_t(_input[i]), listener);
-      if (syntax.failed) { _offset = i; return fail(check.error ? check.error : ARD_LANG_NATIVE_EXPECTED_VALUE); }
+      if (syntax.failed) {
+        _offset = i;
+        return fail(check.error ? check.error : ARD_LANG_NATIVE_EXPECTED_VALUE);
+      }
     }
     if (!syntax.finishInput(listener)) return fail(ARD_LANG_NATIVE_EXPECTED_VALUE);
     ArduinoJson::JsonDocument document;
     auto error = ArduinoJson::deserializeJson(document, _input.c_str(), _input.length(),
-      ArduinoJson::DeserializationOption::NestingLimit(33));
+                                              ArduinoJson::DeserializationOption::NestingLimit(33));
     if (error) return fail(error == ArduinoJson::DeserializationError::NoMemory ? ARD_LANG_NATIVE_OUT_OF_MEMORY : ARD_LANG_NATIVE_EXPECTED_VALUE);
     _offset = 0;
     JSONVar value = import(document.as<ArduinoJson::JsonVariantConst>(), 0);
@@ -57,15 +60,24 @@ public:
     _offset = _input.length();
     return value;
   }
-  const char* error() const { return _error; }
-  size_t offset() const { return _offset; }
-  size_t nodes() const { return _nodes; }
+  const char* error() const {
+    return _error;
+  }
+  size_t offset() const {
+    return _offset;
+  }
+  size_t nodes() const {
+    return _nodes;
+  }
 private:
   const String& _input;
   const Limits& _limits;
   size_t _offset = 0, _nodes = 0;
   const char* _error = nullptr;
-  JSONVar fail(const char* error) { _error = error; return JSONVar(); }
+  JSONVar fail(const char* error) {
+    _error = error;
+    return JSONVar();
+  }
   void whitespace() {
     while (_offset < _input.length() && (_input[_offset] == ' ' || _input[_offset] == '\n' || _input[_offset] == '\r' || _input[_offset] == '\t')) ++_offset;
   }
@@ -85,10 +97,14 @@ private:
       JSONVar result = JSONVar::object();
       ++_offset;
       for (auto member : source.as<ArduinoJson::JsonObjectConst>()) {
-        whitespace(); skipString(); whitespace(); ++_offset;
+        whitespace();
+        skipString();
+        whitespace();
+        ++_offset;
         auto key = member.key();
         if (key.size() > _limits.maxStringBytes) return fail(ARD_LANG_NATIVE_STRING_LIMIT);
-        String name; name.concat(key.c_str(), key.size());
+        String name;
+        name.concat(key.c_str(), key.size());
         if (name.length() != key.size()) return fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
         result[name] = import(member.value(), depth + 1);
         if (_error) return JSONVar();
@@ -113,7 +129,8 @@ private:
     if (source.is<ArduinoJson::JsonString>()) {
       auto text = source.as<ArduinoJson::JsonString>();
       if (text.size() > _limits.maxStringBytes) return fail(ARD_LANG_NATIVE_STRING_LIMIT);
-      String value; value.concat(text.c_str(), text.size());
+      String value;
+      value.concat(text.c_str(), text.size());
       skipString();
       return value.length() == text.size() ? JSONVar(value) : fail(ARD_LANG_NATIVE_OUT_OF_MEMORY);
     }
@@ -138,27 +155,41 @@ private:
 class ArduinoStreamParser {
 public:
   ARDPORTAL_NO_THROW_ALLOCATION
-  explicit ArduinoStreamParser(const Limits& limits = Limits()) : _limits(limits), _syntax(limits.maxDepth, true), _check{_limits} {}
+  explicit ArduinoStreamParser(const Limits& limits = Limits())
+    : _limits(limits), _syntax(limits.maxDepth, true), _check{ _limits } {}
   void reset(const Limits& limits = Limits()) {
-    _limits = limits; _input = String(); _error = nullptr; _nodes = _offset = 0;
-    _syntax.reset(limits.maxDepth, true); _check.nodes = _check.stringBytes = 0; _check.error = nullptr;
+    _limits = limits;
+    _input = String();
+    _error = nullptr;
+    _nodes = _offset = 0;
+    _syntax.reset(limits.maxDepth, true);
+    _check.nodes = _check.stringBytes = 0;
+    _check.error = nullptr;
   }
   bool input(size_t offset, const uint8_t* bytes, size_t length) {
     if (_error) return false;
     if (offset != _input.length() || length > _limits.maxInputBytes || offset > _limits.maxInputBytes - length) {
-      _error = ARD_LANG_NATIVE_INPUT_LIMIT; return false;
+      _error = ARD_LANG_NATIVE_INPUT_LIMIT;
+      return false;
     }
     const ArdJsonStream::Listener listener{ &_check, [](void* context, ArdJsonStream::Event event, uint8_t, unsigned depth) {
-      return static_cast<ArduinoJsonCheck*>(context)->event(event, depth);
-    } };
+                                             return static_cast<ArduinoJsonCheck*>(context)->event(event, depth);
+                                           } };
     ArdCooperativeBudget budget;
     for (size_t i = 0; i < length; ++i) {
       if ((i & 127) == 0) budget.checkpoint();
       _syntax.inputByte(bytes[i], listener);
-      if (_syntax.failed) { _error = _check.error ? _check.error : ARD_LANG_NATIVE_EXPECTED_VALUE; _offset = offset + i; return false; }
+      if (_syntax.failed) {
+        _error = _check.error ? _check.error : ARD_LANG_NATIVE_EXPECTED_VALUE;
+        _offset = offset + i;
+        return false;
+      }
     }
     _input.concat(reinterpret_cast<const char*>(bytes), length);
-    if (_input.length() != offset + length) { _error = ARD_LANG_NATIVE_OUT_OF_MEMORY; return false; }
+    if (_input.length() != offset + length) {
+      _error = ARD_LANG_NATIVE_OUT_OF_MEMORY;
+      return false;
+    }
     _offset = _input.length();
     return true;
   }
@@ -166,13 +197,21 @@ public:
     if (_error) return JSONVar();
     ArduinoParser parser(_input, _limits);
     JSONVar result = parser.parse();
-    _error = parser.error(); _offset = parser.offset(); _nodes = parser.nodes();
+    _error = parser.error();
+    _offset = parser.offset();
+    _nodes = parser.nodes();
     _input = String();
     return result;
   }
-  const char* error() const { return _error; }
-  size_t offset() const { return _offset; }
-  size_t nodes() const { return _nodes; }
+  const char* error() const {
+    return _error;
+  }
+  size_t offset() const {
+    return _offset;
+  }
+  size_t nodes() const {
+    return _nodes;
+  }
 private:
   Limits _limits;
   ArdJsonStream _syntax;
@@ -214,20 +253,22 @@ private:
       case T::Boolean: return target.set(value._boolean);
       case T::Number: return target.set(ArduinoJson::serialized(value._text.c_str(), value._text.length()));
       case T::String: return target.set(ArduinoJson::JsonString(value._text.c_str(), value._text.length()));
-      case T::Object: {
-        auto object = target.to<ArduinoJson::JsonObject>();
-        for (const auto* item = value._children.get(); item; item = item->next.get()) {
-          String key = item->key.text();
-          if (key.length() != item->key.length() || !exportValue(item->value, object[ArduinoJson::JsonString(key.c_str(), key.length())].to<ArduinoJson::JsonVariant>())) return false;
+      case T::Object:
+        {
+          auto object = target.to<ArduinoJson::JsonObject>();
+          for (const auto* item = value._children.get(); item; item = item->next.get()) {
+            String key = item->key.text();
+            if (key.length() != item->key.length() || !exportValue(item->value, object[ArduinoJson::JsonString(key.c_str(), key.length())].to<ArduinoJson::JsonVariant>())) return false;
+          }
+          return !object.isNull();
         }
-        return !object.isNull();
-      }
-      case T::Array: {
-        auto array = target.to<ArduinoJson::JsonArray>();
-        for (const auto* item = value._children.get(); item; item = item->next.get())
-          if (!exportValue(item->value, array.add<ArduinoJson::JsonVariant>())) return false;
-        return !array.isNull();
-      }
+      case T::Array:
+        {
+          auto array = target.to<ArduinoJson::JsonArray>();
+          for (const auto* item = value._children.get(); item; item = item->next.get())
+            if (!exportValue(item->value, array.add<ArduinoJson::JsonVariant>())) return false;
+          return !array.isNull();
+        }
       default: return false;
     }
   }
@@ -238,12 +279,20 @@ private:
     String text;
     bool quoted = false, escaped = false, failed = false;
     const char* error = nullptr;
-    explicit Output(const Limits& value) : limits(value) {}
+    explicit Output(const Limits& value)
+      : limits(value) {}
     bool append(char c) {
       const size_t before = text.length();
-      if (before >= limits.maxOutputBytes) { error = ARD_LANG_NATIVE_OUTPUT_LIMIT; failed = true; return false; }
+      if (before >= limits.maxOutputBytes) {
+        error = ARD_LANG_NATIVE_OUTPUT_LIMIT;
+        failed = true;
+        return false;
+      }
       text += c;
-      if (text.length() != before + 1) { error = ARD_LANG_NATIVE_OUT_OF_MEMORY; failed = true; }
+      if (text.length() != before + 1) {
+        error = ARD_LANG_NATIVE_OUT_OF_MEMORY;
+        failed = true;
+      }
       return !failed;
     }
     bool unicode(uint8_t c) {
@@ -259,8 +308,10 @@ private:
         if (found) {
           const uint8_t codes[] = { 8, 12, 10, 13, 9 };
           unicode(codes[found - shortEscapes]);
+        } else {
+          append('\\');
+          append(char(c));
         }
-        else { append('\\'); append(char(c)); }
       } else if (quoted && c == '\\') escaped = true;
       else {
         if (c == '"') quoted = !quoted;
