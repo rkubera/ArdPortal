@@ -27,8 +27,8 @@ struct Limits {
   bool escapeHtml = false;  // Escape HTML delimiters when embedding JSON in a script element.
   unsigned maxDepth = 16;   // Parser and writer also enforce a hard ceiling of 32.
 };
-class Parser;
-class StreamParser;
+class NativeParser;
+class NativeStreamParser;
 class Writer;
 class ObjectKey;
 class JSONVar {
@@ -462,9 +462,11 @@ private:
    * @return No value.
    */
   void clear();
-  friend class Parser;
-  friend class StreamParser;
+  friend class NativeParser;
+  friend class NativeStreamParser;
   friend class Writer;
+  friend class ArduinoParser;
+  friend struct ArduinoAPI;
 };
 // Common immutable object keys share flash storage. Other keys own exact bytes,
 // including embedded NULs; array members need no key allocation.
@@ -1100,10 +1102,10 @@ inline bool validUtf8(const String& text) {
   return remaining == 0;
 }
 // DOM construction and storage validation share the same incremental grammar.
-class StreamParser {
+class NativeStreamParser {
 public:
   ARDPORTAL_NO_THROW_ALLOCATION
-  explicit StreamParser(const Limits& limits = Limits());
+  explicit NativeStreamParser(const Limits& limits = Limits());
   void reset(const Limits& limits = Limits());
   bool input(size_t offset, const uint8_t* bytes, size_t length);
   JSONVar take();
@@ -1133,9 +1135,9 @@ private:
   static bool dispatch(void* context, ArdJsonStream::Event event, uint8_t b, unsigned depth);
   static const char* syntaxError(ArdJsonStream::Error error);
 };
-class Parser {
+class NativeParser {
 public:
-  Parser(const String& input, const Limits& limits)
+  NativeParser(const String& input, const Limits& limits)
     : _input(input), _limits(limits) {}
   JSONVar parse();
   const char* error() const {
@@ -1360,7 +1362,7 @@ private:
     return append(object ? "}" : "]");
   }
 };
-struct API {
+struct NativeAPI {
   /**
    * @brief Parse JSON text with the supplied resource limits.
    * @param text Text to read, encode or display.
@@ -1369,7 +1371,7 @@ struct API {
    * @return Parsed JSON value, or Undefined with error text when input is invalid or a resource limit is exceeded.
    */
   JSONVar parse(const String& text, String* error = nullptr, const Limits& limits = Limits()) const {
-    Parser parser(text, limits);
+    NativeParser parser(text, limits);
     JSONVar value = parser.parse();
     if (error) *error = parser.error() ? String(parser.error()) + ARD_LANG_NATIVE_AT_BYTE + String(parser.offset()) : String();
     return value;
@@ -1446,5 +1448,19 @@ struct API {
     }
   }
 };
+}
+#include "JsonBackendConfig.h"
+#if ARDPORTAL_USE_ARDUINOJSON
+#include "ArdArduinoJson.h"
+namespace ArdJSON {
+using Parser = ArduinoParser;
+using StreamParser = ArduinoStreamParser;
+using API = ArduinoAPI;
+#else
+namespace ArdJSON {
+using Parser = NativeParser;
+using StreamParser = NativeStreamParser;
+using API = NativeAPI;
+#endif
 static const API JSON;
 }

@@ -114,6 +114,31 @@ See [portal screenshots](https://github.com/rkubera/ArdPortal/wiki/Screenshots),
 
 [MIT](LICENSE). Copyright Radoslaw Kubera (rkubera on GitHub).
 
+### JSON backend
+
+ArdJSON is the default and requires no external dependency. To use
+[ArduinoJson 7](https://arduinojson.org/v7/) for document parsing and serialization,
+install that library and select it before including ArdPortal:
+
+```cpp
+#define ARDPORTAL_USE_ARDUINOJSON 1
+#include <ArdPortal.h>
+```
+
+`0` (default) keeps ArdJSON. Like `ARDPORTAL_USE_LITTLEFS` and
+`ARDPORTAL_USE_PUBSUBCLIENT`, the selection participates in the feature signature;
+use the same selection in every application translation unit. ArduinoJson is
+only included when selected and remains an optional dependency.
+
+Both backends retain the `ArdJSON::JSONVar` value API, exact number lexemes,
+strict syntax/UTF-8/duplicate-key checks, resource limits, patch deletion semantics
+and the existing JSON wire format. The compatibility value model and bounded
+slice/patch writer are shared. The optional backend converts documents to/from
+ArduinoJson; storage input is validated incrementally and buffered up to
+`maxInputBytes` before parsing. This uses more peak RAM than native DOM streaming.
+ArduinoJson is an interoperability option, not a firmware-size optimization;
+see the measured comparison in `docs/testing/ArdPortal-json-backends-2026-10-30.json`.
+
 ### MQTT client backend
 
 The default MQTT protocol client is the standalone, header-only `ArdMQTT.h`.
