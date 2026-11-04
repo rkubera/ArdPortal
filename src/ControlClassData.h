@@ -38,7 +38,8 @@ enum class Type : uint8_t { Invalid,
                             Vacuum,
                             LawnMower,
                             WaterHeater,
-                            Update };
+                            Update,
+                            Password };
 enum class Class : uint8_t { None,
                              Invalid,
                              Text,
@@ -498,6 +499,9 @@ inline Type typeOf(const String& name) {
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
   if (strcmp_P(name.c_str(), PSTR("update")) == 0) return Type::Update;
 #endif
+#if ARDPORTAL_ENABLE_CONTROL_PASSWORD
+  if (strcmp_P(name.c_str(), PSTR("password")) == 0) return Type::Password;
+#endif
   return Type::Invalid;
 }
 inline Type typeOf(const ArdJSON::JSONVar& field) {
@@ -595,6 +599,9 @@ inline Type typeOf(const ArdJSON::JSONVar& field) {
 #endif
 #if ARDPORTAL_ENABLE_CONTROL_UPDATE
   if (strcmp_P(name->c_str(), PSTR("update")) == 0) return Type::Update;
+#endif
+#if ARDPORTAL_ENABLE_CONTROL_PASSWORD
+  if (strcmp_P(name->c_str(), PSTR("password")) == 0) return Type::Password;
 #endif
   return Type::Invalid;
 #endif

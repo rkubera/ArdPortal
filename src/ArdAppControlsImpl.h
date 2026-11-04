@@ -142,6 +142,7 @@ void ArdAppControls::dynamicMqtt(const String& topic, const uint8_t* data, size_
     String id = _portal._dynamic.idAt(i);
     if (command != id && command.indexOf(id + "_") != 0) continue;
     const V& f = _portal._dynamic.at(i);
+    if (ArdControl::secret(f)) continue;
     String type = f["type"].asString();
     V value;
     if (false) {
@@ -653,6 +654,7 @@ void ArdAppControls::resetMqtt() {
  * @return True on success; false if validation, resource allocation or the operation fails.
  */
 bool ArdAppControls::acceptMqttState(const String& key, V value) {
+  if (ArdControl::secret(_portal._dynamic.field(key))) return false;
   // Own the command value: application callbacks can replace the reported state.
   if (!applyAppState(key, value, ChangeSource::Mqtt)) return false;
   markDirty(key);
@@ -724,6 +726,10 @@ bool ArdAppControls::publishState() {
   if (f >= _portal._dynamic.count()) return false;
   {
     const V& field = _portal._dynamic.at(f);
+    if (ArdControl::secret(field)) {
+      _stateDirty &= ~ArdAppConfigFieldMask::forField(f);
+      return true;
+    }
     String id = field["id"].asString(), topic = ArdMqttFieldTopics::stateTopic(field, _portal._mqttClient.mqttTopic("stat", id.c_str()));
     V value = _portal.getAppConfigValue(id.c_str());
     String payload;

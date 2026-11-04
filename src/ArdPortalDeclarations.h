@@ -120,7 +120,7 @@ public:
   static constexpr size_t MaxPortalConfigBytes = 5 * 1024;
   static constexpr size_t MaxAppConfigBytes = 8 * 1024;
   static constexpr size_t MaxConfigDocumentBytes = 13 * 1024 + 64;
-  static constexpr size_t MaxBackupDocumentBytes = 2 * MaxPortalConfigBytes + MaxAppConfigBytes + 64;
+  static constexpr size_t MaxBackupDocumentBytes = 2 * MaxPortalConfigBytes + 4 * MaxAppConfigBytes + 64;
   struct Options {
     const char* deviceName = nullptr;  // Default: ArdUI- + chip ID; also the AP SSID.
     const char* apPassword = "1234567890";
@@ -1118,6 +1118,7 @@ private:
    * @param path Journal file path.
    * @return True on success; false if validation, resource allocation or the operation fails.
    */
+  ArdJSON::JSONVar portalAppValue(const char* id) const;
   bool dynamicHttp(const String& method, const String& path);
 #if ARDPORTAL_ENABLE_WIFI
   String _ntpServer1, _ntpServer2;
@@ -1139,7 +1140,7 @@ private:
   bool scheduleAppPatch(ArdJSON::JSONVar patch, ChangeSource source, bool coalesceSource = false);
   void applyPendingApp();
   String saveDocumentSlice(size_t offset, size_t maximum) const;
-  String configDocumentPrefix(const PortalConfig& config, bool backup = false) const;
+  String configDocumentPrefix(const PortalConfig& config, bool backup = false, const ArdJSON::JSONVar& maskedAppPasswords = ArdJSON::JSONVar()) const;
   String configDocumentSlice(const String& prefix, const ArdJSON::JSONVar& app, bool patch, size_t appBytes, size_t offset, size_t maximum) const;
 
   PortalConfigChangedCallback _changed;

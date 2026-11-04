@@ -207,6 +207,7 @@ bool ArdHomeAssistant::serviceDependencies() {
  * @return The resulting text; an empty value indicates no available text or failure where applicable.
  */
 String ArdHomeAssistant::discoveryConfig(const V& definition, String* error) const {
+  if (ArdControl::secret(definition)) return String();
   V resolved;
   const V* source = &definition;
   if (!definition.isValid()) {
@@ -446,6 +447,10 @@ bool ArdHomeAssistant::serviceOne(uint32_t now) {
               defer();
               return true;
             }
+            if (ArdControl::secret(field)) {
+              _dependencyDiscovery &= ~bit;
+              return true;
+            }
             String topic = String(F("homeassistant/")) + ArdHa::component(field) + "/ardui_" + _portal.chipId() + "/" + field["id"].asString() + "/config";
             String payload = _dependencyVisible.test(index) ? discoveryConfig(field) : String();
             if (_dependencyVisible.test(index) && !payload.length()) {
@@ -494,6 +499,10 @@ bool ArdHomeAssistant::serviceOne(uint32_t now) {
           V field = _portal._dynamic.at(_haDiscovery);
           if (field.isUndefined() || !field.isValid()) {
             defer();
+            return true;
+          }
+          if (ArdControl::secret(field)) {
+            ++_haDiscovery;
             return true;
           }
           String topic = String(F("homeassistant/")) + ArdHa::component(field) + "/ardui_" + _portal.chipId() + "/" + field["id"].asString() + "/config", payload = visible ? discoveryConfig(field) : String();

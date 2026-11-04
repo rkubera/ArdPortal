@@ -33,6 +33,30 @@ inline bool mask(const String& text, String& result) {
   result = std::move(out);
   return true;
 }
+// Backup-only metadata makes masking portable and keeps old, unmarked backups
+// readable without guessing from the current application's field definitions.
+inline bool restoreAppPasswords(ArdJSON::JSONVar& root) {
+  using V = ArdJSON::JSONVar;
+  if (!root.hasOwnProperty("maskedAppPasswords")) return true;
+  const V& view = root;
+  const V& keys = view["maskedAppPasswords"];
+  const V& app = view["app"];
+  if (keys.type() != V::Type::Array || app.type() != V::Type::Object || keys.length() > app.length()) return false;
+  for (size_t i = 0; i < keys.length(); ++i) {
+    const String* id = keys[i].stringValue();
+    if (!id || !id->length() || id->length() > 48 || strlen(id->c_str()) != id->length()) return false;
+    for (size_t j = 0; j < i; ++j)
+      if (keys[j].asString() == *id) return false;
+    const String* stored = app[*id].stringValue();
+    String plain;
+    if (!stored || !mask(*stored, plain) || strlen(plain.c_str()) != plain.length()) return false;
+    root["app"][*id] = plain;
+    if (!root.isValid()) return false;
+  }
+  root.remove("maskedAppPasswords");
+  return root.isValid();
+}
+
 #endif
 struct TextField {
   const char* key;

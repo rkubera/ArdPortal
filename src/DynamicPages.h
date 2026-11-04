@@ -856,6 +856,9 @@ public:
 #if ARDPORTAL_ENABLE_CONTROL_TEXT
     if (type == "text") return ArdControl::validReading(f, v);
 #endif
+#if ARDPORTAL_ENABLE_CONTROL_PASSWORD
+    if (type == "password") return ArdControl::validMaxLength(f) && ArdControl::string(v, ArdControl::maxLength(f));
+#endif
 #if ARDPORTAL_ENABLE_CONTROL_EDIT
     if (type == "edit") return ArdControl::validMaxLength(f) && ArdControl::string(v, ArdControl::maxLength(f));
 #endif
@@ -878,6 +881,7 @@ public:
     if (!title(f)) return fail("field", id, ARD_LANG_NATIVE_INVALID_NAME_NAMES_1_80_BYTES);
 
     if (!ardPortalBasicControl(type) && (!ArdControl::extended(f) || ArdControl::descriptor(type).isUndefined())) return fail("field", id, ARD_LANG_NATIVE_UNSUPPORTED_OR_DISABLED_CONTROL_TYPE);
+    if (ArdControl::secret(f) && (f["extended"].asBool() || f.hasOwnProperty("controls"))) return fail("field", id, F("password is a local basic control"));
     if (!ArdControl::validClass(f)) return fail("field", id, F("invalid class for control type (use class, not textType/device_class)"));
 #if ARDPORTAL_ENABLE_CONTROL_TEXT && ARDPORTAL_ENABLE_CLASSES
     if (type == "text" && ArdControl::classOf(f) == ArdControl::Class::Enum) {
@@ -895,7 +899,7 @@ public:
       }
     }
 #endif
-    if (!ArdControl::validMaxLength(f)) return fail("field", id, F("maxLength requires edit or plain text and an integer from 1 to 8192 (UTF-8 bytes)"));
+    if (!ArdControl::validMaxLength(f)) return fail("field", id, F("maxLength requires edit, password or plain text and an integer from 1 to 8192 (UTF-8 bytes)"));
     if (f.hasOwnProperty("mqtt") && f["mqtt"].type() != T::Object) return fail("field", id, ARD_LANG_NATIVE_MQTT_MUST_BE_AN_OBJECT);
     if (f["mqtt"].hasOwnProperty("state_topic") && f["mqtt"]["state_topic"].type() != T::String) return fail("field", id, ARD_LANG_NATIVE_MQTT_STATE_TOPIC_MUST_BE_A_STRING);
     if (f["ha"].hasOwnProperty("event_types")) return fail("field", id, F("use top-level event_types"));

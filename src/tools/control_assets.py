@@ -8,7 +8,7 @@ from pathlib import Path
 CONTROLS=json.loads(Path(__file__).with_name('control_types.json').read_text())
 PREFIX='ARDPORTAL_ENABLE_CONTROL_'
 GROUPS={
- 'EXTENDED':CONTROLS[6:], 'DIAL':['climate','humidifier','water_heater'],
+ 'EXTENDED':[c for c in CONTROLS[6:] if c!='password'], 'DIAL':['climate','humidifier','water_heater'],
  'SWITCH':['switch','light','fan','humidifier','siren'],
  'SLIDER':['slider','light','fan','cover','valve','humidifier','siren','water_heater'],
  'SELECT':['select','climate','fan','humidifier','siren','water_heater','vacuum'],

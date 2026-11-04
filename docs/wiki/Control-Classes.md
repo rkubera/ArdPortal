@@ -38,7 +38,7 @@ generator. If that customization changes the wire protocol, keep any explicit
 external topics, custom templates or other integration-specific behavior. They
 are not required when using the standard presets.
 
-## All 30 controls
+## All 31 controls
 
 | Type | Optional classes | Without class |
 | --- | --- | --- |
@@ -46,6 +46,7 @@ are not required when using the standard presets.
 | `text` | See the reading catalogue below | Plain text (strings or finite numbers) |
 | `select` | None; omit `class` | Existing type preset |
 | `edit` | None; omit `class` | Existing type preset |
+| `password` | None | Local secret; no HA, Matter or Zigbee mapping. |
 | `switch` | `switch`, `outlet`, `light`, `pump` | Generic On/Off output |
 | `climate` | None; omit `class` | Existing type preset |
 | `binary_sensor` | `moisture`, `carbon_monoxide`, `power`, `gas`, `light`, `opening`, `door`, `window`, `garage_door`, `lock`, `tamper`, `motion`, `occupancy`, `presence`, `moving`, `smoke`, `heat`, `cold`, `safety`, `problem`, `plug`, `battery_low`, `battery_charging`, `connectivity`, `running`, `update`, `sound`, `vibration` | Generic boolean sensor |
@@ -186,4 +187,4 @@ IR `receiver` is read-only, has no send controls and accepts bounded signal obje
 
 `src/tools/control_models.json` is the protocol-independent preset source; `src/tools/control_protocols.py` derives HA defaults from it. `src/tools/control_classes.json` defines semantic names, units and class mappings. Run `python3 src/tools/generate_state_schemas.py`, then the portal/language/gateway generators as applicable. `--check` verifies generated files without rewriting them.
 
-Run `bash tests/run-host.sh`. The model suite covers all 30 controls and every allowed/disallowed class pair, optional classes, calendar/IR/event values, capabilities, HA-independent defaults and absence of disabled class names from compiled profiles. Arduino builds and the external ZHA/Z2M tests are described in [test instructions](../../tests/README.md).
+Run `bash tests/run-host.sh`. The model suite covers all 31 controls and every allowed/disallowed class pair, optional classes, calendar/IR/event values, capabilities, HA-independent defaults and absence of disabled class names from compiled profiles. Arduino builds and the external ZHA/Z2M tests are described in [test instructions](../../tests/README.md).

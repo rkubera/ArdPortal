@@ -65,6 +65,10 @@ bool ArdPortal::addAppConfigEntity(const String& definition) {
 #endif
 #include "AppConfigPageRegistrationImpl.h"
 
+// Never send stored or default password values back to the browser.
+ArdJSON::JSONVar ArdPortal::portalAppValue(const char* id) const {
+  return ArdControl::secret(_dynamic.field(id)) ? V("") : getAppConfigValue(id);
+}
 /**
  * @brief Handle an HTTP request for dynamic page metadata or application values.
  * @param method HTTP request method.
@@ -254,7 +258,7 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
     V body = V::object(), values = _appConfig;
     for (size_t i = 0; i < _dynamic.count(); ++i) {
       const String id = _dynamic.idAt(i);
-      values[id] = getAppConfigValue(id.c_str());
+      values[id] = portalAppValue(id.c_str());
       yield();
     }
     body["values"] = values;
@@ -321,6 +325,7 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
       replyMessage(400, ArdUILanguage::Key::s_177);
       return true;
     }
+    if (ArdControl::secret(f) && !values[key].asString().length()) continue;
 #if ARDPORTAL_ENABLE_CONTROL_CLIMATE
     if (f["type"].asString() == "climate") {
       V current = getAppConfigValue(key.c_str());
@@ -352,7 +357,7 @@ bool ArdPortal::dynamicHttp(const String& method, const String& path) {
   }
   for (size_t i = 0; i < keys.length(); ++i) {
     String key = keys[i].asString();
-    _appControls.applyAppState(key, applied[key], ChangeSource::Portal);
+    if (applied.hasOwnProperty(key)) _appControls.applyAppState(key, applied[key], ChangeSource::Portal);
   }
   replyMessage(202, ArdUILanguage::Key::s_175);
   return true;
@@ -458,7 +463,7 @@ bool ArdPortal::buildDynamicHttpPart() {
     const size_t f = _httpDynamicField++;
     if (_httpDynamicMode == 2) {
       const char* id = _dynamic.pages.fieldId(p, f);
-      String value = _json.stringify(getAppConfigValue(id), false, nullptr, snapshotLimits());
+      String value = _json.stringify(portalAppValue(id), false, nullptr, snapshotLimits());
       if (!value.length()) return false;
       _httpDynamicText = (f ? String(F(",")) : String()) + _json.stringify(V(id)) + ":" + value;
     } else {
@@ -554,7 +559,7 @@ bool ArdPortal::queueAppConfigStatePublish(const char* key) {
 #if ARDPORTAL_ENABLE_MQTT
   if (!key) return false;
   const auto& field = _dynamic.field(key);
-  if (field.isUndefined() || ArdControl::transient(field)) return false;
+  if (field.isUndefined() || ArdControl::transient(field) || ArdControl::secret(field)) return false;
   _appControls.markDirty(key);
   return true;
 #else

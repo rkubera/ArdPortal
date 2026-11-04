@@ -15,5 +15,5 @@ for(const [field,limit]of [[{type:'edit'},128],[{type:'edit',maxLength:1024},102
 }
 const node={};vm.runInNewContext(setup,{node,field:{type:'text',maxLength:1024},TextEncoder});
 assert(node.readOnly);assert.equal(node.maxLength,undefined);
-assert(source.includes('if(!node.reportValidity())return;return queueDynamic'));
+assert(source.includes('if(!node.reportValidity())return;'));
 console.log('PASS: editable UTF-8 byte limits and read-only text input');

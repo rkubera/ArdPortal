@@ -175,18 +175,27 @@ inline Model describe(const ArdJSON::JSONVar& field) {
   }
   return result;
 }
+// Password controls are local application settings, never protocol entities.
+inline bool secret(const ArdJSON::JSONVar& field) {
+#if ARDPORTAL_ENABLE_CONTROL_PASSWORD
+  return field["type"].asString() == "password";
+#else
+  (void)field;
+  return false;
+#endif
+}
 // String limits use UTF-8 bytes, matching Arduino String::length().
 inline bool validMaxLength(const ArdJSON::JSONVar& field) {
   const auto& limit = field["maxLength"];
   if (limit.isUndefined()) return true;
   const String type = field["type"].asString();
   const Class id = classOf(field);
-  if (type != "edit" && !(type == "text" && (id == Class::None || id == Class::Text))) return false;
+  if (type != "edit" && !secret(field) && !(type == "text" && (id == Class::None || id == Class::Text))) return false;
   return limit.isInteger() && limit.asDouble() >= 1 && limit.asDouble() <= 8192;
 }
 inline size_t maxLength(const ArdJSON::JSONVar& field) {
   if (!validMaxLength(field)) return 0;
-  return field["maxLength"].isUndefined() ? (field["type"].asString() == "edit" ? 128 : 512)
+  return field["maxLength"].isUndefined() ? (field["type"].asString() == "edit" || secret(field) ? 128 : 512)
                                           : size_t(field["maxLength"].asDouble());
 }
 // Shared read-only value rules, independent of protocol discovery metadata.

@@ -7,6 +7,7 @@
 namespace ArdHa {
 using V = ArdJSON::JSONVar;
 inline String component(const V& field) {
+  if (ArdControl::secret(field)) return String();
   ArdControl::Model model{ ArdControl::typeOf(field), ArdControl::classOf(field), 0 };
 #if ARDPORTAL_ENABLE_CONTROL_SWITCH
   if (model.type == ArdControl::Type::Switch && model.classId == ArdControl::Class::Light) return "light";

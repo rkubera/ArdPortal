@@ -49,7 +49,7 @@ with tempfile.TemporaryDirectory(prefix='ardportal-control-model-') as directory
                     expected = 'light'
                 lines += ['{auto id=ArdControl::classOf(field); auto info=ArdControl::classInfo(id); assert(info.name && String(FPSTR(info.name))==' + json.dumps(name) + '); assert(String(FPSTR(info.unit))==' + json.dumps(spec['unit'],ensure_ascii=False) + '); assert(info.numeric==' + str(spec['numeric']).lower() + ' && info.measurement==' + str(spec['measurement']).lower() + '); auto ha=ArdHa::className(ArdControl::describe(field)); ' + ('assert(ha && String(FPSTR(ha))=='+json.dumps(expected)+');' if expected else 'assert(ha==nullptr);') + '}']
 
-        if control not in TYPES[:6]:
+        if control not in TYPES[:6] and control != 'password':
             lines += ['field.remove("class"); assert(ArdControl::normalize(field)); assert(!field.hasOwnProperty("ha"));']
     lines += [r'''
     field=ArdJSON::JSON.parse(R"({"type":"event","class":"doorbell"})");
@@ -94,6 +94,15 @@ with tempfile.TemporaryDirectory(prefix='ardportal-control-model-') as directory
     assert(ArdControl::validClass(field));
     assert(ArdControl::classInfo(ArdControl::Class::Outlet).name==nullptr);
     ''', ['-DARDPORTAL_ENABLE_CONTROLS=0', '-DARDPORTAL_ENABLE_CONTROL_SLIDER=1'])
+    compile_run(work, 'password-only', r'''
+    V field=ArdJSON::JSON.parse(R"({"type":"password"})");
+    assert(ardPortalBasicControl("password") && !ardPortalBasicControl("edit"));
+    assert(ArdControl::validClass(field) && ArdControl::secret(field));
+    assert(!ArdControl::extended(field) && !ArdControl::readonly(field));
+    assert(ArdControl::maxLength(field)==128 && ArdHa::component(field).length()==0);
+    field["maxLength"]=1024; assert(ArdControl::validMaxLength(field));
+    field["class"]="text"; assert(!ArdControl::validClass(field));
+    ''', ['-DARDPORTAL_ENABLE_CONTROLS=0', '-DARDPORTAL_ENABLE_CONTROL_PASSWORD=1', '-DARDPORTAL_ENABLE_HA=0'])
     image = compile_run(work, 'text-no-classes', r'''
     V field=ArdJSON::JSON.parse(R"({"type":"text"})");
     assert(ArdControl::validReading(field,"value"));
@@ -105,4 +114,4 @@ with tempfile.TemporaryDirectory(prefix='ardportal-control-model-') as directory
     ''', ['-DARDPORTAL_ENABLE_CONTROLS=0', '-DARDPORTAL_ENABLE_CONTROL_TEXT=1', '-DARDPORTAL_ENABLE_CLASSES=0'])
     for symbol in (b'_ZN10ArdControl4date', b'_ZN10ArdControl8datetime', b'name_temperature'):
         assert symbol not in image, 'Disabled class implementation retained: '+str(symbol)
-print('PASS: all 30 controls, every class/type pair, protocol-free defaults, capabilities, events, calendar/IR validation and excluded binary names')
+print('PASS: all 31 controls, every class/type pair, protocol-free defaults, capabilities, events, calendar/IR validation and excluded binary names')

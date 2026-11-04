@@ -1,6 +1,7 @@
 // Author: Radoslaw Kubera (rkubera on GitHub).
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "ArdPortalFeatures.h"
 #include "ArdJSON.h"
 #include "JsonFieldSlices.h"
 namespace ArdTopicTemplates {
@@ -76,6 +77,25 @@ inline String resolveJson(const String& source, const String& device) {
 
 /** @brief Reproduce registration's extended/persist flags without a definition DOM. */
 inline String fieldHttpJson(const String& source, const String& device, bool extended, bool persist) {
+#if ARDPORTAL_ENABLE_CONTROL_PASSWORD
+  ArdJsonFieldSlices passwordSlices(source);
+  bool password = false;
+  if (!passwordSlices.members(0, source.length(), [&](const String& key, size_t start, size_t bytes) {
+        if (key == "type") password = ArdJSON::JSON.parse(passwordSlices.slice(start, bytes)).asString() == "password";
+        return true;
+      })) return String();
+  if (password) {
+    size_t start = 0, bytes = 0;
+    if (!passwordSlices.members(0, source.length(), [&](const String& key, size_t at, size_t length) {
+          if (key == "default") {
+            start = at;
+            bytes = length;
+          }
+          return true;
+        })) return String();
+    if (bytes) return resolveJson(source.substring(0, start) + "\"\"" + source.substring(start + bytes), device);
+  }
+#endif
   if (!extended) return resolveJson(source, device);
   ArdJsonFieldSlices slices(source);
   String normalized = "{";

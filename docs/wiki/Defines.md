@@ -97,6 +97,7 @@ excluded types; literals owned by the sketch cannot be removed by the library.
 | `text` | `ARDPORTAL_ENABLE_CONTROL_TEXT` |
 | `select` | `ARDPORTAL_ENABLE_CONTROL_SELECT` |
 | `edit` | `ARDPORTAL_ENABLE_CONTROL_EDIT` |
+| `password` | `ARDPORTAL_ENABLE_CONTROL_PASSWORD` |
 | `switch` | `ARDPORTAL_ENABLE_CONTROL_SWITCH` |
 | `climate` | `ARDPORTAL_ENABLE_CONTROL_CLIMATE` |
 | `binary_sensor` | `ARDPORTAL_ENABLE_CONTROL_BINARY_SENSOR` |

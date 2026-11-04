@@ -2323,8 +2323,28 @@ bool ArdPortal::startConfigBackup() {
     return false;
   }
   _httpBackupApp = _appConfig;  // Stable snapshot while application callbacks keep running.
-  size_t appBytes = ArdJSON::JSON.measure(_httpBackupApp, nullptr, snapshotLimits());
-  _request = configDocumentPrefix(_config, true);
+  ArdJSON::JSONVar maskedAppPasswords = ArdJSON::JSONVar::array();
+#if ARDPORTAL_ENABLE_DYNAMIC_PAGES && ARDPORTAL_ENABLE_CONTROL_PASSWORD
+  for (size_t i = 0; i < _dynamic.count(); ++i) {
+    const auto field = _dynamic.at(i);
+    if (!ArdControl::secret(field)) continue;
+    String id = _dynamic.idAt(i);
+    const auto& app = static_cast<const ArdJSON::JSONVar&>(_httpBackupApp);
+    if (!app.hasOwnProperty(id)) continue;
+    const String* raw = app[id].stringValue();
+    String masked;
+    if (!raw || !ArdPortalJson::mask(*raw, masked)) {
+      replyMessage(500, ArdUILanguage::Key::s_107);
+      return false;
+    }
+    _httpBackupApp[id] = masked;
+    maskedAppPasswords.push(id);
+  }
+#endif
+  auto backupLimits = snapshotLimits();
+  backupLimits.maxOutputBytes = MaxBackupDocumentBytes;
+  size_t appBytes = ArdJSON::JSON.measure(_httpBackupApp, nullptr, backupLimits);
+  _request = maskedAppPasswords.isValid() ? configDocumentPrefix(_config, true, maskedAppPasswords) : String();
   if (!_request.length() || !appBytes) {
     replyMessage(500, ArdUILanguage::Key::s_107);
     return false;
@@ -2370,9 +2390,10 @@ void ArdPortal::receiveConfigRestore() {
   _httpRestoreBytes = 0;
   auto root = _loadParser->take();
   _loadParser.reset();
+  const bool appPasswordsOK = ArdPortalJson::restoreAppPasswords(root);
   const auto& view = root;
   PortalConfig config;
-  if (!decodeSnapshot(view, config, true) || !validPortalConfig(config)) {
+  if (!appPasswordsOK || !decodeSnapshot(view, config, true) || !validPortalConfig(config)) {
     replyMessage(400, ArdUILanguage::Key::s_120);
     return;
   }
@@ -2609,10 +2630,17 @@ bool ArdPortal::scheduleAppPatch(ArdJSON::JSONVar patch, ChangeSource source, bo
   }
   return true;
 }
-String ArdPortal::configDocumentPrefix(const PortalConfig& config, bool backup) const {
+String ArdPortal::configDocumentPrefix(const PortalConfig& config, bool backup, const ArdJSON::JSONVar& maskedAppPasswords) const {
   String json = ArdPortalJson::encode(config, _json, backup);
-  String prefix = String(F("{\"config\":")) + json + ",\"app\":";
-  return json.length() && prefix.length() == json.length() + 17 ? prefix : String();
+  String metadata;
+  if (backup && maskedAppPasswords.length()) {
+    String ids = _json.stringify(maskedAppPasswords, false, nullptr, snapshotLimits());
+    if (!ids.length()) return String();
+    metadata = String(F(",\"maskedAppPasswords\":")) + ids;
+    if (metadata.length() != ids.length() + 22) return String();
+  }
+  String prefix = String(F("{\"config\":")) + json + metadata + ",\"app\":";
+  return json.length() && prefix.length() == json.length() + metadata.length() + 17 ? prefix : String();
 }
 String ArdPortal::saveDocumentSlice(size_t offset, size_t maximum) const {
   return configDocumentSlice(_saveDocumentPrefix, _pendingApp, _pendingAppPatch, _saveDocumentAppBytes, offset, maximum);
@@ -2632,7 +2660,7 @@ String ArdPortal::configDocumentSlice(const String& documentPrefix, const ArdJSO
     size_t at = offset - prefix, n = appBytes - at;
     if (n > maximum) n = maximum;
     auto limits = snapshotLimits();
-    limits.maxOutputBytes = MaxAppConfigBytes;
+    limits.maxOutputBytes = appBytes > MaxAppConfigBytes ? appBytes : MaxAppConfigBytes;
     String part = patch ? ArdJSON::JSON.stringifyObjectPatchSlice(_appConfig, app, at, n, nullptr, limits) : ArdJSON::JSON.stringifySlice(app, at, n, nullptr, limits);
     if (part.length() != n) return String();
     out += part;

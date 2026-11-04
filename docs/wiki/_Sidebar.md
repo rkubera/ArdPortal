@@ -14,6 +14,7 @@
   - [text](https://github.com/rkubera/ArdPortal/wiki/Control-text)
   - [select](https://github.com/rkubera/ArdPortal/wiki/Control-select)
   - [edit](https://github.com/rkubera/ArdPortal/wiki/Control-edit)
+  - [password](https://github.com/rkubera/ArdPortal/wiki/Control-password)
   - [switch](https://github.com/rkubera/ArdPortal/wiki/Control-switch)
   - [climate](https://github.com/rkubera/ArdPortal/wiki/Control-climate)
   - [binary_sensor](https://github.com/rkubera/ArdPortal/wiki/Control-binary_sensor)

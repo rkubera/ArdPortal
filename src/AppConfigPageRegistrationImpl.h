@@ -391,11 +391,13 @@ void ArdPortal::serviceAppConfigPageRegistrationUnit() {
         return;
       }
 #if ARDPORTAL_ENABLE_HA
-    String discoveryError;
-    String payload = _homeAssistant.discoveryConfig(value, &discoveryError);
-    if (!payload.length() || payload.length() + 400 > ArdMqtt::PacketCapacity - 5) {
-      failed("discovery", id, !payload.length() ? discoveryError : String(F(ARD_LANG_NATIVE_DISCOVERY_PAYLOAD_EXCEEDS_MQTT_PACKET_CAPACITY_PAYLOAD)) + String(payload.length()) + ARD_LANG_NATIVE_RESERVE_400_CAPACITY + String(ArdMqtt::PacketCapacity - 5));
-      return;
+    if (!ArdControl::secret(value)) {
+      String discoveryError;
+      String payload = _homeAssistant.discoveryConfig(value, &discoveryError);
+      if (!payload.length() || payload.length() + 400 > ArdMqtt::PacketCapacity - 5) {
+        failed("discovery", id, !payload.length() ? discoveryError : String(F(ARD_LANG_NATIVE_DISCOVERY_PAYLOAD_EXCEEDS_MQTT_PACKET_CAPACITY_PAYLOAD)) + String(payload.length()) + ARD_LANG_NATIVE_RESERVE_400_CAPACITY + String(ArdMqtt::PacketCapacity - 5));
+        return;
+      }
     }
 #endif
     // Only existing owners whose generated names might match this new ID need

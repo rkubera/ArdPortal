@@ -10,6 +10,7 @@
 | [text](https://github.com/rkubera/ArdPortal/wiki/Control-text) | Read-only measurement or text |
 | [select](https://github.com/rkubera/ArdPortal/wiki/Control-select) | Dropdown selection |
 | [edit](https://github.com/rkubera/ArdPortal/wiki/Control-edit) | Editable text |
+| [password](https://github.com/rkubera/ArdPortal/wiki/Control-password) | Hidden local password; excluded from integrations |
 | [switch](https://github.com/rkubera/ArdPortal/wiki/Control-switch) | On/off toggle |
 | [climate](https://github.com/rkubera/ArdPortal/wiki/Control-climate) | Thermostat dial |
 | [binary_sensor](https://github.com/rkubera/ArdPortal/wiki/Control-binary_sensor) | Binary status indicator |
@@ -40,7 +41,7 @@
 
 The [complete current Zigbee coverage table](https://github.com/rkubera/ArdPortal/wiki/Zigbee#complete-current-control-coverage)
 marks which fields are native, composite (several separate endpoints), generic
-single-endpoint controls, or unmapped. All 30 types remain documented individually.
+single-endpoint controls, or unmapped. All 31 types remain documented individually.
 
 See [Control classes and shared model](Control-Classes) for the complete optional `class` catalogue and migration rules.
 
@@ -147,6 +148,7 @@ are:
 | `select` | `options: ["eco","normal"]` | String dropdown; this descriptor syntax differs from a `select` field's translated option objects. |
 | `color` | None | RGB object with integer `r`, `g`, `b` channels, each 0–255. |
 | `edit` | None | Editable string. |
+| `password` | None | Local secret string; no protocol mapping. |
 | `date`, `time`, `datetime` | None | Strings following the formats listed above. |
 | `action` | `payload` | Button invoking `onAppConfigCommand` with the declared payload. |
 | `action_text` | None | Text input and explicit Send; invokes `onAppConfigCommand`. |
@@ -267,6 +269,7 @@ discovery refresh and storage work are scheduled incrementally by `loop()`.
 | `text` | `sensor` |
 | `select` | `select` |
 | `edit` | `text` |
+| `password` | Not exported |
 | `switch`, `climate` | Same component name |
 | `device_trigger` | `device_automation` |
 | Other descriptor-based types | Matching component name |
