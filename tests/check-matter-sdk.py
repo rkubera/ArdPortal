@@ -65,6 +65,12 @@ if thread:
 if router:
     assert not enabled('IEEE802154_SLEEP_ENABLE'), 'Router must keep the Thread radio listening'
 wifi = args.profile != 'thread'
+if wifi:
+    for option in ('ESP_WIFI_11KV_SUPPORT', 'ESP_WIFI_MBO_SUPPORT', 'ESP_WIFI_11R_SUPPORT'):
+        assert enabled(option), 'Wi-Fi profile requires SDK roaming support: ' + option
+    if args.profile == 'wifi':
+        for unit in ('NetworkCommissioningDriver', 'ESP32Utils'):
+            assert (args.build / 'ardportal-matter-roaming' / (unit + '.cpp')).is_file(), 'Missing Matter roaming overlay'
 assert enabled('ENABLE_MATTER_OVER_THREAD') == thread
 assert enabled('OPENTHREAD_ENABLED') == thread
 assert enabled('ENABLE_WIFI_STATION') == (args.profile == 'wifi')

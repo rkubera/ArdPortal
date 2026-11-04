@@ -19,7 +19,7 @@ using ArdNetworkIo::stopClient;
 #endif
 #if defined(ESP32)
 #include <esp_system.h>
-#if ARDPORTAL_ENABLE_MATTER && ARDPORTAL_MATTER_THREAD && ARDPORTAL_ENABLE_WIFI
+#if ARDPORTAL_ENABLE_WIFI && ((ARDPORTAL_ENABLE_MATTER && ARDPORTAL_MATTER_THREAD) || CONFIG_ESP_WIFI_11KV_SUPPORT || CONFIG_ESP_WIFI_11R_SUPPORT)
 #include <esp_wifi.h>
 #endif
 #if ARDPORTAL_ENABLE_WWW
@@ -337,7 +337,34 @@ void ArdPortal::connectWifi() {
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
   log(ArdUILanguage::text(ArdUILanguage::Key::s_209) + String(_wifiSince));
 #endif
+#if defined(ESP32) && (CONFIG_ESP_WIFI_11KV_SUPPORT || CONFIG_ESP_WIFI_11R_SUPPORT)
+  _wifiRoamPending = false;
+  // Arduino clears wifi_sta_config_t when credentials are supplied. Prepare it
+  // without associating, then enable only features compiled into this SDK.
+  WiFi.begin(_config.ssid.c_str(), _config.password.c_str(), 0, nullptr, false);
+  wifi_config_t wifi = {};
+  if (esp_wifi_get_config(WIFI_IF_STA, &wifi) == ESP_OK
+      && strncmp(reinterpret_cast<const char*>(wifi.sta.ssid), _config.ssid.c_str(), sizeof(wifi.sta.ssid)) == 0
+      && strncmp(reinterpret_cast<const char*>(wifi.sta.password), _config.password.c_str(), sizeof(wifi.sta.password)) == 0) {
+#if CONFIG_ESP_WIFI_11KV_SUPPORT
+    wifi.sta.rm_enabled = 1;   // 802.11k radio measurements.
+    wifi.sta.btm_enabled = 1;  // 802.11v AP-assisted BSS transitions.
+#endif
+#if CONFIG_ESP_WIFI_11KV_SUPPORT && CONFIG_ESP_WIFI_MBO_SUPPORT
+    wifi.sta.mbo_enabled = 1;  // SDK network-assisted roaming policy.
+#endif
+#if CONFIG_ESP_WIFI_11R_SUPPORT
+    wifi.sta.ft_enabled = 1;  // 802.11r fast transition (over the air).
+#endif
+    // Roaming must not be pinned to one AP or channel.
+    wifi.sta.bssid_set = false;
+    wifi.sta.channel = 0;
+    if (esp_wifi_set_config(WIFI_IF_STA, &wifi) == ESP_OK) WiFi.begin();
+    else WiFi.begin(_config.ssid.c_str(), _config.password.c_str());
+  } else WiFi.begin(_config.ssid.c_str(), _config.password.c_str());
+#else
   WiFi.begin(_config.ssid.c_str(), _config.password.c_str());
+#endif
   _attempting = true;
   _wifiState = WifiState::Connecting;
 #else
@@ -395,6 +422,9 @@ void ArdPortal::serviceWifi(uint32_t now) {
   }
 #endif
   if (wifiConnected()) {
+#if defined(ESP32) && (CONFIG_ESP_WIFI_11KV_SUPPORT || CONFIG_ESP_WIFI_11R_SUPPORT)
+    _wifiRoamPending = false;
+#endif
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES
     const bool wasAttempting = _attempting;
 #endif
@@ -445,6 +475,18 @@ void ArdPortal::serviceWifi(uint32_t now) {
     _attempting = false;
     _wifiState = _apActive ? WifiState::FallbackAP : WifiState::Disconnected;
     return;
+  }
+#endif
+#if defined(ESP32) && (CONFIG_ESP_WIFI_11KV_SUPPORT || CONFIG_ESP_WIFI_11R_SUPPORT)
+  // The driver may briefly drop station/IP status during a BSS transition.
+  // Do not cancel its roam with a fresh credential-based association. Bound
+  // this grace period so a real AP loss still reaches ordinary recovery.
+  if (_wasConnected && _wifiAutoReconnect) {
+    if (!_wifiRoamPending) {
+      _wifiRoamPending = true;
+      _wifiRoamSince = now;
+    }
+    if (uint32_t(now - _wifiRoamSince) < 2000) return;
   }
 #endif
   // STA association can retune the shared radio and disconnect AP stations.

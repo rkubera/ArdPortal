@@ -13,8 +13,8 @@ workflow = (root / '.github/workflows/pr-checks.yml').read_text()
 job = workflow.split('  arduino-builds:', 1)[1].split('  matter-sdk:', 1)[0]
 profiles = subprocess.check_output(['bash', str(script), '--list'], text=True).splitlines()
 entries = re.findall(r'- profile: (\S+)\n\s+name: "([^"]+)"\n\s+core: (\S+)', job)
-assert len(profiles) == len(set(profiles)) == 19
-assert len(entries) == len({entry[0] for entry in entries}) == 9
+assert len(profiles) == len(set(profiles)) == 20
+assert len(entries) == len({entry[0] for entry in entries}) == 10
 assert {entry[0] for entry in entries} <= set(profiles)
 assert 'fail-fast: false' in job and "compile-arduino.sh '${{ matrix.profile }}'" in job
 assert 'Firmware / Arduino / ${{ matrix.name }}' in job
@@ -66,6 +66,9 @@ if Path(args[-1]).name=='no_network' and args[args.index('--fqbn')+1]=='esp32:es
             flag = '-DARDPORTAL_ENABLE_CONTROLS=1' if profile.endswith('full') else '-DARDPORTAL_MATTER_THREAD=' + str(int(profile.endswith('thread')))
             assert 'compiler.cpp.extra_flags=' + flag in args
             assert ('esp32h2' in fqbn) == ('-h2-' in profile)
+        elif profile == 'portal-esp32c3':
+            assert fqbn == 'esp32:esp32:esp32c3:PartitionScheme=min_spiffs'
+            assert args[-1] == 'examples/DynamicPages'
         elif profile.startswith('api-'):
             assert Path(args[-1]).name == profile.removeprefix('api-')
         elif profile == 'no-network-esp32':
@@ -82,4 +85,4 @@ if Path(args[-1]).name=='no_network' and args[args.index('--fqbn')+1]=='esp32:es
                                      ('unknown', {}, 2)]:
         result = subprocess.run(['bash', str(script), profile], env={**env, **extra}, capture_output=True, text=True)
         assert result.returncode == expected, (profile, result.returncode, result.stderr)
-print('PASS: 9 CI Arduino jobs, 19 local profiles, target/core/flag dispatch, all-profiles entry point and linker/compiler failures')
+print('PASS: 10 CI Arduino jobs, 20 local profiles, target/core/flag dispatch, all-profiles entry point and linker/compiler failures')

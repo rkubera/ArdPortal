@@ -106,3 +106,35 @@ Each probe is aborted after four seconds; no fixed restart countdown is used.
 Formatting shows that same moving bar throughout both formatting and its restart,
 without hiding it between stages. Availability probes begin after formatting
 finishes, and the dialog disappears when navigation loads the available portal.
+
+## Wi-Fi roaming (802.11k/v/r)
+
+For station connections started by ArdPortal, ESP32 builds automatically enable
+802.11k radio measurements and 802.11v BSS Transition Management when the SDK has
+`CONFIG_ESP_WIFI_11KV_SUPPORT`, and 802.11r Fast Transition when it has
+`CONFIG_ESP_WIFI_11R_SUPPORT`. These are SDK capabilities, not a chip-name whitelist.
+ESP8266 and builds without those capabilities keep the ordinary connection path.
+No JSON setting is required. Every ArdPortal connection attempt reapplies the flags
+before association, without locking a BSSID or channel. Where compiled in, MBO
+is enabled with k/v to use the SDK network-assisted roaming policy. A driver configuration
+failure falls back to the ordinary credential-based connection.
+After an established connection briefly loses status, ArdPortal gives the driver
+up to two seconds to complete its transition before ordinary recovery takes over.
+
+The source-built ESP-IDF `wifi` and `thread-wifi` profiles request k/v, MBO and FT.
+The `wifi` profile also generates an overlay for the pinned Matter commissioning
+driver, so credentials installed or restored through Matter retain these flags.
+Downloaded Component Manager sources are not edited.
+Precompiled Arduino cores must already include them: adding compiler `-D` flags
+cannot add roaming code to a prebuilt SDK. In the locally checked Arduino ESP32
+3.3.12 packages, C3 enables both; ESP32, S2, S3, C5 and C6 disable both. Use an SDK
+built with these options for those targets. Wi-Fi-free profiles do not enable them.
+In precompiled Arduino Matter builds, direct ESP-Matter commissioning remains
+owned by its SDK driver; ArdPortal cannot change that precompiled driver.
+
+APs must share a compatible SSID/security configuration and support the relevant
+features; FT also requires matching mobility-domain configuration. ESP-IDF 5.5
+supports FT over the air for WPA2-PSK. Ordinary APs remain usable. This enables
+network-assisted roaming; it does not add periodic background scans, an RSSI-based
+AP-selection algorithm, or a guarantee that TCP/MQTT sessions survive a transition.
+See [Espressif's roaming documentation](https://docs.espressif.com/projects/esp-idf/en/v5.5.1/esp32/api-guides/wifi.html#wireless-network-management).
