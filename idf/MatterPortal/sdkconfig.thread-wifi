@@ -20,3 +20,8 @@ CONFIG_OPENTHREAD_NUM_MESSAGE_BUFFERS=32
 
 # Allocate Matter pool entries on demand rather than reserving unused entries.
 CONFIG_CHIP_SYSTEM_CONFIG_POOL_USE_HEAP=y
+
+# Network-assisted roaming and fast transition on supported Wi-Fi targets.
+CONFIG_ESP_WIFI_11KV_SUPPORT=y
+CONFIG_ESP_WIFI_MBO_SUPPORT=y
+CONFIG_ESP_WIFI_11R_SUPPORT=y

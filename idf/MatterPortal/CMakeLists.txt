@@ -88,6 +88,7 @@ endif()
 idf_component_get_property(matter_lib espressif__esp_matter COMPONENT_LIB)
 get_target_property(matter_sources ${matter_lib} SOURCES)
 include("${CMAKE_CURRENT_LIST_DIR}/MatterWiFiBands.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/MatterWiFiRoaming.cmake")
 foreach(source IN LISTS matter_sources)
     if(source MATCHES "/closure-control-server/[^/]+\\.cpp$")
         set_property(SOURCE "${source}" TARGET_DIRECTORY ${matter_lib} APPEND PROPERTY
@@ -117,6 +118,10 @@ if(ARDPORTAL_PROFILE STREQUAL "thread-wifi" AND
 endif()
 if(ARDPORTAL_PROFILE STREQUAL "thread-wifi" AND NOT CONFIG_ESP_COEX_SW_COEXIST_ENABLE)
     message(FATAL_ERROR "Thread with Wi-Fi portal requires Wi-Fi/802.15.4 radio coexistence")
+endif()
+if((ARDPORTAL_PROFILE STREQUAL "wifi" OR ARDPORTAL_PROFILE STREQUAL "thread-wifi") AND
+   (NOT CONFIG_ESP_WIFI_11KV_SUPPORT OR NOT CONFIG_ESP_WIFI_MBO_SUPPORT OR NOT CONFIG_ESP_WIFI_11R_SUPPORT))
+    message(FATAL_ERROR "Wi-Fi profiles require SDK k/v/r roaming support; use a fresh build directory")
 endif()
 if(NOT CONFIG_ENABLE_CHIPOBLE)
     message(FATAL_ERROR "These profiles require BLE commissioning")

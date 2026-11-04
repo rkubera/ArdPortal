@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 set -euo pipefail
 cd "$(dirname "$0")/.."
-profiles=(portal-esp8266 portal-esp32 zigbee-c5-ed zigbee-c6-ed zigbee-h2-ed
+profiles=(portal-esp8266 portal-esp32 portal-esp32c3 zigbee-c5-ed zigbee-c6-ed zigbee-h2-ed
   matter-c6-wifi matter-c6-thread matter-h2-thread matter-c6-full no-network-esp32
   api-all api-no_power api-no_www api-log_headless api-log_without_console
   api-no_network api-no_dynamic api-no_actions api-local_dynamic)
@@ -38,6 +38,7 @@ properties=()
 case "$profile" in
   portal-esp8266) fqbn=esp8266:esp8266:generic ;;
   portal-esp32) ;;
+  portal-esp32c3) fqbn=esp32:esp32:esp32c3:PartitionScheme=min_spiffs ;;
   zigbee-*-ed)
     chip="esp32${profile#zigbee-}"
     chip="${chip%-ed}"

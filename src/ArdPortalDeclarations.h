@@ -1357,6 +1357,10 @@ private:
   uint32_t _wifiRevision = 0;
   uint8_t _wifiResult = 0;  // 0 pending, 1 connected, 2 failed; retained across retries.
   uint32_t _wifiSince = 0, _retrySince = 0;
+#if defined(ESP32) && (CONFIG_ESP_WIFI_11KV_SUPPORT || CONFIG_ESP_WIFI_11R_SUPPORT)
+  bool _wifiRoamPending = false;
+  uint32_t _wifiRoamSince = 0;
+#endif
 
   String _networks = "[]";
   uint32_t _scanId = 0, _scanCompletedId = 0;

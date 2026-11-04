@@ -56,6 +56,9 @@ jobs:
           - profile: portal-esp32
             name: "ESP32 / portal"
             core: esp32:esp32@3.3.12
+          - profile: portal-esp32c3
+            name: "ESP32-C3 / portal / roaming k-v-r"
+            core: esp32:esp32@3.3.12
           - profile: zigbee-c6-ed
             name: "ESP32-C6 / Zigbee end device"
             core: esp32:esp32@3.3.12
