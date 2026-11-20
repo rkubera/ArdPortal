@@ -5,8 +5,8 @@ import tempfile
 
 root = Path(__file__).resolve().parents[1]
 source = (root / 'src/ArdPortalImpl.h').read_text()
-a = source.index('        // Reuse the existing transport String:')
-b = source.index('\n      }\n      _responseOffset = 0;', a)
+a = source.index('      // Reuse the existing transport String:')
+b = source.index('      _responseOffset = 0;', a)
 block = source[a:b]
 dynamic = (root / 'src/DynamicPortalImpl.h').read_text()
 skip_start = dynamic.index('  // Commit bounded cursor-only progress')
