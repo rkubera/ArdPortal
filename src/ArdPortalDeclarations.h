@@ -81,7 +81,7 @@ public:
    * Input: ArdPortalBuildTag<ARDPORTAL_FEATURE_MASK>.
    * @return No value.
    */
-  ArdPortal(ArdPortalBuildTag<ARDPORTAL_FEATURE_MASK> = {});
+  ArdPortal(ArdPortalBuildTag<ARDPORTAL_BUILD_FEATURE_MASK> = {});
   /**
    * @brief Disallow copying or moving this resource-owning instance.
    * Input: const ArdPortal&.
@@ -764,6 +764,10 @@ private:
     return time(nullptr) >= 1704067200;
   }
 public:
+  /** Convert the SNTP-maintained UTC clock to configured local calendar time. */
+  bool localTime(struct tm& result) const;
+  /** Current configured offset east of UTC, in minutes; zero before time is valid. */
+  int16_t utcOffsetMinutes() const;
   // 2024-01-01
   /**
    * @brief Check portal and app config storage ok.
@@ -1122,6 +1126,9 @@ private:
 #if ARDPORTAL_ENABLE_WIFI
   String _ntpServer1, _ntpServer2;
 #endif
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  void applyTimezone();
+#endif
   PortalConfig _config, _pending;
   ArdPortalStorage _storage;
   std::unique_ptr<ArdJSON::StreamParser> _loadParser;
@@ -1201,7 +1208,7 @@ private:
   static constexpr bool _http = false;
 #endif
 #if ARDPORTAL_ENABLE_WWW && ARDPORTAL_ENABLE_DYNAMIC_PAGES
-  bool _httpDynamicPages = false, _httpDynamicPageStarted = false, _httpPortalTail = false;
+  bool _httpDynamicPages = false, _httpDynamicPageStarted = false;
   String _httpDynamicText;
   // 0: definition list, 1: selected definition, 2: selected state, 3: menu catalog.
   uint8_t _httpDynamicMode = 0, _httpDynamicStage = 0;

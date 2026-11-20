@@ -20,6 +20,8 @@ int main() {
    assert(document.hasOwnProperty(key)==bool(ARDPORTAL_ENABLE_MQTT));
   for(const char* key:{"mqttTls","caCert"})
    assert(document.hasOwnProperty(key)==bool(ARDPORTAL_ENABLE_MQTT_TLS));
+  for(const char* key:{"timezoneRule1Week","timezoneRule2Offset"})
+   assert(document.hasOwnProperty(key)==bool(ARDPORTAL_ENABLE_TIMEZONE_RULES));
   String json=ArdPortalJson::encode(c,ArdJsonCodec(),backup);
   assert(json.length());
   assert(ArdPortalJson::decode(json,loaded,ArdJsonCodec(),backup));
@@ -63,6 +65,8 @@ int main() {
  assert(api.hasOwnProperty("mqttName")==bool(ARDPORTAL_ENABLE_MQTT));
  assert(api.hasOwnProperty("caCert")==bool(ARDPORTAL_ENABLE_MQTT_TLS));
  assert(api.hasOwnProperty("mqttTls")==bool(ARDPORTAL_ENABLE_MQTT_TLS));
+ assert(api.hasOwnProperty("timezoneRule1Week")==bool(ARDPORTAL_ENABLE_TIMEZONE_RULES));
+ assert(api.hasOwnProperty("timezoneRule2Offset")==bool(ARDPORTAL_ENABLE_TIMEZONE_RULES));
  assert(!api.hasOwnProperty("password")&&!api.hasOwnProperty("mqttPassword"));
 #if !ARDPORTAL_ENABLE_MQTT_TLS
  for(const char* body:{"mqttTls=0","caCert=certificate"}) {
@@ -77,12 +81,14 @@ int main() {
 with tempfile.TemporaryDirectory(prefix='ardportal-config-features-') as directory:
     work = Path(directory)
     (work / 'test.cpp').write_text(fixture + main)
-    for wifi, mqtt, tls in ((0, 0, 0), (1, 0, 0), (1, 1, 0), (1, 1, 1)):
+    for wifi, mqtt, tls, timezone in ((0, 0, 0, 1), (1, 0, 0, 1), (1, 1, 0, 1),
+                                      (1, 1, 1, 1), (1, 1, 1, 0)):
         subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-fsanitize=address,undefined',
                         '-DESP8266', '-DARDFS_HOST_TEST', f'-DARDPORTAL_ENABLE_WIFI={wifi}',
                         f'-DARDPORTAL_ENABLE_MQTT={mqtt}', f'-DARDPORTAL_ENABLE_MQTT_TLS={tls}',
+                        f'-DARDPORTAL_ENABLE_TIMEZONE_RULES={timezone}',
                         '-I' + str(root / 'tests/memory-host'), '-I' + str(root / 'src'), str(work / 'test.cpp'),
                         *[str(root / 'src' / name) for name in ('ArdStorage.cpp', 'JsonStream.cpp', 'JournalReader.cpp', 'JsonDocumentStream.cpp')],
                         '-o', str(work / 'test')], check=True)
         subprocess.run([str(work / 'test')], check=True)
-print('PASS: config/API/backup fields follow Wi-Fi/MQTT/TLS; legacy fields ignored; feature defaults; strict unknown keys')
+print('PASS: config/API/backup fields follow Wi-Fi/MQTT/TLS/timezone; legacy fields ignored; feature defaults; strict unknown keys')

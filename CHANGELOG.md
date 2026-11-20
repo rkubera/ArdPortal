@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reduce portal firmware and request-stack use by serving the dynamic-page HTML shell as gzip, loading its existing page-catalog endpoint at startup, packing form keys and storing numeric timezone fields without temporary `String` objects.
+
+- Add persistent two-rule time-zone selection, automatic daylight/standard-time conversion, local-time APIs and UTC RTC synchronization through NTP; `ARDPORTAL_ENABLE_TIMEZONE_RULES=0` omits the rules and page.
+
 - Keep conditional controls and empty scene groups hidden until the first visibility snapshot, avoiding an expanded-form flash on large dynamic pages.
 
 - Reduce programmatic visibility RAM/flash costs: pack field/page flags, exclude dependency graph state and browser previews when dependencies are disabled, and evaluate plain visibility from metadata without parsing field JSON.

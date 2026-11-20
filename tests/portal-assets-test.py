@@ -32,7 +32,8 @@ class PortalAssetsTest(unittest.TestCase):
         scripts = {name.removeprefix('portal-assets/Script_') for name in includes
                    if name.startswith('portal-assets/Script_')}
         self.assertEqual(len(html), 18)
-        self.assertEqual(html, scripts)
+        self.assertEqual(len(scripts), 36)
+        self.assertEqual(html, {re.sub(r'_timezone[01](?=\.h$)', '', name) for name in scripts})
         for name in includes:
             with self.subTest(header=name):
                 self.assertLess((source / name).stat().st_size, 10 * 1024 * 1024)
@@ -68,6 +69,29 @@ class PortalAssetsTest(unittest.TestCase):
             flags = {'MATTER': enabled, 'ZIGBEE': 0}
             self.assertEqual('api/matter/status' in selected(script, None, flags), bool(enabled))
             self.assertEqual('ui_221' in selected(html, None, flags), bool(enabled))
+
+    def test_timezone_uses_listboxes_and_shows_local_clock(self):
+        _, script, html = portal_parts(ROOT / 'src', guarded=True)
+        enabled = {'TIMEZONE_RULES': 1}
+        timezone_html = selected(html, None, enabled)
+        timezone_script = selected(script, None, enabled)
+        for name, marker in (('timezoneRule1Hour', 'data-hour'),
+                             ('timezoneRule2Hour', 'data-hour'),
+                             ('timezoneRule1Offset', 'data-offset'),
+                             ('timezoneRule2Offset', 'data-offset')):
+            self.assertIn(f'<select name={name} {marker}>', timezone_html)
+            self.assertNotIn(f'<input name={name}', timezone_html)
+        self.assertIn('id="timezoneClock"', (ROOT / 'src/PortalPage.h').read_text())
+        self.assertIn("value=0;value<24", timezone_script)
+        self.assertIn("value=-12;value<=14", timezone_script)
+        self.assertIn("utcOffsetMinutes*60", timezone_script)
+        self.assertNotIn('utcOffsetMinutes*60', selected(script, None, {'TIMEZONE_RULES': 0}))
+
+    def test_dynamic_catalog_is_fetched_instead_of_embedded_in_html(self):
+        _, script, html = portal_parts(ROOT / 'src', guarded=True)
+        self.assertNotIn('pageCatalog', html)
+        self.assertNotIn('pageCatalog', script)
+        self.assertIn("request('/api/page-catalog')", script)
 
     def test_compact_html_preserves_parsed_content_and_inline_code(self):
         class Events(HTMLParser):

@@ -20,7 +20,7 @@ GROUPS={
 # @param features Feature selections used to evaluate the asset guard.
 # @return True if the feature expression is enabled for the chosen controls.
 def condition_enabled(condition, controls=None, features=None):
- values={'ARDPORTAL_ENABLE_BACKUP_RESTORE':1,'ARDPORTAL_ENABLE_GROUPS':0,'ARDPORTAL_ENABLE_ZIGBEE':0,'ARDPORTAL_ENABLE_MATTER':0,'ARDPORTAL_ENABLE_MATTER_CONSOLE':0,'ARDPORTAL_ENABLE_VISIBILITY':1,'ARDPORTAL_ENABLE_DEPENDENCIES':1,'ARDPORTAL_ENABLE_DYNAMIC_PAGES':1}
+ values={'ARDPORTAL_ENABLE_BACKUP_RESTORE':1,'ARDPORTAL_ENABLE_TIMEZONE_RULES':1,'ARDPORTAL_ENABLE_GROUPS':0,'ARDPORTAL_ENABLE_ZIGBEE':0,'ARDPORTAL_ENABLE_MATTER':0,'ARDPORTAL_ENABLE_MATTER_CONSOLE':0,'ARDPORTAL_ENABLE_VISIBILITY':1,'ARDPORTAL_ENABLE_DEPENDENCIES':1,'ARDPORTAL_ENABLE_DYNAMIC_PAGES':1}
  values.update({PREFIX+c.upper():int(controls is None or c in controls) for c in CONTROLS})
  values.update({'ARDPORTAL_CONTROL_SUPPORT_'+g:int(any(values[PREFIX+c.upper()] for c in cs)) for g,cs in GROUPS.items()})
  if features:values.update({'ARDPORTAL_ENABLE_'+k:int(v) for k,v in features.items()})
