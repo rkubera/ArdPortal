@@ -1,6 +1,9 @@
 .DS_Store
 __pycache__/
 
+# Arduino IDE/CLI build products generated next to example sketches
+examples/**/build/
+
 # ESP-IDF generated build products
 idf/**/build*/
 idf/**/managed_components/
