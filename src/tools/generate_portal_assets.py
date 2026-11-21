@@ -231,7 +231,6 @@ def generate(root):
     source = (root/'PortalPage.h').read_text()
     classes, ids = identifier_maps(source)
     head = source.split('R"HEAD(', 1)[1].split(')HEAD"', 1)[0]
-    lines += ['static const char PORTAL_PAGE_HEAD[] PROGMEM = R"HEAD('+compact_html(html_names(head, classes, ids))+')HEAD";']
     css, _, _ = portal_parts(root, guarded=True)
     banner = '\n'.join(lines[:3]) + '\n#pragma once\n// clang-format off\n'
     def asset_file(filename, contents):
@@ -250,20 +249,17 @@ def generate(root):
         variant = '_'.join(name.lower() + str(value) for name, value in flags)
         parts = []
         _, script, shell = portal_parts(root, ota, mqtt, console, guarded=True,tls=tls,messages=messages)
-        head=(root/'PortalPage.h').read_text().split('R"HEAD(',1)[1].split(')HEAD"',1)[0].split('<script id="pageCatalog"',1)[0]
-        minimal=head+shell.removeprefix('</script>')
-        minimal=re.sub(r'<section id='+re.escape(ids['dynamicLoading'])+r'(?=[\s>]).*?</section>','',minimal,flags=re.S)
-        minimal=re.sub(r'<nav id='+re.escape(ids['dynamicNavigation'])+r'(?=[\s>]).*?</nav>','',minimal,flags=re.S)
-        parts += ['#if ARDPORTAL_ENABLE_DYNAMIC_PAGES','static const char PORTAL_HTML[] PROGMEM =']
-        for guard,fragment in segments(shell):
-            if guard!='1':parts.append('#if '+guard)
-            parts.append('R"ASSET('+fragment+')ASSET"')
-            if guard!='1':parts.append('#endif')
-        parts+=[';','#else']
-        parts += emit_chunks('PORTAL_HTML_GZIP',segments(minimal),gzip_array)
-        parts += ['#endif']
+        head=(root/'PortalPage.h').read_text().split('R"HEAD(',1)[1].split(')HEAD"',1)[0]
+        document=head+shell
+        parts += emit_chunks('PORTAL_HTML_GZIP',segments(document),gzip_array)
         lines.append(asset_file('Html_' + variant, parts))
-        lines.append(asset_file('Script_' + variant, emit_profile_chunks('PORTAL_JS_GZIP', script, gzip_array)))
+        lines.append('#if ARDPORTAL_ENABLE_TIMEZONE_RULES')
+        timezone_on = re.sub(r'/\*@if ARDPORTAL_ENABLE_TIMEZONE_RULES\*/(.*?)/\*@endif\*/', r'\1', script, flags=re.S)
+        timezone_off = re.sub(r'/\*@if ARDPORTAL_ENABLE_TIMEZONE_RULES\*/(.*?)/\*@endif\*/', '', script, flags=re.S)
+        lines.append(asset_file('Script_' + variant + '_timezone1', emit_profile_chunks('PORTAL_JS_GZIP', timezone_on, gzip_array)))
+        lines.append('#else')
+        lines.append(asset_file('Script_' + variant + '_timezone0', emit_profile_chunks('PORTAL_JS_GZIP', timezone_off, gzip_array)))
+        lines.append('#endif')
     lines += ['#else', 'ARD_LANG_COMPILE_ERROR(ARD_LANG_NATIVE_INVALID_UI_FEATURE_COMBINATION)', '#endif']
     outputs['PortalAssets.h'] = '\n'.join(lines) + '\n'
     return outputs

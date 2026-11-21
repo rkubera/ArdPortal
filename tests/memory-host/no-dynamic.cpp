@@ -58,6 +58,18 @@ int main() {
     portal.loop();
   }
   assert(portal.portalAndAppConfigReady());
+  time_t winter = 1704067200;  // 2024-01-01 00:00 UTC.
+  time_t summer = 1719792000;  // 2024-07-01 00:00 UTC.
+  struct tm calendar;
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  assert(localtime_r(&winter, &calendar) && calendar.tm_hour == 1 && calendar.tm_isdst == 0);
+  assert(localtime_r(&summer, &calendar) && calendar.tm_hour == 2 && calendar.tm_isdst > 0);
+  assert(portal.localTime(calendar) && portal.utcOffsetMinutes() == 60);
+#else
+  assert(gmtime_r(&winter, &calendar) && calendar.tm_hour == 0 && calendar.tm_isdst == 0);
+  assert(gmtime_r(&summer, &calendar) && calendar.tm_hour == 0 && calendar.tm_isdst == 0);
+  assert(portal.localTime(calendar) && portal.utcOffsetMinutes() == 0);
+#endif
   auto config = portal.getPortalConfig();
   config.password = u8"wifi-zażółć";
   config.apPassword = "ap-masked-pass";

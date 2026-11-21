@@ -205,6 +205,8 @@ only during the callback; copy values you need afterward. Keep callbacks short.
 | `mqttConnected()` / `mqttState()` | Broker CONNACK acceptance boolean / `MqttState`; false/Disabled when compiled out. |
 | `apActive()` / `localIP()` / `apIP()` | AP active flag, station IP and soft-AP IP. Check connectivity before using an IP. |
 | `tlsClockReady()` | Clock has reached the minimum plausible TLS date; not a guarantee of current NTP accuracy. |
+| `localTime(tm)` | Convert the SNTP-maintained UTC clock to local calendar time using the saved recurring timezone rules; false while the clock is not valid. |
+| `utcOffsetMinutes()` | Active saved UTC offset in minutes; zero while the clock is not valid. |
 | `chipId()` / `defaultDeviceName()` | Static chip identifier and generated `ArdUI-<chip ID>` name. |
 | `mqttTopic(kind, command)` | Build an allowed device topic; returns an empty String on invalid arguments or when MQTT is absent. |
 | `validMqttTopic(topic, subscription=false)` | Validate the device namespace and final-level wildcard policy; false without MQTT. |
@@ -413,6 +415,17 @@ member explicitly ends in `Seconds`.
 | `tcpTimeoutMs` | `250` | Synchronous broker TCP connect timeout where supported by the core; must be nonzero. DNS is separate. |
 | `keepAliveSeconds` | `30` | MQTT keepalive; must be nonzero. |
 | `tlsHandshakeTimeoutSeconds` | `5` | ESP32 TLS handshake timeout; must be nonzero even if TLS is disabled. ESP8266 uses core BearSSL timeouts. |
+
+NTP keeps the system clock in UTC and starts again after every Wi-Fi connection.
+The built-in **Time zone** page stores two recurring transition rules in
+`PortalConfig`: `timezoneRule1*` for summer/daylight time and `timezoneRule2*`
+for standard time. Each rule contains `Week` (`0` means last), `DayOfWeek` (`1`
+is Sunday), `Month`, `Hour` and `Offset` (whole hours east of UTC). The defaults
+match the current European rules: the last Sunday in March at 02:00, UTC+2, and
+the last Sunday in October at 03:00, UTC+1. Equal offsets create a fixed-offset
+zone without seasonal changes.
+Define `ARDPORTAL_ENABLE_TIMEZONE_RULES=0` before `ArdPortal.h` to omit the
+rules and page while retaining UTC NTP synchronization.
 
 
 The design is cooperative, not hard real-time. It has no `delay()`, `readString()`

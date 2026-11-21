@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix='ardportal-profile-assets-') as director
  for profile,controls in (('FULL',None),('BASIC',['slider','text','select','edit']),('CUSTOM',['switch','slider','text'])):
   for zigbee,matter,traffic,groups,dependencies in ((0,0,0,0,1),(1,0,0,0,1),(0,1,0,0,1),(0,1,1,0,1),(0,0,0,1,1),(0,0,0,1,0)):
    for visibility in (0,1):
-    features={'BACKUP_RESTORE':visibility,'VISIBILITY':visibility,'GROUPS':groups,'DYNAMIC_PAGES':1,'DEPENDENCIES':dependencies,'ZIGBEE':zigbee,'MATTER':matter,'MATTER_CONSOLE':traffic}
+    features={'BACKUP_RESTORE':visibility,'TIMEZONE_RULES':1,'VISIBILITY':visibility,'GROUPS':groups,'DYNAMIC_PAGES':1,'DEPENDENCIES':dependencies,'ZIGBEE':zigbee,'MATTER':matter,'MATTER_CONSOLE':traffic}
     defines={'ARDPORTAL_ENABLE_'+k:v for k,v in features.items()}
     defines.update({'ARDPORTAL_CONTROL_PROFILE_FULL':int(profile=='FULL'),'ARDPORTAL_CONTROL_PROFILE_BASIC':int(profile=='BASIC')})
     defines.update({'ARDPORTAL_ENABLE_CONTROL_'+c.upper():int(controls is None or c in controls) for c in CONTROLS})

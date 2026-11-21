@@ -401,7 +401,7 @@ bool ArdPortal::reserveDynamicHttpMemory(size_t bytes, size_t block) {
   return false;
 }
 bool ArdPortal::dynamicHttpMemoryReady() {
-  if (_httpPortalTail || _httpDynamicPageOffset < _httpDynamicText.length()) return true;
+  if (_httpDynamicPageOffset < _httpDynamicText.length()) return true;
   _httpDynamicText = String();
   _httpDynamicPageOffset = 0;
   const bool indexed = _httpDynamicPageIndex < _dynamic.pages.length() && _httpDynamicField < _dynamic.pages.fields(_httpDynamicPageIndex);

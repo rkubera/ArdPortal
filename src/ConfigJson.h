@@ -13,7 +13,7 @@ namespace ArdPortalJson {
 inline ArdJSON::Limits limits() {
   ArdJSON::Limits value;
   value.maxDepth = 1;
-  value.maxNodes = 16;
+  value.maxNodes = ARDPORTAL_ENABLE_TIMEZONE_RULES ? 32 : 16;
   value.maxStringBytes = 4096;
   return value;
 }
@@ -71,6 +71,9 @@ inline TextField field(size_t index) {
  * @return True if every portal setting matches; false otherwise.
  */
 inline bool equal(const ArdPortal::PortalConfig& a, const ArdPortal::PortalConfig& b) {
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  if (a.timezoneRule1Week != b.timezoneRule1Week || a.timezoneRule2Week != b.timezoneRule2Week || a.timezoneRule1DayOfWeek != b.timezoneRule1DayOfWeek || a.timezoneRule2DayOfWeek != b.timezoneRule2DayOfWeek || a.timezoneRule1Month != b.timezoneRule1Month || a.timezoneRule2Month != b.timezoneRule2Month || a.timezoneRule1Hour != b.timezoneRule1Hour || a.timezoneRule2Hour != b.timezoneRule2Hour || a.timezoneRule1Offset != b.timezoneRule1Offset || a.timezoneRule2Offset != b.timezoneRule2Offset) return false;
+#endif
 #if ARDPORTAL_ENABLE_MQTT
   if (a.port != b.port) return false;
 #endif
@@ -94,6 +97,18 @@ inline bool equal(const ArdPortal::PortalConfig& a, const ArdPortal::PortalConfi
 inline ArdJSON::JSONVar value(const ArdPortal::PortalConfig& config, bool backup = false) {
   auto root = ArdJSON::JSONVar::object();
   root["version"] = 1;
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  root["timezoneRule1Week"] = config.timezoneRule1Week;
+  root["timezoneRule2Week"] = config.timezoneRule2Week;
+  root["timezoneRule1DayOfWeek"] = config.timezoneRule1DayOfWeek;
+  root["timezoneRule2DayOfWeek"] = config.timezoneRule2DayOfWeek;
+  root["timezoneRule1Month"] = config.timezoneRule1Month;
+  root["timezoneRule2Month"] = config.timezoneRule2Month;
+  root["timezoneRule1Hour"] = config.timezoneRule1Hour;
+  root["timezoneRule2Hour"] = config.timezoneRule2Hour;
+  root["timezoneRule1Offset"] = config.timezoneRule1Offset;
+  root["timezoneRule2Offset"] = config.timezoneRule2Offset;
+#endif
 #if ARDPORTAL_ENABLE_WIFI
   root["apBand"] = config.apBand;
 #endif
@@ -176,6 +191,30 @@ inline bool decodeValue(const ArdJSON::JSONVar& root, ArdPortal::PortalConfig& r
   if (!root["version"].toInteger(version) || version != 1) return false;
   ArdPortal::PortalConfig config;
   size_t count = 1;
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  struct NumberField {
+    const char* key;
+    uint8_t ArdPortal::PortalConfig::*member;
+    int8_t minimum, maximum;
+  };
+  static const NumberField fields[] = {
+    { "timezoneRule1Week", &ArdPortal::PortalConfig::timezoneRule1Week, 0, 4 }, { "timezoneRule2Week", &ArdPortal::PortalConfig::timezoneRule2Week, 0, 4 }, { "timezoneRule1DayOfWeek", &ArdPortal::PortalConfig::timezoneRule1DayOfWeek, 1, 7 }, { "timezoneRule2DayOfWeek", &ArdPortal::PortalConfig::timezoneRule2DayOfWeek, 1, 7 }, { "timezoneRule1Month", &ArdPortal::PortalConfig::timezoneRule1Month, 1, 12 }, { "timezoneRule2Month", &ArdPortal::PortalConfig::timezoneRule2Month, 1, 12 }, { "timezoneRule1Hour", &ArdPortal::PortalConfig::timezoneRule1Hour, 0, 23 }, { "timezoneRule2Hour", &ArdPortal::PortalConfig::timezoneRule2Hour, 0, 23 }
+  };
+  for (const auto& field : fields)
+    if (root.hasOwnProperty(field.key)) {
+      ++count;
+      int64_t number;
+      if (!root[field.key].toInteger(number) || number < field.minimum || number > field.maximum) return false;
+      config.*field.member = uint8_t(number);
+    }
+  for (const char* key : { "timezoneRule1Offset", "timezoneRule2Offset" })
+    if (root.hasOwnProperty(key)) {
+      ++count;
+      int64_t number;
+      if (!root[key].toInteger(number) || number < -12 || number > 14) return false;
+      (key[12] == '1' ? config.timezoneRule1Offset : config.timezoneRule2Offset) = int8_t(number);
+    }
+#endif
   if (root.hasOwnProperty("port")) {
     ++count;
 #if ARDPORTAL_ENABLE_MQTT

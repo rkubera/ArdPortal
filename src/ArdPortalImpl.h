@@ -170,7 +170,7 @@ bool decode(const String& s, String& out) {
  * Input: ArdPortalBuildTag<ARDPORTAL_FEATURE_MASK>.
  * @return No value.
  */
-ArdPortal::ArdPortal(ArdPortalBuildTag<ARDPORTAL_FEATURE_MASK>)
+ArdPortal::ArdPortal(ArdPortalBuildTag<ARDPORTAL_BUILD_FEATURE_MASK>)
   :
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
     _appControls(*this)
@@ -202,6 +202,9 @@ ArdPortal::ArdPortal(ArdPortalBuildTag<ARDPORTAL_FEATURE_MASK>)
  * @return True if all portal settings pass validation; false with reason set otherwise.
  */
 bool ArdPortal::validPortalConfig(const PortalConfig& c) {
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  if (c.timezoneRule1Week > 4 || c.timezoneRule2Week > 4 || c.timezoneRule1DayOfWeek < 1 || c.timezoneRule1DayOfWeek > 7 || c.timezoneRule2DayOfWeek < 1 || c.timezoneRule2DayOfWeek > 7 || c.timezoneRule1Month < 1 || c.timezoneRule1Month > 12 || c.timezoneRule2Month < 1 || c.timezoneRule2Month > 12 || c.timezoneRule1Hour > 23 || c.timezoneRule2Hour > 23 || c.timezoneRule1Offset < -12 || c.timezoneRule1Offset > 14 || c.timezoneRule2Offset < -12 || c.timezoneRule2Offset > 14) return false;
+#endif
   for (size_t i = 0; i < sizeof(ArdPortalJson::TextFields) / sizeof(ArdPortalJson::TextFields[0]); ++i) {
     auto entry = ArdPortalJson::field(i);
     if (!entry.enabled) continue;
@@ -224,6 +227,44 @@ bool ArdPortal::validPortalConfig(const PortalConfig& c) {
   limits.maxOutputBytes = MaxPortalConfigBytes;
   if (!ArdJSON::JSON.measure(ArdPortalJson::value(c), nullptr, limits)) return false;
   return true;
+}
+
+/** Apply the two saved transition rules to the C runtime without changing UTC. */
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+void ArdPortal::applyTimezone() {
+  char zone[96];
+  if (_config.timezoneRule1Offset == _config.timezoneRule2Offset) {
+    snprintf(zone, sizeof(zone), "STD%+d", -int(_config.timezoneRule2Offset));
+  } else {
+    const unsigned week1 = _config.timezoneRule1Week ? _config.timezoneRule1Week : 5;
+    const unsigned week2 = _config.timezoneRule2Week ? _config.timezoneRule2Week : 5;
+    snprintf(zone, sizeof(zone), "STD%+dDST%+d,M%u.%u.%u/%u,M%u.%u.%u/%u",
+             -int(_config.timezoneRule2Offset), -int(_config.timezoneRule1Offset),
+             unsigned(_config.timezoneRule1Month), week1, unsigned(_config.timezoneRule1DayOfWeek - 1), unsigned(_config.timezoneRule1Hour),
+             unsigned(_config.timezoneRule2Month), week2, unsigned(_config.timezoneRule2DayOfWeek - 1), unsigned(_config.timezoneRule2Hour));
+  }
+  setenv("TZ", zone, 1);
+  tzset();
+}
+#endif
+
+bool ArdPortal::localTime(struct tm& result) const {
+  time_t now = time(nullptr);
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  return now >= 1704067200 && localtime_r(&now, &result) != nullptr;
+#else
+  return now >= 1704067200 && gmtime_r(&now, &result) != nullptr;
+#endif
+}
+
+int16_t ArdPortal::utcOffsetMinutes() const {
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  struct tm local;
+  if (!localTime(local)) return 0;
+  return int16_t((local.tm_isdst > 0 ? _config.timezoneRule1Offset : _config.timezoneRule2Offset) * 60);
+#else
+  return 0;
+#endif
 }
 
 /**
@@ -274,6 +315,9 @@ bool ArdPortal::begin(const Options& options) {
   _config.deviceName = _config.apName;
   _config.apName = ArdDeviceName::ap(_config.deviceName);
   if (!validPortalConfig(_config)) return false;
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  applyTimezone();
+#endif
 #if ARDPORTAL_ENABLE_WIFI
 #if ARDPORTAL_ENABLE_MATTER && ARDPORTAL_MATTER_THREAD
   // The first Wi-Fi init owns buffer sizes. Arduino applies its Matter limits
@@ -639,6 +683,9 @@ void ArdPortal::loop() {
 #endif
     closeMqtt();
     _config = std::move(_pending);
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+    applyTimezone();
+#endif
     applyPendingApp();
     _pendingReady = false;
     _pendingApp = ArdJSON::JSONVar::object();
@@ -874,7 +921,7 @@ void ArdPortal::closeHttp() {
   _httpDynamicMode = _httpDynamicStage = 0;
   _httpDynamicField = 0;
   _httpDynamicConditionFirst = true;
-  _httpDynamicPages = _httpDynamicPageStarted = _httpPortalTail = false;
+  _httpDynamicPages = _httpDynamicPageStarted = false;
   _httpDynamicPageIndex = _httpDynamicPageCount = _httpDynamicPageOffset = _httpDynamicPageLength = 0;
 #endif
 #if ARDPORTAL_ZIGBEE_HTTP_EXPORT_SUPPORT
@@ -982,68 +1029,43 @@ void ArdPortal::serviceHttpIo(uint32_t now) {
 #endif
         return;
       }
-      if (_httpPortalTail) {
-        if (!_httpDynamicPageStarted) {
-          _response = "[";
-          _httpDynamicPageStarted = true;
-        } else if (_httpDynamicPageIndex < _httpDynamicPageCount) {
-          const String& menu = _dynamic.pages.menu(_httpDynamicPageIndex);
-          String part = menu.substring(_httpDynamicPageOffset, _httpDynamicPageOffset + 256);
-          _response = (_httpDynamicPageIndex && !_httpDynamicPageOffset ? String(F(",")) : String()) + part;
-          _httpDynamicPageOffset += part.length();
-          if (_httpDynamicPageOffset == menu.length()) {
-            ++_httpDynamicPageIndex;
-            _httpDynamicPageOffset = 0;
-          }
-        } else {
-          _response = "]";
-          _httpDynamicPages = false;
-        }
-      } else {
-        // Reuse the existing transport String: no additional coalescing buffer.
-        // Bound fragment construction independently of transport backpressure.
-        const uint32_t started = millis();
-        bool accumulated = false;
-        for (size_t parts = 0; parts < 8; ++parts) {
-          if (_httpDynamicPageOffset >= _httpDynamicText.length()) {
-            if (!_httpDynamicPages) break;
-            if (!dynamicHttpMemoryReady()) {
+      // Reuse the existing transport String: no additional coalescing buffer.
+      // Bound fragment construction independently of transport backpressure.
+      const uint32_t started = millis();
+      bool accumulated = false;
+      for (size_t parts = 0; parts < 8; ++parts) {
+        if (_httpDynamicPageOffset >= _httpDynamicText.length()) {
+          if (!_httpDynamicPages) break;
+          if (!dynamicHttpMemoryReady()) {
 #if ARDPORTAL_ENABLE_DEPENDENCIES
-              _httpVisibilityCache.reset();
+            _httpVisibilityCache.reset();
 #endif
-              break;
-            }
-            auto part = prepareDynamicHttpPart();
-            if (part == DynamicHttpPart::RetryLater) break;
-            if (part == DynamicHttpPart::Failed || part == DynamicHttpPart::Finished) {
-              if (accumulated) break;
-              closeHttp();
-              return;
-            }
+            break;
           }
-          size_t bytes = _httpDynamicText.length() - _httpDynamicPageOffset;
-          const size_t used = accumulated ? _response.length() : 0;
-          if (bytes > 256 - used) bytes = 256 - used;
-          // Keep the old consumed response as the service-state sentinel until
-          // replacement succeeds; failed appends never consume source bytes.
-          if (!accumulated) {
-            if (!_response.reserve(bytes)) return;
-            _response.remove(0);
-            _response.concat(_httpDynamicText.c_str() + _httpDynamicPageOffset, bytes);
-            accumulated = true;
-          } else if (!_response.concat(_httpDynamicText.c_str() + _httpDynamicPageOffset, bytes)) break;
-          _httpDynamicPageOffset += bytes;
-          if (_response.length() == 256 || uint32_t(millis() - started) >= 2) break;
+          auto part = prepareDynamicHttpPart();
+          if (part == DynamicHttpPart::RetryLater) break;
+          if (part == DynamicHttpPart::Failed || part == DynamicHttpPart::Finished) {
+            if (accumulated) break;
+            closeHttp();
+            return;
+          }
         }
-        if (!accumulated) return;
+        size_t bytes = _httpDynamicText.length() - _httpDynamicPageOffset;
+        const size_t used = accumulated ? _response.length() : 0;
+        if (bytes > 256 - used) bytes = 256 - used;
+        // Keep the old consumed response as the service-state sentinel until
+        // replacement succeeds; failed appends never consume source bytes.
+        if (!accumulated) {
+          if (!_response.reserve(bytes)) return;
+          _response.remove(0);
+          _response.concat(_httpDynamicText.c_str() + _httpDynamicPageOffset, bytes);
+          accumulated = true;
+        } else if (!_response.concat(_httpDynamicText.c_str() + _httpDynamicPageOffset, bytes)) break;
+        _httpDynamicPageOffset += bytes;
+        if (_response.length() == 256 || uint32_t(millis() - started) >= 2) break;
       }
+      if (!accumulated) return;
       _responseOffset = 0;
-    } else if (_httpPortalTail) {
-      _page = PORTAL_HTML;
-      _pageLength = strlen_P(_page);
-      _pageOffset = 0;
-      _httpPortalTail = false;
-
 #endif
     } else {
 #if ARDPORTAL_SUPPORT_WEBSOCKET
@@ -1314,7 +1336,11 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     return;
   }
 #endif
-  if (_apActive && get && !ardFlashEqual(path, F("/")) && !ardFlashEqual(path, F("/device")) && !ardFlashEqual(path, F("/wifi")) && path.indexOf("/p/") != 0 && !ardFlashEqual(path, F("/zigbee")) && !ardFlashEqual(path, F("/ap")) && !ardFlashEqual(path, F("/mqtt")) && !ardFlashEqual(path, F("/upgrade")) && !ardFlashEqual(path, F("/console")) && path.indexOf("/api/") != 0
+  if (_apActive && get && !ardFlashEqual(path, F("/")) && !ardFlashEqual(path, F("/device")) && !ardFlashEqual(path, F("/wifi")) && path.indexOf("/p/") != 0 && !ardFlashEqual(path, F("/zigbee")) && !ardFlashEqual(path, F("/ap"))
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+      && !ardFlashEqual(path, F("/timezone"))
+#endif
+      && !ardFlashEqual(path, F("/mqtt")) && !ardFlashEqual(path, F("/upgrade")) && !ardFlashEqual(path, F("/console")) && path.indexOf("/api/") != 0
 #if ARDPORTAL_ENABLE_MATTER
       && !ardFlashEqual(path, F("/matter"))
 #endif
@@ -1325,26 +1351,8 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     return;
   }
   if (get && (path.indexOf("/api/") != 0 && path.indexOf('.') < 0)) {
-#if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-    const size_t catalogLength = _dynamic.pages.menuLength();
-    _page = PORTAL_PAGE_HEAD;
-    _pageLength = strlen_P(_page);
-    _pageOffset = 0;
-    _httpDynamicPages = true;
-    _httpDynamicPageStarted = false;
-    _httpPortalTail = true;
-    _httpDynamicPageIndex = 0;
-    _httpDynamicPageOffset = 0;
-    _httpDynamicPageCount = _dynamic.pages.length();
-    size_t length = _pageLength + catalogLength + strlen_P(PORTAL_HTML);
-#else
     size_t length = beginAsset(PORTAL_HTML_GZIP, sizeof(PORTAL_HTML_GZIP) / sizeof(PORTAL_HTML_GZIP[0]));
-#endif
-#if ARDPORTAL_ENABLE_DYNAMIC_PAGES
-    responseHeader(200, "text/html", length, false, true);
-#else
     responseHeader(200, "text/html", length, true, true);
-#endif
     return;
   }
   if (post && ardFlashEqual(path, F("/api/restart"))) {
@@ -1441,6 +1449,10 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     appendJsonBool(out, F(",\"storage\":"), _storageOK);
     appendJsonBool(out, F(",\"tls\":"), _config.mqttTls);
     appendJsonBool(out, F(",\"clockReady\":"), tlsClockReady());
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+    appendJsonNumber(out, F(",\"utcSeconds\":"), tlsClockReady() ? time(nullptr) : 0);
+    appendJsonNumber(out, F(",\"utcOffsetMinutes\":"), utcOffsetMinutes());
+#endif
     appendJsonBool(out, F(",\"filesystemMounted\":"), _storageMounted);
 #if ARDPORTAL_ENABLE_DYNAMIC_PAGES
     appendJsonNumber(out, F(",\"appConfigPageCount\":"), _dynamic.pages.length());
@@ -1466,6 +1478,18 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     String out;
     appendJsonText(out, F("{\"deviceName\":"), _config.deviceName);
     appendJsonText(out, F(",\"deviceDescription\":"), _config.deviceDescription);
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+    appendJsonNumber(out, F(",\"timezoneRule1Week\":"), _config.timezoneRule1Week);
+    appendJsonNumber(out, F(",\"timezoneRule2Week\":"), _config.timezoneRule2Week);
+    appendJsonNumber(out, F(",\"timezoneRule1DayOfWeek\":"), _config.timezoneRule1DayOfWeek);
+    appendJsonNumber(out, F(",\"timezoneRule2DayOfWeek\":"), _config.timezoneRule2DayOfWeek);
+    appendJsonNumber(out, F(",\"timezoneRule1Month\":"), _config.timezoneRule1Month);
+    appendJsonNumber(out, F(",\"timezoneRule2Month\":"), _config.timezoneRule2Month);
+    appendJsonNumber(out, F(",\"timezoneRule1Hour\":"), _config.timezoneRule1Hour);
+    appendJsonNumber(out, F(",\"timezoneRule2Hour\":"), _config.timezoneRule2Hour);
+    appendJsonNumber(out, F(",\"timezoneRule1Offset\":"), _config.timezoneRule1Offset);
+    appendJsonNumber(out, F(",\"timezoneRule2Offset\":"), _config.timezoneRule2Offset);
+#endif
 #if ARDPORTAL_ENABLE_WIFI
     appendJsonText(out, F(",\"ssid\":"), _config.ssid);
     appendJsonText(out, F(",\"apName\":"), _config.apName);
@@ -1508,9 +1532,20 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     replyMessage(409, ArdUILanguage::Key::s_132);
     return;
   }
-  static const char keys[][18] PROGMEM = { "ssid", "password", "host", "port", "user", "mqttPassword", "mqttTls", "caCert", "apName", "apPassword", "deviceName", "clearWifi", "deviceDescription", "apBand" };
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  static const char keys[] PROGMEM = "ssid\0password\0host\0port\0user\0mqttPassword\0mqttTls\0caCert\0apName\0apPassword\0deviceName\0clearWifi\0deviceDescription\0apBand\0timezoneRule1Week\0timezoneRule2Week\0timezoneRule1DayOfWeek\0timezoneRule2DayOfWeek\0timezoneRule1Month\0timezoneRule2Month\0timezoneRule1Hour\0timezoneRule2Hour\0timezoneRule1Offset\0timezoneRule2Offset";
+  constexpr unsigned keyCount = 24;
+  using SeenMask = uint32_t;
+#else
+  static const char keys[] PROGMEM = "ssid\0password\0host\0port\0user\0mqttPassword\0mqttTls\0caCert\0apName\0apPassword\0deviceName\0clearWifi\0deviceDescription\0apBand";
+  constexpr unsigned keyCount = 14;
+  using SeenMask = uint16_t;
+#endif
   String values[14];
-  uint16_t seen = 0;
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  int8_t timezoneValues[10] = {};
+#endif
+  SeenMask seen = 0;
   String body = _request.substring(_request.indexOf("\r\n\r\n") + 4);
   int offset = 0;
   while (offset < int(body.length())) {
@@ -1527,17 +1562,35 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
       return;
     }
     int index = -1;
-    for (int i = 0; i < 14; ++i)
-      if (ardFlashEqual(key, keys[i])) {
+    const char* candidate = keys;
+    for (unsigned i = 0; i < keyCount; ++i) {
+      if (ardFlashEqual(key, candidate)) {
         index = i;
         break;
       }
-    if (index < 0 || (seen & (1 << index))) {
+      candidate += strlen_P(candidate) + 1;
+    }
+    if (index < 0 || (seen & (uint32_t(1) << index))) {
       replyMessage(400, ArdUILanguage::Key::s_120);
       return;
     }
-    seen |= 1 << index;
-    values[index] = value;
+    seen |= uint32_t(1) << index;
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+    if (index >= 14) {
+      char* parsedEnd = nullptr;
+      const long parsed = strtol(value.c_str(), &parsedEnd, 10);
+      const long minimum = index >= 22 ? -12 : (index < 16 || index >= 20 ? 0 : 1);
+      const long maximum = index >= 22 ? 14 : (index < 16 ? 4 : index < 18 ? 7
+                                                              : index < 20 ? 12
+                                                                           : 23);
+      if (!parsedEnd || *parsedEnd || parsed < minimum || parsed > maximum) {
+        replyMessage(400, ArdUILanguage::Key::s_142);
+        return;
+      }
+      timezoneValues[index - 14] = int8_t(parsed);
+    } else
+#endif
+      values[index] = value;
     offset = end + 1;
   }
 #if !ARDPORTAL_ENABLE_MQTT_TLS
@@ -1603,6 +1656,24 @@ void ArdPortal::handleBuiltinHttp(const String& method, const String& path) {
     }
   }
   if (seen & 4096) c.deviceDescription = values[12];
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  for (unsigned i = 14; i < 24; ++i)
+    if (seen & (uint32_t(1) << i)) {
+      const int8_t parsed = timezoneValues[i - 14];
+      switch (i) {
+        case 14: c.timezoneRule1Week = parsed; break;
+        case 15: c.timezoneRule2Week = parsed; break;
+        case 16: c.timezoneRule1DayOfWeek = parsed; break;
+        case 17: c.timezoneRule2DayOfWeek = parsed; break;
+        case 18: c.timezoneRule1Month = parsed; break;
+        case 19: c.timezoneRule2Month = parsed; break;
+        case 20: c.timezoneRule1Hour = parsed; break;
+        case 21: c.timezoneRule2Hour = parsed; break;
+        case 22: c.timezoneRule1Offset = parsed; break;
+        case 23: c.timezoneRule2Offset = parsed; break;
+      }
+    }
+#endif
   if (seen & 2048) {
     if (!ardFlashEqual(values[11], F("1")) || seen != 2048) {
       replyMessage(400, ArdUILanguage::Key::s_142);
@@ -2418,6 +2489,9 @@ void ArdPortal::finishLoad(const ArdPortalStorage::Result& result) {
   _storageOK = _storageMounted && result.ok && !_storageError.length();
   if (!_config.deviceName.length()) _config.deviceName = defaultDeviceName();
   _config.apName = ArdDeviceName::ap(_config.deviceName);
+#if ARDPORTAL_ENABLE_TIMEZONE_RULES
+  applyTimezone();
+#endif
   configureIdentity();
   _configurationReady = true;
 #if ARDPORTAL_ENABLE_CONSOLE_MESSAGES

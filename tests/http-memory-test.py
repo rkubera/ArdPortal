@@ -15,7 +15,7 @@ struct HeapStub{uint32_t getFreeHeap(){++heapReads;return fakeFree();}uint32_t g
 #define ARDPORTAL_ENABLE_CONSOLE_MESSAGES 1
 struct Pages{size_t work=4000;size_t length(){return 9;}size_t fields(size_t){return 1;}size_t fieldIndex(size_t,size_t){return 0;}size_t fieldWork(size_t){return work;}size_t fieldHttpWork(size_t){return work;}size_t fieldHttpBlock(size_t){return 2000;}};
 struct ArdPortal{
- unsigned _httpDynamicMode=1;bool _httpPortalTail=false;size_t _httpDynamicPageOffset=0,_httpDynamicPageIndex=0,_httpDynamicField=0;String _httpDynamicText;
+ unsigned _httpDynamicMode=1;size_t _httpDynamicPageOffset=0,_httpDynamicPageIndex=0,_httpDynamicField=0;String _httpDynamicText;
  struct {Pages pages;} _dynamic;
  struct ConsoleLine{uint32_t id=0;String text;};static constexpr size_t ConsoleCapacity=16;ConsoleLine _console[16],_consoleMessages[16];
  bool reserveDynamicHttpMemory(size_t,size_t);bool dynamicHttpMemoryReady();
@@ -43,7 +43,9 @@ int main(){
  portal._httpDynamicPageOffset=1000;pressure=1;assert(!portal.dynamicHttpMemoryReady());assert(!portal._httpDynamicText.length()&&portal._httpDynamicPageOffset==0);
  pressure=0;assert(portal.dynamicHttpMemoryReady());
  blockPenalty=1400;assert(!ArdHeap::permits(4000));assert(ArdHeap::permits(4000,2000));blockPenalty=0;
- portal._httpPortalTail=true;pressure=1000;assert(portal.dynamicHttpMemoryReady());
+ // Non-field fragments use the small structural reserve instead of the removed portal-tail mode.
+ portal._httpDynamicPageIndex=portal._dynamic.pages.length();pressure=1000;assert(portal.dynamicHttpMemoryReady());
+ portal._httpDynamicPageIndex=0;
  // Under pressure, old traffic yields memory while recent messages stay available.
  pressure=0;credit=600;blockPenalty=0;portal._httpDynamicText=String();
  for(unsigned i=0;i<8;++i){portal._console[i].id=i+1;portal._console[i].text=std::string(200,'m').c_str();}
